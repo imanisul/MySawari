@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "MySawari",
+    "slug": "car-rental-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "car-rental-mobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#171914"
+    },
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {},
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://mysawari.app/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

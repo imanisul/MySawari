@@ -39,8 +39,11 @@ export default function BookingsScreen() {
               <Image source={selectedCar.image} resizeMode="cover" style={styles.activeImage} />
               <View style={styles.activeCopy}>
                 <Text style={[styles.activeName, { color: colors.warmWhite }]}>{selectedCar.name}</Text>
-                <Text style={[styles.activeMeta, { color: colors.mutedForeground }]}>{bookingStatus === 'active' ? 'With Driver · Jaipur' : 'Self Drive · Bikaner'}</Text>
-                <Text style={[styles.activeMeta, { color: colors.mutedForeground }]}>Return · 18 Aug · 09:00 AM</Text>
+                <View style={styles.activeMetaRow}>
+                  <Feather name={mode === 'With Driver' ? 'user' : 'aperture'} size={13} color={colors.mutedForeground} />
+                  <Text style={[styles.activeMeta, { color: colors.mutedForeground }]}>{mode} · {pickup}</Text>
+                </View>
+                <Text style={[styles.activeMeta, { color: colors.mutedForeground, marginTop: 4 }]}>Return · 18 Aug · 09:00 AM</Text>
               </View>
             </View>
             <View style={[styles.rentalButton, { backgroundColor: colors.primary }]}>
@@ -130,12 +133,13 @@ const styles = StyleSheet.create({
   statusDot: { borderRadius: 99, height: 8, width: 8 },
   statusText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
   activeCarRow: { alignItems: 'center', flexDirection: 'row', marginTop: 16 },
-  activeImage: { borderRadius: 12, height: 72, width: 86 },
+  activeImage: { borderRadius: 12, height: 76, width: 76 },
   activeCopy: { marginLeft: 16 },
-  activeName: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
-  activeMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 4 },
-  rentalButton: { alignItems: 'center', borderRadius: 14, height: 48, justifyContent: 'center', marginTop: 16 },
-  rentalText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
+  activeName: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  activeMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 8 },
+  activeMeta: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  rentalButton: { alignItems: 'center', borderRadius: 14, height: 48, justifyContent: 'center', marginTop: 20 },
+  rentalText: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
   emptyCard: { alignItems: 'center', borderRadius: 20, marginTop: 24, padding: 32 },
   emptyIcon: { alignItems: 'center', borderRadius: 99, height: 56, justifyContent: 'center', width: 56 },
   emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, marginTop: 20 },

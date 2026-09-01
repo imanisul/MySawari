@@ -19,7 +19,7 @@ export function TripField({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.tripField, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.tripField, { borderBottomColor: colors.border }, pressed && styles.pressed]}
     >
       <Feather name={icon} size={23} color={colors.foreground} />
       <View style={styles.tripFieldCopy}>

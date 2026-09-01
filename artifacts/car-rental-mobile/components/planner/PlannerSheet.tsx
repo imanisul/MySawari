@@ -18,7 +18,7 @@ export function PlannerSheet() {
         <TripField icon="map-pin" label="Pickup location" value={pickup} onPress={() => router.push('/location')} />
         <TripField icon="calendar" label="Dates" value={dateRange} onPress={() => router.push('/dates')} />
         <TripField icon="clock" label="Time" value={`${pickupTime} – ${returnTime}`} onPress={() => router.push('/times')} />
-        <TripField icon="disc" label="Driving Option" value={mode} onPress={() => router.push('/driver-option')} />
+        <TripField icon="aperture" label="Driving Option" value={mode} onPress={() => router.push('/driver-option')} />
       </View>
       <Pressable
         accessibilityRole="button"
@@ -26,7 +26,7 @@ export function PlannerSheet() {
         onPress={() => router.push('/driver-charges')}
         style={[styles.driverHint, { backgroundColor: colors.secondary }]}
       >
-        <View style={[styles.hintDot, { backgroundColor: colors.blue }]} />
+        <View style={[styles.hintDot, { backgroundColor: colors.success }]} />
         <Text style={[styles.driverHintText, { color: colors.foreground }]}>
           {mode === 'Self Drive' ? 'No driver charges' : 'Driver charges apply'}
         </Text>

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -9,10 +9,28 @@ import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollV
 export default function BookingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, mode, pickup, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
-  const rental = selectedCar.perDay * 3;
+  const { selectedCar, mode, pickup, dateRange, duration, durationDays, pickupTime, returnTime, customer, updateCustomer } = useSawari();
+  
+  const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string; license?: string}>({});
+
+  const rental = selectedCar.perDay * (durationDays || 1);
   const additional = mode === 'With Driver' ? 2400 : 500;
   const payToday = rental + additional - 300;
+
+  const validateAndProceed = () => {
+    const newErrors: typeof errors = {};
+    if (!customer.name.trim()) newErrors.name = 'Name is required';
+    if (!customer.mobile.trim() || !/^\d{10}$/.test(customer.mobile)) newErrors.mobile = 'Enter a valid 10-digit mobile number';
+    if (!customer.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) newErrors.email = 'Enter a valid email';
+    if (!customer.license.trim()) newErrors.license = 'Driving licence is required';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+    } else {
+      setErrors({});
+      router.push('/payment');
+    }
+  };
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -43,10 +61,10 @@ export default function BookingScreen() {
           <DetailRow icon={mode === 'Self Drive' ? 'aperture' : 'user'} label="Driving option" value={`${mode} · ${mode === 'Self Drive' ? 'No driver charges' : '₹800/day'}`} last />
         </View>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customer details</Text>
-        <Input label="Full name" value={customer.name} onChangeText={(value) => updateCustomer('name', value)} />
-        <Input label="Mobile number" value={customer.mobile} placeholder="10-digit mobile number" keyboardType="phone-pad" onChangeText={(value) => updateCustomer('mobile', value)} />
-        <Input label="Email" value={customer.email} keyboardType="email-address" onChangeText={(value) => updateCustomer('email', value)} />
-        <Input label="Driving licence number" value={customer.license} placeholder="e.g. RJ0620230001234" onChangeText={(value) => updateCustomer('license', value)} />
+        <Input label="Full name" value={customer.name} error={errors.name} onChangeText={(value) => updateCustomer('name', value)} />
+        <Input label="Mobile number" value={customer.mobile} placeholder="10-digit mobile number" keyboardType="phone-pad" error={errors.mobile} onChangeText={(value) => updateCustomer('mobile', value)} />
+        <Input label="Email" value={customer.email} keyboardType="email-address" error={errors.email} onChangeText={(value) => updateCustomer('email', value)} />
+        <Input label="Driving licence number" value={customer.license} placeholder="e.g. RJ0620230001234" error={errors.license} onChangeText={(value) => updateCustomer('license', value)} />
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Price summary</Text>
         <View style={styles.priceSummary}>
           <PriceRow label="Vehicle rental" value={`₹${rental.toLocaleString('en-IN')}`} />
@@ -61,7 +79,7 @@ export default function BookingScreen() {
         <Pressable
           accessibilityRole="button"
           testID="continue-to-payment"
-          onPress={() => router.push('/payment')}
+          onPress={validateAndProceed}
           style={({ pressed }) => [styles.paymentButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}
         >
           <Text style={[styles.paymentButtonText, { color: colors.primaryForeground }]}>Continue to payment</Text>
@@ -83,7 +101,7 @@ function DetailRow({ icon, label, value, last = false }: { icon: React.Component
   );
 }
 
-function Input({ label, value, placeholder, keyboardType, onChangeText }: { label: string; value: string; placeholder?: string; keyboardType?: 'default' | 'phone-pad' | 'email-address'; onChangeText: (value: string) => void }) {
+function Input({ label, value, placeholder, keyboardType, error, onChangeText }: { label: string; value: string; placeholder?: string; keyboardType?: 'default' | 'phone-pad' | 'email-address'; error?: string; onChangeText: (value: string) => void }) {
   const colors = useColors();
   return (
     <View style={styles.inputGroup}>
@@ -94,8 +112,9 @@ function Input({ label, value, placeholder, keyboardType, onChangeText }: { labe
         placeholderTextColor={colors.mutedForeground}
         keyboardType={keyboardType}
         onChangeText={onChangeText}
-        style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+        style={[styles.input, { backgroundColor: colors.card, borderColor: error ? colors.destructive : colors.border, color: colors.foreground }]}
       />
+      {error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
     </View>
   );
 }
@@ -140,4 +159,5 @@ const styles = StyleSheet.create({
   paymentButton: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', height: 56, justifyContent: 'center', marginTop: 24 },
   paymentButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 8 },
   pressed: { opacity: 0.7 },
+  errorText: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 6 },
 });

@@ -9,8 +9,8 @@ import { useSawari } from '@/context/SawariContext';
 export default function CarDetailsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, mode, setMode, pickup, dateRange, duration, pickupTime, returnTime } = useSawari();
-  const rental = selectedCar.perDay * 3;
+  const { selectedCar, mode, setMode, pickup, dateRange, duration, durationDays, pickupTime, returnTime } = useSawari();
+  const rental = selectedCar.perDay * (durationDays || 1);
   const additional = mode === 'With Driver' ? 2400 : 500;
   const discount = 300;
   const payToday = rental + additional - discount;

@@ -8,7 +8,7 @@ import { useSawari } from '@/context/SawariContext';
 export default function BookingDetailScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, dateRange, durationDays, pickup, mode } = useSawari();
+  const { selectedCar, dateRange, durationDays, pickup, mode, pickupTime, returnTime, customer } = useSawari();
 
   const days = durationDays || 1;
   const total = selectedCar.perDay * days + (mode === 'With Driver' ? 2400 : 500) - 300;
@@ -47,21 +47,21 @@ export default function BookingDetailScreen() {
           <View style={[styles.tripBox, { backgroundColor: colors.card }]}>
             <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>PICKUP</Text>
             <Text style={[styles.boxValue, { color: colors.foreground }]}>{pickup}</Text>
-            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{dateRange.split('–')[0]?.trim() || '17 Aug'} · 10:00 AM</Text>
+            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{dateRange.split('–')[0]?.trim() || '17 Aug'} · {pickupTime}</Text>
           </View>
           <View style={[styles.tripBox, { backgroundColor: colors.card }]}>
             <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>RETURN</Text>
             <Text style={[styles.boxValue, { color: colors.foreground }]}>{pickup}</Text>
-            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{dateRange.split('–')[1]?.trim() || '20 Aug'} · 10:00 AM</Text>
+            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{dateRange.split('–')[1]?.trim() || '20 Aug'} · {returnTime}</Text>
           </View>
         </View>
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CUSTOMER</Text>
         <View style={[styles.customerCard, { backgroundColor: colors.card }]}>
-          <CustomerRow icon="user" label="Full name" value="Jatin Prajapat" border />
-          <CustomerRow icon="smartphone" label="Mobile" value="1234565433" border />
-          <CustomerRow icon="mail" label="Email" value="jatinprajapat682@gmail.com" border />
-          <CustomerRow icon="shield" label="Driving licence" value="23456543456y65434" />
+          <CustomerRow icon="user" label="Full name" value={customer.name} border />
+          <CustomerRow icon="smartphone" label="Mobile" value={customer.mobile} border />
+          <CustomerRow icon="mail" label="Email" value={customer.email} border />
+          <CustomerRow icon="shield" label="Driving licence" value={customer.license} />
         </View>
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DRIVING OPTION</Text>

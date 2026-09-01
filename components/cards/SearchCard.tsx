@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { DriverMode } from '@/lib/sawari';
 import { useSawari } from '@/context/SawariContext';
@@ -18,17 +19,23 @@ export function SearchCard({
   onSearch: () => void;
 }) {
   const colors = useColors();
+  const router = useRouter();
   const { dateRange, pickupTime } = useSawari();
+  
   return (
     <View style={[styles.searchCard, { backgroundColor: colors.card }]}>
       <View style={styles.searchTopRow}>
-        <View style={styles.locationCopy}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/location')}
+          style={({ pressed }) => [styles.locationCopy, pressed && styles.pressed]}
+        >
           <View style={styles.labelRow}>
             <Feather name="map-pin" size={13} color={colors.mutedForeground} />
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Pickup</Text>
           </View>
           <Text style={[styles.locationName, { color: colors.foreground }]}>{pickup}</Text>
-        </View>
+        </Pressable>
         <Pressable
           accessibilityRole="button"
           testID="driver-mode-toggle"
@@ -46,14 +53,20 @@ export function SearchCard({
         </Pressable>
       </View>
       <View style={[styles.tripMetaRow, { borderBottomColor: colors.border }]}>
-        <View style={styles.tripMeta}>
+        <Pressable 
+          style={({ pressed }) => [styles.tripMeta, pressed && styles.pressed]} 
+          onPress={() => router.push('/dates')}
+        >
           <Feather name="calendar" size={14} color={colors.mutedForeground} />
           <Text style={[styles.tripMetaText, { color: colors.foreground }]}>{dateRange}</Text>
-        </View>
-        <View style={styles.tripMeta}>
+        </Pressable>
+        <Pressable 
+          style={({ pressed }) => [styles.tripMeta, pressed && styles.pressed]} 
+          onPress={() => router.push('/times')}
+        >
           <Feather name="clock" size={14} color={colors.mutedForeground} />
           <Text style={[styles.tripMetaText, { color: colors.foreground }]}>{pickupTime}</Text>
-        </View>
+        </Pressable>
       </View>
       <Pressable
         accessibilityRole="button"

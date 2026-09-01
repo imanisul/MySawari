@@ -30,7 +30,13 @@ export default function SearchResultsScreen() {
             <View style={styles.searchHeaderTop}>
               <View style={styles.headerTextGroup}>
                 <Text style={[styles.availableLabel, { color: colors.mutedForeground }]}>Available cars</Text>
-                <Text style={[styles.location, { color: colors.foreground }]}>{pickup} · {dateRange} · {mode}</Text>
+                <Text style={[styles.location, { color: colors.foreground }]}>
+                  <Text onPress={() => router.push('/location')}>{pickup}</Text>
+                  {' · '}
+                  <Text onPress={() => router.push('/dates')}>{dateRange}</Text>
+                  {' · '}
+                  <Text onPress={() => router.push('/driver-option')}>{mode}</Text>
+                </Text>
               </View>
               <Pressable
                 accessibilityRole="button"

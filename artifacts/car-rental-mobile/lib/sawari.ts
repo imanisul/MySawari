@@ -56,16 +56,27 @@ export const cars: Car[] = [
 export const resultCars: Car[] = [
   { ...cars[0], image: require('../assets/images/creta.jpg') },
   {
-    id: 'thar',
-    name: 'Mahindra Thar',
+    id: 'seltos-result',
+    name: 'Kia Seltos',
     category: 'SUV',
     price: '₹2,500',
     perDay: 2500,
-    image: require('../assets/images/thar.jpg'),
-    seats: '4 seats',
+    image: require('../assets/images/seltos.jpg'),
+    seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'Diesel',
   },
+  {
+    id: 'swift-result',
+    name: 'Suzuki Swift',
+    category: 'Hatchback',
+    price: '₹1,800',
+    perDay: 1800,
+    image: require('../assets/images/swift.jpg'),
+    seats: '5 seats',
+    transmission: 'Manual',
+    fuel: 'Petrol',
+  }
 ];
 
 // Mock API functions for future backend integration

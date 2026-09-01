@@ -15,7 +15,6 @@ import {
   SearchCard,
   SectionHeading,
   CarTile,
-  BrandTabs,
 } from '@/components';
 
 export default function HomeScreen() {
@@ -49,8 +48,6 @@ export default function HomeScreen() {
            router.push('/planner');
         }}
       />
-      <SectionHeading title="Top Brands" action="View all" onAction={() => {}} />
-      <BrandTabs />
       <SectionHeading title="Available cars" action="View all" onAction={() => router.push('/explore')} />
       {isLoading ? (
         <View style={[styles.carRow, { justifyContent: 'center', minHeight: 180 }]}>
@@ -58,7 +55,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <FlatList
-          data={filteredCars}
+          data={fetchedCars}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <CarTile car={item} />}
           horizontal

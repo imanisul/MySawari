@@ -10,12 +10,12 @@ export function LocationSheet() {
   const colors = useColors();
   const { pickup, setPickup } = useSawari();
   const locations = [
+    'Guwahati',
+    'Shillong',
     'Bikaner',
     'Jaipur',
     'Delhi',
     'Jodhpur',
-    'Guwahati',
-    'Shillong',
     'Mumbai',
     'Bangalore',
     'Hyderabad',

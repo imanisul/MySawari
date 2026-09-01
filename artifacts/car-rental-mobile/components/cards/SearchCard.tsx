@@ -6,10 +6,12 @@ import { useColors } from '@/hooks/useColors';
 import { DriverMode } from '@/lib/sawari';
 
 export function SearchCard({
+  pickup,
   mode,
   onModeChange,
   onSearch,
 }: {
+  pickup: string;
   mode: DriverMode;
   onModeChange: (mode: DriverMode) => void;
   onSearch: () => void;
@@ -23,7 +25,7 @@ export function SearchCard({
             <Feather name="map-pin" size={13} color={colors.mutedForeground} />
             <Text style={[styles.fieldLabel, { color: colors.mutedForeground }]}>Pickup</Text>
           </View>
-          <Text style={[styles.locationName, { color: colors.foreground }]}>Bikaner</Text>
+          <Text style={[styles.locationName, { color: colors.foreground }]}>{pickup}</Text>
         </View>
         <Pressable
           accessibilityRole="button"

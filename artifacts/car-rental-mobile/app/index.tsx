@@ -20,7 +20,7 @@ import {
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode } = useSawari();
+  const { mode, setMode, pickup, customer } = useSawari();
   const [category, setCategory] = useState<Category>('All');
   
   const { data: fetchedCars = cars, isLoading } = useQuery({
@@ -33,7 +33,7 @@ export default function HomeScreen() {
   return (
     <Page bottomNav>
       <Header />
-      <Text style={[styles.greeting, { color: colors.mutedForeground }]}>Good morning, Jatin</Text>
+      <Text style={[styles.greeting, { color: colors.mutedForeground }]}>Good morning, {customer.name.split(' ')[0]}</Text>
       <Text style={[styles.heading, { color: colors.foreground }]}>
         Where are you{'\n'}going next?
       </Text>
@@ -41,6 +41,7 @@ export default function HomeScreen() {
         Find a car that fits your journey.
       </Text>
       <SearchCard
+        pickup={pickup}
         mode={mode}
         onModeChange={setMode}
         onSearch={() => {

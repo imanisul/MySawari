@@ -41,18 +41,18 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<DriverMode>('Self Drive');
   const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
-  const [pickup, setPickup] = useState('Bikaner');
-  const [dateRange, setDateRange] = useState('17 Aug – 20 Aug');
-  const [duration, setDuration] = useState('3 days');
-  const [pickupTime, setPickupTime] = useState('10:00 AM');
-  const [returnTime, setReturnTime] = useState('10:00 AM');
+  const [pickup, setPickup] = useState('Guwahati');
+  const [dateRange, setDateRange] = useState('20 Aug – 25 Aug');
+  const [duration, setDuration] = useState('5 days');
+  const [pickupTime, setPickupTime] = useState('09:00 AM');
+  const [returnTime, setReturnTime] = useState('09:00 AM');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
   const [paymentAttempts, setPaymentAttempts] = useState(0);
   const [bookingStatus, setBookingStatus] = useState<BookingStatus>('upcoming');
   const [customer, setCustomer] = useState({
-    name: 'Jatin Prajapat',
+    name: 'Anisul',
     mobile: '',
-    email: 'jatinprajapat682@gmail.com',
+    email: 'anisul@example.com',
     license: '',
   });
 

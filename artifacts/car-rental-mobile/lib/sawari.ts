@@ -1,6 +1,6 @@
 import { ImageSourcePropType } from 'react-native';
 
-export type Category = 'All' | 'SUV' | 'Sedan' | 'Hatchback' | 'MUV' | 'Luxury';
+export type Category = 'All' | 'SUV' | 'Sedan' | 'Hatchback' | 'MUV' | 'Luxury' | 'Off-road';
 export type DriverMode = 'Self Drive' | 'With Driver';
 
 export type Car = {
@@ -56,13 +56,13 @@ export const cars: Car[] = [
 export const resultCars: Car[] = [
   { ...cars[0], image: require('../assets/images/creta.jpg') },
   {
-    id: 'seltos-result',
-    name: 'Kia Seltos',
-    category: 'SUV',
+    id: 'thar-result',
+    name: 'Mahindra Thar',
+    category: 'Off-road',
     price: '₹2,500',
     perDay: 2500,
-    image: require('../assets/images/seltos.jpg'),
-    seats: '5 seats',
+    image: require('../assets/images/seltos.jpg'), // Using existing image
+    seats: '4 seats',
     transmission: 'Automatic',
     fuel: 'Diesel',
   },

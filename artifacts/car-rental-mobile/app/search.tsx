@@ -26,24 +26,28 @@ export default function SearchResultsScreen() {
         keyExtractor={(car) => car.id}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <>
-            <Header title="Available cars" />
-            <Text style={[styles.location, { color: colors.foreground }]}>Bikaner · 17–20 Aug · {mode}</Text>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => router.push('/planner')}
-              style={({ pressed }) => [styles.editButton, { borderColor: colors.border }, pressed && styles.pressed]}
-            >
-              <Text style={[styles.editText, { color: colors.foreground }]}>Edit</Text>
-            </Pressable>
+          <View style={styles.listHeader}>
+            <View style={styles.searchHeaderTop}>
+              <View style={styles.headerTextGroup}>
+                <Text style={[styles.availableLabel, { color: colors.mutedForeground }]}>Available cars</Text>
+                <Text style={[styles.location, { color: colors.foreground }]}>{pickup} · {dateRange} · {mode}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/planner')}
+                style={({ pressed }) => [styles.editButton, { borderColor: colors.border }, pressed && styles.pressed]}
+              >
+                <Text style={[styles.editText, { color: colors.foreground }]}>Edit</Text>
+              </Pressable>
+            </View>
             <View style={styles.toolbar}>
               <ToolButton icon="sliders" label="Filter" />
-              <ToolButton icon="bar-chart-2" label="Sort" />
+              <ToolButton icon="arrow-down" label="Sort" />
             </View>
             <Text style={[styles.title, { color: colors.foreground }]}>
               {isLoading ? 'Searching...' : `${fetchedResultCars.length} cars ready`}
             </Text>
-          </>
+          </View>
         }
         renderItem={({ item: car }) => (
           <Pressable
@@ -91,7 +95,7 @@ function ToolButton({ icon, label }: { icon: React.ComponentProps<typeof Feather
     <Pressable
       accessibilityRole="button"
       onPress={() => Haptics.selectionAsync()}
-      style={({ pressed }) => [styles.toolButton, { backgroundColor: colors.card }, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.toolButton, { backgroundColor: colors.card, borderColor: colors.border }, pressed && styles.pressed]}
     >
       <Feather name={icon} size={15} color={colors.foreground} />
       <Text style={[styles.toolText, { color: colors.foreground }]}>{label}</Text>
@@ -100,12 +104,16 @@ function ToolButton({ icon, label }: { icon: React.ComponentProps<typeof Feather
 }
 
 const styles = StyleSheet.create({
-  location: { fontFamily: 'Inter_500Medium', fontSize: 15, marginTop: 18 },
-  editButton: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 40, justifyContent: 'center', position: 'absolute', right: 24, top: 77, width: 56 },
+  listHeader: { marginTop: 12 },
+  searchHeaderTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerTextGroup: { flex: 1, paddingRight: 12 },
+  availableLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13, marginBottom: 4 },
+  location: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  editButton: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 32, justifyContent: 'center', width: 56 },
   editText: { fontFamily: 'Inter_400Regular', fontSize: 13 },
   toolbar: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  toolButton: { alignItems: 'center', borderRadius: 99, flexDirection: 'row', gap: 8, paddingHorizontal: 18, paddingVertical: 10 },
-  toolText: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  toolButton: { alignItems: 'center', borderRadius: 99, borderWidth: 1, flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
+  toolText: { fontFamily: 'Inter_400Regular', fontSize: 13 },
   title: { fontFamily: 'Inter_600SemiBold', fontSize: 24, letterSpacing: -0.7, marginTop: 25 },
   resultCard: { marginTop: 18 },
   resultImageWrap: { borderRadius: 22, overflow: 'hidden', position: 'relative' },

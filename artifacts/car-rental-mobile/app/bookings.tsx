@@ -11,9 +11,11 @@ type BookingTab = 'Upcoming' | 'Active' | 'Completed';
 export default function BookingsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, bookingConfirmed, bookingStatus, setBookingStatus } = useSawari();
+  const { selectedCar, dateRange, pickup, mode, bookingConfirmed, bookingStatus, setBookingStatus } = useSawari();
   const [tab, setTab] = useState<BookingTab>(bookingStatus === 'active' ? 'Active' : 'Upcoming');
   const tabs: BookingTab[] = ['Upcoming', 'Active', 'Completed'];
+
+  const total = selectedCar.perDay * 3 + (mode === 'With Driver' ? 2400 : 500) - 300;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -22,7 +24,7 @@ export default function BookingsScreen() {
         <View style={[styles.tabs, { borderBottomColor: colors.border }]}>
           {tabs.map((item) => (
             <Pressable key={item} onPress={() => setTab(item)} style={styles.tab}>
-              <Text style={[styles.tabText, { color: tab === item ? colors.foreground : colors.mutedForeground }]}>{item}</Text>
+              <Text style={[styles.tabText, { color: tab === item ? colors.foreground : colors.mutedForeground, fontFamily: tab === item ? 'Inter_500Medium' : 'Inter_400Regular' }]}>{item}</Text>
               {tab === item && <View style={[styles.tabUnderline, { backgroundColor: colors.foreground }]} />}
             </Pressable>
           ))}
@@ -63,26 +65,27 @@ export default function BookingsScreen() {
                   <Text style={[styles.upcomingStatusText, { color: colors.foreground }]}>Upcoming</Text>
                 </View>
               </View>
-              <Text style={[styles.upcomingMeta, { color: colors.mutedForeground }]}>{selectedCar.seats} · {dateCopy()}</Text>
-              <Text style={[styles.upcomingPaid, { color: colors.foreground }]}>₹7,700 paid</Text>
+              <View style={styles.upcomingMetaRow}>
+                <Feather name="calendar" size={13} color={colors.mutedForeground} />
+                <Text style={[styles.upcomingMeta, { color: colors.mutedForeground }]}>{dateRange}</Text>
+              </View>
+              <View style={styles.upcomingMetaRow}>
+                <Feather name="aperture" size={13} color={colors.mutedForeground} />
+                <Text style={[styles.upcomingMeta, { color: colors.mutedForeground }]}>{pickup} · {mode}</Text>
+              </View>
+              <Text style={styles.upcomingPaidRow}>
+                <Text style={[styles.upcomingPaidAmount, { color: colors.foreground }]}>₹{total.toLocaleString('en-IN')}</Text>
+                <Text style={[styles.upcomingPaidText, { color: colors.mutedForeground }]}> paid</Text>
+              </Text>
             </View>
           </Pressable>
         ) : (
           <EmptyState title="No upcoming trips" copy="Your next adventure is only a search away." />
         )}
-        {bookingConfirmed && tab === 'Upcoming' && (
-          <Pressable onPress={() => { setBookingStatus('active'); setTab('Active'); }} style={styles.demoLink}>
-            <Text style={[styles.demoText, { color: colors.blue }]}>View active rental state</Text>
-          </Pressable>
-        )}
       </View>
       <BottomNavigation />
     </View>
   );
-}
-
-function dateCopy() {
-  return '17 Aug – 20 Aug';
 }
 
 function EmptyState({ title, copy }: { title: string; copy: string }) {
@@ -104,38 +107,39 @@ function EmptyState({ title, copy }: { title: string; copy: string }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 27 },
-  title: { fontFamily: 'Inter_600SemiBold', fontSize: 18 },
-  tabs: { flexDirection: 'row', gap: 25, marginTop: 18, borderBottomWidth: 1 },
-  tab: { paddingBottom: 10, position: 'relative' },
-  tabText: { fontFamily: 'Inter_400Regular', fontSize: 12 },
-  tabUnderline: { bottom: -1, height: 1, left: 0, position: 'absolute', right: 0 },
-  upcomingCard: { borderRadius: 16, flexDirection: 'row', marginTop: 14, padding: 10 },
-  upcomingImage: { borderRadius: 11, height: 74, width: 74 },
-  upcomingCopy: { flex: 1, marginLeft: 11 },
+  content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
+  title: { fontFamily: 'Inter_600SemiBold', fontSize: 22 },
+  tabs: { flexDirection: 'row', gap: 24, marginTop: 24, borderBottomWidth: 1 },
+  tab: { paddingBottom: 12, position: 'relative' },
+  tabText: { fontSize: 14 },
+  tabUnderline: { bottom: -1, height: 2, left: 0, position: 'absolute', right: 0 },
+  upcomingCard: { borderRadius: 20, flexDirection: 'row', marginTop: 20, padding: 16 },
+  upcomingImage: { borderRadius: 12, height: 86, width: 86 },
+  upcomingCopy: { flex: 1, marginLeft: 16 },
   upcomingTitleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  upcomingName: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  upcomingStatus: { alignItems: 'center', flexDirection: 'row', gap: 5 },
-  upcomingStatusText: { fontFamily: 'Inter_400Regular', fontSize: 10 },
-  upcomingMeta: { fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 6 },
-  upcomingPaid: { fontFamily: 'Inter_600SemiBold', fontSize: 10, marginTop: 4 },
-  activeCard: { borderRadius: 18, marginTop: 16, padding: 13 },
+  upcomingName: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  upcomingStatus: { alignItems: 'center', flexDirection: 'row', gap: 6 },
+  upcomingStatusText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
+  upcomingMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 8, marginTop: 6 },
+  upcomingMeta: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  upcomingPaidRow: { marginTop: 10 },
+  upcomingPaidAmount: { fontFamily: 'Inter_700Bold', fontSize: 14 },
+  upcomingPaidText: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  activeCard: { borderRadius: 20, marginTop: 20, padding: 16 },
   statusRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  statusDot: { borderRadius: 99, height: 7, width: 7 },
-  statusText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
-  activeCarRow: { alignItems: 'center', flexDirection: 'row', marginTop: 12 },
-  activeImage: { borderRadius: 10, height: 62, width: 78 },
-  activeCopy: { marginLeft: 11 },
-  activeName: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  activeMeta: { fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 4 },
-  rentalButton: { alignItems: 'center', borderRadius: 14, height: 44, justifyContent: 'center', marginTop: 13 },
-  rentalText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
-  emptyCard: { alignItems: 'center', borderRadius: 18, marginTop: 22, padding: 24 },
-  emptyIcon: { alignItems: 'center', borderRadius: 99, height: 50, justifyContent: 'center', width: 50 },
-  emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 17, marginTop: 16 },
-  emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 19, marginTop: 7, textAlign: 'center' },
-  browseButton: { borderRadius: 13, marginTop: 20, paddingHorizontal: 22, paddingVertical: 13 },
-  browseText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  demoLink: { alignItems: 'center', marginTop: 18 },
-  demoText: { fontFamily: 'Inter_400Regular', fontSize: 11 },
+  statusDot: { borderRadius: 99, height: 8, width: 8 },
+  statusText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  activeCarRow: { alignItems: 'center', flexDirection: 'row', marginTop: 16 },
+  activeImage: { borderRadius: 12, height: 72, width: 86 },
+  activeCopy: { marginLeft: 16 },
+  activeName: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
+  activeMeta: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 4 },
+  rentalButton: { alignItems: 'center', borderRadius: 14, height: 48, justifyContent: 'center', marginTop: 16 },
+  rentalText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
+  emptyCard: { alignItems: 'center', borderRadius: 20, marginTop: 24, padding: 32 },
+  emptyIcon: { alignItems: 'center', borderRadius: 99, height: 56, justifyContent: 'center', width: 56 },
+  emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, marginTop: 20 },
+  emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 22, marginTop: 8, textAlign: 'center' },
+  browseButton: { borderRadius: 14, marginTop: 24, paddingHorizontal: 24, paddingVertical: 14 },
+  browseText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
 });

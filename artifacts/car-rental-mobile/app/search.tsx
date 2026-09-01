@@ -12,7 +12,7 @@ import { Header, Page } from '@/components';
 export default function SearchResultsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, selectCar } = useSawari();
+  const { pickup, dateRange, mode, setMode, selectCar } = useSawari();
 
   const { data: fetchedResultCars = resultCars, isLoading } = useQuery({
     queryKey: ['resultCars'],

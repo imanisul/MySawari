@@ -42,7 +42,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [pickup, setPickup] = useState('Guwahati');
-  const [dateRange, setDateRange] = useState('20 Aug – 25 Aug');
+  const [dateRange, setDateRange] = useState('10 Oct – 15 Oct');
   const [duration, setDuration] = useState('5 days');
   const [pickupTime, setPickupTime] = useState('09:00 AM');
   const [returnTime, setReturnTime] = useState('09:00 AM');
@@ -50,9 +50,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [paymentAttempts, setPaymentAttempts] = useState(0);
   const [bookingStatus, setBookingStatus] = useState<BookingStatus>('upcoming');
   const [customer, setCustomer] = useState({
-    name: 'Anisul',
+    name: 'Rahul',
     mobile: '',
-    email: 'anisul@example.com',
+    email: 'rahul@example.com',
     license: '',
   });
 

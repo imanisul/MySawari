@@ -27,7 +27,7 @@ export function NextTrip({ car }: { car: Car }) {
       <View style={styles.nextTripCopy}>
         <Text style={[styles.nextTripLabel, { color: colors.primary }]}>Your next trip</Text>
         <Text style={[styles.nextTripName, { color: colors.warmWhite }]}>{car.name}</Text>
-        <Text style={[styles.nextTripDate, { color: colors.mutedForeground }]}>17 Aug → 20 Aug</Text>
+        <Text style={[styles.nextTripDate, { color: colors.mutedForeground }]}>10 Oct → 15 Oct</Text>
       </View>
       <Feather name="arrow-right" size={20} color={colors.warmWhite} />
     </Pressable>

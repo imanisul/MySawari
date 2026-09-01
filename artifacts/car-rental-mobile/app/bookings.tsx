@@ -43,7 +43,7 @@ export default function BookingsScreen() {
                   <Feather name={mode === 'With Driver' ? 'user' : 'aperture'} size={13} color={colors.mutedForeground} />
                   <Text style={[styles.activeMeta, { color: colors.mutedForeground }]}>{mode} · {pickup}</Text>
                 </View>
-                <Text style={[styles.activeMeta, { color: colors.mutedForeground, marginTop: 4 }]}>Return · 18 Aug · 09:00 AM</Text>
+                <Text style={[styles.activeMeta, { color: colors.mutedForeground, marginTop: 4 }]}>Return · 15 Oct · 09:00 AM</Text>
               </View>
             </View>
             <View style={[styles.rentalButton, { backgroundColor: colors.primary }]}>

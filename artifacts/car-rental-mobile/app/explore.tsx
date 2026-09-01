@@ -24,7 +24,7 @@ export default function ExploreScreen() {
       </View>
       <CategoryTabs selected={category} onSelect={setCategory} />
       <SectionHeading
-        title={`${filteredCars.length} cars near Bikaner`}
+        title={`${filteredCars.length} cars near ${useSawari().pickup}`}
         action="Map view"
         onAction={() => router.push('/search')}
       />

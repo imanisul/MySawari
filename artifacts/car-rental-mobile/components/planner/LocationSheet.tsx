@@ -12,15 +12,15 @@ export function LocationSheet() {
   const locations = [
     'Guwahati',
     'Shillong',
-    'Bikaner',
-    'Jaipur',
-    'Delhi',
-    'Jodhpur',
-    'Mumbai',
-    'Bangalore',
-    'Hyderabad',
-    'Chennai',
-    'Kolkata',
+    'Tawang',
+    'Darjeeling',
+    'Kaziranga',
+    'Cherrapunji',
+    'Gangtok',
+    'Kohima',
+    'Agartala',
+    'Imphal',
+    'Aizawl',
   ];
   return (
     <SheetFrame height={700}>
@@ -37,7 +37,7 @@ export function LocationSheet() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => setPickup('Bikaner')}
+          onPress={() => setPickup('Shillong')}
           style={({ pressed }) => [styles.currentLocation, pressed && styles.pressed]}
         >
           <View style={[styles.currentLocationIcon, { backgroundColor: colors.tintLight }]}>

@@ -55,13 +55,13 @@ export default function CarDetailsScreen() {
                 accessibilityRole="radio"
                 accessibilityState={{ selected: active }}
                 onPress={() => setMode(option)}
-                style={[styles.driverChoice, { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.optionSurface : colors.card }]}
+                style={[styles.driverChoice, { borderColor: active ? colors.primary : colors.border, backgroundColor: active ? colors.tintLight : colors.card }]}
               >
                 <View style={styles.driverChoiceTop}>
-                  <Feather name={option === 'Self Drive' ? 'disc' : 'user'} size={14} color={colors.foreground} />
+                  <Feather name={option === 'Self Drive' ? 'aperture' : 'user'} size={16} color={colors.foreground} />
                   <Text style={[styles.driverChoiceName, { color: colors.foreground }]}>{option}</Text>
                   <View style={[styles.radio, { backgroundColor: active ? colors.navy : colors.card, borderColor: active ? colors.navy : colors.border }]}>
-                    {active && <Feather name="check" size={11} color={colors.primary} />}
+                    {active && <Feather name="check" size={12} color={colors.card} />}
                   </View>
                 </View>
                 <Text style={[styles.driverPrice, { color: colors.mutedForeground }]}>{option === 'Self Drive' ? 'No driver charges' : '₹800/day'}</Text>
@@ -73,7 +73,7 @@ export default function CarDetailsScreen() {
         <View style={styles.features}>
           {['Sunroof', 'Rear camera', 'Bluetooth', 'Cruise control'].map((feature) => (
             <View key={feature} style={styles.feature}>
-              <Feather name="check" size={14} color={colors.success} />
+              <Feather name="check" size={16} color={colors.success} />
               <Text style={[styles.featureText, { color: colors.mutedForeground }]}>{feature}</Text>
             </View>
           ))}
@@ -90,7 +90,13 @@ export default function CarDetailsScreen() {
           <PriceRow label="Additional charges" value={`₹${additional.toLocaleString('en-IN')}`} />
           <PriceRow label="Discount" value={`-₹${discount.toLocaleString('en-IN')}`} accent />
           <PriceRow label="Security deposit (refundable)" value="₹2,000" />
-          <PriceRow label="Pay today" value={`₹${payToday.toLocaleString('en-IN')}`} strong last />
+          <View style={[styles.payTodayRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.payTodayLabel, { color: colors.mutedForeground }]}>Pay today</Text>
+            <Text style={[styles.payTodayValue, { color: colors.foreground }]}>₹{payToday.toLocaleString('en-IN')}</Text>
+          </View>
+          <Text style={[styles.disclaimer, { color: colors.mutedForeground }]}>
+            Security deposit is collected separately and fully refunded after the vehicle is returned in original condition.
+          </Text>
         </View>
       </ScrollView>
       <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
@@ -150,39 +156,43 @@ const styles = StyleSheet.create({
   circleButton: { alignItems: 'center', borderRadius: 99, height: 40, justifyContent: 'center', left: 16, position: 'absolute', top: 50, width: 40 },
   shareButton: { alignItems: 'center', borderRadius: 99, height: 40, justifyContent: 'center', position: 'absolute', right: 16, top: 50, width: 40 },
   identityRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16 },
-  name: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
+  name: { fontFamily: 'Inter_600SemiBold', fontSize: 24 },
   ratingRow: { alignItems: 'center', flexDirection: 'row', gap: 5, marginTop: 6 },
-  rating: { fontFamily: 'Inter_400Regular', fontSize: 11 },
+  rating: { fontFamily: 'Inter_400Regular', fontSize: 13 },
   availableBadge: { alignItems: 'center', borderRadius: 99, flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 6 },
   badgeDot: { borderRadius: 99, height: 6, marginRight: 5, width: 6 },
-  badgeText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
+  badgeText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   specRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 18 },
-  spec: { alignItems: 'center', borderRadius: 12, borderWidth: 1, flex: 1, gap: 8, paddingVertical: 14 },
-  specText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
-  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13, marginLeft: 18, marginTop: 24 },
+  spec: { alignItems: 'center', borderRadius: 16, borderWidth: 1, flex: 1, gap: 10, paddingVertical: 18 },
+  specText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginLeft: 18, marginTop: 28, marginBottom: 4 },
   driverModes: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 11 },
-  driverChoice: { borderRadius: 13, borderWidth: 1, flex: 1, minHeight: 74, padding: 10 },
+  driverChoice: { borderRadius: 16, borderWidth: 1, flex: 1, minHeight: 84, padding: 14 },
   driverChoiceTop: { alignItems: 'center', flexDirection: 'row', gap: 8 },
-  driverChoiceName: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 12 },
-  driverPrice: { fontFamily: 'Inter_400Regular', fontSize: 10, marginLeft: 22, marginTop: 9 },
-  radio: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 17, justifyContent: 'center', width: 17 },
-  features: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 18, paddingTop: 10, rowGap: 10 },
+  driverChoiceName: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  driverPrice: { fontFamily: 'Inter_400Regular', fontSize: 12, marginLeft: 24, marginTop: 10 },
+  radio: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 18, justifyContent: 'center', width: 18 },
+  features: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 18, paddingTop: 10, rowGap: 14 },
   feature: { alignItems: 'center', flexDirection: 'row', width: '50%' },
-  featureText: { fontFamily: 'Inter_400Regular', fontSize: 11, marginLeft: 7 },
-  infoCard: { borderRadius: 13, marginHorizontal: 18, marginTop: 10, paddingHorizontal: 12 },
-  infoRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 42 },
-  infoLabel: { fontFamily: 'Inter_400Regular', fontSize: 10 },
-  infoValue: { fontFamily: 'Inter_500Medium', fontSize: 10 },
-  priceDetails: { marginHorizontal: 18, marginTop: 12 },
+  featureText: { fontFamily: 'Inter_400Regular', fontSize: 14, marginLeft: 10 },
+  infoCard: { borderRadius: 16, marginHorizontal: 18, marginTop: 10, paddingHorizontal: 16 },
+  infoRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', minHeight: 52 },
+  infoLabel: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  infoValue: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  priceDetails: { marginHorizontal: 18, marginTop: 16 },
   priceRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  priceLabel: { fontFamily: 'Inter_400Regular', fontSize: 10 },
-  priceValue: { fontFamily: 'Inter_500Medium', fontSize: 10 },
-  priceLabelStrong: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  priceValueStrong: { fontFamily: 'Inter_600SemiBold', fontSize: 17 },
-  bottomBar: { alignItems: 'center', borderTopWidth: 1, bottom: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 11, position: 'absolute', width: '100%' },
-  bottomLabel: { fontFamily: 'Inter_400Regular', fontSize: 10 },
-  bottomPrice: { fontFamily: 'Inter_600SemiBold', fontSize: 17, marginTop: 3 },
-  bottomButton: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', height: 50, justifyContent: 'center', paddingHorizontal: 18 },
-  bottomButtonText: { fontFamily: 'Inter_500Medium', fontSize: 12, marginRight: 8 },
+  priceLabel: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  priceValue: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  priceLabelStrong: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  priceValueStrong: { fontFamily: 'Inter_600SemiBold', fontSize: 18 },
+  payTodayRow: { alignItems: 'baseline', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, paddingTop: 18 },
+  payTodayLabel: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  payTodayValue: { fontFamily: 'Inter_700Bold', fontSize: 24, letterSpacing: -0.5 },
+  disclaimer: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, marginTop: 12 },
+  bottomBar: { alignItems: 'center', borderTopWidth: 1, bottom: 0, flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingVertical: 14, position: 'absolute', width: '100%' },
+  bottomLabel: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  bottomPrice: { fontFamily: 'Inter_700Bold', fontSize: 20, marginTop: 2, letterSpacing: -0.5 },
+  bottomButton: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', height: 54, justifyContent: 'center', paddingHorizontal: 22 },
+  bottomButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 8 },
   pressed: { opacity: 0.7 },
 });

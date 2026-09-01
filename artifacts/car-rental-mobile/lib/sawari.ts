@@ -67,3 +67,16 @@ export const resultCars: Car[] = [
     fuel: 'Diesel',
   },
 ];
+
+// Mock API functions for future backend integration
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function fetchCars(): Promise<Car[]> {
+  await delay(800); // Simulate network latency
+  return cars;
+}
+
+export async function fetchResultCars(): Promise<Car[]> {
+  await delay(1200);
+  return resultCars;
+}

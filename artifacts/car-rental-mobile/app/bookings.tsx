@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
-import { BottomNavigation } from '@/components/sawari';
+import { BottomNavigation } from '@/components';
 
 type BookingTab = 'Upcoming' | 'Active' | 'Completed';
 

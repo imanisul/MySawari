@@ -39,21 +39,21 @@ export default function PaymentScreen() {
               accessibilityRole="radio"
               accessibilityState={{ selected }}
               onPress={() => setPaymentMethod(method.name)}
-              style={[styles.methodCard, { backgroundColor: selected ? colors.optionSurface : colors.card, borderColor: selected ? colors.navy : colors.border }]}
+              style={[styles.methodCard, { backgroundColor: selected ? colors.tintLight : colors.surfaceSoft, borderColor: selected ? colors.navy : colors.border }]}
             >
               <Feather name={method.icon} size={19} color={colors.foreground} />
               <View style={styles.methodCopy}>
                 <Text style={[styles.methodName, { color: colors.foreground }]}>{method.name}</Text>
                 <Text style={[styles.methodDescription, { color: colors.mutedForeground }]}>{method.description}</Text>
               </View>
-              <View style={[styles.radio, { backgroundColor: selected ? colors.primary : colors.card, borderColor: selected ? colors.navy : colors.border }]}>
-                {selected && <Feather name="check" size={13} color={colors.primaryForeground} />}
+              <View style={[styles.radio, { backgroundColor: selected ? 'transparent' : 'transparent', borderColor: selected ? colors.navy : colors.border }]}>
+                {selected && <Feather name="check" size={13} color={colors.navy} />}
               </View>
             </Pressable>
           );
         })}
         <View style={styles.secureRow}>
-          <Feather name="check" size={14} color={colors.blue} />
+          <Feather name="check" size={14} color={colors.success} />
           <Text style={[styles.secureText, { color: colors.mutedForeground }]}>Secure payment · Deposit refunded after return</Text>
         </View>
       </View>

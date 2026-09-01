@@ -73,7 +73,7 @@ export default function CarDetailsScreen() {
         <View style={styles.features}>
           {['Sunroof', 'Rear camera', 'Bluetooth', 'Cruise control'].map((feature) => (
             <View key={feature} style={styles.feature}>
-              <Feather name="check" size={14} color={colors.blue} />
+              <Feather name="check" size={14} color={colors.success} />
               <Text style={[styles.featureText, { color: colors.mutedForeground }]}>{feature}</Text>
             </View>
           ))}
@@ -115,7 +115,7 @@ export default function CarDetailsScreen() {
 function Spec({ icon, label }: { icon: React.ComponentProps<typeof Feather>['name']; label: string }) {
   const colors = useColors();
   return (
-    <View style={[styles.spec, { backgroundColor: colors.card }]}>
+    <View style={[styles.spec, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>
       <Feather name={icon} size={15} color={colors.mutedForeground} />
       <Text style={[styles.specText, { color: colors.foreground }]}>{label}</Text>
     </View>
@@ -137,7 +137,7 @@ function PriceRow({ label, value, accent = false, strong = false, last = false }
   return (
     <View style={[styles.priceRow, !last && { marginBottom: 12 }]}>
       <Text style={[strong ? styles.priceLabelStrong : styles.priceLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[strong ? styles.priceValueStrong : styles.priceValue, { color: accent ? colors.blue : colors.foreground }]}>{value}</Text>
+      <Text style={[strong ? styles.priceValueStrong : styles.priceValue, { color: accent ? colors.success : colors.foreground }]}>{value}</Text>
     </View>
   );
 }
@@ -147,8 +147,8 @@ const styles = StyleSheet.create({
   content: { paddingBottom: 116 },
   heroWrap: { height: 250, position: 'relative' },
   hero: { height: '100%', width: '100%' },
-  circleButton: { alignItems: 'center', borderRadius: 99, height: 40, justifyContent: 'center', left: 16, position: 'absolute', top: 16, width: 40 },
-  shareButton: { alignItems: 'center', borderRadius: 99, height: 40, justifyContent: 'center', position: 'absolute', right: 16, top: 16, width: 40 },
+  circleButton: { alignItems: 'center', borderRadius: 99, height: 40, justifyContent: 'center', left: 16, position: 'absolute', top: 50, width: 40 },
+  shareButton: { alignItems: 'center', borderRadius: 99, height: 40, justifyContent: 'center', position: 'absolute', right: 16, top: 50, width: 40 },
   identityRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16 },
   name: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
   ratingRow: { alignItems: 'center', flexDirection: 'row', gap: 5, marginTop: 6 },
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   badgeDot: { borderRadius: 99, height: 6, marginRight: 5, width: 6 },
   badgeText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
   specRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 18 },
-  spec: { alignItems: 'center', borderRadius: 12, flex: 1, gap: 8, paddingVertical: 14 },
+  spec: { alignItems: 'center', borderRadius: 12, borderWidth: 1, flex: 1, gap: 8, paddingVertical: 14 },
   specText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
   sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13, marginLeft: 18, marginTop: 24 },
   driverModes: { flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingTop: 11 },

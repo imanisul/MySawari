@@ -1,70 +1,86 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
-import { resultCars } from '@/lib/sawari';
+import { fetchResultCars, resultCars } from '@/lib/sawari';
 import { useSawari } from '@/context/SawariContext';
-import { Header, Page } from '@/components/sawari';
+import { Header, Page } from '@/components';
 
 export default function SearchResultsScreen() {
   const colors = useColors();
   const router = useRouter();
   const { mode, setMode, selectCar } = useSawari();
 
+  const { data: fetchedResultCars = resultCars, isLoading } = useQuery({
+    queryKey: ['resultCars'],
+    queryFn: fetchResultCars,
+  });
+
   return (
-    <Page bottomNav>
-      <Header title="Available cars" />
-      <Text style={[styles.location, { color: colors.foreground }]}>Bikaner · 17–20 Aug · {mode}</Text>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push('/planner')}
-        style={({ pressed }) => [styles.editButton, { borderColor: colors.border }, pressed && styles.pressed]}
-      >
-        <Text style={[styles.editText, { color: colors.foreground }]}>Edit</Text>
-      </Pressable>
-      <View style={styles.toolbar}>
-        <ToolButton icon="sliders" label="Filter" />
-        <ToolButton icon="bar-chart-2" label="Sort" />
-      </View>
-      <Text style={[styles.title, { color: colors.foreground }]}>2 cars ready</Text>
-      {resultCars.map((car) => (
-        <Pressable
-          key={car.id}
-          accessibilityRole="button"
-          testID={`result-${car.id}`}
-          onPress={() => {
-            Haptics.selectionAsync();
-            selectCar(car);
-            router.push('/car-details');
-          }}
-          style={({ pressed }) => [styles.resultCard, pressed && styles.cardPressed]}
-        >
-          <View style={styles.resultImageWrap}>
-            <Image source={car.image} resizeMode="cover" style={styles.resultImage} />
-            <View style={[styles.availablePill, { backgroundColor: colors.primary }]}>
-              <Text style={[styles.availablePillText, { color: colors.primaryForeground }]}>Available</Text>
+    <Page bottomNav scroll={false}>
+      <FlatList
+        data={fetchedResultCars}
+        keyExtractor={(car) => car.id}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <>
+            <Header title="Available cars" />
+            <Text style={[styles.location, { color: colors.foreground }]}>Bikaner · 17–20 Aug · {mode}</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/planner')}
+              style={({ pressed }) => [styles.editButton, { borderColor: colors.border }, pressed && styles.pressed]}
+            >
+              <Text style={[styles.editText, { color: colors.foreground }]}>Edit</Text>
+            </Pressable>
+            <View style={styles.toolbar}>
+              <ToolButton icon="sliders" label="Filter" />
+              <ToolButton icon="bar-chart-2" label="Sort" />
             </View>
-          </View>
-          <View style={styles.resultInfo}>
-            <View>
-              <Text style={[styles.carName, { color: colors.foreground }]}>{car.name}</Text>
-              <Text style={[styles.carMeta, { color: colors.mutedForeground }]}>
-                {car.category} · {car.seats} · {car.transmission}
-              </Text>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              {isLoading ? 'Searching...' : `${fetchedResultCars.length} cars ready`}
+            </Text>
+          </>
+        }
+        renderItem={({ item: car }) => (
+          <Pressable
+            accessibilityRole="button"
+            testID={`result-${car.id}`}
+            onPress={() => {
+              Haptics.selectionAsync();
+              selectCar(car);
+              router.push('/car-details');
+            }}
+            style={({ pressed }) => [styles.resultCard, pressed && styles.cardPressed]}
+          >
+            <View style={styles.resultImageWrap}>
+              <Image source={car.image} resizeMode="cover" style={styles.resultImage} />
+              <View style={[styles.availablePill, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.availablePillText, { color: colors.primaryForeground }]}>Available</Text>
+              </View>
             </View>
-            <View style={styles.priceCopy}>
-              <Text style={[styles.price, { color: colors.foreground }]}>{car.price}</Text>
-              <Text style={[styles.perDay, { color: colors.mutedForeground }]}>per day</Text>
+            <View style={styles.resultInfo}>
+              <View>
+                <Text style={[styles.carName, { color: colors.foreground }]}>{car.name}</Text>
+                <Text style={[styles.carMeta, { color: colors.mutedForeground }]}>
+                  {car.category} · {car.seats} · {car.transmission}
+                </Text>
+              </View>
+              <View style={styles.priceCopy}>
+                <Text style={[styles.price, { color: colors.foreground }]}>{car.price}</Text>
+                <Text style={[styles.perDay, { color: colors.mutedForeground }]}>per day</Text>
+              </View>
             </View>
-          </View>
-          <View style={[styles.detailsButton, { borderColor: colors.mutedForeground }]}>
-            <Text style={[styles.detailsText, { color: colors.foreground }]}>View Details</Text>
-            <Feather name="arrow-right" size={18} color={colors.foreground} />
-          </View>
-        </Pressable>
-      ))}
+            <View style={[styles.detailsButton, { borderColor: colors.mutedForeground }]}>
+              <Text style={[styles.detailsText, { color: colors.foreground }]}>View Details</Text>
+              <Feather name="arrow-right" size={18} color={colors.foreground} />
+            </View>
+          </Pressable>
+        )}
+      />
     </Page>
   );
 }

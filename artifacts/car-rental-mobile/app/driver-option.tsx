@@ -1,5 +1,5 @@
 import React from 'react';
-import { DriverOptionSheet } from '@/components/planner';
+import { DriverOptionSheet } from '@/components';
 
 export default function DriverOptionScreen() {
   return <DriverOptionSheet />;

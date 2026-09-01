@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { SheetFrame } from '@/components/planner';
+import { SheetFrame } from '@/components';
 
 export default function PaymentErrorScreen() {
   const colors = useColors();

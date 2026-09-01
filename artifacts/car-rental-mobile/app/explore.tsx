@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { cars, Category } from '@/lib/sawari';
-import { CategoryTabs, CarListCard, Header, Page, SectionHeading } from '@/components/sawari';
+import { CategoryTabs, CarListCard, Header, Page, SectionHeading } from '@/components';
 
 export default function ExploreScreen() {
   const colors = useColors();

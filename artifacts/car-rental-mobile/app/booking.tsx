@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -28,9 +28,7 @@ export default function BookingScreen() {
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Review booking</Text>
         </View>
         <View style={[styles.carSummary, { backgroundColor: colors.card }]}>
-          <View style={[styles.carThumb, { backgroundColor: colors.secondary }]}>
-            <Text style={[styles.carThumbText, { color: colors.foreground }]}>{selectedCar.name.split(' ')[1]?.slice(0, 2) ?? 'CA'}</Text>
-          </View>
+          <Image source={selectedCar.image} style={styles.carThumb} resizeMode="cover" />
           <View style={styles.carCopy}>
             <Text style={[styles.carName, { color: colors.foreground }]}>{selectedCar.name}</Text>
             <Text style={[styles.carMeta, { color: colors.mutedForeground }]}>{selectedCar.seats} · {selectedCar.transmission}</Text>
@@ -62,14 +60,29 @@ export default function BookingScreen() {
         </View>
         <Pressable
           accessibilityRole="button"
-          testID="continue-to-payment"
+          testID="continue-to-payment-scroll"
           onPress={() => router.push('/payment')}
-          style={({ pressed }) => [styles.paymentButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.paymentButton, { backgroundColor: colors.primary, display: 'none' }, pressed && styles.pressed]}
         >
           <Text style={[styles.paymentButtonText, { color: colors.primaryForeground }]}>Continue to payment</Text>
           <Feather name="arrow-right" size={17} color={colors.primaryForeground} />
         </Pressable>
       </KeyboardAwareScrollViewCompat>
+      <View style={[styles.bottomBar, { backgroundColor: colors.background }]}>
+        <View style={styles.bottomBarLeft}>
+          <Text style={[styles.payLabel, { color: colors.mutedForeground }]}>Pay today</Text>
+          <Text style={[styles.payValue, { color: colors.foreground }]}>₹{payToday.toLocaleString('en-IN')}</Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          testID="continue-to-payment"
+          onPress={() => router.push('/payment')}
+          style={({ pressed }) => [styles.paymentButton, { backgroundColor: colors.primary, flex: 1, marginTop: 0 }, pressed && styles.pressed]}
+        >
+          <Text style={[styles.paymentButtonText, { color: colors.primaryForeground }]}>Continue to payment</Text>
+          <Feather name="arrow-right" size={17} color={colors.primaryForeground} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -77,7 +90,7 @@ export default function BookingScreen() {
 function DetailRow({ icon, label, value, last = false }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; last?: boolean }) {
   const colors = useColors();
   return (
-    <View style={[styles.detailRow, !last && { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+    <View style={[styles.detailRow]}>
       <Feather name={icon} size={13} color={colors.mutedForeground} />
       <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <Text style={[styles.detailValue, { color: colors.foreground }]}>{value}</Text>
@@ -96,7 +109,7 @@ function Input({ label, value, placeholder, keyboardType, onChangeText }: { labe
         placeholderTextColor={colors.mutedForeground}
         keyboardType={keyboardType}
         onChangeText={onChangeText}
-        style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+        style={[styles.input, { backgroundColor: colors.surfaceSoft, borderColor: colors.border, color: colors.foreground }]}
       />
     </View>
   );
@@ -107,7 +120,7 @@ function PriceRow({ label, value, accent = false }: { label: string; value: stri
   return (
     <View style={styles.priceRow}>
       <Text style={[styles.priceLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.priceText, { color: accent ? colors.blue : colors.foreground }]}>{value}</Text>
+      <Text style={[styles.priceText, { color: accent ? colors.success : colors.foreground }]}>{value}</Text>
     </View>
   );
 }
@@ -138,9 +151,11 @@ const styles = StyleSheet.create({
   priceLabel: { fontFamily: 'Inter_400Regular', fontSize: 10 },
   priceText: { fontFamily: 'Inter_500Medium', fontSize: 10 },
   payRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 3, paddingTop: 15 },
-  payLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  payLabel: { fontFamily: 'Inter_400Regular', fontSize: 12 },
   payValue: { fontFamily: 'Inter_600SemiBold', fontSize: 17 },
   paymentButton: { alignItems: 'center', borderRadius: 14, flexDirection: 'row', height: 53, justifyContent: 'center', marginTop: 22 },
   paymentButtonText: { fontFamily: 'Inter_500Medium', fontSize: 13, marginRight: 9 },
   pressed: { opacity: 0.7 },
+  bottomBar: { flexDirection: 'row', paddingHorizontal: 31, paddingBottom: 35, paddingTop: 15, alignItems: 'center', gap: 20 },
+  bottomBarLeft: { flexDirection: 'column' },
 });

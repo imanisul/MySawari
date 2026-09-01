@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/api-client-react",
+  "name": "@mysawari/api-client-react",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@tanstack/react-query": "catalog:"
+    "@tanstack/react-query": "^5.90.21"
   },
   "peerDependencies": {
     "react": ">=18"

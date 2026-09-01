@@ -8,11 +8,14 @@ import { PrimaryButton } from '../ui/PrimaryButton';
 
 export function DatesSheet() {
   const colors = useColors();
-  const { setDates } = useSawari();
+  const { setDates, dateRange } = useSawari();
   const router = useRouter();
   
-  const [start, setStart] = useState<number | null>(10);
-  const [end, setEnd] = useState<number | null>(15);
+  const parsedStart = parseInt(dateRange.split('–')[0]) || 10;
+  const parsedEnd = parseInt(dateRange.split('–')[1]) || 15;
+
+  const [start, setStart] = useState<number | null>(parsedStart);
+  const [end, setEnd] = useState<number | null>(parsedEnd);
   
   const dates = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
 

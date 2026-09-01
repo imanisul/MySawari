@@ -11,7 +11,7 @@ type BookingTab = 'Upcoming' | 'Active' | 'Completed';
 export default function BookingsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, dateRange, durationDays, pickup, mode, bookingConfirmed, bookingStatus, setBookingStatus } = useSawari();
+  const { selectedCar, dateRange, durationDays, pickup, mode, bookingConfirmed, bookingStatus, setBookingStatus, returnTime } = useSawari();
   const [tab, setTab] = useState<BookingTab>(bookingStatus === 'active' ? 'Active' : 'Upcoming');
   const tabs: BookingTab[] = ['Upcoming', 'Active', 'Completed'];
 
@@ -43,7 +43,9 @@ export default function BookingsScreen() {
                   <Feather name={mode === 'With Driver' ? 'user' : 'aperture'} size={13} color={colors.mutedForeground} />
                   <Text style={[styles.activeMeta, { color: colors.mutedForeground }]}>{mode} · {pickup}</Text>
                 </View>
-                <Text style={[styles.activeMeta, { color: colors.mutedForeground, marginTop: 4 }]}>Return · 15 Oct · 09:00 AM</Text>
+                <Text style={[styles.activeMeta, { color: colors.mutedForeground, marginTop: 4 }]}>
+                  Return · {dateRange.split('–')[1]?.trim() || '15 Oct'} · {returnTime}
+                </Text>
               </View>
             </View>
             <View style={[styles.rentalButton, { backgroundColor: colors.primary }]}>

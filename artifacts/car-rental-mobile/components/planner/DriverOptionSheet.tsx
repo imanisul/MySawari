@@ -18,7 +18,7 @@ export function DriverOptionSheet() {
         title="Self Drive"
         description="You drive the vehicle yourself."
         price="No driver charges"
-        icon="disc"
+        icon="aperture"
         selected={mode === 'Self Drive'}
         onPress={() => setMode('Self Drive')}
       />
@@ -30,7 +30,9 @@ export function DriverOptionSheet() {
         selected={mode === 'With Driver'}
         onPress={() => setMode('With Driver')}
       />
-      <PrimaryButton label="Confirm Option" icon={undefined} onPress={() => router.back()} />
+      <View style={{ marginTop: 24 }}>
+        <PrimaryButton label="Confirm Option" icon={undefined} onPress={() => router.back()} />
+      </View>
     </SheetFrame>
   );
 }
@@ -58,7 +60,7 @@ function OptionCard({
       onPress={onPress}
       style={({ pressed }) => [
         styles.optionCard,
-        { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.optionSurface : colors.card },
+        { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.tintLight : colors.card },
         pressed && styles.pressed,
       ]}
     >
@@ -82,7 +84,7 @@ function OptionCard({
 
 const styles = StyleSheet.create({
   optionCard: { alignItems: 'center', borderRadius: 20, borderWidth: 1, flexDirection: 'row', marginTop: 16, padding: 16 },
-  optionIcon: { alignItems: 'center', borderRadius: 99, height: 46, justifyContent: 'center', width: 46 },
+  optionIcon: { alignItems: 'center', borderRadius: 16, height: 46, justifyContent: 'center', width: 46 },
   optionCopy: { flex: 1, marginLeft: 16 },
   optionTitleRow: { alignItems: 'center', flexDirection: 'row', gap: 6 },
   optionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 17 },

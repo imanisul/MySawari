@@ -8,9 +8,10 @@ import { useSawari } from '@/context/SawariContext';
 export default function BookingDetailScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, dateRange, pickup, mode } = useSawari();
+  const { selectedCar, dateRange, durationDays, pickup, mode } = useSawari();
 
-  const total = selectedCar.perDay * 3 + (mode === 'With Driver' ? 2400 : 500) - 300;
+  const days = durationDays || 1;
+  const total = selectedCar.perDay * days + (mode === 'With Driver' ? 2400 : 500) - 300;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
@@ -46,12 +47,12 @@ export default function BookingDetailScreen() {
           <View style={[styles.tripBox, { backgroundColor: colors.card }]}>
             <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>PICKUP</Text>
             <Text style={[styles.boxValue, { color: colors.foreground }]}>{pickup}</Text>
-            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>17 Aug · 10:00 AM</Text>
+            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{dateRange.split('–')[0]?.trim() || '17 Aug'} · 10:00 AM</Text>
           </View>
           <View style={[styles.tripBox, { backgroundColor: colors.card }]}>
             <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>RETURN</Text>
             <Text style={[styles.boxValue, { color: colors.foreground }]}>{pickup}</Text>
-            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>20 Aug · 10:00 AM</Text>
+            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{dateRange.split('–')[1]?.trim() || '20 Aug'} · 10:00 AM</Text>
           </View>
         </View>
 
@@ -76,7 +77,7 @@ export default function BookingDetailScreen() {
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>PAYMENT</Text>
         <View style={[styles.paymentCard, { backgroundColor: colors.card }]}>
-          <PaymentRow label="Rental (3 days)" value={`₹${(selectedCar.perDay * 3).toLocaleString('en-IN')}`} />
+          <PaymentRow label={`Rental (${days} days)`} value={`₹${(selectedCar.perDay * days).toLocaleString('en-IN')}`} />
           <PaymentRow label="Additional charges" value={`₹${mode === 'With Driver' ? '2,400' : '500'}`} />
           <PaymentRow label="Discount" value="-₹300" accent />
           <View style={[styles.divider, { backgroundColor: colors.border }]} />

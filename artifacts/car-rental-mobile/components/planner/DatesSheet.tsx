@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -10,7 +10,29 @@ export function DatesSheet() {
   const colors = useColors();
   const { setDates } = useSawari();
   const router = useRouter();
+  
+  const [start, setStart] = useState<number | null>(10);
+  const [end, setEnd] = useState<number | null>(15);
+  
   const dates = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30];
+
+  const handlePress = (date: number) => {
+    if (start && end) {
+      setStart(date);
+      setEnd(null);
+    } else if (start && !end) {
+      if (date <= start) {
+        setStart(date);
+      } else {
+        setEnd(date);
+      }
+    } else {
+      setStart(date);
+    }
+  };
+
+  const calculatedDays = (start && end) ? (end - start) : (start ? 1 : 0);
+
   return (
     <SheetFrame height={700}>
       <SheetHeader title="Where do you want to go?" subtitle="Find the right car for your journey." />
@@ -22,10 +44,10 @@ export function DatesSheet() {
       <View style={styles.calendarGrid}>
         {Array.from({ length: 4 }).map((_, index) => <View key={`empty-${index}`} style={styles.dateCell} />)}
         {dates.map((date) => {
-          const isStart = date === 10;
-          const isEnd = date === 15;
+          const isStart = date === start;
+          const isEnd = date === end;
           const selected = isStart || isEnd;
-          const inRange = date > 10 && date < 15;
+          const inRange = start && end && date > start && date < end;
           const highlighted = selected || inRange;
           
           return (
@@ -42,7 +64,7 @@ export function DatesSheet() {
               )}
               <Pressable
                 accessibilityRole="button"
-                onPress={() => {}}
+                onPress={() => handlePress(date)}
                 style={[styles.dateCircle, selected && { backgroundColor: colors.navy }]}
               >
                 <Text style={[styles.dateText, { color: selected ? colors.warmWhite : colors.foreground }]}>{date}</Text>
@@ -52,10 +74,19 @@ export function DatesSheet() {
         })}
       </View>
       <View style={[styles.dateSummary, { borderTopColor: colors.border }]}>
-        <Text style={[styles.dateDuration, { color: colors.mutedForeground }]}>5 days</Text>
-        <Text style={[styles.dateRange, { color: colors.foreground }]}>10 Oct – 15 Oct</Text>
+        <Text style={[styles.dateDuration, { color: colors.mutedForeground }]}>{calculatedDays} days</Text>
+        <Text style={[styles.dateRange, { color: colors.foreground }]}>{start ? `${start} Oct` : 'Select'} – {end ? `${end} Oct` : 'Select'}</Text>
       </View>
-      <PrimaryButton label="Apply Dates" icon={undefined} onPress={() => { setDates('10 Oct – 15 Oct', '5 days'); router.back(); }} />
+      <PrimaryButton 
+        label="Apply Dates" 
+        icon={undefined} 
+        onPress={() => {
+          if (start && end) {
+            setDates(`${start} Oct – ${end} Oct`, `${calculatedDays} days`);
+            router.back();
+          }
+        }} 
+      />
     </SheetFrame>
   );
 }

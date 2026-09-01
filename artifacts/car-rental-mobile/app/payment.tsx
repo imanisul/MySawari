@@ -8,8 +8,8 @@ import { useSawari } from '@/context/SawariContext';
 export default function PaymentScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, dateRange, mode, paymentMethod, setPaymentMethod, payBooking } = useSawari();
-  const total = selectedCar.perDay * 3 + (mode === 'With Driver' ? 2400 : 500) - 300;
+  const { selectedCar, dateRange, durationDays, mode, paymentMethod, setPaymentMethod, payBooking } = useSawari();
+  const total = selectedCar.perDay * (durationDays || 1) + (mode === 'With Driver' ? 2400 : 500) - 300;
   const methods = [
     { name: 'UPI' as const, description: 'Pay by any UPI app', icon: 'credit-card' as const },
     { name: 'Card' as const, description: 'Credit or debit card', icon: 'credit-card' as const },

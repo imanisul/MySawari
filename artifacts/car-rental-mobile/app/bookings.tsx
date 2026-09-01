@@ -11,11 +11,11 @@ type BookingTab = 'Upcoming' | 'Active' | 'Completed';
 export default function BookingsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, dateRange, pickup, mode, bookingConfirmed, bookingStatus, setBookingStatus } = useSawari();
+  const { selectedCar, dateRange, durationDays, pickup, mode, bookingConfirmed, bookingStatus, setBookingStatus } = useSawari();
   const [tab, setTab] = useState<BookingTab>(bookingStatus === 'active' ? 'Active' : 'Upcoming');
   const tabs: BookingTab[] = ['Upcoming', 'Active', 'Completed'];
 
-  const total = selectedCar.perDay * 3 + (mode === 'With Driver' ? 2400 : 500) - 300;
+  const total = selectedCar.perDay * (durationDays || 1) + (mode === 'With Driver' ? 2400 : 500) - 300;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>

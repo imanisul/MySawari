@@ -11,6 +11,7 @@ type SawariContextValue = {
   pickup: string;
   dateRange: string;
   duration: string;
+  durationDays: number;
   pickupTime: string;
   returnTime: string;
   paymentMethod: PaymentMethod;
@@ -64,6 +65,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       pickup,
       dateRange,
       duration,
+      durationDays: parseInt(duration.split(' ')[0]) || 0,
       pickupTime,
       returnTime,
       paymentMethod,

@@ -15,6 +15,7 @@ import {
   SearchCard,
   SectionHeading,
   CarTile,
+  BrandTabs,
 } from '@/components';
 
 export default function HomeScreen() {
@@ -48,9 +49,9 @@ export default function HomeScreen() {
            router.push('/planner');
         }}
       />
-      <NextTrip car={cars[0]} />
-      <SectionHeading title="Popular near you" action="View all" onAction={() => router.push('/explore')} />
-      <CategoryTabs selected={category} onSelect={setCategory} />
+      <SectionHeading title="Top Brands" action="View all" onAction={() => {}} />
+      <BrandTabs />
+      <SectionHeading title="Available cars" action="View all" onAction={() => router.push('/explore')} />
       {isLoading ? (
         <View style={[styles.carRow, { justifyContent: 'center', minHeight: 180 }]}>
           <Text style={{ color: colors.mutedForeground }}>Loading cars...</Text>

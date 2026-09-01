@@ -54,7 +54,7 @@ export const cars: Car[] = [
 ];
 
 export const resultCars: Car[] = [
-  { ...cars[0], image: require('../assets/images/creta-result.jpg') },
+  { ...cars[0], image: require('../assets/images/creta.jpg') },
   {
     id: 'thar',
     name: 'Mahindra Thar',

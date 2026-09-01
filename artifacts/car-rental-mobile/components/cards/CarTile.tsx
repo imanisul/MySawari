@@ -32,7 +32,7 @@ export function CarTile({ car, onPress }: { car: Car; onPress?: () => void }) {
         </View>
         <View style={styles.carSubHeader}>
           <Text style={[styles.carType, { color: colors.mutedForeground }]}>
-            {car.category} · {car.transmission} · {car.seats} seats
+            {car.category} · {car.transmission} · {car.seats}
           </Text>
           <Text style={[styles.carPriceSuffix, { color: colors.mutedForeground }]}>/day</Text>
         </View>

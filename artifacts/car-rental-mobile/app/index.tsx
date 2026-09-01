@@ -45,17 +45,19 @@ export default function HomeScreen() {
         onModeChange={setMode}
         onSearch={() => {
           Haptics.selectionAsync();
-           router.push('/planner');
+          router.push('/planner');
         }}
       />
-      <SectionHeading title="Available cars" action="View all" onAction={() => router.push('/explore')} />
+      <NextTrip car={cars[0]} />
+      <SectionHeading title="Popular near you" action="View all" onAction={() => router.push('/explore')} />
+      <CategoryTabs selected={category} onSelect={setCategory} />
       {isLoading ? (
         <View style={[styles.carRow, { justifyContent: 'center', minHeight: 180 }]}>
           <Text style={{ color: colors.mutedForeground }}>Loading cars...</Text>
         </View>
       ) : (
         <FlatList
-          data={fetchedCars}
+          data={filteredCars}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => <CarTile car={item} />}
           horizontal

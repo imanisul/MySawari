@@ -50,6 +50,6 @@ const styles = StyleSheet.create({
   category: { alignItems: 'center', paddingBottom: 7 },
   categoryText: { fontFamily: 'Inter_400Regular', fontSize: 13 },
   categoryTextSelected: { fontFamily: 'Inter_500Medium' },
-  categoryUnderline: { bottom: 0, height: 1.5, position: 'absolute', width: 20 },
+  categoryUnderline: { bottom: 0, height: 1.5, position: 'absolute', width: '100%' },
   pressed: { opacity: 0.65 },
 });

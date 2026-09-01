@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -9,7 +9,19 @@ import { SheetFrame, SheetHeader } from '../layout/SheetFrame';
 export function LocationSheet() {
   const colors = useColors();
   const { pickup, setPickup } = useSawari();
-  const locations = ['Bikaner', 'Jaipur', 'Delhi', 'Jodhpur'];
+  const locations = [
+    'Bikaner',
+    'Jaipur',
+    'Delhi',
+    'Jodhpur',
+    'Guwahati',
+    'Shillong',
+    'Mumbai',
+    'Bangalore',
+    'Hyderabad',
+    'Chennai',
+    'Kolkata',
+  ];
   return (
     <SheetFrame height={700}>
       <SheetHeader title="Pickup location" />
@@ -22,24 +34,26 @@ export function LocationSheet() {
           testID="location-search"
         />
       </View>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => setPickup('Bikaner')}
-        style={({ pressed }) => [styles.currentLocation, pressed && styles.pressed]}
-      >
-        <View style={[styles.currentLocationIcon, { backgroundColor: colors.lightBlue }]}>
-          <Feather name="crosshair" size={22} color={colors.foreground} />
-        </View>
-        <Text style={[styles.currentLocationText, { color: colors.foreground }]}>Use current location</Text>
-      </Pressable>
-      <Text style={[styles.listLabel, { color: colors.mutedForeground }]}>Recent</Text>
-      {locations.slice(0, 2).map((location) => (
-        <LocationRow key={location} location={location} selected={pickup === location} onPress={() => setPickup(location)} />
-      ))}
-      <Text style={[styles.listLabel, { color: colors.mutedForeground, marginTop: 23 }]}>Popular locations</Text>
-      {locations.slice(0, 4).map((location) => (
-        <LocationRow key={`popular-${location}`} location={location} selected={pickup === location} onPress={() => setPickup(location)} />
-      ))}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setPickup('Bikaner')}
+          style={({ pressed }) => [styles.currentLocation, pressed && styles.pressed]}
+        >
+          <View style={[styles.currentLocationIcon, { backgroundColor: colors.tintLight }]}>
+            <Feather name="crosshair" size={22} color={colors.foreground} />
+          </View>
+          <Text style={[styles.currentLocationText, { color: colors.foreground }]}>Use current location</Text>
+        </Pressable>
+        <Text style={[styles.listLabel, { color: colors.mutedForeground }]}>Recent</Text>
+        {locations.slice(0, 2).map((location) => (
+          <LocationRow key={location} location={location} selected={pickup === location} onPress={() => setPickup(location)} />
+        ))}
+        <Text style={[styles.listLabel, { color: colors.mutedForeground, marginTop: 23 }]}>Popular locations</Text>
+        {locations.map((location) => (
+          <LocationRow key={`popular-${location}`} location={location} selected={pickup === location} onPress={() => setPickup(location)} />
+        ))}
+      </ScrollView>
     </SheetFrame>
   );
 }

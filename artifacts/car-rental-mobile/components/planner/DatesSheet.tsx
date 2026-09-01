@@ -15,17 +15,17 @@ export function DatesSheet() {
     <SheetFrame height={700}>
       <SheetHeader title="Where do you want to go?" subtitle="Find the right car for your journey." />
       <View style={styles.weekHeader}>
-        {['S', 'M', 'T', 'W', 'TH', 'F', 'S'].map((day) => (
-          <Text key={day} style={[styles.weekDay, { color: colors.mutedForeground }]}>{day}</Text>
+        {['S', 'M', 'T', 'W', 'TH', 'F', 'S'].map((day, index) => (
+          <Text key={index} style={[styles.weekDay, { color: colors.mutedForeground }]}>{day}</Text>
         ))}
       </View>
       <View style={styles.calendarGrid}>
-        {Array.from({ length: 6 }).map((_, index) => <View key={`empty-${index}`} style={styles.dateCell} />)}
+        {Array.from({ length: 4 }).map((_, index) => <View key={`empty-${index}`} style={styles.dateCell} />)}
         {dates.map((date) => {
-          const isStart = date === 17;
-          const isEnd = date === 20;
+          const isStart = date === 10;
+          const isEnd = date === 15;
           const selected = isStart || isEnd;
-          const inRange = date > 17 && date < 20;
+          const inRange = date > 10 && date < 15;
           const highlighted = selected || inRange;
           
           return (
@@ -52,10 +52,10 @@ export function DatesSheet() {
         })}
       </View>
       <View style={[styles.dateSummary, { borderTopColor: colors.border }]}>
-        <Text style={[styles.dateDuration, { color: colors.mutedForeground }]}>3 days</Text>
-        <Text style={[styles.dateRange, { color: colors.foreground }]}>17 Aug – 20 Aug</Text>
+        <Text style={[styles.dateDuration, { color: colors.mutedForeground }]}>5 days</Text>
+        <Text style={[styles.dateRange, { color: colors.foreground }]}>10 Oct – 15 Oct</Text>
       </View>
-      <PrimaryButton label="Apply Dates" icon={undefined} onPress={() => { setDates('17 Aug – 20 Aug', '3 days'); router.back(); }} />
+      <PrimaryButton label="Apply Dates" icon={undefined} onPress={() => { setDates('10 Oct – 15 Oct', '5 days'); router.back(); }} />
     </SheetFrame>
   );
 }

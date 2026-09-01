@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { DriverMode } from '@/lib/sawari';
+import { useSawari } from '@/context/SawariContext';
 
 export function SearchCard({
   pickup,
@@ -17,6 +18,7 @@ export function SearchCard({
   onSearch: () => void;
 }) {
   const colors = useColors();
+  const { dateRange, pickupTime } = useSawari();
   return (
     <View style={[styles.searchCard, { backgroundColor: colors.card }]}>
       <View style={styles.searchTopRow}>
@@ -46,11 +48,11 @@ export function SearchCard({
       <View style={[styles.tripMetaRow, { borderBottomColor: colors.border }]}>
         <View style={styles.tripMeta}>
           <Feather name="calendar" size={14} color={colors.mutedForeground} />
-          <Text style={[styles.tripMetaText, { color: colors.foreground }]}>17 Aug – 20 Aug</Text>
+          <Text style={[styles.tripMetaText, { color: colors.foreground }]}>{dateRange}</Text>
         </View>
         <View style={styles.tripMeta}>
           <Feather name="clock" size={14} color={colors.mutedForeground} />
-          <Text style={[styles.tripMetaText, { color: colors.foreground }]}>10:00 AM</Text>
+          <Text style={[styles.tripMetaText, { color: colors.foreground }]}>{pickupTime}</Text>
         </View>
       </View>
       <Pressable

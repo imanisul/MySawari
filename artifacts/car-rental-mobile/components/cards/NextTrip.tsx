@@ -4,11 +4,13 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
+import { useSawari } from '@/context/SawariContext';
 import { Car } from '@/lib/sawari';
 
 export function NextTrip({ car }: { car: Car }) {
   const colors = useColors();
   const router = useRouter();
+  const { dateRange } = useSawari();
   return (
     <Pressable
       accessibilityRole="button"
@@ -27,7 +29,7 @@ export function NextTrip({ car }: { car: Car }) {
       <View style={styles.nextTripCopy}>
         <Text style={[styles.nextTripLabel, { color: colors.primary }]}>Your next trip</Text>
         <Text style={[styles.nextTripName, { color: colors.warmWhite }]}>{car.name}</Text>
-        <Text style={[styles.nextTripDate, { color: colors.mutedForeground }]}>10 Oct → 15 Oct</Text>
+        <Text style={[styles.nextTripDate, { color: colors.mutedForeground }]}>{dateRange.replace('–', '→')}</Text>
       </View>
       <Feather name="arrow-right" size={20} color={colors.warmWhite} />
     </Pressable>

@@ -35,7 +35,7 @@ export default function PaymentProcessingScreen() {
 
 const styles = StyleSheet.create({
   screen: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  lockCircle: { alignItems: 'center', borderRadius: 99, borderWidth: 4, height: 74, justifyContent: 'center', width: 74 },
-  title: { fontFamily: 'Inter_600SemiBold', fontSize: 19, marginTop: 29 },
-  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 10 },
+  lockCircle: { alignItems: 'center', borderRadius: 99, borderWidth: 4, height: 86, justifyContent: 'center', width: 86 },
+  title: { fontFamily: 'Inter_600SemiBold', fontSize: 20, marginTop: 32 },
+  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 15, marginTop: 8 },
 });

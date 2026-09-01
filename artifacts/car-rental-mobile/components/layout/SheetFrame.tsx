@@ -23,7 +23,9 @@ export function SheetFrame({
         style={[
           styles.sheet,
           centered && styles.centeredSheet,
-          { backgroundColor: colors.card, paddingBottom: insets.bottom + 18 },
+          { backgroundColor: colors.card },
+          !centered && { paddingBottom: insets.bottom + 18 },
+          centered && { paddingBottom: 28 },
           height ? { minHeight: height } : undefined,
         ]}
       >

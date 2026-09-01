@@ -25,6 +25,6 @@ export function DriverChargesSheet() {
 
 const styles = StyleSheet.create({
   chargesHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  chargesTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18 },
-  chargesCopy: { fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 22, marginTop: 12 },
+  chargesTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
+  chargesCopy: { fontFamily: 'Inter_400Regular', fontSize: 16, lineHeight: 24, marginTop: 12 },
 });

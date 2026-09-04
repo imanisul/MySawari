@@ -16,7 +16,9 @@
     "ios": {
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "package": "com.anisul17.mysawari"
+    },
     "plugins": [
       [
         "expo-router",
@@ -30,6 +32,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "640f7262-fb50-4d44-8d81-3c497c59c448"
+      }
+    },
+    "owner": "anisul17"
   }
 }

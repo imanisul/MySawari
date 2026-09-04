@@ -1,0 +1,15 @@
+{
+  "cli": {
+    "version": ">= 14.7.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "node": "20.20.2",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {}
+  }
+}

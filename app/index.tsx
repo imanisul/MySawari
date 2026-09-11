@@ -22,7 +22,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { mode, setMode, pickup, customer } = useSawari();
   const [category, setCategory] = useState<Category>('All');
-  
+
   const { data: fetchedCars = cars, isLoading } = useQuery({
     queryKey: ['cars'],
     queryFn: fetchCars,
@@ -38,7 +38,7 @@ export default function HomeScreen() {
         Where are you{'\n'}going next?
       </Text>
       <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-      welcome to my sawari
+        Welcome to Trip8
       </Text>
       <SearchCard
         pickup={pickup}

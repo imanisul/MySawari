@@ -38,7 +38,7 @@ export default function HomeScreen() {
         Where are you{'\n'}going next?
       </Text>
       <Text style={[styles.subheading, { color: colors.mutedForeground }]}>
-        Welcome to MySawari , our destination is together
+        Welcome to MySawari , our destination is
       </Text>
       <SearchCard
         pickup={pickup}

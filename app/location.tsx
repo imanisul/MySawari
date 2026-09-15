@@ -1,6 +1,6 @@
 import React from 'react';
-import { LocationSheet } from '@/components';
+import LocationScreen from '@/screens/Home/LocationScreen';
 
-export default function LocationScreen() {
-  return <LocationSheet />;
+export default function Route() {
+  return <LocationScreen />;
 }

@@ -57,41 +57,6 @@ export default function HomeScreen() {
     queryFn: fetchOffers,
   });
 
-  const [showPopup, setShowPopup] = useState(false);
-  const [scaleAnim] = useState(new Animated.Value(0.8));
-  const [fadeAnim] = useState(new Animated.Value(0));
-
-  useEffect(() => {
-    const checkPopup = async () => {
-      if (totalBookings === 0) {
-        try {
-          const hasSeen = await AsyncStorage.getItem('@sawari_popup_seen');
-          if (!hasSeen) {
-            setShowPopup(true);
-          }
-        } catch (e) {
-          console.warn('Failed to read popup state');
-        }
-      }
-    };
-    
-    const timer = setTimeout(checkPopup, 500);
-    return () => clearTimeout(timer);
-  }, [totalBookings]);
-
-  const closePopup = () => {
-    Haptics.selectionAsync();
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(async () => {
-      setShowPopup(false);
-      try {
-        await AsyncStorage.setItem('@sawari_popup_seen', 'true');
-      } catch (e) {}
-    });
-  };
 
   // ── Vehicle image drive-in animation ──
   const vehicleSlideAnim = useRef(new Animated.Value(0)).current;
@@ -159,7 +124,7 @@ export default function HomeScreen() {
                   {greeting}{isAuthenticated && customer?.name ? `, ${customer.name.split(' ')[0]}` : ''}
                 </Text>
                 <Text style={[styles.heading, { color: colors.foreground }]}>
-                  Where are you{'\n'}going next?
+                  Where are you{'\n'}going?
                 </Text>
               </View>
               <Animated.Image 
@@ -335,57 +300,7 @@ export default function HomeScreen() {
         removeClippedSubviews={false} // don't clip vertical sections
       />
 
-      {/* Welcome / Marketing Popup */}
-      <Modal 
-        visible={showPopup} 
-        transparent={true} 
-        animationType="none" 
-        statusBarTranslucent
-        onShow={() => {
-          Animated.parallel([
-            Animated.spring(scaleAnim, {
-              toValue: 1,
-              friction: 6,
-              tension: 40,
-              useNativeDriver: true,
-            }),
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 300,
-              useNativeDriver: true,
-            })
-          ]).start();
-        }}
-      >
-        <Animated.View style={[styles.popupOverlay, { opacity: fadeAnim }]}>
-          <Animated.View style={[styles.popupCard, { transform: [{ scale: scaleAnim }] }]}>
-            
-            {/* Top Close Button */}
-            <TouchableOpacity style={styles.popupClose} onPress={closePopup}>
-              <Feather name="x" size={24} color={colors.walletMuted} />
-            </TouchableOpacity>
 
-            <View style={styles.popupIconWrap}>
-              <View style={[styles.popupIconBox, { backgroundColor: colors.emerald + '20' }]}>
-                <Text style={{ color: colors.emerald, fontSize: 44, fontFamily: 'Inter_700Bold' }}>₹</Text>
-              </View>
-            </View>
-            
-            <Text style={[styles.popupTitle, { color: colors.walletText }]}>Earn SawariCash!</Text>
-            <Text style={styles.popupSubtitle}>
-              Get <Text style={{ color: colors.gold, fontFamily: 'Inter_700Bold' }}>100 Coins</Text> on your very first ride.
-            </Text>
-            <Text style={styles.popupDesc}>
-              1 Coin = ₹1. Use it to instantly get discounts on your future bookings!
-            </Text>
-
-            <TouchableOpacity style={[styles.popupBtn, { backgroundColor: colors.emerald }]} onPress={closePopup}>
-              <Text style={styles.popupBtnText}>Awesome, Let's Go!</Text>
-            </TouchableOpacity>
-
-          </Animated.View>
-        </Animated.View>
-      </Modal>
 
       {/* Login Bottom Sheet - Rapido-style funnel */}
       <Modal visible={showLogin} transparent animationType="fade">
@@ -409,16 +324,7 @@ const styles = StyleSheet.create({
   offerRow: { gap: 14, paddingBottom: 6, paddingTop: 12, paddingHorizontal: 20 },
   luxuryRow: { gap: 16, paddingBottom: 24, paddingTop: 10, paddingHorizontal: 20 },
   destRow: { paddingBottom: 32, paddingTop: 10, paddingHorizontal: 20 },
-  popupOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  popupCard: { width: '100%', backgroundColor: '#111827', borderRadius: 28, padding: 32, alignItems: 'center', borderWidth: 1, borderColor: '#374151', position: 'relative' },
-  popupClose: { position: 'absolute', top: 16, right: 16, padding: 8, zIndex: 10, minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
-  popupIconWrap: { marginBottom: 20, marginTop: 10 },
-  popupIconBox: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center' },
-  popupTitle: { fontFamily: 'Inter_700Bold', fontSize: 26, marginBottom: 12, textAlign: 'center' },
-  popupSubtitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, color: '#D1D5DB', textAlign: 'center', marginBottom: 16 },
-  popupDesc: { fontFamily: 'Inter_400Regular', fontSize: 14, color: '#9CA3AF', textAlign: 'center', lineHeight: 22, marginBottom: 32, paddingHorizontal: 10 },
-  popupBtn: { width: '100%', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  popupBtnText: { color: '#FFF', fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+
   footer: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20, marginBottom: 10 },
   footerDivider: { width: 60, height: 3, borderRadius: 2, marginBottom: 20 },
   footerHashtag: { fontFamily: 'Inter_700Bold', fontSize: 28, letterSpacing: -0.5 },

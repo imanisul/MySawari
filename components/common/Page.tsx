@@ -21,7 +21,9 @@ export function Page({
         styles.pageContent,
         {
           paddingTop: insets.top + 9,
-          paddingBottom: insets.bottom + (bottomNav ? 80 : 24),
+          // Only apply wrapper padding if Page is handling the scrolling.
+          // Otherwise, it hard-clips FlatLists.
+          paddingBottom: scroll ? insets.bottom + (bottomNav ? 80 : 24) : 0,
         },
       ]}
     >

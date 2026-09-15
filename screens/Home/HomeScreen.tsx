@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { cars, premiumCollection } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
@@ -38,6 +39,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { mode, setMode, vehicleType, setVehicleType, pickup, dropoff, customer, totalBookings, bookingConfirmed, selectedCar, isAuthenticated } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
@@ -124,7 +126,7 @@ export default function HomeScreen() {
                   {greeting}{isAuthenticated && customer?.name ? `, ${customer.name.split(' ')[0]}` : ''}
                 </Text>
                 <Text style={[styles.heading, { color: colors.foreground }]}>
-                  Where are you{'\n'}going?
+                  Where are you{'\n'}going next?
                 </Text>
               </View>
               <Animated.Image 
@@ -296,7 +298,7 @@ export default function HomeScreen() {
         renderItem={renderSection}
         extraData={{ vehicleType, displayVehicle }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         removeClippedSubviews={false} // don't clip vertical sections
       />
 

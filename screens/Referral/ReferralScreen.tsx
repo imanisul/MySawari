@@ -10,11 +10,13 @@ import ViewShot from 'react-native-view-shot';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReferScreen() {
   const colors = useColors();
   const router = useRouter();
   const { customer, isAuthenticated, isAuthLoading } = useSawari();
+  const insets = useSafeAreaInsets();
   
   const [config, setConfig] = useState<any>(null);
   const [referrals, setReferrals] = useState<any[]>([]);
@@ -280,7 +282,7 @@ export default function ReferScreen() {
           )}
         </View>
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: insets.bottom + 80 }} />
       </ScrollView>
     </Page>
   );

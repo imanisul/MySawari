@@ -3,6 +3,7 @@ import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, Act
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { cars, Category } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
@@ -11,6 +12,7 @@ import { CategoryTabs, CarListCard, Header, Page, FilterSheet, FilterState, defa
 export default function ExploreScreen() {
   const colors = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<string>('All Dates');
   const { vehicleType: globalVehicleType } = useSawari();
   const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>(globalVehicleType === 'car' ? 'Cars' : 'Bikes');
@@ -262,7 +264,7 @@ export default function ExploreScreen() {
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={ListEmpty}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         initialNumToRender={5}

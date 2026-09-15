@@ -7,6 +7,7 @@ import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoginBottomSheet } from '@/components';
 
 export default function ProfileScreen() {
@@ -14,6 +15,7 @@ export default function ProfileScreen() {
   const { customer, logout, earnReward, sawariCash, isAuthenticated } = useSawari();
   const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const menuItems = [
     { id: 'rewards', title: 'My Rewards', icon: 'gift' },
@@ -209,8 +211,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        
-        <View style={styles.bottomPadding} />
+        <View style={{ height: insets.bottom + 80 }} />
       </ScrollView>
     </Page>
   );
@@ -430,7 +431,4 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
   },
-  bottomPadding: {
-    height: 40,
-  },
-});
+

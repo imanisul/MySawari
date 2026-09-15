@@ -36,15 +36,14 @@ jobs:
         run: npx tsc --noEmit
 
       - name: 🏗 Setup EAS CLI
-        uses: expo/expo-github-action@v8
-        with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+        run: npm install -g eas-cli
 
       - name: 🚀 Publish OTA update
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           COMMIT_MSG=$(git log -1 --pretty=%B | head -c 200)
-          npx eas-cli update \
+          eas update \
             --branch production \
             --message "${COMMIT_MSG}" \
             --non-interactive

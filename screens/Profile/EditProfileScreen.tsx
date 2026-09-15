@@ -12,9 +12,10 @@ import { Alert } from 'react-native';
 
 export default function EditProfileScreen() {
   const colors = useColors();
-  const { customer, updateCustomer } = useSawari();
+  const { customer, saveProfile } = useSawari();
   const router = useRouter();
 
+  const [isLoading, setIsLoading] = useState(false);
   const [name, setName] = useState(customer.name);
   const [email, setEmail] = useState(customer.email);
   const [dob, setDob] = useState(customer.dob);
@@ -44,7 +45,7 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       alert("Name is required.");
       return;
@@ -56,12 +57,21 @@ export default function EditProfileScreen() {
       return;
     }
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    updateCustomer('name', name);
-    updateCustomer('email', email);
-    updateCustomer('dob', dob);
-    updateCustomer('gender', gender);
-    router.back();
+    try {
+      setIsLoading(true);
+      await saveProfile({
+        name,
+        email,
+        dob,
+        gender
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } catch (error: any) {
+      alert(error.message || "Failed to update profile. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleKycUpload = async () => {
@@ -129,9 +139,10 @@ export default function EditProfileScreen() {
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Edit Profile</Text>
           <TouchableOpacity 
             onPress={handleSave}
-            style={[styles.saveButton, { backgroundColor: colors.primary }]}
+            disabled={isLoading}
+            style={[styles.saveButton, { backgroundColor: colors.primary, opacity: isLoading ? 0.7 : 1 }]}
           >
-            <Text style={styles.saveText}>Save</Text>
+            <Text style={styles.saveText}>{isLoading ? 'Saving...' : 'Save'}</Text>
           </TouchableOpacity>
         </View>
 

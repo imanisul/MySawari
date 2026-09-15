@@ -121,7 +121,6 @@ export default function HomeScreen() {
 
   const sections = useMemo(() => [
     { type: 'header', key: 'header' },
-    { type: 'trustBadge', key: 'trustBadge' },
     { type: 'nextTrip', key: 'nextTrip' },
     { type: 'offers', key: 'offers' },
     { type: 'exploreVehicles', key: 'exploreVehicles' },
@@ -170,7 +169,7 @@ export default function HomeScreen() {
               onSearch={() => {
                 Haptics.selectionAsync();
                 if (isAuthenticated) {
-                  router.push('/explore');
+                  router.push('/search');
                 } else {
                   setShowLogin(true);
                 }
@@ -180,8 +179,6 @@ export default function HomeScreen() {
         );
       case 'referEarn':
         return <AnimatedReferBanner router={router} colors={colors} />;
-      case 'trustBadge':
-        return <TrustSafetyBadge colors={colors} />;
       case 'nextTrip':
         if (!bookingConfirmed || !selectedCar) return null;
         return (
@@ -353,16 +350,6 @@ const styles = StyleSheet.create({
 });
 
 /* ─── Marketing Components ─── */
-function TrustSafetyBadge({ colors }: any) {
-  return (
-    <View style={{ marginHorizontal: 20, marginVertical: 8, paddingVertical: 12, paddingHorizontal: 16, backgroundColor: colors.success + '15', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, borderWidth: 1, borderColor: colors.success + '30' }}>
-      <Feather name="shield" size={16} color={colors.success} />
-      <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, color: colors.success, letterSpacing: 0.5 }}>100% SECURE</Text>
-      <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: colors.success }} />
-      <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 11, color: colors.success, letterSpacing: 0.5 }}>VERIFIED DRIVERS</Text>
-    </View>
-  );
-}
 
 function AnimatedReferBanner({ router, colors }: { router: any, colors: any }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;

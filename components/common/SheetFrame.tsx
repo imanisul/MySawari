@@ -12,7 +12,7 @@ export function SheetFrame({
 }: {
   children: React.ReactNode;
   centered?: boolean;
-  height?: number;
+  height?: number | string;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();

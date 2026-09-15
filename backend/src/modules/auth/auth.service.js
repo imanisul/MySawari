@@ -1,69 +1,87 @@
 const jwt = require('jsonwebtoken');
 const watiService = require('../../integrations/wati.service');
-const AuthRepository = require('./auth.repository');
+const User = require('../../models/user.model');
+const Otp = require('../../models/otp.model');
 const AppError = require('../../common/errors/app-error');
 
 class AuthService {
   constructor() {
-    this.repository = new AuthRepository();
     this.JWT_SECRET = process.env.JWT_SECRET || 'mysawari_super_secret_key_123!';
   }
 
-  async sendOtp({ mobile }) {
+  async sendOtp({ mobileNumber }) {
     const otp = Math.floor(1000 + Math.random() * 9000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
     
-    await this.repository.saveOtp(mobile, otp, expiresAt);
+    await Otp.findOneAndUpdate(
+      { mobileNumber },
+      { otp, expiresAt },
+      { upsert: true, new: true }
+    );
     
     try {
       // Call WATI API to send WhatsApp message
-      await watiService.sendWhatsAppOtp(mobile, otp);
+      await watiService.sendWhatsAppOtp(mobileNumber, otp);
 
       // Local logging for development/auditing
       console.log(`\n================================`);
-      console.log(`💬 WhatsApp OTP Request Queued: ${mobile}`);
+      console.log(`💬 WhatsApp OTP Request Queued: ${mobileNumber}`);
       console.log(`🔒 Developer Override Code: ${otp}`);
       console.log(`================================\n`);
     } catch (error) {
       // If sending fails, rollback the OTP from database so the user isn't stuck
-      await this.repository.deleteOtp(mobile);
+      await Otp.deleteOne({ mobileNumber });
       throw error;
     }
   }
 
-  async verifyOtp({ mobile, otp, name }) {
-    const storedData = await this.repository.getOtp(mobile);
+  async verifyOtp({ mobileNumber, otp, fullName }) {
+    const storedData = await Otp.findOne({ mobileNumber });
     
     if (!storedData) {
       throw new AppError('Please request a new OTP first', 400);
     }
-    if (Date.now() > storedData.expiresAt) {
-      await this.repository.deleteOtp(mobile);
+    if (new Date() > storedData.expiresAt) {
+      await Otp.deleteOne({ mobileNumber });
       throw new AppError('OTP has expired', 400);
     }
     if (storedData.otp !== otp) {
       throw new AppError('Invalid OTP', 400);
     }
 
-    await this.repository.deleteOtp(mobile);
+    await Otp.deleteOne({ mobileNumber });
 
-    let user = await this.repository.findUserByMobile(mobile);
+    let user = await User.findOne({ mobileNumber });
     
     if (!user) {
-      const prefix = name ? name.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '') : 'USER';
-      const uniqueCode = `${prefix}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      const crypto = require('crypto');
+      const generateUniqueCode = () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        let code = '';
+        const bytes = crypto.randomBytes(6);
+        for (let i = 0; i < 6; i++) {
+          code += chars[bytes[i] % chars.length];
+        }
+        return code;
+      };
       
-      user = await this.repository.createUser({
-        id: `usr_${Math.random().toString(36).substring(2, 10)}`,
-        name: name || 'New User',
-        mobile: mobile,
+      const uniqueCode = generateUniqueCode();
+      
+      user = await User.create({
+        fullName: fullName || 'New User',
+        mobileNumber: mobileNumber,
         referralCode: uniqueCode,
         walletBalance: 0,
-        rewardsPoints: 0
+        rewardsPoints: 0,
+        email: '',
+        dob: '',
+        gender: '',
+        aadhaarNumber: '',
+        drivingLicenseNumber: ''
       });
     }
 
-    const token = jwt.sign({ id: user.id, mobile: user.mobile }, this.JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign({ id: user._id, mobileNumber: user.mobileNumber }, this.JWT_SECRET, { expiresIn: '30d' });
     
     return { token, user };
   }

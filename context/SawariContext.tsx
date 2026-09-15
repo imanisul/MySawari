@@ -88,6 +88,7 @@ type SawariContextValue = {
   setTimes: (pickupTime: string, returnTime: string) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
   updateCustomer: (field: 'name' | 'mobile' | 'email' | 'license' | 'dob' | 'gender', value: string) => void;
+  saveProfile: (data: Partial<AppCustomer>) => Promise<void>;
   earnReward: (reward: Offer) => void;
   earnSawariCash: (amount: number) => void;
   useSawariCash: (amount: number) => void;
@@ -352,6 +353,27 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           return next;
         });
       },
+      saveProfile: async (data: Partial<AppCustomer>) => {
+        try {
+          // 1. Call Backend API
+          const updatedUser = await API.updateProfile({
+            fullName: data.name,
+            email: data.email,
+            dob: data.dob,
+            gender: data.gender
+          } as any);
+          
+          // 2. Update local state seamlessly
+          setCustomer((prev) => {
+            const next = { ...prev, ...data };
+            AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(next)).catch(() => {});
+            return next;
+          });
+        } catch (e) {
+          console.error("Failed to save profile", e);
+          throw e; // Let the UI handle the error
+        }
+      },
       earnReward: async (reward: Offer) => {
         setEarnedRewards((prev) => {
           const next = [reward, ...prev];
@@ -436,11 +458,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           await SecureStore.setItemAsync('user_id', String(user.id));
           
           const newCustomer = {
-            id: user.id,
-            name: user.name,
-            mobile: user.mobile,
+            id: user._id || user.id,
+            name: user.fullName || user.name,
+            mobile: user.mobileNumber || user.mobile,
             email: user.email || '',
-            license: user.license || '',
+            license: user.drivingLicenseNumber || user.license || '',
             dob: user.dob || '',
             gender: user.gender || '',
             joinedOn: new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),

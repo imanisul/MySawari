@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -66,6 +66,17 @@ export function DatesSheet() {
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
+  const pickupScrollRef = useRef<ScrollView>(null);
+  const returnScrollRef = useRef<ScrollView>(null);
+  
+  useEffect(() => {
+    setTimeout(() => {
+      // 8 AM is roughly index 16.
+      pickupScrollRef.current?.scrollTo({ x: 1280, animated: false });
+      returnScrollRef.current?.scrollTo({ x: 1280, animated: false });
+    }, 100);
+  }, []);
+
   const generateDaysInMonth = (year: number, month: number) => {
     const date = new Date(year, month, 1);
     const days = [];
@@ -125,12 +136,12 @@ export function DatesSheet() {
   const canApply = start && end && start < end;
 
   return (
-    <SheetFrame>
+    <SheetFrame height="95%">
       <SheetHeader title="Select Dates & Time" />
 
       {/* Simplified Note */}
-      <View style={{ paddingHorizontal: 12, marginBottom: 12 }}>
-        <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 12, color: colors.mutedForeground, textAlign: 'center' }}>
+      <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+        <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: colors.mutedForeground, textAlign: 'center' }}>
           *Note: 1 Day = 8:00 AM to 8:00 AM the next day.
         </Text>
       </View>
@@ -147,7 +158,12 @@ export function DatesSheet() {
           </Text>
         </View>
 
-        <Feather name="arrow-right" size={20} color={colors.mutedForeground} />
+        <View style={{ alignItems: 'center' }}>
+          <Feather name="arrow-right" size={20} color={colors.mutedForeground} />
+          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: rentalDays > 0 ? colors.primary : colors.mutedForeground, marginTop: 4 }}>
+            {rentalDays} Day{rentalDays !== 1 ? 's' : ''}
+          </Text>
+        </View>
 
         <View style={styles.selectedCol}>
           <Text style={[styles.selectedLabel, { color: colors.mutedForeground }]}>End Sawari</Text>
@@ -216,54 +232,52 @@ export function DatesSheet() {
         </View>
 
         {/* Quick Days Selection */}
-        {start && (
-          <View style={{ marginTop: 20 }}>
-            <Text style={[styles.timeTitle, { color: colors.foreground }]}>Select Duration (Days)</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
-              {[1, 2, 3, 4, 5, 7, 10, 15, 30].map(numDays => {
-                const diffDays = end ? Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-                const isSelected = diffDays === numDays;
-                return (
-                  <Pressable
-                    key={`quick_day_${numDays}`}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      // Ensure we don't hit Daylight Savings Time anomalies by explicitly passing Y, M, D
-                      const newEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() + numDays);
-                      newEnd.setHours(0, 0, 0, 0);
-                      setEnd(newEnd);
-                      
-                      // The user specifically requested that quick days default to a standard return time of 8:00 AM
-                      setTempReturnTime('8:00 AM');
-                      
-                      // If the auto-selected end date is in a different month, navigate the calendar to show it
-                      if (newEnd.getMonth() !== currentMonth.getMonth()) {
-                         setCurrentMonth(new Date(newEnd.getFullYear(), newEnd.getMonth(), 1));
-                      }
-                    }}
-                    style={[
-                      styles.timeChip,
-                      { borderColor: isSelected ? colors.primary : colors.border, paddingVertical: 8, paddingHorizontal: 14 },
-                      isSelected && { backgroundColor: colors.primary }
-                    ]}
-                  >
-                    <Text style={[
-                      styles.timeChipText,
-                      { color: isSelected ? colors.primaryForeground : colors.foreground }
-                    ]}>
-                      {numDays} Day{numDays > 1 ? 's' : ''}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-        )}
+        <View style={{ marginTop: 10 }}>
+          <Text style={[styles.timeTitle, { color: colors.foreground }]}>Select Duration (Days)</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
+            {[1, 2, 3, 4, 5, 7, 10, 15, 30].map(numDays => {
+              const diffDays = (start && end) ? Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+              const isSelected = diffDays === numDays;
+              return (
+                <Pressable
+                  key={`quick_day_${numDays}`}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    const baseStart = start || new Date(today);
+                    if (!start) setStart(baseStart);
+                    
+                    const newEnd = new Date(baseStart.getFullYear(), baseStart.getMonth(), baseStart.getDate() + numDays);
+                    newEnd.setHours(0, 0, 0, 0);
+                    setEnd(newEnd);
+                    
+                    setTempReturnTime('8:00 AM');
+                    
+                    if (newEnd.getMonth() !== currentMonth.getMonth()) {
+                       setCurrentMonth(new Date(newEnd.getFullYear(), newEnd.getMonth(), 1));
+                    }
+                  }}
+                  style={[
+                    styles.timeChip,
+                    { borderColor: isSelected ? colors.primary : colors.border, paddingVertical: 6, paddingHorizontal: 12 },
+                    isSelected && { backgroundColor: colors.primary }
+                  ]}
+                >
+                  <Text style={[
+                    styles.timeChipText,
+                    { color: isSelected ? colors.primaryForeground : colors.foreground }
+                  ]}>
+                    {numDays} Day{numDays > 1 ? 's' : ''}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         {/* Time Selection */}
         <View style={styles.timeSection}>
           <Text style={[styles.timeTitle, { color: colors.foreground }]}>Pickup Time</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
+          <ScrollView ref={pickupScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
             {ALL_TIMES.map((time) => {
               const selected = time === tempPickupTime;
               const isAnchorTime = time === '8:00 AM';
@@ -293,8 +307,8 @@ export function DatesSheet() {
             })}
           </ScrollView>
 
-          <Text style={[styles.timeTitle, { color: colors.foreground, marginTop: 24 }]}>Return Time</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
+          <Text style={[styles.timeTitle, { color: colors.foreground, marginTop: 12 }]}>Return Time</Text>
+          <ScrollView ref={returnScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
             {ALL_TIMES.map((time) => {
               const selected = time === tempReturnTime;
               const isAnchorTime = time === '8:00 AM';
@@ -328,13 +342,14 @@ export function DatesSheet() {
 
       <View style={{ paddingTop: 16 }}>
         <PrimaryButton 
-          label={canApply ? `Confirm ${rentalDays} Day${rentalDays > 1 ? 's' : ''}` : "Select Dates"} 
+          label="Search Cars"
           disabled={!canApply}
           onPress={() => {
             if (start && end) {
               setDates(`${formatDateStr(start)} – ${formatDateStr(end)}`, `${rentalDays} Days`);
               setTimes(tempPickupTime, tempReturnTime);
-              router.back();
+              router.dismissAll();
+              router.push('/search');
             }
           }} 
         />
@@ -348,10 +363,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 12,
+    padding: 8,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 20,
+    marginBottom: 8,
   },
   selectedCol: {
     alignItems: 'center',
@@ -402,16 +417,16 @@ const styles = StyleSheet.create({
   },
   dateCell: {
     width: '14.28%',
-    height: 44,
+    height: 34,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    marginBottom: 4,
+    marginBottom: 0,
   },
   dateCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 2,
@@ -445,16 +460,16 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   timeSection: {
-    marginTop: 16,
-    paddingTop: 16,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e5e5e5',
-    marginBottom: 20,
+    marginBottom: 8,
   },
   timeTitle: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    marginBottom: 12,
+    fontSize: 12,
+    marginBottom: 6,
   },
   timeScroll: {
     paddingRight: 20,
@@ -463,13 +478,13 @@ const styles = StyleSheet.create({
   timeChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
     borderWidth: 1,
   },
   timeChipText: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
+    fontSize: 12,
   },
 });

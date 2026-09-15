@@ -3,21 +3,21 @@ import { Animated, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Te
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { fetchResultCars, resultCars, Car, Category } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
-import { Header, Page, Skeleton } from '@/components';
-import { shadows } from '@/constants/shadows';
+import { Header, Page, Skeleton, CarListCard } from '@/components';
 
 type SortOption = 'low-to-high' | 'high-to-low';
-type PriceRange = 'all' | 'under-2000' | '2000-5000' | 'above-5000';
+type PriceRange = 'all' | 'under-2000' | '2000-5000' | 'above-5000' | 'under-1000' | '1000-1500' | 'above-1500';
 type TransmissionFilter = 'all' | 'Automatic' | 'Manual';
 type FuelFilter = 'all' | 'Petrol' | 'Diesel' | 'EV';
 
-const CATEGORY_OPTIONS: Array<{ label: string; value: Category | 'All' }> = [
+const CAR_CATEGORY_OPTIONS: Array<{ label: string; value: string }> = [
   { label: 'All', value: 'All' },
   { label: 'SUV', value: 'SUV' },
   { label: 'Sedan', value: 'Sedan' },
@@ -26,11 +26,50 @@ const CATEGORY_OPTIONS: Array<{ label: string; value: Category | 'All' }> = [
   { label: 'Off-road', value: 'Off-road' },
 ];
 
-const PRICE_RANGES: Array<{ label: string; value: PriceRange }> = [
+const BIKE_CATEGORY_OPTIONS: Array<{ label: string; value: string }> = [
+  { label: 'All', value: 'All' },
+  { label: 'Cruiser', value: 'Bike' },
+  { label: 'Off-road', value: 'Off-road' },
+  { label: 'Scooter', value: 'Scooter' },
+];
+
+const CAR_PRICE_RANGES: Array<{ label: string; value: PriceRange }> = [
   { label: 'All Prices', value: 'all' },
   { label: 'Under ₹2,000', value: 'under-2000' },
   { label: '₹2,000 – ₹5,000', value: '2000-5000' },
   { label: 'Above ₹5,000', value: 'above-5000' },
+];
+
+const BIKE_PRICE_RANGES: Array<{ label: string; value: PriceRange }> = [
+  { label: 'All Prices', value: 'all' },
+  { label: 'Under ₹1,000', value: 'under-1000' },
+  { label: '₹1,000 – ₹1,500', value: '1000-1500' },
+  { label: 'Above ₹1,500', value: 'above-1500' },
+];
+
+const CAR_TRANSMISSION: Array<{ label: string; value: TransmissionFilter }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Automatic', value: 'Automatic' },
+  { label: 'Manual', value: 'Manual' },
+];
+
+const BIKE_TRANSMISSION: Array<{ label: string; value: TransmissionFilter }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Gearless', value: 'Automatic' },
+  { label: 'Geared', value: 'Manual' },
+];
+
+const CAR_FUEL: Array<{ label: string; value: FuelFilter }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Petrol', value: 'Petrol' },
+  { label: 'Diesel', value: 'Diesel' },
+  { label: 'EV', value: 'EV' },
+];
+
+const BIKE_FUEL: Array<{ label: string; value: FuelFilter }> = [
+  { label: 'All', value: 'all' },
+  { label: 'Petrol', value: 'Petrol' },
+  { label: 'EV', value: 'EV' },
 ];
 
 const SORT_OPTIONS: Array<{ label: string; value: SortOption; icon: React.ComponentProps<typeof Feather>['name'] }> = [
@@ -41,10 +80,11 @@ const SORT_OPTIONS: Array<{ label: string; value: SortOption; icon: React.Compon
 export default function SearchResultsScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { pickup, dropoff, dateRange, mode, selectCar } = useSawari();
+  const insets = useSafeAreaInsets();
+  const { pickup, dropoff, dateRange, mode, selectCar, vehicleType } = useSawari();
 
   const [filterVisible, setFilterVisible] = useState(false);
-  const [category, setCategory] = useState<Category | 'All'>('All');
+  const [category, setCategory] = useState<string>('All');
   const [priceRange, setPriceRange] = useState<PriceRange>('all');
   const [transmission, setTransmission] = useState<TransmissionFilter>('all');
   const [fuel, setFuel] = useState<FuelFilter>('all');
@@ -65,6 +105,13 @@ export default function SearchResultsScreen() {
   const filteredCars = useMemo(() => {
     let result = [...fetchedResultCars];
 
+    // Vehicle Type filter
+    if (vehicleType === 'bike') {
+      result = result.filter((c) => c.type === 'Bike');
+    } else {
+      result = result.filter((c) => c.type === 'Car' || !c.type);
+    }
+
     // Category filter
     if (category !== 'All') {
       result = result.filter((c) => c.category === category);
@@ -77,6 +124,12 @@ export default function SearchResultsScreen() {
       result = result.filter((c) => c.perDay >= 2000 && c.perDay <= 5000);
     } else if (priceRange === 'above-5000') {
       result = result.filter((c) => c.perDay > 5000);
+    } else if (priceRange === 'under-1000') {
+      result = result.filter((c) => c.perDay < 1000);
+    } else if (priceRange === '1000-1500') {
+      result = result.filter((c) => c.perDay >= 1000 && c.perDay <= 1500);
+    } else if (priceRange === 'above-1500') {
+      result = result.filter((c) => c.perDay > 1500);
     }
 
     // Transmission filter
@@ -110,12 +163,12 @@ export default function SearchResultsScreen() {
 
   return (
     <Page bottomNav scroll={false}>
-      <Header title="Available Cars" back />
+      <Header title={vehicleType === 'bike' ? "Available Bikes" : "Available Cars"} back />
       <FlatList
         data={isLoading ? [] : filteredCars}
         keyExtractor={(car) => car.id}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
         ListHeaderComponent={
           <View style={styles.listHeader}>
             {/* Trip info pills */}
@@ -200,7 +253,7 @@ export default function SearchResultsScreen() {
 
             {/* Results count */}
             <Text style={[styles.resultCount, { color: colors.foreground }]}>
-              {isLoading ? 'Searching for cars...' : `${filteredCars.length} cars available`}
+              {isLoading ? `Searching for ${vehicleType}s...` : `${filteredCars.length} ${vehicleType}s available`}
             </Text>
           </View>
         }
@@ -216,7 +269,7 @@ export default function SearchResultsScreen() {
               <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
                 <Feather name="search" size={28} color={colors.mutedForeground} />
               </View>
-              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No cars found</Text>
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No {vehicleType}s found</Text>
               <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>Try adjusting your filters to see more results</Text>
               <Pressable
                 accessibilityRole="button"
@@ -229,7 +282,7 @@ export default function SearchResultsScreen() {
           )
         }
         renderItem={({ item: car }) => (
-          <ResultCard car={car} />
+          <CarListCard car={car} isExplore={false} />
         )}
         ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
       />
@@ -255,7 +308,7 @@ export default function SearchResultsScreen() {
               {/* Category */}
               <FilterSection title="Category" icon="grid">
                 <View style={styles.chipRow}>
-                  {CATEGORY_OPTIONS.map((opt) => (
+                  {(vehicleType === 'bike' ? BIKE_CATEGORY_OPTIONS : CAR_CATEGORY_OPTIONS).map((opt) => (
                     <ChipButton
                       key={opt.value}
                       label={opt.label}
@@ -269,7 +322,7 @@ export default function SearchResultsScreen() {
               {/* Price Range */}
               <FilterSection title="Price Range" icon="tag">
                 <View style={styles.chipRow}>
-                  {PRICE_RANGES.map((opt) => (
+                  {(vehicleType === 'bike' ? BIKE_PRICE_RANGES : CAR_PRICE_RANGES).map((opt) => (
                     <ChipButton
                       key={opt.value}
                       label={opt.label}
@@ -283,12 +336,12 @@ export default function SearchResultsScreen() {
               {/* Transmission */}
               <FilterSection title="Transmission" icon="settings">
                 <View style={styles.chipRow}>
-                  {(['all', 'Automatic', 'Manual'] as TransmissionFilter[]).map((opt) => (
+                  {(vehicleType === 'bike' ? BIKE_TRANSMISSION : CAR_TRANSMISSION).map((opt) => (
                     <ChipButton
-                      key={opt}
-                      label={opt === 'all' ? 'All' : opt}
-                      active={transmission === opt}
-                      onPress={() => { Haptics.selectionAsync(); setTransmission(opt); }}
+                      key={opt.value}
+                      label={opt.label}
+                      active={transmission === opt.value}
+                      onPress={() => { Haptics.selectionAsync(); setTransmission(opt.value); }}
                     />
                   ))}
                 </View>
@@ -297,12 +350,12 @@ export default function SearchResultsScreen() {
               {/* Fuel Type */}
               <FilterSection title="Fuel Type" icon="droplet">
                 <View style={styles.chipRow}>
-                  {(['all', 'Petrol', 'Diesel', 'EV'] as FuelFilter[]).map((opt) => (
+                  {(vehicleType === 'bike' ? BIKE_FUEL : CAR_FUEL).map((opt) => (
                     <ChipButton
-                      key={opt}
-                      label={opt === 'all' ? 'All' : opt}
-                      active={fuel === opt}
-                      onPress={() => { Haptics.selectionAsync(); setFuel(opt); }}
+                      key={opt.value}
+                      label={opt.label}
+                      active={fuel === opt.value}
+                      onPress={() => { Haptics.selectionAsync(); setFuel(opt.value); }}
                     />
                   ))}
                 </View>
@@ -329,7 +382,7 @@ export default function SearchResultsScreen() {
                 style={({ pressed }) => [styles.applyButton, { backgroundColor: colors.primary }, pressed && styles.pressed]}
               >
                 <Text style={[styles.applyText, { color: colors.primaryForeground }]}>
-                  Show {filteredCars.length} cars
+                  Show {filteredCars.length} {vehicleType}s
                 </Text>
               </Pressable>
             </View>
@@ -376,90 +429,6 @@ function ChipButton({ label, active, onPress }: { label: string; active: boolean
   );
 }
 
-/* ───── Result Card ───── */
-function ResultCard({ car }: { car: Car }) {
-  const colors = useColors();
-  const router = useRouter();
-  const { selectCar } = useSawari();
-  const { scaleAnim, opacityAnim, onPressIn, onPressOut } = usePressAnimation();
-
-  return (
-    <Pressable
-      accessibilityRole="button"
-      testID={`result-${car.id}`}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        selectCar(car);
-        router.push('/car-details');
-      }}
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
-    >
-      <Animated.View
-        style={[
-          styles.resultCard,
-          shadows.level1,
-          { 
-            backgroundColor: colors.card,
-            transform: [{ scale: scaleAnim }],
-            opacity: opacityAnim,
-          },
-        ]}
-      >
-      <View style={styles.imageWrap}>
-        <Image source={car.image} resizeMode="cover" style={styles.carImage} />
-        <LinearGradient
-          colors={['transparent', 'rgba(17,26,43,0.7)']}
-          style={styles.imageGradient}
-        />
-        <View style={[styles.availableBadge, { backgroundColor: colors.primary }]}>
-          <View style={styles.availableDot} />
-          <Text style={[styles.availableBadgeText, { color: colors.primaryForeground }]}>Available</Text>
-        </View>
-        <View style={styles.priceOverImage}>
-          <Text style={styles.priceOnImage}>{car.price}</Text>
-          <Text style={styles.perDayOnImage}>/day</Text>
-        </View>
-      </View>
-
-      <View style={styles.cardBody}>
-        <View style={styles.cardTopRow}>
-          <Text style={[styles.carName, { color: colors.foreground }]}>{car.name}</Text>
-          <View style={[styles.categoryChip, { backgroundColor: colors.muted }]}>
-            <Text style={[styles.categoryChipText, { color: colors.mutedForeground }]}>{car.category}</Text>
-          </View>
-        </View>
-
-        <View style={styles.specsRow}>
-          <SpecItem icon="users" label={car.seats} />
-          <View style={[styles.specDivider, { backgroundColor: colors.border }]} />
-          <SpecItem icon="settings" label={car.transmission} />
-          <View style={[styles.specDivider, { backgroundColor: colors.border }]} />
-          <SpecItem icon="droplet" label={car.fuel} />
-        </View>
-
-        <Pressable
-          accessibilityRole="button"
-          testID={`book-${car.id}`}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            selectCar(car);
-            router.push('/car-details');
-          }}
-          style={({ pressed }) => [
-            styles.bookButton,
-            { backgroundColor: colors.primary },
-            pressed && styles.bookButtonPressed,
-          ]}
-        >
-          <Text style={[styles.bookButtonText, { color: colors.primaryForeground }]}>View Details</Text>
-          <Feather name="arrow-right" size={16} color={colors.primaryForeground} />
-        </Pressable>
-      </View>
-    </Animated.View>
-  </Pressable>
-  );
-}
 
 /* ───── Skeleton Result Card ───── */
 function SkeletonResultCard() {
@@ -567,36 +536,5 @@ const styles = StyleSheet.create({
   applyButton: { flex: 1, alignItems: 'center', paddingVertical: 15, borderRadius: 14 },
   applyText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
 
-  // ─── Result Card ───
-  resultCard: {
-    borderRadius: 20, marginHorizontal: 20, overflow: 'hidden',
-  },
-  imageWrap: { position: 'relative', height: 190 },
-  carImage: { width: '100%', height: '100%' },
-  imageGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80 },
-  availableBadge: {
-    position: 'absolute', top: 14, left: 14, flexDirection: 'row',
-    alignItems: 'center', gap: 6, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
-  },
-  availableDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(0,0,0,0.3)' },
-  availableBadgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
-  priceOverImage: { position: 'absolute', bottom: 12, right: 14, flexDirection: 'row', alignItems: 'baseline' },
-  priceOnImage: { fontFamily: 'Inter_700Bold', fontSize: 22, color: '#FFFFFF' },
-  perDayOnImage: { fontFamily: 'Inter_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.8)', marginLeft: 3 },
-  cardBody: { padding: 16 },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  carName: { fontFamily: 'Inter_600SemiBold', fontSize: 19, flex: 1 },
-  categoryChip: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginLeft: 10 },
-  categoryChipText: { fontFamily: 'Inter_500Medium', fontSize: 11 },
-  specsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 12 },
-  specItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  specText: { fontFamily: 'Inter_400Regular', fontSize: 12 },
-  specDivider: { width: 1, height: 14 },
-  bookButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, borderRadius: 14, marginTop: 16, paddingVertical: 14,
-  },
-  bookButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
-  bookButtonPressed: { opacity: 0.85, transform: [{ scale: 0.98 }] },
   pressed: { opacity: 0.7 },
 });

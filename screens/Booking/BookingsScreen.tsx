@@ -98,7 +98,7 @@ export default function BookingsScreen() {
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 64 }} />
         ) : filteredBookings.length > 0 ? (
-          <ScrollView contentContainerStyle={{ paddingBottom: 24, paddingTop: 8 }} showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 8 }} showsVerticalScrollIndicator={false}>
             {filteredBookings.map((booking) => {
               const isActive = tab === 'Active';
               const cardBg = isActive ? colors.surfaceStrong : colors.card;

@@ -291,7 +291,7 @@ export const API = {
       const response = await fetch(`${BACKEND_URL}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile })
+        body: JSON.stringify({ mobileNumber: mobile })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to send OTP');
@@ -310,7 +310,7 @@ export const API = {
       const response = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile, otp, name })
+        body: JSON.stringify({ mobileNumber: mobile, otp, fullName: name })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Invalid OTP');
@@ -327,6 +327,37 @@ export const API = {
   async getUserProfile(userId: string) {
     await delay(300);
     return DB.users.find(u => u.id === userId) || null;
+  },
+
+  /**
+   * PUT /api/users/profile
+   */
+  async updateProfile(profileData: { fullName?: string, email?: string, dob?: string, gender?: string, aadhaarNumber?: string, drivingLicenseNumber?: string }) {
+    try {
+      const { getItemAsync } = require('expo-secure-store');
+      const token = await getItemAsync('auth_token');
+      
+      const payload: any = { ...profileData };
+      if (payload.name) {
+        payload.fullName = payload.name;
+        delete payload.name;
+      }
+      
+      const response = await fetch(`${BACKEND_URL}/users/profile`, {
+        method: 'PUT',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to update profile');
+      return data.data.user;
+    } catch (e: any) {
+      console.error('updateProfile API error:', e.message);
+      throw e;
+    }
   },
 
   /**

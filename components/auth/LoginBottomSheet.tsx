@@ -21,7 +21,7 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
 
   // Countdown timer for Resend OTP
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
     if (resendTimer > 0 && step === 2) {
       interval = setInterval(() => setResendTimer(prev => prev - 1), 1000);
     }

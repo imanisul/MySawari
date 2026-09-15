@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ErrorBoundary, AnimatedSplash, FloatingSupport, UpdateModal } from '@/components';
+import { ErrorBoundary, FloatingSupport, UpdateModal } from '@/components';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -114,9 +114,6 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
-  // Don't call SplashScreen.hideAsync() here — AnimatedSplash handles it
-  // so the animated logo plays first before revealing the app.
-
   if (!fontsLoaded && !fontError) return null;
 
   return (
@@ -126,11 +123,11 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <SawariProvider>
-                <AnimatedSplash>
+                <SplashHider fontsLoaded={fontsLoaded}>
                   <RootLayoutNav />
                   <FloatingSupport />
                   <OTAUpdateChecker />
-                </AnimatedSplash>
+                </SplashHider>
               </SawariProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
@@ -140,3 +137,14 @@ export default function RootLayout() {
   );
 }
 
+function SplashHider({ children, fontsLoaded }: { children: React.ReactNode, fontsLoaded: boolean }) {
+  const { isAuthLoading } = useSawari();
+
+  useEffect(() => {
+    if (fontsLoaded && !isAuthLoading) {
+      SplashScreen.hideAsync().catch(console.warn);
+    }
+  }, [fontsLoaded, isAuthLoading]);
+
+  return <>{children}</>;
+}

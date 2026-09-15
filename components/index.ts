@@ -27,6 +27,5 @@ export * from './vehicle/CarTile';
 export * from './common/DestinationCard';
 export * from './booking/NextTrip';
 export * from './common/ErrorFallback';
-export * from './common/AnimatedSplash';
 export * from './common/ErrorBoundary';
 export * from './common/UpdateModal';

@@ -23,6 +23,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOffers } from '@/services/api/offers';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 
 const DESTINATIONS = [
   { id: '1', title: 'Assam', subtitle: 'Northeast India', image: require('../../assets/images/kaziranga.jpg'), places: ['Kaziranga National Park', 'Kamakhya Temple', 'Majuli', 'Manas National Park', 'Sivasagar'] },
@@ -423,6 +424,22 @@ function LoginFunnel({ colors, onClose }: { colors: any; onClose: () => void }) 
       setStep(3);
     } else if (step === 3 && name.trim().length > 0) {
       await login(name.trim(), mobile);
+      
+      // Request Notifications Permission Just-In-Time
+      try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus === 'granted') {
+          console.log('Notification permissions granted.');
+        }
+      } catch (error) {
+        console.warn('Failed to request notification permission:', error);
+      }
+      
       onClose();
     }
   };

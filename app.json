@@ -15,16 +15,29 @@
       "url": "https://u.expo.dev/640f7262-fb50-4d44-8d81-3c497c59c448"
     },
     "splash": {
-      "image": "./assets/images/splash.png",
+      "image": "./assets/images/splash_final.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F9F9F8"
+      "backgroundColor": "#FAFAF9"
     },
     "ios": {
       "supportsTablet": false,
-      "icon": "./assets/images/MySawari.png"
+      "icon": "./assets/images/MySawari.png",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "MySawari uses your location to find nearby drivers and set pickup points.",
+        "NSCameraUsageDescription": "MySawari uses your camera so you can verify your identity or upload your driver's license for rentals.",
+        "NSPhotoLibraryUsageDescription": "MySawari uses your photo library so you can upload existing documents for identity verification.",
+        "NSMicrophoneUsageDescription": "MySawari does not use the microphone."
+      }
     },
     "android": {
       "package": "com.anisul17.mysawari",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#F9F9F8"

@@ -4,6 +4,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
+import * as Notifications from 'expo-notifications';
 
 export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
@@ -69,6 +70,19 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
         setLoading(true);
         const { token, user } = await API.verifyOtp(mobile, otp, name.trim());
         await login(token, user);
+        
+        // Request Notifications Permission Just-In-Time
+        try {
+          const { status: existingStatus } = await Notifications.getPermissionsAsync();
+          let finalStatus = existingStatus;
+          if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+          }
+        } catch (error) {
+          console.warn('Failed to request notification permission:', error);
+        }
+        
         onClose();
       } catch (e: any) {
         Alert.alert('Error', e.message || 'Invalid OTP');

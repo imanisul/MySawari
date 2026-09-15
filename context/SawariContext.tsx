@@ -151,29 +151,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     referralCode: '',
   });
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [earnedRewards, setEarnedRewards] = useState<Offer[]>([
-    {
-      id: 'reward-1',
-      title: '₹150 Sawari Cash',
-      subtitle: 'Earned from referring Rajesh Kumar',
-      discount: 'CREDITED',
-      code: 'APPLIED',
-      expiry: 'No expiry',
-      gradientColors: ['#10B981', '#059669'], // Beautiful Emerald Green
-      icon: 'check-circle',
-    },
-    {
-      id: 'reward-2',
-      title: 'Flat 20% Off',
-      subtitle: 'Earned from referring Priya Singh',
-      discount: '20% OFF',
-      code: 'PRIYAREF20',
-      expiry: 'Valid till 31 Dec',
-      gradientColors: ['#8B5CF6', '#6D28D9'], // Premium Purple
-      icon: 'gift',
-    }
-  ]);
-  const [sawariCash, setSawariCash] = useState(350); // Start with some cash to test logic
+  const [earnedRewards, setEarnedRewards] = useState<Offer[]>([]);
+  const [sawariCash, setSawariCash] = useState(0);
   const [totalBookings, setTotalBookings] = useState(0);
   const [expoPushToken, setPushToken] = useState<string | null>(null);
   const [hasSeenPermissions, setHasSeenPermissions] = useState<boolean | null>(null);
@@ -341,7 +320,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             fuelEstimate || undefined
           );
           // Refresh cash from DB
-          const cash = await AsyncStorage.getItem('@sawari_cash');
+          const cash = await AsyncStorage.getItem(`@sawari_cash_${customer.id}`);
           if (cash) setSawariCash(Number(cash));
           return snapshot;
         } catch (e) {
@@ -469,8 +448,16 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           };
           
           setCustomer(newCustomer);
-          // Save locally so it persists decoupled from the backend!
           await AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(newCustomer));
+          
+          // SET CASH AND REWARDS DIRECTLY FROM BACKEND
+          const cash = user.walletBalance || 0;
+          setSawariCash(cash);
+          await AsyncStorage.setItem(`@sawari_cash_${user.id}`, cash.toString());
+
+          const rewards = user.rewards || [];
+          setEarnedRewards(rewards);
+          await AsyncStorage.setItem(`@earned_rewards_${user.id}`, JSON.stringify(rewards));
           
           setIsAuthenticated(true);
         } catch (e) {
@@ -489,6 +476,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setSawariCash(0);
           setEarnedRewards([]);
           setTotalBookings(0);
+          setNotifications([]);
           setIsAuthenticated(false);
         } catch (e) {
           if (__DEV__) console.warn('Logout failed', e);

@@ -42,9 +42,16 @@ export const API = {
   async quoteBooking(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<PricingQuote> {
     await delay(500);
     
-    // In a real backend, we'd fetch the user's SawariCash balance securely from the DB
-    const storedCash = await AsyncStorage.getItem('@sawari_cash');
-    const availableSawariCash = storedCash ? Number(storedCash) : 0;
+    // Fetch the user's SawariCash balance securely
+    let availableSawariCash = 0;
+    try {
+      const { getItemAsync } = require('expo-secure-store');
+      const userId = await getItemAsync('user_id');
+      if (userId) {
+        const storedCash = await AsyncStorage.getItem(`@sawari_cash_${userId}`);
+        availableSawariCash = storedCash ? Number(storedCash) : 0;
+      }
+    } catch(e) {}
     
     const quote = await calculateBookingPrice({
       ...params,
@@ -111,12 +118,18 @@ export const API = {
     const quote = serverQuote;
     
     // 1. Deduct Sawari Cash safely
-    if (quote.sawariCashUsed > 0) {
-      const storedCash = await AsyncStorage.getItem('@sawari_cash');
+    let userId = null;
+    try {
+      const { getItemAsync } = require('expo-secure-store');
+      userId = await getItemAsync('user_id');
+    } catch(e) {}
+
+    if (quote.sawariCashUsed > 0 && userId) {
+      const storedCash = await AsyncStorage.getItem(`@sawari_cash_${userId}`);
       let currentCash = storedCash ? Number(storedCash) : 0;
       if (currentCash >= quote.sawariCashUsed) {
         currentCash -= quote.sawariCashUsed;
-        await AsyncStorage.setItem('@sawari_cash', currentCash.toString());
+        await AsyncStorage.setItem(`@sawari_cash_${userId}`, currentCash.toString());
       }
     }
     
@@ -164,9 +177,11 @@ export const API = {
     DB.bookings.push(snapshot);
     
     // Save locally to AsyncStorage for the My Bookings page to see it
-    const storedBookings = await AsyncStorage.getItem('@my_bookings');
-    const existing = storedBookings ? JSON.parse(storedBookings) as BookingSnapshot[] : [];
-    await AsyncStorage.setItem('@my_bookings', JSON.stringify([snapshot, ...existing]));
+    if (userId) {
+      const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
+      const existing = storedBookings ? JSON.parse(storedBookings) as BookingSnapshot[] : [];
+      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify([snapshot, ...existing]));
+    }
     
     // Referral Processing Logic
     const user = DB.users.find(u => u.mobile === customerDetails.mobile);
@@ -193,7 +208,15 @@ export const API = {
   
   async getBooking(id: string): Promise<BookingSnapshot | null> {
     await delay(300);
-    const storedBookings = await AsyncStorage.getItem('@my_bookings');
+    let userId = null;
+    try {
+      const { getItemAsync } = require('expo-secure-store');
+      userId = await getItemAsync('user_id');
+    } catch(e) {}
+    
+    if (!userId) return null;
+
+    const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
     if (!storedBookings) return null;
     const bookings = JSON.parse(storedBookings) as BookingSnapshot[];
     return bookings.find(b => b.id === id) || null;

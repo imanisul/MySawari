@@ -126,7 +126,7 @@ export default function HomeScreen() {
                   {greeting}{isAuthenticated && customer?.name ? `, ${customer.name.split(' ')[0]}` : ''}
                 </Text>
                 <Text style={[styles.heading, { color: colors.foreground }]}>
-                  Where are you{'\n'}going today?
+                  Where are you{'\n'}going?
                 </Text>
               </View>
               <Animated.Image 

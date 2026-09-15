@@ -1,9 +1,15 @@
 import { DB, BookingSnapshot } from './database';
 import { calculateBookingPrice, QuoteParams, PricingQuote } from './pricingEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
 // Simulated delay for realistic backend latency
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// For Expo, localhost points to the phone. We need the local IP of the machine running the bundler.
+const debuggerHost = Constants.expoConfig?.hostUri;
+const localIp = debuggerHost?.split(':')[0];
+const BACKEND_URL = localIp ? `http://${localIp}:5001/api` : 'http://localhost:5001/api';
 
 export const API = {
   /**
@@ -254,6 +260,44 @@ export const API = {
   },
 
   /**
+   * POST /api/auth/send-otp (Real Backend via WATI)
+   */
+  async sendOtp(mobile: string) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to send OTP');
+      return data;
+    } catch (e: any) {
+      console.error('sendOtp API error:', e.message);
+      throw e;
+    }
+  },
+
+  /**
+   * POST /api/auth/verify-otp (Real Backend via WATI)
+   */
+  async verifyOtp(mobile: string, otp: string, name?: string) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile, otp, name })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Invalid OTP');
+      return data.data; // returns { token, user }
+    } catch (e: any) {
+      console.error('verifyOtp API error:', e.message);
+      throw e;
+    }
+  },
+
+  /**
    * GET /api/users/profile
    */
   async getUserProfile(userId: string) {
@@ -274,8 +318,45 @@ export const API = {
       return {
         ...ref,
         referredName: referredUser?.name || 'Unknown',
-        referredJoinedAt: referredUser?.createdAt
       };
     });
+  },
+
+  /**
+   * POST /api/locations/autocomplete (Real Backend via Google Places API)
+   */
+  async searchLocations(input: string, regionId: string = 'guwahati', isDestination: boolean = false) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/locations/autocomplete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input, regionId, isDestination })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to search locations');
+      return data.data.predictions;
+    } catch (e: any) {
+      console.error('searchLocations API error:', e.message);
+      return [];
+    }
+  },
+
+  /**
+   * POST /api/locations/details (Real Backend via Google Places API)
+   */
+  async getLocationDetails(placeId: string) {
+    try {
+      const response = await fetch(`${BACKEND_URL}/locations/details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ placeId })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to get location details');
+      return data.data.location; // { latitude, longitude }
+    } catch (e: any) {
+      console.error('getLocationDetails API error:', e.message);
+      return null;
+    }
   }
 };

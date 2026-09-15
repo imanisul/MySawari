@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, TouchableWithoutFeedback, Keyboard, Linking } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, TouchableWithoutFeedback, Keyboard, Linking, Alert } from 'react-native';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
+import { API } from '@/services/backend/api';
 
 export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
@@ -12,8 +13,19 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
   
   const slideAnim = useRef(new Animated.Value(400)).current;
+
+  // Countdown timer for Resend OTP
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (resendTimer > 0 && step === 2) {
+      interval = setInterval(() => setResendTimer(prev => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer, step]);
 
   // Slide up animation when visible
   useEffect(() => {
@@ -40,13 +52,42 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
 
   const handleNext = async () => {
     if (step === 1 && mobile.length >= 10) {
-      setStep(2);
+      try {
+        setLoading(true);
+        await API.sendOtp(mobile);
+        setStep(2);
+        setResendTimer(30);
+      } catch (e: any) {
+        Alert.alert('Error', e.message || 'Failed to send OTP');
+      } finally {
+        setLoading(false);
+      }
     } else if (step === 2 && otp.length === 4) {
       setStep(3);
     } else if (step === 3 && name.trim().length > 0) {
-      // Complete login
-      await login(name, mobile);
-      onClose();
+      try {
+        setLoading(true);
+        const { token, user } = await API.verifyOtp(mobile, otp, name.trim());
+        await login(token, user);
+        onClose();
+      } catch (e: any) {
+        Alert.alert('Error', e.message || 'Invalid OTP');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+    try {
+      setLoading(true);
+      await API.sendOtp(mobile);
+      setResendTimer(30);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to resend OTP');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -58,6 +99,7 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
   };
 
   const getButtonText = () => {
+    if (loading) return 'Please wait...';
     if (step === 1) return 'Send OTP';
     if (step === 2) return 'Verify OTP';
     if (step === 3) return 'Let\'s Go!';
@@ -92,13 +134,18 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
                 </TouchableOpacity>
               </View>
               
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                {step === 1 
-                  ? 'We will send a 4-digit code to verify.' 
-                  : step === 2 
-                    ? `Sent to +91 ${mobile}` 
-                    : 'We need your name to complete your profile.'}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 24 }}>
+                {step === 2 && (
+                  <FontAwesome name="whatsapp" size={16} color="#25D366" style={{ marginRight: 6 }} />
+                )}
+                <Text style={[styles.subtitle, { color: colors.mutedForeground, marginBottom: 0 }]}>
+                  {step === 1 
+                    ? 'We will send a 4-digit code via WhatsApp.' 
+                    : step === 2 
+                      ? `Sent via WhatsApp to +91 ${mobile}` 
+                      : 'We need your name to complete your profile.'}
+                </Text>
+              </View>
 
               {/* Step 1: Mobile */}
               {step === 1 && (
@@ -119,18 +166,31 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
 
               {/* Step 2: OTP */}
               {step === 2 && (
-                <View style={[styles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, textAlign: 'center', letterSpacing: 10 }]}
-                    placeholder="• • • •"
-                    placeholderTextColor={colors.mutedForeground}
-                    keyboardType="number-pad"
-                    maxLength={4}
-                    value={otp}
-                    onChangeText={setOtp}
-                    autoFocus
-                  />
-                </View>
+                <>
+                  <View style={[styles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground, textAlign: 'center', letterSpacing: 10 }]}
+                      placeholder="• • • •"
+                      placeholderTextColor={colors.mutedForeground}
+                      keyboardType="number-pad"
+                      maxLength={4}
+                      value={otp}
+                      onChangeText={setOtp}
+                      autoFocus
+                    />
+                  </View>
+                  
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 24, marginTop: -8 }}>
+                    <Text style={{ fontFamily: 'Inter_400Regular', color: colors.mutedForeground, fontSize: 14 }}>
+                      Didn't receive it?{' '}
+                    </Text>
+                    <TouchableOpacity onPress={handleResendOtp} disabled={resendTimer > 0 || loading}>
+                      <Text style={{ fontFamily: 'Inter_600SemiBold', color: resendTimer > 0 ? colors.mutedForeground : colors.blue, fontSize: 14 }}>
+                        {resendTimer > 0 ? `Wait 00:${resendTimer.toString().padStart(2, '0')}` : 'Resend OTP'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
               )}
 
               {/* Step 3: Name */}
@@ -148,8 +208,8 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
               )}
 
               <TouchableOpacity 
-                style={[styles.actionBtn, { backgroundColor: isButtonEnabled() ? colors.primary : colors.muted }]} 
-                disabled={!isButtonEnabled()}
+                style={[styles.actionBtn, { backgroundColor: isButtonEnabled() && !loading ? colors.primary : colors.muted }]} 
+                disabled={!isButtonEnabled() || loading}
                 onPress={handleNext}
               >
                 <Text style={[styles.actionText, { color: isButtonEnabled() ? '#000' : colors.mutedForeground }]}>

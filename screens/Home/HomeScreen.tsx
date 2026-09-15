@@ -22,6 +22,7 @@ import {
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOffers } from '@/services/api/offers';
+import * as Location from 'expo-location';
 
 const DESTINATIONS = [
   { id: '1', title: 'Assam', subtitle: 'Northeast India', image: require('../../assets/images/kaziranga.jpg'), places: ['Kaziranga National Park', 'Kamakhya Temple', 'Majuli', 'Manas National Park', 'Sivasagar'] },
@@ -58,6 +59,20 @@ export default function HomeScreen() {
     queryKey: ['offers'],
     queryFn: fetchOffers,
   });
+
+  // ── App Startup Permissions ──
+  useEffect(() => {
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.warn('Permission to access location was denied');
+        }
+      } catch (e) {
+        console.warn('Error requesting location permissions:', e);
+      }
+    })();
+  }, []);
 
 
   // ── Vehicle image drive-in animation ──

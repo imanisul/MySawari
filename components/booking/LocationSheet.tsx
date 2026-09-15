@@ -7,6 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { SheetFrame, SheetHeader } from '../common/SheetFrame';
 import { LocationResult } from '@/utils/sawari';
+import { API } from '@/services/backend/api';
 
 export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
   const colors = useColors();
@@ -38,18 +39,19 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
       return;
     }
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       setLoading(true);
       
-      // Mock local filtering
-      const lowerQuery = searchQuery.toLowerCase();
-      const results = popularLocations.filter(loc => 
-        loc.description.toLowerCase().includes(lowerQuery)
-      );
-      
-      setPredictions(results);
-      setLoading(false);
-    }, 300);
+      try {
+        const results = await API.searchLocations(searchQuery, 'guwahati', mode === 'pickup');
+        setPredictions(results);
+      } catch (error) {
+        console.error("Search failed:", error);
+        setPredictions([]);
+      } finally {
+        setLoading(false);
+      }
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [searchQuery, mode]);
@@ -57,21 +59,28 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
   const handleSelectPlace = async (place: any, isPopular = false) => {
     Haptics.selectionAsync();
     
-    // If it's a popular mock location without real place_id, we just mock the lat/lng
+    setLoading(true);
     let lat = 26.1445 + (Math.random() * 0.1);
     let lng = 91.7362 + (Math.random() * 0.1);
+    let exactAddress = place.description;
+    let exactName = place.structured_formatting?.main_text || place.description;
 
-    if (!isPopular) {
-      // For mock logic, we don't have a backend to get exact details from.
-      // We will just use the random lat/lng generated above.
+    if (!isPopular && place.place_id) {
+      const details = await API.getLocationDetails(place.place_id);
+      if (details) {
+        lat = details.latitude || details.lat || lat;
+        lng = details.longitude || details.lng || lng;
+        if (details.address) exactAddress = details.address;
+      }
     }
+    setLoading(false);
 
     const loc: LocationResult = {
       id: place.place_id || `loc_${Date.now()}`,
-      address: place.description,
+      address: exactAddress,
       latitude: lat,
       longitude: lng,
-      name: place.structured_formatting?.main_text || place.description,
+      name: exactName,
       source: 'database'
     };
 

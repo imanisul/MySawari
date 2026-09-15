@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const watiService = require('../../integrations/wati.service');
 const AuthRepository = require('./auth.repository');
 const AppError = require('../../common/errors/app-error');
 
@@ -14,10 +15,20 @@ class AuthService {
     
     await this.repository.saveOtp(mobile, otp, expiresAt);
     
-    console.log(`\n================================`);
-    console.log(`💬 SMS Sent to: ${mobile}`);
-    console.log(`🔒 Your MySawari OTP is: ${otp}`);
-    console.log(`================================\n`);
+    try {
+      // Call WATI API to send WhatsApp message
+      await watiService.sendWhatsAppOtp(mobile, otp);
+
+      // Local logging for development/auditing
+      console.log(`\n================================`);
+      console.log(`💬 WhatsApp OTP Request Queued: ${mobile}`);
+      console.log(`🔒 Developer Override Code: ${otp}`);
+      console.log(`================================\n`);
+    } catch (error) {
+      // If sending fails, rollback the OTP from database so the user isn't stuck
+      await this.repository.deleteOtp(mobile);
+      throw error;
+    }
   }
 
   async verifyOtp({ mobile, otp, name }) {

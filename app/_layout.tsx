@@ -13,7 +13,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { SawariProvider } from '@/context/SawariContext';
+import { SawariProvider, useSawari } from '@/context/SawariContext';
 import { useAppUpdates } from '@/hooks/useAppUpdates';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.

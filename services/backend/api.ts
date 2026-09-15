@@ -177,9 +177,10 @@ export const API = {
     DB.bookings.push(snapshot);
     
     // Save locally to AsyncStorage for the My Bookings page to see it
+    let existing: BookingSnapshot[] = [];
     if (userId) {
       const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
-      const existing = storedBookings ? JSON.parse(storedBookings) as BookingSnapshot[] : [];
+      existing = storedBookings ? JSON.parse(storedBookings) as BookingSnapshot[] : [];
       await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify([snapshot, ...existing]));
     }
     

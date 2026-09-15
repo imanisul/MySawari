@@ -26,12 +26,12 @@
     "android": {
       "package": "com.anisul17.mysawari",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/MySawari.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#F9F9F8"
       }
     },
     "web": {
-      "favicon": "./assets/images/MySawari.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       [

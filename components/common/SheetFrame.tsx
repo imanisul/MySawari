@@ -26,7 +26,7 @@ export function SheetFrame({
           { backgroundColor: colors.card },
           !centered && { paddingBottom: insets.bottom + 18 },
           centered && { paddingBottom: 28 },
-          height ? { minHeight: height } : undefined,
+          height ? { minHeight: height as any } : undefined,
         ]}
       >
         {!centered && <View style={[styles.grabber, { backgroundColor: colors.border }]} />}

@@ -536,5 +536,13 @@ const styles = StyleSheet.create({
   applyButton: { flex: 1, alignItems: 'center', paddingVertical: 15, borderRadius: 14 },
   applyText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
 
+  // Skeleton card styles
+  resultCard: { borderRadius: 20, overflow: 'hidden' as const },
+  cardBody: { padding: 16 },
+  cardTopRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, marginBottom: 12 },
+  specsRow: { marginTop: 8 },
+  specItem: { flexDirection: 'row' as const, alignItems: 'center' as const, gap: 6 },
+  specText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+
   pressed: { opacity: 0.7 },
 });

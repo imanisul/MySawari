@@ -118,17 +118,7 @@ type SawariContextValue = {
 
 const SawariContext = createContext<SawariContextValue | null>(null);
 
-const getMockDateRange = () => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const nextWeek = new Date();
-  nextWeek.setDate(nextWeek.getDate() + 5);
-  const format = (d: Date) => {
-    const parts = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).split(' ');
-    return `${parts[0]} ${parts[1]}`;
-  };
-  return `${format(tomorrow)} – ${format(nextWeek)}`;
-};
+
 
 export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [vehicleType, setVehicleType] = useState<'car' | 'bike'>('car');
@@ -141,7 +131,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [isDeliveryRequested, setIsDeliveryRequested] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'return' | 'both'>('both');
   const [returnAddress, setReturnAddress] = useState<LocationResult | null>(null);
-  const [dateRange, setDateRange] = useState(getMockDateRange());
+  const [dateRange, setDateRange] = useState('Select Dates');
   const [duration, setDuration] = useState('5 days');
   const [pickupTime, setPickupTime] = useState('08:00 AM');
   const [returnTime, setReturnTime] = useState('08:00 AM');

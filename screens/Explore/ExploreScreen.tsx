@@ -8,7 +8,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { cars, premiumCollection, checkCarAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
-import { MonthCalendar } from '@/components/booking/MonthCalendar';
 
 export default function ExploreScreen() {
   const colors = useColors();
@@ -18,43 +17,10 @@ export default function ExploreScreen() {
   const { vehicleType: globalVehicleType, setBookingSource, setDateRange, dateRange } = useSawari();
   const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>(globalVehicleType === 'car' ? 'Cars' : 'Bikes');
   
-  const [start, setStart] = useState<Date | null>(null);
-  const [end, setEnd] = useState<Date | null>(null);
-  
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
-  const handleDateSelect = (date: Date) => {
-    if (start && end) {
-      setStart(date);
-      setEnd(null);
-      setSelectedDate('All Dates');
-      setDateRange('All Dates');
-      return;
-    }
-    if (start && !end) {
-      if (date < start) {
-        setStart(date);
-      } else {
-        setEnd(date);
-        const rangeStr = `${start.getDate()} ${MONTHS[start.getMonth()]} – ${date.getDate()} ${MONTHS[date.getMonth()]}`;
-        setSelectedDate(rangeStr);
-        setDateRange(rangeStr);
-      }
-      return;
-    }
-    setStart(date);
-    setEnd(null);
-  };
-
-  // Sync selectedDate when dateRange changes via Calendar or Context
+  // Sync selectedDate when dateRange changes via Calendar
   useEffect(() => {
     if (dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates') {
       setSelectedDate(dateRange);
-      // Try parsing back to start/end if possible, but for explore it's mostly one-way
-    } else if (dateRange === 'All Dates' || !dateRange) {
-      setSelectedDate('All Dates');
-      setStart(null);
-      setEnd(null);
     }
   }, [dateRange]);
 
@@ -87,7 +53,16 @@ export default function ExploreScreen() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
-
+  const availableDates = useMemo(() => {
+    const dates = ['All Dates'];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      dates.push(d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
+    }
+    return dates;
+  }, []);
 
   const filteredCars = useMemo(() => {
     return cars.filter(car => {
@@ -218,11 +193,66 @@ export default function ExploreScreen() {
         </Pressable>
       </View>
       
-      <View style={{ marginTop: 16 }}>
-        <MonthCalendar start={start} end={end} onPress={handleDateSelect} />
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.dateRow}
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open calendar to pick dates"
+          onPress={() => {
+            Haptics.selectionAsync();
+            router.push('/dates');
+          }}
+          style={({ pressed }) => [
+            styles.dateChip,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              paddingHorizontal: 12,
+            },
+            pressed && styles.chipPressed,
+          ]}
+        >
+          <Feather name="calendar" size={16} color={colors.foreground} />
+        </Pressable>
+        {availableDates.map((date) => {
+          const active = date === selectedDate;
+          return (
+            <Pressable
+              key={date}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter by date: ${date}`}
+              accessibilityState={{ selected: active }}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setSelectedDate(date);
+                if (date !== 'All Dates') setDateRange(date);
+              }}
+              style={({ pressed }) => [
+                styles.dateChip,
+                {
+                  backgroundColor: active ? colors.foreground : colors.card,
+                  borderColor: active ? colors.foreground : colors.border,
+                },
+                pressed && styles.chipPressed,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dateChipText,
+                  { color: active ? colors.background : colors.foreground },
+                ]}
+              >
+                {date}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
-  ), [colors, searchQuery, vehicleType, selectedDate, activeFilterCount, start, end]);
+  ), [colors, searchQuery, vehicleType, selectedDate, availableDates, activeFilterCount]);
 
   /* ─── ListEmptyComponent ─── */
   const ListEmpty = useCallback(() => (
@@ -247,8 +277,6 @@ export default function ExploreScreen() {
             setSearchQuery('');
             setDebouncedQuery('');
             setSelectedDate('All Dates');
-            setStart(null);
-            setEnd(null);
             setFilters(defaultFilters);
             setPage(1);
           }}
@@ -257,7 +285,7 @@ export default function ExploreScreen() {
         </Pressable>
       )}
     </View>
-  ), [colors, vehicleType, debouncedQuery, selectedDate, activeFilterCount]);
+  ), [colors, debouncedQuery, selectedDate, vehicleType, activeFilterCount]);
 
   return (
     <Page bottomNav scroll={false}>

@@ -91,11 +91,8 @@ export default function ExploreScreen() {
           const [startStr, endStr] = selectedDate.split(' – ');
           matchDate = checkCarAvailability(car, startStr, endStr);
         } else {
-          // User selected a single date from chips. Use strict exact matching.
-          const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-          const carAvail = car.availabilityRange?.start || car.availabilityDate || 'Available Now';
-          const carAvailMapped = carAvail === 'Available Now' ? todayStr : carAvail;
-          matchDate = carAvailMapped === selectedDate;
+          // User selected a single date from chips. Check if it falls within the availability range.
+          matchDate = checkCarAvailability(car, selectedDate, selectedDate);
         }
       }
       

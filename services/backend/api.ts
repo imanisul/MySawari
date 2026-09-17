@@ -94,12 +94,15 @@ export const API = {
 
       // If we made it through all intervals and didn't find a gap that ends before an interval,
       // it means the car is available from currentCheckTime indefinitely.
+      if (!nextAvailableEnd) {
+        nextAvailableEnd = currentCheckTime + 30 * 24 * 60 * 60 * 1000;
+      }
       
       return {
         ...car,
         availabilityRange: {
           start: formatDate(currentCheckTime),
-          end: nextAvailableEnd ? formatDate(nextAvailableEnd) : undefined
+          end: formatDate(nextAvailableEnd)
         }
       };
     });

@@ -40,17 +40,28 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
   
   const isDateSelected = dateRange && !dateRange.includes('Select');
   let availableText = 'AVAILABLE NOW';
+  const todayStr = (() => { const d = new Date(); return `${d.getDate()} ${['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()]}`; })();
+
   if (car.availabilityRange?.start) {
-    if (car.availabilityRange.end) {
-      availableText = `AVAILABLE: ${car.availabilityRange.start} – ${car.availabilityRange.end}`;
+    const startStr = car.availabilityRange.start.toUpperCase();
+    const endStr = car.availabilityRange.end?.toUpperCase();
+    if (endStr) {
+      if (startStr === endStr) {
+        availableText = `AVAIL: ${startStr}`;
+      } else {
+        availableText = `AVAIL: ${startStr} – ${endStr}`;
+      }
     } else {
-      availableText = `AVAILABLE FROM ${car.availabilityRange.start}`;
+      if (startStr === todayStr) {
+        availableText = `AVAILABLE NOW`;
+      } else {
+        availableText = `AVAIL FROM ${startStr}`;
+      }
     }
   } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-    // Fallback for old data format just in case
-    availableText = car.availableToDate ? `AVAILABLE: ${car.availabilityDate} – ${car.availableToDate}` : `AVAILABLE FROM ${car.availabilityDate}`;
+    availableText = car.availableToDate ? `AVAIL: ${car.availabilityDate.toUpperCase()} – ${car.availableToDate.toUpperCase()}` : `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
   } else if (car.availableToDate) {
-    availableText = `AVAILABLE UNTIL ${car.availableToDate}`;
+    availableText = `AVAIL UNTIL ${car.availableToDate.toUpperCase()}`;
   }
 
   // Determine badge colors based on category

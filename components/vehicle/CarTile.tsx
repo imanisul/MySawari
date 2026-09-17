@@ -49,16 +49,27 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
           <View style={[styles.availableDot, { backgroundColor: colors.primary }]} />
           <Text style={[styles.availableText, { color: colors.foreground }]}>
             {(() => {
+              const todayStr = (() => { const d = new Date(); return `${d.getDate()} ${['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()]}`; })();
               if (car.availabilityRange?.start) {
-                if (car.availabilityRange.end) {
-                  return `AVAILABLE: ${car.availabilityRange.start} – ${car.availabilityRange.end}`;
+                const startStr = car.availabilityRange.start.toUpperCase();
+                const endStr = car.availabilityRange.end?.toUpperCase();
+                if (endStr) {
+                  if (startStr === endStr) {
+                    return `AVAIL: ${startStr}`;
+                  } else {
+                    return `AVAIL: ${startStr} – ${endStr}`;
+                  }
                 } else {
-                  return `AVAILABLE FROM ${car.availabilityRange.start}`;
+                  if (startStr === todayStr) {
+                    return `AVAILABLE NOW`;
+                  } else {
+                    return `AVAIL FROM ${startStr}`;
+                  }
                 }
               } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-                return car.availableToDate ? `AVAILABLE: ${car.availabilityDate} – ${car.availableToDate}` : `AVAILABLE FROM ${car.availabilityDate}`;
+                return car.availableToDate ? `AVAIL: ${car.availabilityDate.toUpperCase()} – ${car.availableToDate.toUpperCase()}` : `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
               } else if (car.availableToDate) {
-                return `AVAILABLE UNTIL ${car.availableToDate}`;
+                return `AVAIL UNTIL ${car.availableToDate.toUpperCase()}`;
               }
               return 'AVAILABLE NOW';
             })()}

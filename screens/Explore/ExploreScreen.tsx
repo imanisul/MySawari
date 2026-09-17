@@ -8,6 +8,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { cars, premiumCollection, checkCarAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 export default function ExploreScreen() {
   const colors = useColors();
@@ -53,6 +54,16 @@ export default function ExploreScreen() {
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const onDateChange = (event: DateTimePickerEvent, selectedDateObj?: Date) => {
+    setShowDatePicker(false);
+    if (event.type === 'set' && selectedDateObj) {
+      const formattedDate = selectedDateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      setSelectedDate(formattedDate);
+    }
+  };
+
   const availableDates = useMemo(() => {
     const dates = ['All Dates'];
     const today = new Date();
@@ -61,15 +72,26 @@ export default function ExploreScreen() {
       d.setDate(today.getDate() + i);
       dates.push(d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
     }
+    if (selectedDate !== 'All Dates' && !selectedDate.includes('–') && !dates.includes(selectedDate)) {
+      dates.splice(1, 0, selectedDate);
+    }
     return dates;
-  }, []);
+  }, [selectedDate]);
 
   const filteredCars = useMemo(() => {
     return cars.filter(car => {
       let matchDate = true;
       if (selectedDate !== 'All Dates') {
-        const [startStr, endStr] = selectedDate.split(' – ');
-        matchDate = checkCarAvailability(car, startStr, endStr);
+        if (selectedDate.includes('–')) {
+          const [startStr, endStr] = selectedDate.split(' – ');
+          matchDate = checkCarAvailability(car, startStr, endStr);
+        } else {
+          // User selected a single date from chips. Use strict exact matching.
+          const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+          const carAvail = car.availabilityDate || 'Available Now';
+          const carAvailMapped = carAvail === 'Available Now' ? todayStr : carAvail;
+          matchDate = carAvailMapped === selectedDate;
+        }
       }
       
       const matchType = vehicleType === 'All' || 
@@ -200,10 +222,10 @@ export default function ExploreScreen() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Open calendar to pick dates"
+          accessibilityLabel="Open calendar to pick date"
           onPress={() => {
             Haptics.selectionAsync();
-            router.push('/dates');
+            setShowDatePicker(true);
           }}
           style={({ pressed }) => [
             styles.dateChip,
@@ -217,6 +239,15 @@ export default function ExploreScreen() {
         >
           <Feather name="calendar" size={16} color={colors.foreground} />
         </Pressable>
+        {showDatePicker && (
+          <DateTimePicker
+            value={new Date()}
+            mode="date"
+            display="default"
+            minimumDate={new Date()}
+            onChange={onDateChange}
+          />
+        )}
         {availableDates.map((date) => {
           const active = date === selectedDate;
           return (

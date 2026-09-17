@@ -8,7 +8,7 @@ import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
-import { Car } from '@/utils/sawari';
+import { Car, getAvailabilityLabel } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 
 export const CarListCard = React.memo(function CarListCard({ car, isExplore = true, onIntercept }: { car: Car; isExplore?: boolean; onIntercept?: () => void }) {
@@ -39,12 +39,7 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
   }, [images.length, cardWidth]);
   
   const isDateSelected = dateRange && !dateRange.includes('Select');
-  let availableText = 'Available Now';
-  if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-    availableText = car.availableToDate ? `Avail: ${car.availabilityDate} - ${car.availableToDate}` : `Avail from: ${car.availabilityDate}`;
-  } else if (car.availableToDate) {
-    availableText = `Avail until: ${car.availableToDate}`;
-  }
+  const availableText = getAvailabilityLabel(car);
 
   // Determine badge colors based on category
   const isBike = car.category === 'Bike' || car.category === 'Off-road';

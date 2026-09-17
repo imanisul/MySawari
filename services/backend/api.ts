@@ -465,7 +465,12 @@ export const API = {
     }
 
     const additionalDays = Math.ceil((newReturn.getTime() - currentReturn.getTime()) / (1000 * 60 * 60 * 24));
-    const additionalAmount = additionalDays * booking.dailyRate;
+    let additionalAmount = additionalDays * booking.dailyRate;
+    
+    // Add driver charge if the original booking included a driver
+    if (booking.driverMode === 'With Driver') {
+      additionalAmount += (1400 * additionalDays);
+    }
 
     return {
       available: true,
@@ -504,6 +509,10 @@ export const API = {
     booking.returnDate = newReturnDateStr;
     booking.rentalDays += additionalDays;
     booking.totalRentalAmount = (booking.totalRentalAmount || booking.rentalAmount) + additionalAmount;
+    
+    if (booking.driverMode === 'With Driver') {
+      booking.driverCharge = (booking.driverCharge || 0) + (1400 * additionalDays);
+    }
     
     // Add extension amount to the remaining balance to be paid at drop-off
     booking.remainingRentalAmount = (booking.remainingRentalAmount || 0) + additionalAmount;

@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Car } from '@/utils/sawari';
+import { Car, getAvailabilityLabel } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 
 export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }: { car: Car; onPress?: () => void; onIntercept?: () => void }) {
@@ -47,15 +47,8 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
         </View>
         <View style={styles.availableRow}>
           <View style={[styles.availableDot, { backgroundColor: colors.primary }]} />
-          <Text style={[styles.availableText, { color: colors.foreground }]}>
-            {(() => {
-              if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-                return car.availableToDate ? `Avail: ${car.availabilityDate} - ${car.availableToDate}` : `Avail from: ${car.availabilityDate}`;
-              } else if (car.availableToDate) {
-                return `Avail until: ${car.availableToDate}`;
-              }
-              return 'Available Now';
-            })()}
+          <Text numberOfLines={1} style={[styles.availableText, { color: colors.foreground }]}>
+            {getAvailabilityLabel(car)}
           </Text>
         </View>
       </View>

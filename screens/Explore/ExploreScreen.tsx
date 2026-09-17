@@ -20,11 +20,12 @@ export default function ExploreScreen() {
   
   const [start, setStart] = useState<Date | null>(null);
   const [end, setEnd] = useState<Date | null>(null);
-  
+
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  
+
   const handleDateSelect = (date: Date) => {
     if (start && end) {
+      // Starting a fresh selection after a completed range was already picked.
       setStart(date);
       setEnd(null);
       setSelectedDate('All Dates');
@@ -42,15 +43,34 @@ export default function ExploreScreen() {
       }
       return;
     }
+    // Picking the start date: clear the local filter immediately so the list
+    // doesn't stay filtered by a stale range while an end date is chosen.
+    // (The shared booking dateRange is left untouched until a full range is
+    // confirmed, so an in-progress pick here doesn't clobber Home's dates.)
     setStart(date);
     setEnd(null);
+    setSelectedDate('All Dates');
   };
 
-  // Sync selectedDate when dateRange changes via Calendar or Context
+  const handleClearDates = () => {
+    setStart(null);
+    setEnd(null);
+    setSelectedDate('All Dates');
+    setDateRange('All Dates');
+  };
+
+  // Only reflect the shared booking dateRange (used by Home/Booking's quote
+  // flow) once the user has actually picked a range on this screen — its
+  // initial value is just a mock default for pricing, not a real selection,
+  // so syncing it in on mount would silently filter the list.
+  const hasSyncedFromExplore = React.useRef(false);
   useEffect(() => {
+    if (!hasSyncedFromExplore.current) {
+      hasSyncedFromExplore.current = true;
+      return;
+    }
     if (dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates') {
       setSelectedDate(dateRange);
-      // Try parsing back to start/end if possible, but for explore it's mostly one-way
     } else if (dateRange === 'All Dates' || !dateRange) {
       setSelectedDate('All Dates');
       setStart(null);
@@ -219,6 +239,28 @@ export default function ExploreScreen() {
       </View>
       
       <View style={{ marginTop: 16 }}>
+        <View style={styles.dateStatusRow}>
+          <Text style={[styles.dateStatusText, { color: colors.foreground }]}>
+            {start && !end
+              ? `${start.getDate()} ${MONTHS[start.getMonth()]} – Select return date`
+              : selectedDate !== 'All Dates'
+              ? selectedDate
+              : 'Any date'}
+          </Text>
+          {(selectedDate !== 'All Dates' || start) && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Clear selected dates"
+              onPress={() => {
+                Haptics.selectionAsync();
+                handleClearDates();
+              }}
+              hitSlop={8}
+            >
+              <Text style={[styles.dateClearText, { color: colors.primary }]}>Clear</Text>
+            </Pressable>
+          )}
+        </View>
         <MonthCalendar start={start} end={end} onPress={handleDateSelect} />
       </View>
     </View>
@@ -314,6 +356,10 @@ const styles = StyleSheet.create({
 
   filterButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1 },
   filterButtonText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+
+  dateStatusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, marginBottom: 8 },
+  dateStatusText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  dateClearText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
 
   dateRow: { gap: 8, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
   dateChip: {

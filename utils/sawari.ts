@@ -64,6 +64,20 @@ export const getDynamicDate = (offset: number) => {
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 };
 
+/**
+ * Builds a single, consistently-formatted "from – to" availability label
+ * shown on car tiles/cards, covering every combination of the two optional
+ * availability fields a car may have.
+ */
+export function getAvailabilityLabel(car: Pick<Car, 'availabilityDate' | 'availableToDate'>): string {
+  const isAvailableNow = !car.availabilityDate || car.availabilityDate === 'Available Now';
+
+  if (isAvailableNow && !car.availableToDate) return 'Available Now';
+  if (isAvailableNow && car.availableToDate) return `Avail: Now – ${car.availableToDate}`;
+  if (!isAvailableNow && !car.availableToDate) return `Avail from ${car.availabilityDate}`;
+  return `Avail: ${car.availabilityDate} – ${car.availableToDate}`;
+}
+
 export const categories: Category[] = ['All', 'SUV', 'Sedan', 'Hatchback', 'MUV', 'Luxury', 'Bike'];
 
 /**

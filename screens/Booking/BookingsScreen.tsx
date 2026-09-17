@@ -232,26 +232,24 @@ export default function BookingsScreen() {
                       <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>No Refund (Cancelled within 24 hours)</Text>
                     </View>
                   )}
-                  {(tab === 'Upcoming' && (booking.status === 'CONFIRMED' || booking.status === 'PENDING')) && (
-                    <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                  <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                    {(tab === 'Upcoming' && (booking.status === 'CONFIRMED' || booking.status === 'PENDING')) && (
                       <Pressable 
                         onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('cancel'); }}
                         style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: colors.destructive }}
                       >
                         <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Cancel Trip</Text>
                       </Pressable>
-                    </View>
-                  )}
-                  {tab === 'Active' && (
-                    <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                    )}
+                    {(tab === 'Active' || (tab === 'Upcoming' && booking.status === 'CONFIRMED')) && (
                       <Pressable 
                         onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('extend'); }}
-                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary }}
+                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary, marginLeft: 12 }}
                       >
                         <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extend Trip</Text>
                       </Pressable>
-                    </View>
-                  )}
+                    )}
+                  </View>
                 </View>
               </Pressable>
               );

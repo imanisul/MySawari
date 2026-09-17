@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { CarTile, LoginBottomSheet } from '@/components';
 import { TripEditorModal } from '@/components/home/TripEditorModal';
@@ -15,19 +16,22 @@ import { VehicleSummary } from '@/components/vehicle/details/VehicleSummary';
 import { DetailsTabs } from '@/components/vehicle/details/DetailsTabs';
 import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
 import { PriceBreakdownSheet } from '@/components/vehicle/details/PriceBreakdownSheet';
+import { SearchSheet } from '@/components/booking/SearchSheet';
 
 export default function CarDetailsScreen() {
   const colors = useColors();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, pickup, dateRange, isDeliveryRequested, setFuelEstimate } = useSawari();
+  const { selectedCar, pickup, dropoff, dateRange, bookingSource, isDeliveryRequested, setFuelEstimate } = useSawari();
   
   const hasValidDates = !!(dateRange && !dateRange.includes('Select'));
-  const [startStr] = (dateRange || '').split(' – ');
-  const isAvailable = !hasValidDates ? true : checkCarAvailability(selectedCar?.availabilityDate, startStr);
+  const [startStr, endStr] = (dateRange || '').split(' – ');
+  const isAvailable = !hasValidDates ? true : checkCarAvailability(selectedCar, startStr, endStr);
   
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
+  const [showSearchSheet, setShowSearchSheet] = useState(false);
 
 
   useEffect(() => {
@@ -114,9 +118,33 @@ export default function CarDetailsScreen() {
 
       </ScrollView>
       
-      <StickyBookingBar isAvailable={isAvailable} onViewBreakdown={() => setShowBreakdown(true)} onNeedLogin={() => setShowLogin(true)} />
-      <PriceBreakdownSheet visible={showBreakdown} onClose={() => setShowBreakdown(false)} />
-      <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
+      <StickyBookingBar 
+        isAvailable={isAvailable} 
+        onViewBreakdown={() => setShowBreakdown(true)} 
+        onNeedLogin={() => setShowLogin(true)} 
+        onBookNow={() => {
+          const isMissingEnd = !endStr || endStr.includes('Select');
+          if (bookingSource === 'explore' || !dropoff?.name || isMissingEnd) {
+            setShowSearchSheet(true);
+          } else {
+            router.push('/booking');
+          }
+        }}
+      />
+      <PriceBreakdownSheet
+        visible={showBreakdown}
+        onClose={() => setShowBreakdown(false)}
+      />
+      <SearchSheet
+        visible={showSearchSheet}
+        onClose={() => setShowSearchSheet(false)}
+        onContinue={() => {
+          setShowSearchSheet(false);
+          router.push('/booking');
+        }}
+      />
+      <LoginBottomSheet 
+        visible={showLogin} onClose={() => setShowLogin(false)} />
       <TripEditorModal
         visible={isEditingTrip}
         onClose={() => setIsEditingTrip(false)}

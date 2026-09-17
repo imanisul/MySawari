@@ -38,9 +38,12 @@ type SawariContextValue = {
   mode: DriverMode;
   selectedCar: Car;
   bookingConfirmed: boolean;
+  bookingSource: 'home' | 'explore' | null;
+  setBookingSource: (source: 'home' | 'explore' | null) => void;
   pickup: LocationResult | null;
   dropoff: LocationResult | null;
   dateRange: string;
+  setDateRange: (range: string) => void;
   duration: string;
   durationDays: number;
   pickupTime: string;
@@ -132,6 +135,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<DriverMode>('Self Drive');
   const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  const [bookingSource, setBookingSource] = useState<'home' | 'explore' | null>(null);
   const [pickup, setPickup] = useState<LocationResult | null>(null);
   const [dropoff, setDropoff] = useState<LocationResult | null>(null);
   const [isDeliveryRequested, setIsDeliveryRequested] = useState(false);
@@ -288,6 +292,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       pickup,
       dropoff,
       dateRange,
+      setDateRange,
+      bookingSource,
+      setBookingSource,
       duration,
       durationDays: pricingQuote?.rentalDays || 1, // Fallback to 1 if quote not loaded
       pickupTime,

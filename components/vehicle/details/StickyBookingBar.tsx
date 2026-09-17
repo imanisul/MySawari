@@ -11,10 +11,12 @@ export function StickyBookingBar({
   isAvailable = true,
   onViewBreakdown,
   onNeedLogin,
+  onBookNow,
 }: {
   isAvailable?: boolean;
   onViewBreakdown?: () => void;
   onNeedLogin?: () => void;
+  onBookNow?: () => void;
 }) {
   const colors = useColors();
   const router = useRouter();
@@ -58,7 +60,7 @@ export function StickyBookingBar({
         accessibilityRole="button"
         onPress={() => {
           if (isAuthenticated) {
-            router.push('/booking');
+            onBookNow ? onBookNow() : router.push('/booking');
           } else {
             onNeedLogin?.();
           }

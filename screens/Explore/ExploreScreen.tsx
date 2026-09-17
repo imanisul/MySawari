@@ -4,7 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { cars } from '@/utils/sawari';
+import { useFocusEffect } from 'expo-router';
+import { cars, premiumCollection, checkCarAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
 
@@ -12,8 +13,14 @@ export default function ExploreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<string>('All Dates');
-  const { vehicleType: globalVehicleType } = useSawari();
+  const { vehicleType: globalVehicleType, setBookingSource, setDateRange } = useSawari();
   const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>(globalVehicleType === 'car' ? 'Cars' : 'Bikes');
+  
+  useFocusEffect(
+    useCallback(() => {
+      setBookingSource('explore');
+    }, [setBookingSource])
+  );
   
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
@@ -53,20 +60,7 @@ export default function ExploreScreen() {
     return cars.filter(car => {
       let matchDate = true;
       if (selectedDate !== 'All Dates') {
-        const parseDate = (dStr: string) => {
-          if (!dStr || dStr === 'Available Now') return 0;
-          const parts = dStr.trim().split(' ');
-          if (parts.length < 2) return 0;
-          const day = parseInt(parts[0], 10);
-          const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
-          let month = MONTHS.indexOf(parts[1]);
-          if (month === 12) month = 8;
-          if (month === -1) return 0;
-          return new Date(new Date().getFullYear(), month, day).getTime();
-        };
-        const selectedTime = parseDate(selectedDate);
-        const carTime = parseDate(car.availabilityDate || 'Available Now');
-        matchDate = carTime <= selectedTime;
+        matchDate = checkCarAvailability(car, selectedDate, selectedDate);
       }
       
       const matchType = vehicleType === 'All' || 
@@ -207,6 +201,7 @@ export default function ExploreScreen() {
               onPress={() => {
                 Haptics.selectionAsync();
                 setSelectedDate(date);
+                if (date !== 'All Dates') setDateRange(date);
               }}
               style={({ pressed }) => [
                 styles.dateChip,

@@ -33,8 +33,8 @@ export default function BookingScreen() {
   const isMissingDates = !dateRange || dateRange.includes('Select');
   const isMissingDestination = !dropoff?.name;
   
-  const [startStr] = (dateRange || '').split(' – ');
-  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(selectedCar?.availabilityDate, startStr);
+  const [startStr, endStr] = (dateRange || '').split(' – ');
+  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(selectedCar, startStr, endStr);
 
   const validateAndProceed = () => {
     if (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) {

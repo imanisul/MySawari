@@ -32,7 +32,7 @@ export function SearchSheet({
   }
 
   // Check if selected car is available on these dates
-  const isAvailable = checkCarAvailability(selectedCar?.availabilityDate, startStr);
+  const isAvailable = checkCarAvailability(selectedCar, startStr, endStr);
   // Note: in a real app, this date validation logic would be more robust.
   
   return (

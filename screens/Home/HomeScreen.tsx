@@ -38,7 +38,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated } = useSawari();
+  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated, setBookingSource } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -167,6 +167,7 @@ export default function HomeScreen() {
               onModeChange={setMode}
               onSearch={() => {
                 Haptics.selectionAsync();
+                setBookingSource('home');
                 if (isAuthenticated) {
                   router.push('/search');
                 } else {

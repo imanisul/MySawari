@@ -333,7 +333,10 @@ export const premiumCollection: Car[] = [
   },
 ];
 
-export const checkCarAvailability = (carAvailabilityDate: string | undefined, selectedStartDate: string): boolean => {
+export const checkCarAvailability = (car: Car | undefined | null, selectedStartDate: string, selectedEndDate?: string): boolean => {
+  if (!car) return false;
+  
+  const carAvailabilityDate = car.availabilityDate;
   if (!carAvailabilityDate || carAvailabilityDate === 'Available Now') return true;
   if (!selectedStartDate || selectedStartDate.includes('Select') || selectedStartDate === 'Available Now') return true;
   
@@ -348,9 +351,14 @@ export const checkCarAvailability = (carAvailabilityDate: string | undefined, se
     return new Date(new Date().getFullYear(), month, day).getTime();
   };
   
-  const selectedTime = parseDate(selectedStartDate);
-  const carTime = parseDate(carAvailabilityDate);
-  return carTime <= selectedTime;
+  const selectedStart = parseDate(selectedStartDate);
+  const selectedEnd = selectedEndDate && !selectedEndDate.includes('Select') ? parseDate(selectedEndDate) : selectedStart;
+  const carAvailableFrom = parseDate(carAvailabilityDate);
+  
+  // The car is only available ON and AFTER carAvailableFrom.
+  // This means if ANY part of the requested trip (start -> end) is before carAvailableFrom, it's unavailable.
+  // Therefore, selectedStart must be >= carAvailableFrom.
+  return selectedStart >= carAvailableFrom;
 };
 
 export const resultCars: Car[] = [

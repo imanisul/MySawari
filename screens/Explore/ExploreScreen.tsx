@@ -7,8 +7,10 @@ import { useColors } from '@/hooks/useColors';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { cars, premiumCollection, checkCarAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
+import { API } from '@/services/backend/api';
 import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { Car } from '@/utils/sawari';
 
 export default function ExploreScreen() {
   const colors = useColors();
@@ -36,6 +38,9 @@ export default function ExploreScreen() {
 
   
   // Search state
+  const [fetchedCars, setFetchedCars] = useState<Car[]>([]);
+  const [isFetchingCars, setIsFetchingCars] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
@@ -79,7 +84,7 @@ export default function ExploreScreen() {
   }, [selectedDate]);
 
   const filteredCars = useMemo(() => {
-    return cars.filter(car => {
+    return fetchedCars.filter(car => {
       let matchDate = true;
       if (selectedDate !== 'All Dates') {
         if (selectedDate.includes('–')) {
@@ -88,7 +93,7 @@ export default function ExploreScreen() {
         } else {
           // User selected a single date from chips. Use strict exact matching.
           const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-          const carAvail = car.availabilityDate || 'Available Now';
+          const carAvail = car.availabilityRange?.start || car.availabilityDate || 'Available Now';
           const carAvailMapped = carAvail === 'Available Now' ? todayStr : carAvail;
           matchDate = carAvailMapped === selectedDate;
         }
@@ -116,6 +121,27 @@ export default function ExploreScreen() {
     return filteredCars.slice(0, page * PAGE_SIZE);
   }, [filteredCars, page]);
 
+  const fetchVehicles = useCallback(async () => {
+    try {
+      setIsFetchingCars(true);
+      setFetchError(false);
+      const data = await API.getVehiclesWithAvailability();
+      if (data) {
+        setFetchedCars(data);
+      }
+    } catch (e) {
+      console.error(e);
+      setFetchError(true);
+      setFetchedCars(cars);
+    } finally {
+      setIsFetchingCars(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchVehicles();
+  }, [fetchVehicles]);
+
   const handleLoadMore = () => {
     if (paginatedCars.length < filteredCars.length && !isLoadingMore) {
       setIsLoadingMore(true);
@@ -127,12 +153,10 @@ export default function ExploreScreen() {
     }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setPage(1);
-      setIsRefreshing(false);
-    }, 600);
+    await fetchVehicles();
+    setIsRefreshing(false);
   };
 
   const renderCar = useCallback(({ item }: { item: typeof cars[0] }) => (
@@ -286,20 +310,46 @@ export default function ExploreScreen() {
   ), [colors, searchQuery, vehicleType, selectedDate, availableDates, activeFilterCount]);
 
   /* ─── ListEmptyComponent ─── */
-  const ListEmpty = useCallback(() => (
-    <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-      <Feather name="search" size={28} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
-      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-        {vehicleType === 'Bikes' ? 'No bikes available' : 'No cars available'}
-      </Text>
-      <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
-        {debouncedQuery !== ''
-          ? `No results matching "${debouncedQuery}". Try adjusting your search.`
-          : selectedDate !== 'All Dates'
-          ? `No vehicles available on ${selectedDate}. Try another date.`
-          : `No vehicles found. Try adjusting your filters.`
-        }
-      </Text>
+  const ListEmpty = useCallback(() => {
+    if (isFetchingCars) {
+      return (
+        <View style={{ paddingHorizontal: 16 }}>
+          {[1, 2, 3].map(i => (
+            <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
+          ))}
+        </View>
+      );
+    }
+    
+    if (fetchError) {
+      return (
+        <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+          <Feather name="alert-circle" size={28} color={colors.destructive} style={{ marginBottom: 12 }} />
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Connection Error</Text>
+          <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
+            DATES UNAVAILABLE. Could not connect to the backend. Please try again.
+          </Text>
+          <Pressable style={[styles.clearButton, { backgroundColor: colors.primary, marginTop: 16 }]} onPress={fetchVehicles}>
+            <Text style={[styles.clearButtonText, { color: colors.primaryForeground }]}>Retry</Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
+        <Feather name="search" size={28} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+        <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+          {vehicleType === 'Bikes' ? 'No bikes available' : 'No cars available'}
+        </Text>
+        <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
+          {debouncedQuery !== ''
+            ? `No results matching "${debouncedQuery}". Try adjusting your search.`
+            : selectedDate !== 'All Dates'
+            ? `No vehicles available on ${selectedDate}. Try another date.`
+            : `No vehicles found. Try adjusting your filters.`
+          }
+        </Text>
       {(debouncedQuery !== '' || selectedDate !== 'All Dates' || activeFilterCount > 0) && (
         <Pressable
           accessibilityRole="button"
@@ -315,8 +365,9 @@ export default function ExploreScreen() {
           <Text style={[styles.clearButtonText, { color: colors.primaryForeground }]}>Clear All Filters</Text>
         </Pressable>
       )}
-    </View>
-  ), [colors, debouncedQuery, selectedDate, vehicleType, activeFilterCount]);
+      </View>
+    );
+  }, [colors, debouncedQuery, selectedDate, vehicleType, activeFilterCount, isFetchingCars, fetchError, fetchVehicles]);
 
   return (
     <Page bottomNav scroll={false}>
@@ -392,7 +443,16 @@ const styles = StyleSheet.create({
   emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
   emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 7, textAlign: 'center' },
   clearButton: { marginTop: 16, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  clearButtonText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  clearButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+
+  skeletonCard: {
+    height: 220,
+    width: '100%',
+    borderRadius: 24,
+    borderWidth: 1,
+    marginBottom: 24,
+    opacity: 0.5,
+  },
 
   loadingFooter: { paddingVertical: 20, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   loadingText: { fontFamily: 'Inter_500Medium', fontSize: 13 },

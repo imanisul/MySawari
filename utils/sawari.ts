@@ -26,6 +26,10 @@ export type Car = {
   mileage?: string;
   availabilityDate?: string;
   availableToDate?: string;
+  availabilityRange?: {
+    start: string;
+    end?: string;
+  };
 
   // New UI features
   images?: ImageSourcePropType[];
@@ -340,8 +344,10 @@ export const premiumCollection: Car[] = [
 export const checkCarAvailability = (car: Car | undefined | null, selectedStartDate: string, selectedEndDate?: string): boolean => {
   if (!car) return false;
   
-  const carAvailabilityDate = car.availabilityDate;
-  if (!carAvailabilityDate || carAvailabilityDate === 'Available Now') return true;
+  const rangeStartStr = car.availabilityRange?.start || car.availabilityDate;
+  const rangeEndStr = car.availabilityRange?.end || car.availableToDate;
+
+  if (!rangeStartStr || rangeStartStr === 'Available Now') return true;
   if (!selectedStartDate || selectedStartDate.includes('Select') || selectedStartDate === 'Available Now') return true;
   
   const parseDate = (dStr: string) => {
@@ -358,13 +364,13 @@ export const checkCarAvailability = (car: Car | undefined | null, selectedStartD
   const selectedStart = parseDate(selectedStartDate);
   const selectedEnd = selectedEndDate && !selectedEndDate.includes('Select') ? parseDate(selectedEndDate) : selectedStart;
   
-  if (carAvailabilityDate !== 'Available Now') {
-    const carAvailableFrom = parseDate(carAvailabilityDate);
+  if (rangeStartStr !== 'Available Now') {
+    const carAvailableFrom = parseDate(rangeStartStr);
     if (selectedStart < carAvailableFrom) return false;
   }
   
-  if (car.availableToDate) {
-    const carAvailableTo = parseDate(car.availableToDate);
+  if (rangeEndStr) {
+    const carAvailableTo = parseDate(rangeEndStr);
     if (selectedEnd > carAvailableTo) return false;
   }
   

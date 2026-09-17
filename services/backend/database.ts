@@ -1,4 +1,5 @@
 // Mock Database simulating backend tables/collections
+import { cars } from '../../utils/sawari';
 
 export type FuelPrice = {
   fuelType: string;
@@ -169,7 +170,26 @@ export const DB = {
     { code: 'FESTIVAL10', discountType: 'PERCENTAGE', discountValue: 10, minimumBooking: 2000, maximumDiscount: 500, expiryDate: '2027-12-31', active: true }
   ] as Coupon[],
   
-  bookings: [] as BookingSnapshot[],
+  bookings: [
+    {
+      id: 'MSW-MOCK-1',
+      status: 'CONFIRMED',
+      vehicleId: 'swift',
+      pickupDate: (() => { const d = new Date(); return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()].toUpperCase()}`; })(),
+      returnDate: (() => { const d = new Date(); d.setDate(d.getDate() + 2); return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()].toUpperCase()}`; })()
+    },
+    {
+      id: 'MSW-MOCK-2',
+      status: 'CONFIRMED',
+      vehicleId: 'scorpio-s',
+      pickupDate: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()].toUpperCase()}`; })(),
+      returnDate: (() => { const d = new Date(); d.setDate(d.getDate() + 6); return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()].toUpperCase()}`; })()
+    }
+  ] as any[],
+  
+  // New tables for Availability
+  vehicles: [...cars] as any[],
+  blockedDates: [] as { vehicleId: string; startDate: string; endDate: string }[],
   
   users: [] as User[],
   referrals: [] as Referral[],

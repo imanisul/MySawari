@@ -23,6 +23,91 @@ export const API = {
   },
 
   /**
+   * GET /api/vehicles
+   * Returns vehicles with their dynamically calculated availability range
+   */
+  async getVehiclesWithAvailability() {
+    await delay(500); // Simulate network latency
+
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    const parseDate = (dStr: string) => {
+      const parts = dStr.trim().split(' ');
+      if (parts.length < 2) return 0;
+      const day = parseInt(parts[0], 10);
+      const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+      let month = MONTHS.indexOf(parts[1]);
+      if (month === 12) month = 8;
+      if (month === -1) return 0;
+      return new Date(now.getFullYear(), month, day).getTime();
+    };
+
+    const formatDate = (ts: number) => {
+      const d = new Date(ts);
+      return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()].toUpperCase()}`;
+    };
+
+    // Calculate availability for each vehicle
+    const vehiclesWithAvailability = DB.vehicles.map(car => {
+      // 1. Get relevant bookings (active and in the future/ongoing)
+      const activeBookings = DB.bookings.filter(b => 
+        b.vehicleId === car.id && 
+        ['CONFIRMED', 'ONGOING'].includes(b.status)
+      );
+
+      // Extract intervals [start, end] from bookings and blocked dates
+      const intervals = activeBookings.map(b => ({
+        start: parseDate(b.pickupDate),
+        end: parseDate(b.returnDate)
+      }));
+
+      // Add blocked dates (if any)
+      const blocks = DB.blockedDates?.filter(b => b.vehicleId === car.id) || [];
+      blocks.forEach(b => {
+        intervals.push({
+          start: parseDate(b.startDate),
+          end: parseDate(b.endDate)
+        });
+      });
+
+      // Sort intervals chronologically
+      intervals.sort((a, b) => a.start - b.start);
+
+      // 2. Find the first available window
+      let currentCheckTime = now.getTime();
+      let nextAvailableEnd: number | undefined = undefined;
+
+      // Filter out past intervals
+      const futureIntervals = intervals.filter(i => i.end >= currentCheckTime);
+
+      for (const interval of futureIntervals) {
+        if (currentCheckTime < interval.start) {
+          // We found a gap between currentCheckTime and interval.start
+          nextAvailableEnd = interval.start;
+          break;
+        } else {
+          // currentCheckTime falls inside this interval (or exactly on it), push the check forward
+          currentCheckTime = Math.max(currentCheckTime, interval.end);
+        }
+      }
+
+      // If we made it through all intervals and didn't find a gap that ends before an interval,
+      // it means the car is available from currentCheckTime indefinitely.
+      
+      return {
+        ...car,
+        availabilityRange: {
+          start: formatDate(currentCheckTime),
+          end: nextAvailableEnd ? formatDate(nextAvailableEnd) : undefined
+        }
+      };
+    });
+
+    return vehiclesWithAvailability;
+  },
+
+  /**
    * GET /api/coupons
    */
   async getCoupons() {

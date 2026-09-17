@@ -39,11 +39,18 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
   }, [images.length, cardWidth]);
   
   const isDateSelected = dateRange && !dateRange.includes('Select');
-  let availableText = 'Available Now';
-  if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-    availableText = car.availableToDate ? `Avail: ${car.availabilityDate} - ${car.availableToDate}` : `Avail from: ${car.availabilityDate}`;
+  let availableText = 'AVAILABLE NOW';
+  if (car.availabilityRange?.start) {
+    if (car.availabilityRange.end) {
+      availableText = `AVAILABLE: ${car.availabilityRange.start} – ${car.availabilityRange.end}`;
+    } else {
+      availableText = `AVAILABLE FROM ${car.availabilityRange.start}`;
+    }
+  } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
+    // Fallback for old data format just in case
+    availableText = car.availableToDate ? `AVAILABLE: ${car.availabilityDate} – ${car.availableToDate}` : `AVAILABLE FROM ${car.availabilityDate}`;
   } else if (car.availableToDate) {
-    availableText = `Avail until: ${car.availableToDate}`;
+    availableText = `AVAILABLE UNTIL ${car.availableToDate}`;
   }
 
   // Determine badge colors based on category

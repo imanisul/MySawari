@@ -331,7 +331,14 @@ export const checkCarAvailability = (carAvailabilityDate: string | undefined, se
   if (!selectedStartDate || selectedStartDate.includes('Select') || selectedStartDate === 'Available Now') return true;
   
   const parseDate = (dStr: string) => {
-    return new Date(`${dStr} ${new Date().getFullYear()}`).getTime();
+    const parts = dStr.trim().split(' ');
+    if (parts.length < 2) return 0;
+    const day = parseInt(parts[0], 10);
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+    let month = MONTHS.indexOf(parts[1]);
+    if (month === 12) month = 8; // Handle 'Sept' as 'Sep'
+    if (month === -1) return 0;
+    return new Date(new Date().getFullYear(), month, day).getTime();
   };
   
   const selectedTime = parseDate(selectedStartDate);

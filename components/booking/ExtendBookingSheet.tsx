@@ -74,6 +74,13 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
     }
   };
 
+  const [showRazorpay, setShowRazorpay] = useState(false);
+
+  const handleConfirmPay = () => {
+    if (!availability?.available) return;
+    setShowRazorpay(true);
+  };
+
   const handleExtend = async () => {
     if (!availability?.available) return;
     setLoading(true);
@@ -91,6 +98,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
       Alert.alert('Extension Failed', e.message);
     } finally {
       setLoading(false);
+      setShowRazorpay(false);
     }
   };
 
@@ -102,77 +110,93 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
       <View style={styles.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <Animated.View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 24), transform: [{ translateY: slideAnim }] }]}>
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.foreground }]}>Extend Booking</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={24} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 }}>
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 6 }}>Current Return</Text>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{currentReturnDate}</Text>
+          
+          {showRazorpay ? (
+            <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+              <View style={[styles.razorpayMock, { backgroundColor: '#1A1A1A', borderColor: '#333' }]}>
+                <Text style={{ color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', marginBottom: 12 }}>Razorpay (Mock)</Text>
+                <Text style={{ color: '#aaa', fontFamily: 'Inter_500Medium', marginBottom: 24, fontSize: 16 }}>
+                  Payable: ₹{availability?.additionalAmount.toLocaleString('en-IN')}
+                </Text>
+                <TouchableOpacity onPress={handleExtend} disabled={loading} style={[styles.primaryBtn, { backgroundColor: '#3399cc', width: '100%', marginBottom: 12 }]}>
+                  {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={[styles.primaryBtnText, { color: '#fff' }]}>Simulate Success</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setShowRazorpay(false)} disabled={loading} style={[styles.primaryBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#555', width: '100%' }]}>
+                  <Text style={[styles.primaryBtnText, { color: '#aaa' }]}>Cancel</Text>
+                </TouchableOpacity>
               </View>
-              
-              <View style={{ paddingHorizontal: 12 }}>
-                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+            </View>
+          ) : (
+            <>
+              <View style={styles.header}>
+                <Text style={[styles.title, { color: colors.foreground }]}>Extend Booking</Text>
+                <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                  <Feather name="x" size={24} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 }}>
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 6 }}>Current Return</Text>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{currentReturnDate}</Text>
+                  </View>
+                  
+                  <View style={{ paddingHorizontal: 12 }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+                    </View>
+                  </View>
+                  
+                  <View style={{ flex: 1, alignItems: 'center' }}>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 }}>New Return</Text>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{newReturnDate}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+                
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
+                  <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 16, color: colors.foreground }}>Add Days</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.border, borderRadius: 24, padding: 4 }}>
+                    <TouchableOpacity onPress={decrementDays} disabled={daysToAdd <= 1 || checking} style={{ padding: 10, backgroundColor: daysToAdd <= 1 ? 'transparent' : colors.card, borderRadius: 20 }}>
+                      <Feather name="minus" size={18} color={daysToAdd <= 1 ? colors.mutedForeground : colors.foreground} />
+                    </TouchableOpacity>
+                    <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: colors.foreground, width: 44, textAlign: 'center' }}>{daysToAdd}</Text>
+                    <TouchableOpacity onPress={incrementDays} disabled={daysToAdd >= 30 || checking} style={{ padding: 10, backgroundColor: colors.card, borderRadius: 20 }}>
+                      <Feather name="plus" size={18} color={colors.foreground} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                  <View>
+                    <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Additional Rental</Text>
+                    <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 2 }}>Paid online only</Text>
+                  </View>
+                  {checking ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : availability?.available ? (
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 16 }}>₹{availability.additionalAmount.toLocaleString('en-IN')}</Text>
+                  ) : (
+                    <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{availability?.message || 'Unavailable'}</Text>
+                  )}
                 </View>
               </View>
-              
-              <View style={{ flex: 1, alignItems: 'center' }}>
-                <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 }}>New Return</Text>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{newReturnDate}</Text>
-              </View>
-            </View>
 
-            <View style={styles.divider} />
-            
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
-              <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 16, color: colors.foreground }}>Add Days</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.border, borderRadius: 24, padding: 4 }}>
-                <TouchableOpacity onPress={decrementDays} disabled={daysToAdd <= 1 || checking} style={{ padding: 10, backgroundColor: daysToAdd <= 1 ? 'transparent' : colors.card, borderRadius: 20 }}>
-                  <Feather name="minus" size={18} color={daysToAdd <= 1 ? colors.mutedForeground : colors.foreground} />
-                </TouchableOpacity>
-                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: colors.foreground, width: 44, textAlign: 'center' }}>{daysToAdd}</Text>
-                <TouchableOpacity onPress={incrementDays} disabled={daysToAdd >= 30 || checking} style={{ padding: 10, backgroundColor: colors.card, borderRadius: 20 }}>
-                  <Feather name="plus" size={18} color={colors.foreground} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-              <View>
-                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Additional Rental</Text>
-                <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 2 }}>Paid online only</Text>
-              </View>
-              {checking ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : availability?.available ? (
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 16 }}>₹{availability.additionalAmount.toLocaleString('en-IN')}</Text>
-              ) : (
-                <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{availability?.message || 'Unavailable'}</Text>
-              )}
-            </View>
-          </View>
-
-          <TouchableOpacity 
-            style={[styles.primaryBtn, { backgroundColor: availability?.available ? colors.primary : colors.mutedForeground }]} 
-            onPress={handleExtend}
-            disabled={loading || checking || !availability?.available}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.primaryForeground} />
-            ) : (
-              <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
-                {availability?.available ? `Confirm (Pay ₹${availability.additionalAmount.toLocaleString('en-IN')} Online)` : 'Unavailable'}
-              </Text>
-            )}
-          </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.primaryBtn, { backgroundColor: availability?.available ? colors.primary : colors.mutedForeground }]} 
+                onPress={handleConfirmPay}
+                disabled={loading || checking || !availability?.available}
+              >
+                <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
+                  {availability?.available ? `Confirm Pay` : 'Unavailable'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
         </Animated.View>
       </View>
     </Modal>
@@ -192,4 +216,5 @@ const styles = StyleSheet.create({
   dayPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, borderWidth: 1, marginRight: 8 },
   primaryBtn: { padding: 16, borderRadius: 12, alignItems: 'center' },
   primaryBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  razorpayMock: { padding: 32, backgroundColor: '#1A1A1A', borderRadius: 20, width: '90%', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 15, borderWidth: 1, borderColor: '#333' }
 });

@@ -47,7 +47,16 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
         </View>
         <View style={styles.availableRow}>
           <View style={[styles.availableDot, { backgroundColor: colors.primary }]} />
-          <Text style={[styles.availableText, { color: colors.foreground }]}>Available</Text>
+          <Text style={[styles.availableText, { color: colors.foreground }]}>
+            {(() => {
+              if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
+                return car.availableToDate ? `Avail ${car.availabilityDate} - ${car.availableToDate}` : `From ${car.availabilityDate}`;
+              } else if (car.availableToDate) {
+                return `Until ${car.availableToDate}`;
+              }
+              return 'Available Now';
+            })()}
+          </Text>
         </View>
       </View>
     </Pressable>

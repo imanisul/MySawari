@@ -25,6 +25,7 @@ export type Car = {
   fuel: string;
   mileage?: string;
   availabilityDate?: string;
+  availableToDate?: string;
 
   // New UI features
   images?: ImageSourcePropType[];
@@ -161,6 +162,7 @@ const baseCars: Car[] = [
     fuel: 'Diesel',
     mileage: '19 km/l',
     availabilityDate: 'Available Now',
+    availableToDate: getDynamicDate(7),
   },
   {
     id: 'swift',
@@ -175,6 +177,7 @@ const baseCars: Car[] = [
     fuel: 'Petrol',
     mileage: '23 km/l',
     availabilityDate: getDynamicDate(2),
+    availableToDate: getDynamicDate(5),
   },
   {
     id: 'scorpio-s',
@@ -203,6 +206,7 @@ const baseCars: Car[] = [
     fuel: 'Petrol',
     mileage: '17 km/l',
     availabilityDate: 'Available Now',
+    availableToDate: getDynamicDate(15),
   },
   {
     id: 'jawa',
@@ -353,12 +357,18 @@ export const checkCarAvailability = (car: Car | undefined | null, selectedStartD
   
   const selectedStart = parseDate(selectedStartDate);
   const selectedEnd = selectedEndDate && !selectedEndDate.includes('Select') ? parseDate(selectedEndDate) : selectedStart;
-  const carAvailableFrom = parseDate(carAvailabilityDate);
   
-  // The car is only available ON and AFTER carAvailableFrom.
-  // This means if ANY part of the requested trip (start -> end) is before carAvailableFrom, it's unavailable.
-  // Therefore, selectedStart must be >= carAvailableFrom.
-  return selectedStart >= carAvailableFrom;
+  if (carAvailabilityDate !== 'Available Now') {
+    const carAvailableFrom = parseDate(carAvailabilityDate);
+    if (selectedStart < carAvailableFrom) return false;
+  }
+  
+  if (car.availableToDate) {
+    const carAvailableTo = parseDate(car.availableToDate);
+    if (selectedEnd > carAvailableTo) return false;
+  }
+  
+  return true;
 };
 
 export const resultCars: Car[] = [
@@ -376,6 +386,7 @@ export const resultCars: Car[] = [
     fuel: 'Diesel',
     mileage: '15 km/l',
     availabilityDate: getDynamicDate(2),
+    availableToDate: getDynamicDate(10),
   },
   {
     id: 'swift-result',
@@ -390,6 +401,7 @@ export const resultCars: Car[] = [
     fuel: 'Petrol',
     mileage: '23 km/l',
     availabilityDate: 'Available Now',
+    availableToDate: getDynamicDate(5),
   },
   {
     id: 'city-result',
@@ -404,6 +416,7 @@ export const resultCars: Car[] = [
     fuel: 'Petrol',
     mileage: '18 km/l',
     availabilityDate: getDynamicDate(4),
+    availableToDate: getDynamicDate(20),
   },
   {
     id: 'mercedes-result',

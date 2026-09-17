@@ -4,18 +4,26 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { cars, premiumCollection, checkCarAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
 
 export default function ExploreScreen() {
   const colors = useColors();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<string>('All Dates');
-  const { vehicleType: globalVehicleType, setBookingSource, setDateRange } = useSawari();
+  const { vehicleType: globalVehicleType, setBookingSource, setDateRange, dateRange } = useSawari();
   const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>(globalVehicleType === 'car' ? 'Cars' : 'Bikes');
   
+  // Sync selectedDate when dateRange changes via Calendar
+  useEffect(() => {
+    if (dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates') {
+      setSelectedDate(dateRange);
+    }
+  }, [dateRange]);
+
   useFocusEffect(
     useCallback(() => {
       setBookingSource('explore');
@@ -60,14 +68,8 @@ export default function ExploreScreen() {
     return cars.filter(car => {
       let matchDate = true;
       if (selectedDate !== 'All Dates') {
-        // Use strict matching for testing the filter on the explore screen.
-        // Convert "Available Now" to today's date string.
-        const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        const carAvail = car.availabilityDate || 'Available Now';
-        const carAvailMapped = carAvail === 'Available Now' ? todayStr : carAvail;
-        
-        // Exact string match ensures ONLY cars assigned to this specific date show up
-        matchDate = carAvailMapped === selectedDate;
+        const [startStr, endStr] = selectedDate.split(' – ');
+        matchDate = checkCarAvailability(car, startStr, endStr);
       }
       
       const matchType = vehicleType === 'All' || 
@@ -191,12 +193,30 @@ export default function ExploreScreen() {
         </Pressable>
       </View>
       
-      {/* Date Filter Bar */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.dateRow}
       >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open calendar to pick dates"
+          onPress={() => {
+            Haptics.selectionAsync();
+            router.push('/dates');
+          }}
+          style={({ pressed }) => [
+            styles.dateChip,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              paddingHorizontal: 12,
+            },
+            pressed && styles.chipPressed,
+          ]}
+        >
+          <Feather name="calendar" size={16} color={colors.foreground} />
+        </Pressable>
         {availableDates.map((date) => {
           const active = date === selectedDate;
           return (

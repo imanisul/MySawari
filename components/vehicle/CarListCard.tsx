@@ -37,9 +37,14 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
     }, 3500 + Math.random() * 1000); // Stagger slightly so they don't all slide at exactly the same time
     return () => clearInterval(interval);
   }, [images.length, cardWidth]);
-
+  
   const isDateSelected = dateRange && !dateRange.includes('Select');
-  const availableText = isDateSelected ? `Avail: ${dateRange}` : (car.availabilityDate && car.availabilityDate !== 'Available Now' ? `Avail: ${car.availabilityDate}` : 'Available Now');
+  let availableText = 'Available Now';
+  if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
+    availableText = car.availableToDate ? `${car.availabilityDate} to ${car.availableToDate}` : `From ${car.availabilityDate}`;
+  } else if (car.availableToDate) {
+    availableText = `Until ${car.availableToDate}`;
+  }
 
   // Determine badge colors based on category
   const isBike = car.category === 'Bike' || car.category === 'Off-road';

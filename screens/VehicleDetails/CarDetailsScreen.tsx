@@ -44,7 +44,7 @@ export default function CarDetailsScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <VehicleHeader title={selectedCar?.name || 'Vehicle Details'} showShare />
+      <VehicleHeader carName={selectedCar?.name || 'Vehicle Details'} />
 
       <ScrollView 
         ref={mainScrollRef} 

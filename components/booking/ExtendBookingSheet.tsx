@@ -146,7 +146,10 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
             <View style={styles.divider} />
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-              <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Additional Rental</Text>
+              <View>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Additional Rental</Text>
+                <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 2 }}>Paid online only</Text>
+              </View>
               {checking ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : availability?.available ? (
@@ -166,7 +169,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
               <ActivityIndicator size="small" color={colors.primaryForeground} />
             ) : (
               <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
-                {availability?.available ? `Confirm Extension (Add ₹${availability.additionalAmount.toLocaleString('en-IN')} to balance)` : 'Unavailable'}
+                {availability?.available ? `Confirm (Pay ₹${availability.additionalAmount.toLocaleString('en-IN')} Online)` : 'Unavailable'}
               </Text>
             )}
           </TouchableOpacity>

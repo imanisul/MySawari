@@ -23,8 +23,8 @@ export function DriverOptionSheet() {
       />
       <OptionCard
         title="With Driver"
-        description="Travel with a professional driver."
-        price="From ₹800/day"
+        description="Relax and let our professional driver take the wheel."
+        price="From ₹1400/day"
         icon="user"
         selected={mode === 'With Driver'}
         onPress={() => setMode('With Driver')}

@@ -3,6 +3,7 @@ import { Image, Pressable, StyleSheet, Text, TextInput, View, Alert } from 'reac
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { checkCarAvailability } from '@/utils/sawari';
@@ -12,7 +13,11 @@ export default function BookingScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, mode, pickup, dropoff, returnAddress, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
+  const { 
+    mode, 
+    setMode,
+    selectedCar, 
+    pickup, dropoff, returnAddress, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
 
   const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -116,12 +121,36 @@ export default function BookingScreen() {
             isMissing={isMissingDates}
             onPress={() => router.push('/dates')}
           />
-          <DetailRow
-            icon={mode === 'Self Drive' ? 'aperture' : 'user'}
-            label="Driving option"
-            value={`${mode} · ${mode === 'Self Drive' ? 'No driver charges' : '₹800/day'}`}
-            last
-          />
+          <View style={{ paddingVertical: 12 }}>
+            <Text style={{ fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, marginBottom: 12 }}>Driving option</Text>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {(['Self Drive', 'With Driver'] as const).map(m => (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setMode(m);
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 12,
+                    alignItems: 'center',
+                    backgroundColor: mode === m ? colors.primary : 'transparent',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: mode === m ? colors.primary : colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, fontFamily: mode === m ? 'Inter_600SemiBold' : 'Inter_500Medium', color: mode === m ? '#000' : colors.foreground }}>
+                    {m}
+                  </Text>
+                  <Text style={{ fontSize: 10, fontFamily: 'Inter_400Regular', color: mode === m ? '#333' : colors.mutedForeground, marginTop: 4 }}>
+                    {m === 'Self Drive' ? 'No driver charges' : '₹1400/day'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
         </View>
 
         {!isVehicleAvailable && !isMissingDates && (

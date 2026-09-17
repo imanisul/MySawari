@@ -151,7 +151,7 @@ export function calculateRentalAmount(dailyRate: number, rentalDays: number): nu
 export function calculateDriverCharge(driverMode: 'Self Drive' | 'With Driver' | undefined, rentalDays: number): number {
   if (driverMode !== 'With Driver') return 0;
   const safeDays = Number.isFinite(rentalDays) && rentalDays > 0 ? rentalDays : 0;
-  return 800 * safeDays;
+  return 1400 * safeDays;
 }
 
 /** Pickup service = MySawari delivers the car from its hub to the customer's chosen address. */

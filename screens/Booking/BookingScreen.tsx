@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
+import { checkCarAvailability } from '@/utils/sawari';
 import { KeyboardAwareScrollViewCompat } from '@/components';
 
 export default function BookingScreen() {
@@ -28,9 +29,7 @@ export default function BookingScreen() {
   const isMissingDestination = !isDeliveryRequested && !dropoff?.name;
   
   const [startStr] = (dateRange || '').split(' – ');
-  const isVehicleAvailable = selectedCar?.availabilityDate === undefined || 
-                      (!isMissingDates && (selectedCar.availabilityDate === startStr || selectedCar.availabilityDate === 'Available Now')) ||
-                      isMissingDates; // Let them pick dates first, validate later.
+  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(selectedCar?.availabilityDate, startStr);
 
   const validateAndProceed = () => {
     if (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) {

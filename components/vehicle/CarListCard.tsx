@@ -39,7 +39,7 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
   }, [images.length, cardWidth]);
 
   const isDateSelected = dateRange && !dateRange.includes('Select');
-  const availableText = isDateSelected ? `Avail: ${dateRange}` : 'Available Now';
+  const availableText = isDateSelected ? `Avail: ${dateRange}` : (car.availabilityDate && car.availabilityDate !== 'Available Now' ? `Avail: ${car.availabilityDate}` : 'Available Now');
 
   // Determine badge colors based on category
   const isBike = car.category === 'Bike' || car.category === 'Off-road';

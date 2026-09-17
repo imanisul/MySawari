@@ -35,7 +35,7 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
   }, [images.length]);
   
   const isDateSelected = dateRange && !dateRange.includes('Select');
-  const availableText = isDateSelected ? `Avail: ${dateRange}` : 'Available Now';
+  const availableText = isDateSelected ? `Avail: ${dateRange}` : (car.availabilityDate && car.availabilityDate !== 'Available Now' ? `Avail: ${car.availabilityDate}` : 'Available Now');
 
   return (
     <Pressable

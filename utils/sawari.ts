@@ -326,6 +326,19 @@ export const premiumCollection: Car[] = [
   },
 ];
 
+export const checkCarAvailability = (carAvailabilityDate: string | undefined, selectedStartDate: string): boolean => {
+  if (!carAvailabilityDate || carAvailabilityDate === 'Available Now') return true;
+  if (!selectedStartDate || selectedStartDate.includes('Select') || selectedStartDate === 'Available Now') return true;
+  
+  const parseDate = (dStr: string) => {
+    return new Date(`${dStr} ${new Date().getFullYear()}`).getTime();
+  };
+  
+  const selectedTime = parseDate(selectedStartDate);
+  const carTime = parseDate(carAvailabilityDate);
+  return carTime <= selectedTime;
+};
+
 export const resultCars: Car[] = [
   { ...cars[0], image: require('../assets/images/creta.jpg') },
   {

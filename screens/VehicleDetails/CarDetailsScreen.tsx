@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { CarTile, LoginBottomSheet } from '@/components';
 import { TripEditorModal } from '@/components/home/TripEditorModal';
-import { cars } from '@/utils/sawari';
+import { cars, checkCarAvailability } from '@/utils/sawari';
 
 import { VehicleHeader } from '@/components/vehicle/details/VehicleHeader';
 import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGallery';
@@ -23,9 +23,7 @@ export default function CarDetailsScreen() {
   
   const hasValidDates = !!(dateRange && !dateRange.includes('Select'));
   const [startStr] = (dateRange || '').split(' – ');
-  const isAvailable = selectedCar?.availabilityDate === undefined || 
-                      (hasValidDates && (selectedCar.availabilityDate === startStr || selectedCar.availabilityDate === 'Available Now')) ||
-                      !hasValidDates;
+  const isAvailable = !hasValidDates ? true : checkCarAvailability(selectedCar?.availabilityDate, startStr);
   
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);

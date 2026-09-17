@@ -6,6 +6,7 @@ import { useColors } from '@/hooks/useColors';
 import { SearchCard } from './SearchCard';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { useSawari } from '@/context/SawariContext';
+import { checkCarAvailability } from '@/utils/sawari';
 
 export function SearchSheet({
   visible,
@@ -31,7 +32,7 @@ export function SearchSheet({
   }
 
   // Check if selected car is available on these dates
-  const isAvailable = selectedCar?.availabilityDate === undefined || (hasValidDates && (selectedCar.availabilityDate === startStr || selectedCar.availabilityDate === 'Available Now'));
+  const isAvailable = checkCarAvailability(selectedCar?.availabilityDate, startStr);
   // Note: in a real app, this date validation logic would be more robust.
   
   return (

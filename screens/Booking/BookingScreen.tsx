@@ -93,7 +93,7 @@ export default function BookingScreen() {
               {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
                 <DetailRow
                   icon="map-pin"
-                  label="Pickup"
+                  label="Drop off"
                   value={pickup?.name || 'Select Location'}
                   isMissing={isMissingPickup}
                   onPress={() => router.push('/location')}
@@ -102,10 +102,10 @@ export default function BookingScreen() {
               {(deliveryMode === 'both' || deliveryMode === 'return') && (
                 <DetailRow
                   icon="map-pin"
-                  label="Drop"
+                  label="Pick up"
                   value={returnAddress?.name || 'Select Location'}
                   isMissing={isMissingDrop}
-                  onPress={() => router.push('/location')}
+                  onPress={() => router.push('/return-location')}
                 />
               )}
             </>

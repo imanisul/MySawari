@@ -60,7 +60,14 @@ export default function ExploreScreen() {
     return cars.filter(car => {
       let matchDate = true;
       if (selectedDate !== 'All Dates') {
-        matchDate = checkCarAvailability(car, selectedDate, selectedDate);
+        // Use strict matching for testing the filter on the explore screen.
+        // Convert "Available Now" to today's date string.
+        const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+        const carAvail = car.availabilityDate || 'Available Now';
+        const carAvailMapped = carAvail === 'Available Now' ? todayStr : carAvail;
+        
+        // Exact string match ensures ONLY cars assigned to this specific date show up
+        matchDate = carAvailMapped === selectedDate;
       }
       
       const matchType = vehicleType === 'All' || 

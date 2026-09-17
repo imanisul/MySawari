@@ -256,21 +256,15 @@ export default function PaymentScreen() {
             )}
 
             {pricingQuote && pricingQuote.pickupCharge > 0 && (
-              <View style={[styles.row, { marginTop: 12, alignItems: 'flex-start' }]}>
-                <View>
-                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Pickup Service</Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.pickupDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
-                </View>
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Pickup Service</Text>
                 <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency(pricingQuote.pickupCharge)}</Text>
               </View>
             )}
 
             {pricingQuote && pricingQuote.dropCharge > 0 && (
-              <View style={[styles.row, { marginTop: 12, alignItems: 'flex-start' }]}>
-                <View>
-                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Drop Service</Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.dropDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
-                </View>
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Drop Service</Text>
                 <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency(pricingQuote.dropCharge)}</Text>
               </View>
             )}

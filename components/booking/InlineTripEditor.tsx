@@ -231,7 +231,7 @@ export function InlineTripEditor({ onSave }: { onSave: () => void }) {
         <View style={{ marginBottom: 20 }}>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
             {(['delivery', 'return', 'both'] as const).map(m => {
-              const label = m === 'delivery' ? 'Deliver to Me' : m === 'return' ? 'Collect From Me' : 'Both';
+              const label = m === 'delivery' ? 'Drop off' : m === 'return' ? 'Pick up' : 'Both';
               return (
                 <Pressable
                   key={m}

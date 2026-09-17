@@ -47,14 +47,20 @@ export function PriceBreakdownSheet({ visible, onClose }: { visible: boolean; on
                   <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(pricingQuote.rentalAmount)}</Text>
                 </View>
                 {pricingQuote.pickupCharge > 0 && (
-                  <View style={styles.row}>
-                    <Text style={[styles.label, { color: colors.mutedForeground }]}>Delivery (Pickup) Charge</Text>
+                  <View style={[styles.row, { alignItems: 'flex-start' }]}>
+                    <View>
+                      <Text style={[styles.label, { color: colors.mutedForeground }]}>Delivery (Pickup) Charge</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.pickupDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
+                    </View>
                     <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(pricingQuote.pickupCharge)}</Text>
                   </View>
                 )}
                 {pricingQuote.dropCharge > 0 && (
-                  <View style={styles.row}>
-                    <Text style={[styles.label, { color: colors.mutedForeground }]}>Collection (Drop) Charge</Text>
+                  <View style={[styles.row, { alignItems: 'flex-start' }]}>
+                    <View>
+                      <Text style={[styles.label, { color: colors.mutedForeground }]}>Collection (Drop) Charge</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.dropDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
+                    </View>
                     <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(pricingQuote.dropCharge)}</Text>
                   </View>
                 )}

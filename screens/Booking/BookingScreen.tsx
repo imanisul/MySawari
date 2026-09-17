@@ -141,11 +141,6 @@ export default function BookingScreen() {
         <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 8, marginBottom: 16, fontStyle: 'italic', lineHeight: 16 }}>
           Note: Original Driving Licence and Aadhar Card verification is mandatory at the time of vehicle handover.
         </Text>
-        <View style={{ backgroundColor: colors.destructive + '15', padding: 12, borderRadius: 8, marginBottom: 32 }}>
-          <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18 }}>
-            <Text style={{ fontFamily: 'Inter_700Bold' }}>Cancellation Policy:</Text> Cancellations made less than 24 hours before your scheduled pickup time are completely non-refundable.
-          </Text>
-        </View>
         <Pressable
           accessibilityRole="button"
           testID="continue-to-payment"

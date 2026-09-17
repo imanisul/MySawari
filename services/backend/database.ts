@@ -25,17 +25,43 @@ export type Coupon = {
   active: boolean;
 };
 
+export type BookingExtension = {
+  id: string;
+  bookingId: string;
+  previousEndDate: string;
+  newEndDate: string;
+  additionalDays: number;
+  additionalAmount: number;
+  paymentId?: string;
+  status: 'PENDING' | 'CONFIRMED' | 'FAILED';
+  requestedAt: string;
+  confirmedAt?: string;
+};
+
 export type BookingSnapshot = {
   id: string;
-  status: 'PENDING' | 'CONFIRMED' | 'FAILED' | 'CANCELLED' | 'COMPLETED';
+  status: 'PENDING' | 'CONFIRMED' | 'ONGOING' | 'FAILED' | 'CANCELLED' | 'COMPLETED';
   vehicleId: string;
   vehicleName: string;
   pickupDate: string;
   returnDate: string;
+  
+  // Base Booking Info
   rentalDays: number;
   dailyRate: number;
-  rentalAmount: number;
+  rentalAmount: number; // Base rental amount for original days
   
+  // Extension Info
+  extensions?: BookingExtension[];
+  totalRentalAmount?: number; // Base + Extensions
+  
+  // Cancellation Info
+  cancellationReason?: string;
+  cancellationFee?: number;
+  refundAmount?: number;
+  refundStatus?: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  cancelledAt?: string;
+
   distanceKm: number;
   ratePerKm: number;
   pickupLocationName: string;
@@ -43,13 +69,18 @@ export type BookingSnapshot = {
 
   driverMode?: string;
   driverCharge?: number;
-  
+
   couponCode?: string;
   couponDiscount: number;
   sawariCashUsed: number;
-  
+
   pickupCharge?: number;
+  pickupDistanceKm?: number;
   pickupType?: 'OFFICE' | 'DELIVERY';
+
+  dropCharge?: number;
+  dropDistanceKm?: number;
+  dropLocationName?: string;
   
   bookingAdvance: number;
   onlinePayableNow: number;
@@ -101,6 +132,23 @@ export type AppConfig = {
   referralRewardType?: 'FLAT' | 'PERCENTAGE';
   referralDiscountAmount: number;
   referralDiscountType: 'FLAT' | 'PERCENTAGE';
+};
+
+export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+
+/** A customer-submitted review awaiting or past moderation. Only `status: 'approved'` reviews are ever shown publicly. */
+export type StoredReview = {
+  id: string;
+  carId: string;
+  userId: string;
+  userName: string;
+  bookingId?: string;
+  rating: number;
+  text: string;
+  createdAt: string;
+  status: ReviewStatus;
+  /** True only when we found a real booking record for this customer + vehicle. */
+  isVerified: boolean;
 };
 
 export const DB = {

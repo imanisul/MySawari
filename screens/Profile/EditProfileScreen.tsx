@@ -7,8 +7,6 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
 
 export default function EditProfileScreen() {
   const colors = useColors();
@@ -74,56 +72,6 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleKycUpload = async () => {
-    Alert.alert(
-      "Upload Document",
-      "Choose a method to upload your Driver's License or KYC Document",
-      [
-        {
-          text: "Camera",
-          onPress: async () => {
-            const { status } = await ImagePicker.requestCameraPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
-              return;
-            }
-            const result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ['images'],
-              allowsEditing: true,
-              quality: 1,
-            });
-            if (!result.canceled) {
-              Alert.alert('Success', 'Document photo captured successfully.');
-              // Here you would upload result.assets[0].uri to backend
-            }
-          }
-        },
-        {
-          text: "Photo Library",
-          onPress: async () => {
-            const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-            if (status !== 'granted') {
-              Alert.alert('Permission Denied', 'Photo Library permission is required to select photos.');
-              return;
-            }
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              allowsEditing: true,
-              quality: 1,
-            });
-            if (!result.canceled) {
-              Alert.alert('Success', 'Document selected successfully.');
-              // Here you would upload result.assets[0].uri to backend
-            }
-          }
-        },
-        {
-          text: "Cancel",
-          style: "cancel"
-        }
-      ]
-    );
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -247,17 +195,6 @@ export default function EditProfileScreen() {
               </View>
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={[styles.label, { color: colors.foreground }]}>KYC / Driver's License</Text>
-              <TouchableOpacity 
-                style={[styles.kycButton, { borderColor: colors.border, backgroundColor: colors.muted }]}
-                onPress={handleKycUpload}
-              >
-                <Feather name="upload-cloud" size={20} color={colors.foreground} style={{ marginRight: 8 }} />
-                <Text style={[styles.kycText, { color: colors.foreground }]}>Upload Document</Text>
-              </TouchableOpacity>
-              <Text style={[styles.helpText, { color: colors.mutedForeground }]}>Required for car rentals.</Text>
-            </View>
 
           </ScrollView>
         </KeyboardAvoidingView>

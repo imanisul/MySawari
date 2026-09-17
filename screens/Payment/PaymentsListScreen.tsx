@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
@@ -27,6 +27,7 @@ export default function PaymentsScreen() {
   const [cardName, setCardName] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadSavedMethods();
@@ -53,6 +54,7 @@ export default function PaymentsScreen() {
   };
 
   const handleAddMethod = async () => {
+    if (isSaving) return;
     let newMethod: PaymentMethodItem | null = null;
 
     if (newMethodType === 'upi') {
@@ -95,14 +97,15 @@ export default function PaymentsScreen() {
     if (!newMethod) return;
 
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    
+
     const updatedMethods = [...methods, newMethod];
 
+    setIsSaving(true);
     try {
       await AsyncStorage.setItem(getStorageKey(), JSON.stringify(updatedMethods));
       setMethods(updatedMethods);
       setPaymentMethod(newMethod.id);
-      
+
       // Reset Modal State
       setShowAddModal(false);
       setUpiId('');
@@ -113,6 +116,8 @@ export default function PaymentsScreen() {
     } catch (e) {
       console.error(e);
       Alert.alert('Error', 'Failed to save payment method.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -312,11 +317,16 @@ export default function PaymentsScreen() {
               </View>
             )}
 
-            <TouchableOpacity 
-              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+            <TouchableOpacity
+              style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: isSaving ? 0.7 : 1 }]}
               onPress={handleAddMethod}
+              disabled={isSaving}
             >
-              <Text style={styles.saveBtnText}>Save Securely</Text>
+              {isSaving ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <Text style={styles.saveBtnText}>Save Securely</Text>
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>

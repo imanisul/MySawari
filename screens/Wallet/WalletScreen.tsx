@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Text } from 'react-native';
-import { Page, Header, OfferCard } from '@/components';
+import { View, StyleSheet, FlatList, Text } from 'react-native';
+import { Header, OfferCard } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { SafeAreaView } from 'react-native-safe-area-context';

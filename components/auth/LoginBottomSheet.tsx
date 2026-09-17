@@ -2,12 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, KeyboardAvoidingView, Platform, Animated, TouchableWithoutFeedback, Keyboard, Linking, Alert } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import * as Notifications from 'expo-notifications';
 
 export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const { login } = useSawari();
   
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -74,10 +76,8 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
         // Request Notifications Permission Just-In-Time
         try {
           const { status: existingStatus } = await Notifications.getPermissionsAsync();
-          let finalStatus = existingStatus;
           if (existingStatus !== 'granted') {
-            const { status } = await Notifications.requestPermissionsAsync();
-            finalStatus = status;
+            await Notifications.requestPermissionsAsync();
           }
         } catch (error) {
           console.warn('Failed to request notification permission:', error);
@@ -133,7 +133,12 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
           >
             <Animated.View style={[
               styles.sheet, 
-              { backgroundColor: colors.background, borderColor: colors.border, transform: [{ translateY: slideAnim }] }
+              { 
+                backgroundColor: colors.background, 
+                borderColor: colors.border, 
+                transform: [{ translateY: slideAnim }],
+                paddingBottom: Math.max(insets.bottom, 24)
+              }
             ]}>
               <View style={styles.handleWrap}>
                 <View style={[styles.handle, { backgroundColor: colors.border }]} />

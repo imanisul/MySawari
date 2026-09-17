@@ -3,6 +3,7 @@ import { Linking, Pressable, StyleSheet, View, Animated } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { usePathname } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { shadows } from '@/constants/shadows';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
@@ -29,8 +30,13 @@ export function FloatingSupport() {
 
 function FloatingSupportInner() {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const [isOpen, setIsOpen] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
+
+  // Bottom tab bar's own content height (icon + label + its padding) is ~56px,
+  // plus whatever safe-area inset the device needs, plus a comfortable gap.
+  const bottomOffset = 56 + Math.max(insets.bottom, 7) + 16;
 
   const toggleMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -81,7 +87,7 @@ function FloatingSupportInner() {
   });
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={[styles.container, { bottom: bottomOffset }]} pointerEvents="box-none">
       
       {/* Phone Button */}
       <Animated.View style={phStyle}>
@@ -139,7 +145,6 @@ function FloatingSupportInner() {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 90, // Above bottom nav
     right: 20,
     gap: 12,
     alignItems: 'flex-end',

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, ScrollView, Platform, Share, Linking, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Share, Linking, ActivityIndicator } from 'react-native';
 import { Page, Header, PrimaryButton } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';

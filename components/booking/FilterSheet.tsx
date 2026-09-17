@@ -77,7 +77,7 @@ export function FilterSheet({
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
             <Text style={[styles.headerTitle, { color: colors.foreground }]}>Filters</Text>
             <Pressable onPress={handleReset} style={styles.resetBtn}>
-              <Text style={[styles.resetText, { color: colors.primary }]}>Reset</Text>
+              <Text style={[styles.resetText, { color: colors.primaryText }]}>Reset</Text>
             </Pressable>
             <Pressable onPress={onClose} style={styles.closeBtn}>
               <Feather name="x" size={24} color={colors.foreground} />

@@ -1,7 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, Animated, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useColors } from '@/hooks/useColors';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { shadows } from '@/constants/shadows';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,8 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Offer } from '@/services/api/offers';
 
 export const OfferCard = React.memo(function OfferCard({ offer }: { offer: Offer }) {
-  const colors = useColors();
-  const { scaleAnim, opacityAnim, elevationAnim, onPressIn, onPressOut } = usePressAnimation(1, 0.98, 1, 1);
+  const { scaleAnim, opacityAnim, onPressIn, onPressOut } = usePressAnimation(1, 0.98, 1, 1);
 
   return (
     <Pressable

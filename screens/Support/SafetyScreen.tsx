@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';

@@ -10,11 +10,13 @@ import { useSawari } from '@/context/SawariContext';
 export function SearchSheet({
   visible,
   onClose,
-  onContinue
+  onContinue,
+  buttonLabel = "Continue to Booking"
 }: {
   visible: boolean;
   onClose: () => void;
   onContinue: () => void;
+  buttonLabel?: string;
 }) {
   const colors = useColors();
   const { dateRange, dropoff, selectedCar, isDeliveryRequested, pickup, deliveryMode, returnAddress } = useSawari();
@@ -68,7 +70,7 @@ export function SearchSheet({
 
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
             <PrimaryButton 
-              label="Continue to Booking" 
+              label={buttonLabel} 
               onPress={onContinue} 
               disabled={isSearchDisabled || (hasValidDates && !isAvailable)} 
             />

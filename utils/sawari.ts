@@ -25,7 +25,36 @@ export type Car = {
   fuel: string;
   mileage?: string;
   availabilityDate?: string;
+
+  // New UI features
+  images?: ImageSourcePropType[];
+  rating?: number;
+  reviewCount?: number;
+  description?: string;
+  features?: string[];
+  luggage?: string;
+  doors?: string;
+  modelYear?: string;
+  ratingDistribution?: RatingDistribution;
+  reviews?: Review[];
 };
+
+export interface RatingDistribution {
+  5: number;
+  4: number;
+  3: number;
+  2: number;
+  1: number;
+}
+
+export interface Review {
+  id: string;
+  userName: string;
+  rating: number;
+  text: string;
+  date: string;
+  isVerified: boolean;
+}
 
 const today = new Date();
 export const getDynamicDate = (offset: number) => {
@@ -35,6 +64,54 @@ export const getDynamicDate = (offset: number) => {
 };
 
 export const categories: Category[] = ['All', 'SUV', 'Sedan', 'Hatchback', 'MUV', 'Luxury', 'Bike'];
+
+/**
+ * "Good for" tags derived only from a vehicle's own real attributes
+ * (category / transmission / seats / fuel) — never invented copy.
+ */
+export function getCarHighlights(car: Pick<Car, 'category' | 'transmission' | 'seats' | 'fuel'>): string[] {
+  const tags: string[] = [];
+  const add = (tag: string) => { if (!tags.includes(tag)) tags.push(tag); };
+
+  switch (car.category) {
+    case 'SUV':
+      add('Family trips');
+      add('Highway travel');
+      break;
+    case 'MUV':
+      add('Family trips');
+      add('Group travel');
+      break;
+    case 'Sedan':
+      add('City driving');
+      add('Comfortable long drives');
+      break;
+    case 'Hatchback':
+      add('City driving');
+      add('Easy parking');
+      break;
+    case 'Luxury':
+      add('Special occasions');
+      add('Comfortable long drives');
+      break;
+    case 'Off-road':
+      add('Off-road adventures');
+      add('Hilly terrain');
+      break;
+    case 'Bike':
+      add('City commute');
+      add('Quick errands');
+      break;
+  }
+
+  const seatCount = parseInt(car.seats, 10);
+  if (!isNaN(seatCount) && seatCount >= 6) add('Family trips');
+
+  if (car.transmission === 'Automatic') add('Easy city driving');
+  if (car.fuel === 'EV') add('Eco-friendly trips');
+
+  return tags.slice(0, 4);
+}
 
 const baseCars: Car[] = [
   {
@@ -48,6 +125,27 @@ const baseCars: Car[] = [
     seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'Petrol',
+    mileage: '17 km/l',
+    images: [
+      require('../assets/images/creta.jpg'),
+      require('../assets/images/creta.jpg'), // Mocking multiple images
+      require('../assets/images/creta.jpg'),
+      require('../assets/images/creta.jpg'),
+      require('../assets/images/creta.jpg'),
+    ],
+    rating: 4.8,
+    reviewCount: 126,
+    description: "The Hyundai Creta is a premium 5-seater SUV suitable for highway journeys, family trips and long-distance travel. It offers an automatic transmission, spacious cabin and generous luggage capacity.",
+    features: ['Air Conditioning', 'Power Steering', 'Bluetooth', 'Reverse Camera', 'GPS', 'USB Charging', 'Push Start'],
+    luggage: '3 bags',
+    doors: '5',
+    modelYear: '2023',
+    ratingDistribution: { 5: 82, 4: 12, 3: 4, 2: 1, 1: 1 },
+    reviews: [
+      { id: '1', userName: 'Ankit Kumar', rating: 5, text: "Car was clean and comfortable. Pickup process was quick and the vehicle was in very good condition.", date: '2 days ago', isVerified: true },
+      { id: '2', userName: 'Rahul Sharma', rating: 4, text: "Smooth ride, but the AC took a while to cool.", date: '1 week ago', isVerified: true },
+      { id: '3', userName: 'Priya S.', rating: 5, text: "Amazing experience! The GPS was super helpful for our long trip.", date: '2 weeks ago', isVerified: true }
+    ]
   },
   {
     id: 'seltos',
@@ -60,6 +158,7 @@ const baseCars: Car[] = [
     seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'Diesel',
+    mileage: '19 km/l',
   },
   {
     id: 'swift',
@@ -72,6 +171,7 @@ const baseCars: Car[] = [
     seats: '5 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '23 km/l',
   },
   {
     id: 'scorpio-s',
@@ -84,6 +184,7 @@ const baseCars: Car[] = [
     seats: '7 seats',
     transmission: 'Manual',
     fuel: 'Diesel',
+    mileage: '15 km/l',
   },
   {
     id: 'nexon',
@@ -96,6 +197,7 @@ const baseCars: Car[] = [
     seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'Petrol',
+    mileage: '17 km/l',
   },
   {
     id: 'jawa',
@@ -108,6 +210,7 @@ const baseCars: Car[] = [
     seats: '2 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '35 km/l',
   },
   {
     id: 'xpulse',
@@ -120,6 +223,7 @@ const baseCars: Car[] = [
     seats: '2 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '38 km/l',
   },
   {
     id: 'hunter',
@@ -132,6 +236,7 @@ const baseCars: Car[] = [
     seats: '2 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '36 km/l',
   },
 ];
 
@@ -152,6 +257,7 @@ export const premiumCollection: Car[] = [
     seats: '7 seats',
     transmission: 'Manual',
     fuel: 'Diesel',
+    mileage: '15 km/l',
   },
   {
     id: 'nexon',
@@ -164,6 +270,7 @@ export const premiumCollection: Car[] = [
     seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'Petrol',
+    mileage: '17 km/l',
   },
   {
     id: 'curvv',
@@ -176,6 +283,7 @@ export const premiumCollection: Car[] = [
     seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'EV',
+    // EV — mileage is measured in range/kWh, not km/l, so intentionally left unset.
   },
   {
     id: 'jawa',
@@ -188,6 +296,7 @@ export const premiumCollection: Car[] = [
     seats: '2 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '35 km/l',
   },
   {
     id: 'xpulse',
@@ -200,6 +309,7 @@ export const premiumCollection: Car[] = [
     seats: '2 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '38 km/l',
   },
   {
     id: 'hunter',
@@ -212,6 +322,7 @@ export const premiumCollection: Car[] = [
     seats: '2 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '36 km/l',
   },
 ];
 
@@ -228,6 +339,7 @@ export const resultCars: Car[] = [
     seats: '4 seats',
     transmission: 'Automatic',
     fuel: 'Diesel',
+    mileage: '15 km/l',
   },
   {
     id: 'swift-result',
@@ -240,6 +352,7 @@ export const resultCars: Car[] = [
     seats: '5 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '23 km/l',
   },
   {
     id: 'city-result',
@@ -252,6 +365,7 @@ export const resultCars: Car[] = [
     seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'Petrol',
+    mileage: '18 km/l',
   },
   {
     id: 'mercedes-result',
@@ -264,6 +378,7 @@ export const resultCars: Car[] = [
     seats: '5 seats',
     transmission: 'Automatic',
     fuel: 'Petrol',
+    mileage: '12 km/l',
   },
   {
     id: 'alto-result',
@@ -276,6 +391,7 @@ export const resultCars: Car[] = [
     seats: '4 seats',
     transmission: 'Manual',
     fuel: 'Petrol',
+    mileage: '24 km/l',
   },
 ];
 

@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { FlatList, StyleSheet, Text, View, Modal, TouchableOpacity, Animated, Image as RNImage, TextInput, KeyboardAvoidingView, Platform, Keyboard, TouchableWithoutFeedback, Pressable, Linking } from 'react-native';
+import { FlatList, StyleSheet, Text, View, Animated, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { cars, premiumCollection } from '@/utils/sawari';
+import { premiumCollection } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import {
   Header,
@@ -18,12 +17,12 @@ import {
   LuxuryCarTile,
   Skeleton,
   DestinationCard,
+  LoginBottomSheet,
 } from '@/components';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOffers } from '@/services/api/offers';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
 
 const DESTINATIONS = [
   { id: '1', title: 'Assam', subtitle: 'Northeast India', image: require('../../assets/images/kaziranga.jpg'), places: ['Kaziranga National Park', 'Kamakhya Temple', 'Majuli', 'Manas National Park', 'Sivasagar'] },
@@ -39,7 +38,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, setVehicleType, pickup, dropoff, customer, totalBookings, bookingConfirmed, selectedCar, isAuthenticated } = useSawari();
+  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -178,7 +177,7 @@ export default function HomeScreen() {
           </>
         );
       case 'referEarn':
-        return <AnimatedReferBanner router={router} colors={colors} />;
+        return <AnimatedReferBanner router={router} />;
       case 'nextTrip':
         if (!bookingConfirmed || !selectedCar) return null;
         return (
@@ -317,17 +316,7 @@ export default function HomeScreen() {
 
 
 
-      {/* Login Bottom Sheet - Rapido-style funnel */}
-      <Modal visible={showLogin} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={loginStyles.overlay}>
-            <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setShowLogin(false)} />
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ width: '100%', justifyContent: 'flex-end', flex: 1 }}>
-              <LoginFunnel colors={colors} onClose={() => setShowLogin(false)} />
-            </KeyboardAvoidingView>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
     </Page>
   );
 }
@@ -351,7 +340,7 @@ const styles = StyleSheet.create({
 
 /* ─── Marketing Components ─── */
 
-function AnimatedReferBanner({ router, colors }: { router: any, colors: any }) {
+function AnimatedReferBanner({ router }: { router: any }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -390,163 +379,3 @@ function AnimatedReferBanner({ router, colors }: { router: any, colors: any }) {
   );
 }
 
-/* ─── Rapido-style Login Funnel ─── */
-function LoginFunnel({ colors, onClose }: { colors: any; onClose: () => void }) {
-  const { login } = useSawari();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [mobile, setMobile] = useState('');
-  const [otp, setOtp] = useState('');
-  const [name, setName] = useState('');
-  const slideAnim = useRef(new Animated.Value(400)).current;
-
-  useEffect(() => {
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, friction: 8, tension: 65 }).start();
-  }, []);
-
-  const handleNext = async () => {
-    Haptics.selectionAsync();
-    if (step === 1 && mobile.length >= 10) {
-      setStep(2);
-    } else if (step === 2 && otp.length === 4) {
-      setStep(3);
-    } else if (step === 3 && name.trim().length > 0) {
-      await login(name.trim(), mobile);
-      
-      // Request Notifications Permission Just-In-Time
-      try {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
-        }
-        if (finalStatus === 'granted') {
-          console.log('Notification permissions granted.');
-        }
-      } catch (error) {
-        console.warn('Failed to request notification permission:', error);
-      }
-      
-      onClose();
-    }
-  };
-
-  const canProceed = step === 1 ? mobile.length >= 10 : step === 2 ? otp.length === 4 : name.trim().length > 0;
-
-  return (
-    <Animated.View style={[loginStyles.sheet, { backgroundColor: colors.background, borderColor: colors.border, transform: [{ translateY: slideAnim }] }]}>      
-      <View style={loginStyles.handleWrap}>
-        <View style={[loginStyles.handle, { backgroundColor: colors.border }]} />
-      </View>
-
-      <View style={loginStyles.headerRow}>
-        <Text style={[loginStyles.title, { color: colors.foreground }]}>
-          {step === 1 ? 'Enter mobile number' : step === 2 ? 'Verify OTP' : 'What\'s your name?'}
-        </Text>
-        <TouchableOpacity onPress={onClose} hitSlop={12}>
-          <Feather name="x" size={24} color={colors.mutedForeground} />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={[loginStyles.subtitle, { color: colors.mutedForeground }]}>
-        {step === 1 ? 'We\'ll send a 4-digit OTP to verify' : step === 2 ? `Sent to +91 ${mobile}` : 'So we can personalise your experience'}
-      </Text>
-
-      {step === 1 && (
-        <View style={[loginStyles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-          <Text style={[loginStyles.prefix, { color: colors.foreground }]}>+91</Text>
-          <TextInput
-            style={[loginStyles.input, { color: colors.foreground }]}
-            placeholder="99999 99999"
-            placeholderTextColor={colors.mutedForeground}
-            keyboardType="number-pad"
-            maxLength={10}
-            value={mobile}
-            onChangeText={setMobile}
-            autoFocus
-          />
-        </View>
-      )}
-
-      {step === 2 && (
-        <View style={[loginStyles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-          <TextInput
-            style={[loginStyles.input, { color: colors.foreground, textAlign: 'center', letterSpacing: 12 }]}
-            placeholder="● ● ● ●"
-            placeholderTextColor={colors.mutedForeground}
-            keyboardType="number-pad"
-            maxLength={4}
-            value={otp}
-            onChangeText={setOtp}
-            autoFocus
-          />
-        </View>
-      )}
-
-      {step === 3 && (
-        <View style={[loginStyles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-          <TextInput
-            style={[loginStyles.input, { color: colors.foreground }]}
-            placeholder="E.g. Anisul Islam"
-            placeholderTextColor={colors.mutedForeground}
-            value={name}
-            onChangeText={setName}
-            autoFocus
-            autoCapitalize="words"
-          />
-        </View>
-      )}
-
-      <TouchableOpacity
-        style={[loginStyles.btn, { backgroundColor: canProceed ? colors.primary : colors.muted }]}
-        disabled={!canProceed}
-        onPress={handleNext}
-        activeOpacity={0.8}
-      >
-        <Text style={[loginStyles.btnText, { color: canProceed ? '#000' : colors.mutedForeground }]}>
-          {step === 1 ? 'Send OTP' : step === 2 ? 'Verify' : 'Let\'s Go!'}
-        </Text>
-      </TouchableOpacity>
-
-      {step === 2 && (
-        <TouchableOpacity onPress={() => Haptics.selectionAsync()} style={{ alignSelf: 'center', marginTop: 12 }}>
-          <Text style={[loginStyles.resend, { color: colors.foreground, textDecorationLine: 'underline' }]}>Resend OTP</Text>
-        </TouchableOpacity>
-      )}
-
-      <Text style={[loginStyles.terms, { color: colors.mutedForeground }]}>
-        By continuing, you agree to our{' '}
-        <Text 
-          style={{ textDecorationLine: 'underline', color: colors.foreground }}
-          onPress={() => Linking.openURL('https://mysawari.in/terms/')}
-        >
-          Terms and Conditions
-        </Text>
-        {' '}and{' '}
-        <Text 
-          style={{ textDecorationLine: 'underline', color: colors.foreground }}
-          onPress={() => Linking.openURL('https://mysawari.in/privacy/')}
-        >
-          Privacy Policy
-        </Text>.
-      </Text>
-    </Animated.View>
-  );
-}
-
-const loginStyles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingTop: 12, borderTopWidth: 1 },
-  handleWrap: { alignItems: 'center', marginBottom: 20 },
-  handle: { width: 40, height: 4, borderRadius: 2 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 22 },
-  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, marginBottom: 24 },
-  inputBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, height: 56, marginBottom: 24 },
-  prefix: { fontFamily: 'Inter_600SemiBold', fontSize: 18, marginRight: 12 },
-  input: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 18, height: '100%' },
-  btn: { height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  btnText: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
-  resend: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-  terms: { fontFamily: 'Inter_400Regular', fontSize: 11, textAlign: 'center', marginTop: 20, lineHeight: 16, marginBottom: 8 },
-});

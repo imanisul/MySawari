@@ -21,9 +21,9 @@ export function Page({
         styles.pageContent,
         {
           paddingTop: insets.top + 9,
-          // Only apply wrapper padding if Page is handling the scrolling.
-          // Otherwise, it hard-clips FlatLists.
-          paddingBottom: scroll ? insets.bottom + (bottomNav ? 80 : 24) : 0,
+          // If bottomNav is true, we pad exact height of the tab bar (approx 56) + the safe area inset.
+          // We add an extra 24px of breathing room either way.
+          paddingBottom: scroll ? (bottomNav ? 56 + Math.max(insets.bottom, 7) + 24 : insets.bottom + 24) : 0,
         },
       ]}
     >

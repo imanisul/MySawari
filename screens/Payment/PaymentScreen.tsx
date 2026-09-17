@@ -2,30 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
+import { formatCurrency } from '@/services/backend/pricingEngine';
 
 export default function PaymentScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { 
-    selectedCar, 
-    dateRange, 
-    pickup,
-    mode,
-    customer, 
-    sawariCash, 
-    pricingQuote, 
-    isQuoteLoading, 
+  const insets = useSafeAreaInsets();
+  const {
+    selectedCar,
+    dateRange,
+    customer,
+    sawariCash,
+    pricingQuote,
+    isQuoteLoading,
     quoteError,
     refreshQuote,
     applyCoupon,
     appliedCouponCode,
     applySawariCash,
     sawariCashToApply,
-    setFuelEstimate,
-    fuelEstimate
+    dropoff,
+    isDeliveryRequested,
+    deliveryMode
   } = useSawari();
   
   // Coupon State
@@ -74,7 +76,7 @@ export default function PaymentScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { paddingTop: insets.top + 16 }]}>
           <Pressable accessibilityLabel="Back" onPress={() => router.back()} style={styles.backButton}>
             <Feather name="chevron-left" size={24} color={colors.foreground} />
           </Pressable>
@@ -82,10 +84,54 @@ export default function PaymentScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          
+
+          {/* YOUR TRIP — read-only summary of choices already made earlier in the funnel */}
+          <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0 }]}>Your Trip</Text>
+            <Pressable onPress={() => router.back()} hitSlop={8}>
+              <Text style={{ color: colors.blue, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Edit</Text>
+            </Pressable>
+          </View>
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.row}>
+              <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Trip Dates</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{dateRange}</Text>
+            </View>
+            <View style={[styles.row, { marginTop: 12 }]}>
+              <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Duration</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{pricingQuote?.rentalDays || 1} Days</Text>
+            </View>
+            {!isDeliveryRequested ? (
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Destination</Text>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>
+                  {dropoff?.name || 'Select Destination'}
+                </Text>
+              </View>
+            ) : (
+              <>
+                {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
+                  <View style={[styles.row, { marginTop: 12 }]}>
+                    <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Pickup</Text>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>
+                      {pricingQuote && pricingQuote.pickupCharge > 0 ? pricingQuote.pickupLocationName : 'Select Location'}
+                    </Text>
+                  </View>
+                )}
+                {(deliveryMode === 'both' || deliveryMode === 'return') && (
+                  <View style={[styles.row, { marginTop: 12 }]}>
+                    <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Return</Text>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>
+                      {pricingQuote && pricingQuote.dropCharge > 0 ? pricingQuote.dropLocationName : 'Select Location'}
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
 
           {/* CUSTOMER DETAILS */}
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0 }]}>Customer Details</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customer Details</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.row}>
               <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Name</Text>
@@ -95,10 +141,12 @@ export default function PaymentScreen() {
               <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Mobile</Text>
               <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer.mobile}</Text>
             </View>
-            <View style={[styles.row, { marginTop: 12 }]}>
-              <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Email (Optional)</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer.email || 'Not provided'}</Text>
-            </View>
+            {!!customer.email && (
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Email</Text>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer.email}</Text>
+              </View>
+            )}
             <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 12, fontStyle: 'italic' }}>
               Driving licence verification will be done at the time of pickup/delivery.
             </Text>
@@ -186,66 +234,83 @@ export default function PaymentScreen() {
 
           {/* PRICE BREAKDOWN */}
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Price Breakdown</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Transparent pricing — no surprises before you pay.</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.row}>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Rental Value ({pricingQuote?.rentalDays || 1} days)</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>₹{((pricingQuote?.rentalAmount || 0) - (pricingQuote?.driverCharge || 0)).toLocaleString('en-IN')} ({pricingQuote?.distanceKm} km × ₹{pricingQuote?.ratePerKm}/km)</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Car Rental ({pricingQuote?.rentalDays || 1} days)</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency((pricingQuote?.rentalAmount || 0) - (pricingQuote?.driverCharge || 0))}</Text>
             </View>
-            
+
             {pricingQuote && pricingQuote.driverCharge > 0 && (
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Driver Charges</Text>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>₹{pricingQuote.driverCharge.toLocaleString('en-IN')}</Text>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency(pricingQuote.driverCharge)}</Text>
               </View>
             )}
-            
+
             {pricingQuote && pricingQuote.couponDiscount > 0 && (
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Text style={{ color: colors.success, fontFamily: 'Inter_400Regular' }}>Coupon Discount</Text>
-                <Text style={{ color: colors.success, fontFamily: 'Inter_500Medium' }}>- ₹{pricingQuote.couponDiscount.toLocaleString('en-IN')}</Text>
+                <Text style={{ color: colors.success, fontFamily: 'Inter_500Medium' }}>- {formatCurrency(pricingQuote.couponDiscount)}</Text>
+              </View>
+            )}
+
+            {pricingQuote && pricingQuote.pickupCharge > 0 && (
+              <View style={[styles.row, { marginTop: 12, alignItems: 'flex-start' }]}>
+                <View>
+                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Pickup Service</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.pickupDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
+                </View>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency(pricingQuote.pickupCharge)}</Text>
+              </View>
+            )}
+
+            {pricingQuote && pricingQuote.dropCharge > 0 && (
+              <View style={[styles.row, { marginTop: 12, alignItems: 'flex-start' }]}>
+                <View>
+                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Drop Service</Text>
+                  <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.dropDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
+                </View>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency(pricingQuote.dropCharge)}</Text>
               </View>
             )}
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            
+
             <View style={[styles.row, { marginTop: 12 }]}>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Total Trip Cost</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 15 }}>₹{((pricingQuote?.discountedRentalAmount || 0) + (pricingQuote?.pickupCharge || 0)).toLocaleString('en-IN')}</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Trip Cost</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 15 }}>{formatCurrency((pricingQuote?.discountedRentalAmount || 0) + (pricingQuote?.pickupCharge || 0) + (pricingQuote?.dropCharge || 0))}</Text>
             </View>
 
             <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: 12 }]} />
 
             <View style={styles.row}>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Booking Advance</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>₹{pricingQuote?.bookingAdvance.toLocaleString('en-IN')}</Text>
-            </View>
-
-            {pricingQuote && pricingQuote.pickupCharge > 0 && (
-              <View style={[styles.row, { marginTop: 12 }]}>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>{pricingQuote.pickupLocationName}</Text>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>₹{pricingQuote.pickupCharge.toLocaleString('en-IN')}</Text>
+              <View>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Booking Advance</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>Pay this now to reserve the car</Text>
               </View>
-            )}
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency(pricingQuote?.bookingAdvance || 0)}</Text>
+            </View>
 
             {pricingQuote && pricingQuote.sawariCashUsed > 0 && (
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Text style={{ color: colors.success, fontFamily: 'Inter_400Regular' }}>SawariCash Applied</Text>
-                <Text style={{ color: colors.success, fontFamily: 'Inter_500Medium' }}>- ₹{pricingQuote.sawariCashUsed.toLocaleString('en-IN')}</Text>
+                <Text style={{ color: colors.success, fontFamily: 'Inter_500Medium' }}>- {formatCurrency(pricingQuote.sawariCashUsed)}</Text>
               </View>
             )}
 
             <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: 16 }]} />
-            
+
             <View style={styles.row}>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>PAY NOW</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>₹{pricingQuote?.onlinePayableNow.toLocaleString('en-IN')}</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>Pay Now (Booking Advance)</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{formatCurrency(pricingQuote?.onlinePayableNow || 0)}</Text>
             </View>
 
             {pricingQuote && pricingQuote.remainingRentalAmount > 0 && (
               <View style={[styles.row, { marginTop: 16 }]}>
-                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Remaining Rental Amount</Text>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Remaining Payable</Text>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>₹{pricingQuote.remainingRentalAmount.toLocaleString('en-IN')}</Text>
+                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>{formatCurrency(pricingQuote.remainingRentalAmount)}</Text>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 4 }}>Payable at {pricingQuote.pickupType === 'OFFICE' ? 'Office' : 'Handover'}</Text>
                 </View>
               </View>
@@ -253,11 +318,11 @@ export default function PaymentScreen() {
           </View>
         </ScrollView>
 
-        <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+        <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={{ flex: 1 }}>
             <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Online Payable</Text>
             <Text style={{ color: colors.foreground, fontSize: 24, fontFamily: 'Inter_700Bold' }}>
-              ₹{pricingQuote?.onlinePayableNow.toLocaleString('en-IN') || 0}
+              {formatCurrency(pricingQuote?.onlinePayableNow || 0)}
             </Text>
           </View>
           <Pressable
@@ -268,7 +333,9 @@ export default function PaymentScreen() {
             {isQuoteLoading ? (
               <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>Continue</Text>
+              <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>
+                Pay
+              </Text>
             )}
           </Pressable>
         </View>
@@ -279,11 +346,13 @@ export default function PaymentScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { alignItems: 'center', flexDirection: 'row', paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16 },
+  topBar: { alignItems: 'center', flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 16 },
   backButton: { padding: 8, marginLeft: -8 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 24, marginLeft: 8 },
   content: { padding: 20, paddingBottom: 100 },
   sectionTitle: { fontFamily: 'Inter_700Bold', fontSize: 18, marginBottom: 12, marginTop: 24 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 12 },
+  sectionSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: -8, marginBottom: 12 },
   card: { borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 16 },
   cardTitle: { fontFamily: 'Inter_700Bold', fontSize: 18 },
   cardSub: { fontFamily: 'Inter_500Medium', fontSize: 13, marginTop: 4, marginBottom: 12 },
@@ -295,6 +364,6 @@ const styles = StyleSheet.create({
   couponInputRow: { flexDirection: 'row', gap: 12 },
   applyBtn: { paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
   couponItem: { borderWidth: 1, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center' },
-  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 20, paddingBottom: 40, flexDirection: 'row', alignItems: 'center' },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 20, flexDirection: 'row', alignItems: 'center' },
   payButton: { paddingHorizontal: 32, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }
 });

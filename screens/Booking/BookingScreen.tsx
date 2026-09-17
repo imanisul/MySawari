@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { KeyboardAwareScrollViewCompat } from '@/components';
@@ -9,14 +10,39 @@ import { KeyboardAwareScrollViewCompat } from '@/components';
 export default function BookingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, mode, pickup, dropoff, dateRange, duration, durationDays, pickupTime, returnTime, customer, updateCustomer, sawariCash } = useSawari();
-  
+  const insets = useSafeAreaInsets();
+  const { selectedCar, mode, pickup, dropoff, returnAddress, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
+
   const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   // The pricing quote is automatically managed in SawariContext now based on these details
 
+  // A pickup/drop address is only required when the customer actually asked for
+  // that service — Self Pickup / Self Drop (the default) never needs an address.
+  const needsPickupAddress = isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
+  const needsDropAddress = isDeliveryRequested && (deliveryMode === 'return' || deliveryMode === 'both');
+  const isMissingPickup = needsPickupAddress && !pickup?.name;
+  const isMissingDrop = needsDropAddress && !returnAddress?.name;
+  const isMissingDates = !dateRange || dateRange.includes('Select');
+  const isMissingDestination = !isDeliveryRequested && !dropoff?.name;
+  
+  const [startStr] = (dateRange || '').split(' – ');
+  const isVehicleAvailable = selectedCar?.availabilityDate === undefined || 
+                      (!isMissingDates && (selectedCar.availabilityDate === startStr || selectedCar.availabilityDate === 'Available Now')) ||
+                      isMissingDates; // Let them pick dates first, validate later.
+
   const validateAndProceed = () => {
+    if (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) {
+      Alert.alert('Missing Details', 'Please select your trip locations and travel dates before continuing.');
+      return;
+    }
+    
+    if (!isVehicleAvailable) {
+      Alert.alert('Not Available', 'Sorry, this vehicle is no longer available for your selected dates.');
+      return;
+    }
+
     const newErrors: typeof errors = {};
     if (!customer.name.trim()) newErrors.name = 'Name is required';
     if (!customer.mobile.trim() || !/^\d{10}$/.test(customer.mobile)) newErrors.mobile = 'Enter a valid 10-digit mobile number';
@@ -37,7 +63,7 @@ export default function BookingScreen() {
       <KeyboardAwareScrollViewCompat
         bottomOffset={72}
         keyboardShouldPersistTaps="handled"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       >
         <View style={styles.topBar}>
           <Pressable accessibilityLabel="Back" onPress={() => router.back()} style={[styles.circle, { borderColor: colors.border }]}>
@@ -55,47 +81,114 @@ export default function BookingScreen() {
         </View>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Trip details</Text>
         <View style={styles.tripDetails}>
-          <DetailRow icon="map-pin" label="Pickup" value={pickup?.name || 'Current Location'} />
-          <DetailRow icon="flag" label="Destination" value={dropoff?.name || 'Current Location'} />
-          <DetailRow icon="calendar" label="Dates" value={`${dateRange} · ${duration}`} />
-          <DetailRow icon="clock" label="Time" value={`${pickupTime} – ${returnTime}`} />
-          <DetailRow icon={mode === 'Self Drive' ? 'aperture' : 'user'} label="Driving option" value={`${mode} · ${mode === 'Self Drive' ? 'No driver charges' : '₹800/day'}`} last />
+          {!isDeliveryRequested ? (
+            <DetailRow
+              icon="map-pin"
+              label="Destination"
+              value={dropoff?.name || 'Select Destination'}
+              isMissing={isMissingDestination}
+              onPress={() => router.push('/dropoff')}
+            />
+          ) : (
+            <>
+              {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
+                <DetailRow
+                  icon="map-pin"
+                  label="Pickup"
+                  value={pickup?.name || 'Select Location'}
+                  isMissing={isMissingPickup}
+                  onPress={() => router.push('/location')}
+                />
+              )}
+              {(deliveryMode === 'both' || deliveryMode === 'return') && (
+                <DetailRow
+                  icon="map-pin"
+                  label="Drop"
+                  value={returnAddress?.name || 'Select Location'}
+                  isMissing={isMissingDrop}
+                  onPress={() => router.push('/location')}
+                />
+              )}
+            </>
+          )}
+          <DetailRow
+            icon="calendar"
+            label="Dates & Time"
+            value={isMissingDates ? 'Select Dates' : `${dateRange} · ${duration}\n${pickupTime} – ${returnTime}`}
+            isMissing={isMissingDates}
+            onPress={() => router.push('/dates')}
+          />
+          <DetailRow
+            icon={mode === 'Self Drive' ? 'aperture' : 'user'}
+            label="Driving option"
+            value={`${mode} · ${mode === 'Self Drive' ? 'No driver charges' : '₹800/day'}`}
+            last
+          />
         </View>
+
+        {!isVehicleAvailable && !isMissingDates && (
+          <View style={{ backgroundColor: '#FEE2E2', padding: 16, borderRadius: 12, marginTop: 16 }}>
+            <Text style={{ color: '#DC2626', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Not Available</Text>
+            <Text style={{ color: '#991B1B', fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4 }}>
+              Sorry, this vehicle is no longer available for your selected dates. Please change your dates.
+            </Text>
+          </View>
+        )}
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customer details</Text>
         <Input label="Full name" value={customer.name} error={errors.name} onChangeText={(value) => updateCustomer('name', value)} />
         <Input label="Mobile number" value={customer.mobile} placeholder="10-digit mobile number" keyboardType="phone-pad" error={errors.mobile} onChangeText={(value) => updateCustomer('mobile', value)} />
         <Input label="Email (Optional)" value={customer.email} keyboardType="email-address" error={errors.email} onChangeText={(value) => updateCustomer('email', value)} />
-        <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 8, marginBottom: 32, fontStyle: 'italic', lineHeight: 16 }}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 8, marginBottom: 16, fontStyle: 'italic', lineHeight: 16 }}>
           Note: Original Driving Licence and Aadhar Card verification is mandatory at the time of vehicle handover.
         </Text>
+        <View style={{ backgroundColor: colors.destructive + '15', padding: 12, borderRadius: 8, marginBottom: 32 }}>
+          <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 12, lineHeight: 18 }}>
+            <Text style={{ fontFamily: 'Inter_700Bold' }}>Cancellation Policy:</Text> Cancellations made less than 24 hours before your scheduled pickup time are completely non-refundable.
+          </Text>
+        </View>
         <Pressable
           accessibilityRole="button"
           testID="continue-to-payment"
           onPress={validateAndProceed}
           disabled={isSubmitting}
           style={({ pressed }) => [
-            styles.paymentButton, 
-            { backgroundColor: isSubmitting ? colors.muted : colors.primary }, 
+            styles.paymentButton,
+            { backgroundColor: (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination || !isVehicleAvailable || isSubmitting) ? colors.muted : colors.primary },
             pressed && !isSubmitting && styles.pressed
           ]}
         >
-          <Text style={[styles.paymentButtonText, { color: colors.primaryForeground }]}>Continue to payment</Text>
-          <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
+          <Text style={[styles.paymentButtonText, { color: (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination || !isVehicleAvailable || isSubmitting) ? colors.mutedForeground : colors.primaryForeground }]}>
+            {(isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) ? 'Missing Trip Details' : !isVehicleAvailable ? 'Vehicle Not Available' : 'Continue to payment'}
+          </Text>
+          {(!isMissingPickup && !isMissingDrop && !isMissingDates && !isMissingDestination && isVehicleAvailable) && (
+            <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
+          )}
         </Pressable>
       </KeyboardAwareScrollViewCompat>
     </View>
   );
 }
 
-function DetailRow({ icon, label, value, last = false }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; last?: boolean }) {
+function DetailRow({ icon, label, value, last = false, isMissing = false, onPress }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; last?: boolean; isMissing?: boolean; onPress?: () => void }) {
   const colors = useColors();
-  return (
+  const content = (
     <View style={[styles.detailRow]}>
-      <Feather name={icon} size={16} color={colors.mutedForeground} />
-      <Text style={[styles.detailLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.detailValue, { color: colors.foreground }]}>{value}</Text>
+      <Feather name={icon} size={16} color={isMissing ? colors.destructive : colors.mutedForeground} />
+      <Text style={[styles.detailLabel, { color: isMissing ? colors.destructive : colors.mutedForeground }]}>{label}</Text>
+      <Text style={[styles.detailValue, { color: isMissing ? colors.destructive : colors.foreground }]}>{value}</Text>
+      {onPress && <Feather name="chevron-right" size={16} color={isMissing ? colors.destructive : colors.mutedForeground} style={{ marginLeft: 4 }} />}
     </View>
   );
+  
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={({pressed}) => [pressed && {opacity: 0.7}]}>
+        {content}
+      </Pressable>
+    );
+  }
+  
+  return content;
 }
 
 function Input({ label, value, placeholder, keyboardType, error, onChangeText }: { label: string; value: string; placeholder?: string; keyboardType?: 'default' | 'phone-pad' | 'email-address'; error?: string; onChangeText: (value: string) => void }) {
@@ -116,19 +209,10 @@ function Input({ label, value, placeholder, keyboardType, error, onChangeText }:
   );
 }
 
-function PriceRow({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
-  const colors = useColors();
-  return (
-    <View style={styles.priceRow}>
-      <Text style={[styles.priceLabel, { color: colors.foreground }]}>{label}</Text>
-      <Text style={[styles.priceText, { color: accent ? colors.success : colors.foreground }]}>{value}</Text>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingBottom: 40, paddingHorizontal: 24, paddingTop: 60 },
+  content: { paddingBottom: 40, paddingHorizontal: 24 },
   topBar: { alignItems: 'center', flexDirection: 'row', gap: 16 },
   circle: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
   headerTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },

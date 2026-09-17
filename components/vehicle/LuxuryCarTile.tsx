@@ -8,7 +8,7 @@ import { Car } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
-export function LuxuryCarTile({ car }: { car: Car }) {
+export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, onIntercept }: { car: Car; onPress?: () => void; onIntercept?: () => void }) {
   const colors = useColors();
   const router = useRouter();
   const { selectCar, dateRange } = useSawari();
@@ -44,7 +44,12 @@ export function LuxuryCarTile({ car }: { car: Car }) {
       onPress={() => {
         Haptics.selectionAsync();
         selectCar(car);
-        router.push('/car-details');
+        onPress?.();
+        if (!isDateSelected && onIntercept) {
+          onIntercept();
+        } else {
+          router.push('/car-details');
+        }
       }}
       style={styles.card}
     >
@@ -124,7 +129,7 @@ export function LuxuryCarTile({ car }: { car: Car }) {
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

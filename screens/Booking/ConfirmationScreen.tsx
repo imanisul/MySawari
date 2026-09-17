@@ -2,20 +2,22 @@ import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 
 export default function ConfirmationScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { selectedCar, mode, pickup, dateRange, duration, pickupTime, returnTime, pricingQuote } = useSawari();
+  const insets = useSafeAreaInsets();
+  const { selectedCar, mode, pickup, dropoff, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, pricingQuote } = useSawari();
   
   // Use the backend-validated quote for display
   const payToday = pricingQuote?.onlinePayableNow || 0;
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
+      <View style={[styles.content, { paddingTop: insets.top + 16 }]}>
         <View style={[styles.checkCircle, { backgroundColor: colors.primary }]}>
           <Feather name="check" size={30} color={colors.primaryForeground} />
         </View>
@@ -35,7 +37,18 @@ export default function ConfirmationScreen() {
               <Text style={[styles.carMode, { color: colors.mutedForeground }]}>{mode}</Text>
             </View>
           </View>
-          <InfoRow icon="map-pin" value={pickup?.name || 'Current Location'} />
+          {!isDeliveryRequested ? (
+            <InfoRow icon="map-pin" value={dropoff?.name || 'MySawari Office'} />
+          ) : (
+            <>
+              {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
+                <InfoRow icon="map-pin" value={`Pickup: ${pricingQuote && pricingQuote.pickupCharge > 0 ? pricingQuote.pickupLocationName : (pickup?.name || 'Self Pickup')}`} />
+              )}
+              {(deliveryMode === 'both' || deliveryMode === 'return') && (
+                <InfoRow icon="map-pin" value={`Drop: ${pricingQuote && pricingQuote.dropCharge > 0 ? pricingQuote.dropLocationName : 'Self Drop'}`} />
+              )}
+            </>
+          )}
           <InfoRow icon="calendar" value={`${dateRange} · ${duration}`} />
           <InfoRow icon="clock" value={`${pickupTime} – ${returnTime}`} />
           <View style={[styles.paidRow, { borderTopColor: colors.border }]}>
@@ -44,7 +57,7 @@ export default function ConfirmationScreen() {
           </View>
         </View>
       </View>
-      <View style={styles.actions}>
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 40) }]}>
         <Pressable onPress={() => router.replace('/')} style={[styles.homeButton, { borderColor: colors.border }]}>
           <Text style={[styles.actionText, { color: colors.foreground }]}>Back to home</Text>
         </Pressable>
@@ -68,7 +81,7 @@ function InfoRow({ icon, value }: { icon: React.ComponentProps<typeof Feather>['
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 60, flex: 1 },
+  content: { alignItems: 'center', paddingHorizontal: 24, flex: 1 },
   checkCircle: { alignItems: 'center', borderRadius: 99, height: 86, justifyContent: 'center', width: 86 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 26, letterSpacing: -0.5, marginTop: 24 },
   subtitle: { fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 22, marginTop: 12, textAlign: 'center', paddingHorizontal: 20 },

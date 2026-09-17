@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { BottomNavigation, PrimaryButton, Page } from '@/components';
+import { BottomNavigation, PrimaryButton } from '@/components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BookingSnapshot } from '@/services/backend/database';
 import { useSawari } from '@/context/SawariContext';
 import { LoginBottomSheet } from '@/components';
-
+import { API } from '@/services/backend/api';
+import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
+import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 type BookingTab = 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
 
 export default function BookingsScreen() {
@@ -25,6 +26,9 @@ export default function BookingsScreen() {
   const [bookings, setBookings] = useState<BookingSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [actionBooking, setActionBooking] = useState<BookingSnapshot | null>(null);
+  const [actionType, setActionType] = useState<'cancel' | 'extend' | null>(null);
+
   // Fetch bookings when screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -32,9 +36,11 @@ export default function BookingsScreen() {
       const fetchBookings = async () => {
         try {
           if (!isAuthenticated) return;
-          const storedBookings = await AsyncStorage.getItem('@my_bookings');
-          if (isActive && storedBookings) {
-            setBookings(JSON.parse(storedBookings));
+          const userBookings = await API.getAllBookings();
+          if (isActive) {
+            // Sort by createdAt descending
+            const sorted = userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            setBookings(sorted);
           }
         } catch (e) {
           console.error("Failed to load bookings", e);
@@ -48,8 +54,43 @@ export default function BookingsScreen() {
   );
 
   const filteredBookings = bookings.filter((b) => {
-    if (tab === 'Upcoming') return b.status === 'CONFIRMED' || b.status === 'PENDING';
-    if (tab === 'Active') return b.status === 'CONFIRMED'; // Using CONFIRMED as active for now
+    const parseDate = (dateStr: string, isEnd = false) => {
+      if (dateStr === 'mock-date') {
+        dateStr = isEnd ? '20 Sep' : '15 Sep';
+      }
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const parts = dateStr.split(' ');
+      const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
+      if (parts.length >= 2 && months.includes(monthPrefix)) {
+        const day = parseInt(parts[0], 10);
+        const month = months.indexOf(monthPrefix);
+        const year = new Date().getFullYear();
+        return new Date(year, month, day);
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return new Date(`${dateStr} ${new Date().getFullYear()}`);
+      return d;
+    };
+
+    // Check if the booking is currently ongoing (either explicitly marked or inferred by dates)
+    const pickup = parseDate(b.pickupDate, false);
+    const returnDt = parseDate(b.returnDate, true);
+    returnDt.setHours(23, 59, 59, 999); // Cover the entire return day
+
+    // Only infer if dates are valid
+    const isOngoingInferred = !isNaN(pickup.getTime()) && !isNaN(returnDt.getTime()) 
+      && b.status === 'CONFIRMED' 
+      && pickup <= new Date() 
+      && returnDt >= new Date();
+      
+    const isOngoing = b.status === 'ONGOING' || isOngoingInferred;
+
+    if (tab === 'Upcoming') {
+      return (b.status === 'CONFIRMED' || b.status === 'PENDING') && !isOngoing;
+    }
+    if (tab === 'Active') {
+      return isOngoing;
+    }
     if (tab === 'Completed') return b.status === 'COMPLETED';
     if (tab === 'Cancelled') return b.status === 'CANCELLED' || b.status === 'FAILED';
     return false;
@@ -138,12 +179,37 @@ export default function BookingsScreen() {
                   </View>
                   <View style={styles.upcomingMetaRow}>
                     <Feather name="calendar" size={13} color={subtextColor} />
-                    <Text style={[styles.upcomingMeta, { color: subtextColor }]}>{booking.pickupDate} - {booking.returnDate} ({booking.rentalDays} Days)</Text>
+                    <Text style={[styles.upcomingMeta, { color: subtextColor }]}>
+                      {booking.pickupDate === 'mock-date' ? '15 Sep' : booking.pickupDate} - {booking.returnDate === 'mock-date' ? '20 Sep' : booking.returnDate} ({booking.rentalDays} Days)
+                    </Text>
                   </View>
-                  <View style={styles.upcomingMetaRow}>
-                    <Feather name="map-pin" size={13} color={subtextColor} />
-                    <Text style={[styles.upcomingMeta, { color: subtextColor }]}>{booking.pickupLocationName}</Text>
-                  </View>
+                  {(!booking.pickupCharge && !booking.dropCharge) ? (
+                    <View style={styles.upcomingMetaRow}>
+                      <Feather name="map-pin" size={13} color={subtextColor} />
+                      <Text style={[styles.upcomingMeta, { color: subtextColor }]} numberOfLines={1}>
+                        {booking.dropoffLocationName || 'MySawari Office'}
+                      </Text>
+                    </View>
+                  ) : (
+                    <>
+                      {!!booking.pickupCharge && booking.pickupCharge > 0 && (
+                        <View style={styles.upcomingMetaRow}>
+                          <Feather name="map-pin" size={13} color={subtextColor} />
+                          <Text style={[styles.upcomingMeta, { color: subtextColor }]} numberOfLines={1}>
+                            Pickup: {booking.pickupLocationName}
+                          </Text>
+                        </View>
+                      )}
+                      {!!booking.dropCharge && booking.dropCharge > 0 && (
+                        <View style={styles.upcomingMetaRow}>
+                          <Feather name="map-pin" size={13} color={subtextColor} />
+                          <Text style={[styles.upcomingMeta, { color: subtextColor }]} numberOfLines={1}>
+                            Drop: {booking.dropLocationName}
+                          </Text>
+                        </View>
+                      )}
+                    </>
+                  )}
                   
                   <View style={{ height: 1, backgroundColor: dividerColor, marginVertical: 12 }} />
                   
@@ -153,6 +219,39 @@ export default function BookingsScreen() {
                       <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Remaining: ₹{booking.remainingRentalAmount.toLocaleString('en-IN')}</Text>
                     )}
                   </View>
+                  
+                  {booking.status === 'CANCELLED' && booking.refundAmount !== undefined && booking.refundAmount > 0 && (
+                    <View style={{ marginTop: 12, padding: 12, backgroundColor: booking.refundStatus === 'PROCESSING' ? '#FEF3C7' : colors.success + '15', borderRadius: 8 }}>
+                      <Text style={{ color: booking.refundStatus === 'PROCESSING' ? '#D97706' : colors.success, fontFamily: 'Inter_500Medium', fontSize: 13 }}>
+                        {booking.refundStatus === 'PROCESSING' ? 'Refund Processing' : 'Refund Processed'}: ₹{booking.refundAmount.toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+                  )}
+                  {booking.status === 'CANCELLED' && booking.refundAmount === 0 && (
+                    <View style={{ marginTop: 12, padding: 12, backgroundColor: colors.destructive + '15', borderRadius: 8 }}>
+                      <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>No Refund (Cancelled within 24 hours)</Text>
+                    </View>
+                  )}
+                  {(tab === 'Upcoming' && (booking.status === 'CONFIRMED' || booking.status === 'PENDING')) && (
+                    <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                      <Pressable 
+                        onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('cancel'); }}
+                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: colors.destructive }}
+                      >
+                        <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Cancel Trip</Text>
+                      </Pressable>
+                    </View>
+                  )}
+                  {tab === 'Active' && (
+                    <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                      <Pressable 
+                        onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('extend'); }}
+                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary }}
+                      >
+                        <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extend Trip</Text>
+                      </Pressable>
+                    </View>
+                  )}
                 </View>
               </Pressable>
               );
@@ -163,6 +262,29 @@ export default function BookingsScreen() {
         )}
       </View>
       <BottomNavigation />
+      
+      {actionBooking && actionType === 'cancel' && (
+        <CancelBookingSheet
+          visible={true}
+          onClose={() => { setActionType(null); setActionBooking(null); }}
+          booking={actionBooking}
+          onSuccess={(updatedBooking) => {
+            setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
+            setActionType(null); setActionBooking(null);
+          }}
+        />
+      )}
+      {actionBooking && actionType === 'extend' && (
+        <ExtendBookingSheet
+          visible={true}
+          onClose={() => { setActionType(null); setActionBooking(null); }}
+          booking={actionBooking}
+          onSuccess={(updatedBooking) => {
+            setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
+            setActionType(null); setActionBooking(null);
+          }}
+        />
+      )}
     </View>
   );
 }

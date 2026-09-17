@@ -1,4 +1,4 @@
-import { DB, BookingSnapshot } from './database';
+import { DB, BookingSnapshot, StoredReview } from './database';
 import { calculateBookingPrice, QuoteParams, PricingQuote } from './pricingEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -10,6 +10,8 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 const debuggerHost = Constants.expoConfig?.hostUri;
 const localIp = debuggerHost?.split(':')[0];
 const BACKEND_URL = localIp ? `http://${localIp}:5001/api` : 'http://localhost:5001/api';
+
+const REVIEWS_STORAGE_KEY = '@mysawari_reviews';
 
 export const API = {
   /**
@@ -139,8 +141,8 @@ export const API = {
       status: 'CONFIRMED',
       vehicleId,
       vehicleName,
-      pickupDate: 'mock-date', // In real app, pass ISO date from quote request
-      returnDate: 'mock-date',
+      pickupDate: params.pickupDateStr,
+      returnDate: params.returnDateStr,
       rentalDays: quote.rentalDays,
       dailyRate: quote.dailyRate,
       rentalAmount: quote.rentalAmount,
@@ -149,7 +151,13 @@ export const API = {
       ratePerKm: quote.ratePerKm,
       pickupLocationName: quote.pickupLocationName,
       dropoffLocationName: quote.dropoffLocationName,
-      
+      pickupCharge: quote.pickupCharge,
+      pickupDistanceKm: quote.pickupDistanceKm,
+      pickupType: quote.pickupType,
+      dropCharge: quote.dropCharge,
+      dropDistanceKm: quote.dropDistanceKm,
+      dropLocationName: quote.dropLocationName,
+
       driverMode: quote.driverMode,
       driverCharge: quote.driverCharge,
       
@@ -223,6 +231,209 @@ export const API = {
     return bookings.find(b => b.id === id) || null;
   },
 
+  async getAllBookings(): Promise<BookingSnapshot[]> {
+    await delay(300);
+    let userId = null;
+    try {
+      const { getItemAsync } = require('expo-secure-store');
+      userId = await getItemAsync('user_id');
+    } catch(e) {}
+    
+    if (!userId) return [];
+
+    const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
+    if (!storedBookings) return [];
+    
+    const bookings = JSON.parse(storedBookings) as BookingSnapshot[];
+    
+    // Simulate refund processing funnel
+    let updated = false;
+    const now = new Date().getTime();
+    bookings.forEach(b => {
+      if (b.status === 'CANCELLED' && b.refundStatus === 'PROCESSING' && b.cancelledAt) {
+        // If cancelled more than 15 seconds ago, mark as COMPLETED
+        const cancelTime = new Date(b.cancelledAt).getTime();
+        if (now - cancelTime > 15000) {
+          b.refundStatus = 'COMPLETED';
+          updated = true;
+        }
+      }
+    });
+    
+    if (updated) {
+      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify(bookings));
+    }
+    
+    return bookings;
+  },
+
+  async cancelBooking(id: string, reason?: string): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
+    await delay(600);
+    const bookings = await this.getAllBookings();
+    const index = bookings.findIndex(b => b.id === id);
+    if (index === -1) throw new Error('Booking not found');
+    
+    const booking = bookings[index];
+    if (booking.status !== 'CONFIRMED' && booking.status !== 'PENDING') {
+      throw new Error('Only upcoming bookings can be cancelled');
+    }
+
+    // Cancellation Policy Logic
+    const parseDate = (dateStr: string) => {
+      if (dateStr === 'mock-date') dateStr = '15 Sep';
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const parts = dateStr.split(' ');
+      const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
+      if (parts.length >= 2 && months.includes(monthPrefix)) {
+        const day = parseInt(parts[0], 10);
+        const month = months.indexOf(monthPrefix);
+        const year = new Date().getFullYear();
+        return new Date(year, month, day);
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return new Date(`${dateStr} ${new Date().getFullYear()}`);
+      return d;
+    };
+    
+    const pickupDate = parseDate(booking.pickupDate);
+    const now = new Date();
+    const hoursDifference = (pickupDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+    let cancellationFee = 0;
+    let refundAmount = 0;
+
+    if (hoursDifference >= 24) {
+      // Full refund of what they paid online
+      cancellationFee = 0;
+      refundAmount = booking.onlinePayableNow;
+    } else {
+      // No refund if cancelled less than 24 hours before pickup
+      cancellationFee = booking.onlinePayableNow;
+      refundAmount = 0;
+    }
+
+    booking.status = 'CANCELLED';
+    booking.cancellationReason = reason || 'Customer cancelled';
+    booking.cancellationFee = cancellationFee;
+    booking.refundAmount = refundAmount;
+    if (refundAmount > 0) {
+      booking.refundStatus = 'PROCESSING';
+    }
+    booking.cancelledAt = new Date().toISOString();
+
+    // Update Async Storage
+    let userId = null;
+    try {
+      const { getItemAsync } = require('expo-secure-store');
+      userId = await getItemAsync('user_id');
+    } catch(e) {}
+    
+    if (userId) {
+      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify(bookings));
+    }
+
+    return { success: true, snapshot: booking };
+  },
+
+  async checkExtensionAvailability(bookingId: string, newReturnDateStr: string): Promise<{ available: boolean; message?: string; additionalDays: number; additionalAmount: number }> {
+    await delay(400);
+    const booking = await this.getBooking(bookingId);
+    if (!booking) throw new Error('Booking not found');
+
+    const parseDate = (dateStr: string) => {
+      if (dateStr === 'mock-date') dateStr = '20 Sep';
+      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const parts = dateStr.split(' ');
+      const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
+      if (parts.length >= 2 && months.includes(monthPrefix)) {
+        const day = parseInt(parts[0], 10);
+        const month = months.indexOf(monthPrefix);
+        const year = new Date().getFullYear();
+        return new Date(year, month, day);
+      }
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return new Date(`${dateStr} ${new Date().getFullYear()}`);
+      return d;
+    };
+    
+    const currentReturn = parseDate(booking.returnDate);
+    const newReturn = parseDate(newReturnDateStr);
+    
+    if (newReturn <= currentReturn) {
+      return { available: false, message: 'New return date must be after current return date', additionalDays: 0, additionalAmount: 0 };
+    }
+
+    // Mock overlap check (simulate availability based on dummy logic)
+    // In a real system, we query DB for any booking for this vehicle overlapping the new period.
+    const isAvailable = true; 
+    
+    if (!isAvailable) {
+      return { 
+        available: false, 
+        message: 'This vehicle is already reserved after your current booking and cannot be extended.',
+        additionalDays: 0, 
+        additionalAmount: 0 
+      };
+    }
+
+    const additionalDays = Math.ceil((newReturn.getTime() - currentReturn.getTime()) / (1000 * 60 * 60 * 24));
+    const additionalAmount = additionalDays * booking.dailyRate;
+
+    return {
+      available: true,
+      additionalDays,
+      additionalAmount
+    };
+  },
+
+  async extendBooking(bookingId: string, newReturnDateStr: string, additionalAmount: number, additionalDays: number): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
+    await delay(800); // Simulate payment & verification
+    
+    const bookings = await this.getAllBookings();
+    const index = bookings.findIndex(b => b.id === bookingId);
+    if (index === -1) throw new Error('Booking not found');
+    
+    const booking = bookings[index];
+
+    // Create Extension Record
+    if (!booking.extensions) booking.extensions = [];
+    const extension = {
+      id: `ext_${Date.now()}`,
+      bookingId,
+      previousEndDate: booking.returnDate,
+      newEndDate: newReturnDateStr,
+      additionalDays,
+      additionalAmount,
+      status: 'CONFIRMED' as const,
+      requestedAt: new Date().toISOString(),
+      confirmedAt: new Date().toISOString(),
+      paymentId: `pay_${Date.now()}`
+    };
+    
+    booking.extensions.push(extension);
+    
+    // Update booking state
+    booking.returnDate = newReturnDateStr;
+    booking.rentalDays += additionalDays;
+    booking.totalRentalAmount = (booking.totalRentalAmount || booking.rentalAmount) + additionalAmount;
+    
+    // Add extension amount to the remaining balance to be paid at drop-off
+    booking.remainingRentalAmount = (booking.remainingRentalAmount || 0) + additionalAmount;
+    
+    // Update Async Storage
+    let userId = null;
+    try {
+      const { getItemAsync } = require('expo-secure-store');
+      userId = await getItemAsync('user_id');
+    } catch(e) {}
+    
+    if (userId) {
+      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify(bookings));
+    }
+
+    return { success: true, snapshot: booking };
+  },
+
   /**
    * GET /api/config
    */
@@ -284,41 +495,22 @@ export const API = {
   },
 
   /**
-   * POST /api/auth/send-otp (Real Backend via WATI)
+   * POST /api/auth/send-otp (Mock)
    */
   async sendOtp(mobile: string) {
-    try {
-      const response = await fetch(`${BACKEND_URL}/auth/send-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobileNumber: mobile })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to send OTP');
-      return data;
-    } catch (e: any) {
-      console.error('sendOtp API error:', e.message);
-      throw e;
-    }
+    await delay(600);
+    return { success: true, message: 'OTP sent successfully (MOCK)' };
   },
 
   /**
-   * POST /api/auth/verify-otp (Real Backend via WATI)
+   * POST /api/auth/verify-otp (Mock)
    */
   async verifyOtp(mobile: string, otp: string, name?: string) {
-    try {
-      const response = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobileNumber: mobile, otp, fullName: name })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Invalid OTP');
-      return data.data; // returns { token, user }
-    } catch (e: any) {
-      console.error('verifyOtp API error:', e.message);
-      throw e;
+    await delay(600);
+    if (otp !== '1234') {
+      throw new Error('Invalid OTP (Mock expects 1234)');
     }
+    return await API.login(name || 'MySawari User', mobile);
   },
 
   /**
@@ -330,34 +522,21 @@ export const API = {
   },
 
   /**
-   * PUT /api/users/profile
+   * PUT /api/users/profile (Mock)
    */
   async updateProfile(profileData: { fullName?: string, email?: string, dob?: string, gender?: string, aadhaarNumber?: string, drivingLicenseNumber?: string }) {
-    try {
-      const { getItemAsync } = require('expo-secure-store');
-      const token = await getItemAsync('auth_token');
-      
-      const payload: any = { ...profileData };
-      if (payload.name) {
-        payload.fullName = payload.name;
-        delete payload.name;
-      }
-      
-      const response = await fetch(`${BACKEND_URL}/users/profile`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to update profile');
-      return data.data.user;
-    } catch (e: any) {
-      console.error('updateProfile API error:', e.message);
-      throw e;
-    }
+    await delay(400);
+    const { getItemAsync } = require('expo-secure-store');
+    const userId = await getItemAsync('user_id');
+    const user = DB.users.find(u => u.id === userId);
+    if (!user) throw new Error('User not found in mock DB');
+    
+    if (profileData.fullName) user.name = profileData.fullName;
+    if (profileData.email) user.email = profileData.email;
+    if (profileData.dob) user.dob = profileData.dob;
+    if (profileData.gender) user.gender = profileData.gender;
+    
+    return user;
   },
 
   /**
@@ -378,18 +557,18 @@ export const API = {
   },
 
   /**
-   * POST /api/locations/autocomplete (Real Backend via Google Places API)
+   * GET /api/locations/search (Photon Autocomplete)
    */
-  async searchLocations(input: string, regionId: string = 'guwahati', isDestination: boolean = false) {
+  async searchLocations(input: string, regionId: string = 'guwahati', isDestination: boolean = false, signal?: AbortSignal) {
     try {
-      const response = await fetch(`${BACKEND_URL}/locations/autocomplete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ input, regionId, isDestination })
-      });
+      // Default bias for Guwahati (lat: 26.1445, lon: 91.7362)
+      let url = `${BACKEND_URL}/locations/search?q=${encodeURIComponent(input)}`;
+      url += `&lat=26.1445&lon=91.7362`;
+      
+      const response = await fetch(url, { signal });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to search locations');
-      return data.data.predictions;
+      return data.data.predictions; // Returns mapped Photon array
     } catch (e: any) {
       console.error('searchLocations API error:', e.message);
       return [];
@@ -397,21 +576,100 @@ export const API = {
   },
 
   /**
-   * POST /api/locations/details (Real Backend via Google Places API)
+   * GET /api/locations/reverse (Photon Reverse Geocode)
    */
-  async getLocationDetails(placeId: string) {
+  async reverseGeocode(latitude: number, longitude: number) {
     try {
-      const response = await fetch(`${BACKEND_URL}/locations/details`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ placeId })
-      });
+      const response = await fetch(`${BACKEND_URL}/locations/reverse?lat=${latitude}&lon=${longitude}`);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to get location details');
-      return data.data.location; // { latitude, longitude }
+      if (!response.ok) throw new Error(data.message || 'Failed to get reverse geocode');
+      return data.data.location; // Returns mapped Photon object { id, name, address, latitude, longitude }
     } catch (e: any) {
-      console.error('getLocationDetails API error:', e.message);
+      console.error('reverseGeocode API error:', e.message);
       return null;
+    }
+  },
+
+  /**
+   * Reviews endpoints
+   *
+   * Reviews go through moderation: every new review is stored as `pending`
+   * and only ever appears on the public Car Details page once its status is
+   * flipped to `approved` (there is no admin surface in this app yet, so
+   * that flip currently has to happen by editing the stored record directly —
+   * see REVIEWS_STORAGE_KEY below).
+   */
+  reviews: {
+    async fetchByCarId(carId: string) {
+      await delay(300);
+      try {
+        const stored = await AsyncStorage.getItem(REVIEWS_STORAGE_KEY);
+        const allReviews: StoredReview[] = stored ? JSON.parse(stored) : [];
+        return allReviews
+          .filter(r => r.carId === carId && r.status === 'approved')
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .map(r => ({
+            id: r.id,
+            userName: r.userName,
+            rating: r.rating,
+            text: r.text,
+            date: new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+            isVerified: r.isVerified,
+          }));
+      } catch (e) {
+        return [];
+      }
+    },
+
+    async submit(carId: string, rating: number, text: string): Promise<{ status: 'pending' }> {
+      await delay(500);
+
+      let userId: string | null = null;
+      try {
+        const { getItemAsync } = require('expo-secure-store');
+        userId = await getItemAsync('user_id');
+      } catch (e) {}
+
+      if (!userId) {
+        throw new Error('Please log in to submit a review.');
+      }
+
+      const stored = await AsyncStorage.getItem(REVIEWS_STORAGE_KEY);
+      const allReviews: StoredReview[] = stored ? JSON.parse(stored) : [];
+
+      const alreadyReviewed = allReviews.some(r => r.carId === carId && r.userId === userId && r.status !== 'rejected');
+      if (alreadyReviewed) {
+        throw new Error('You have already reviewed this vehicle.');
+      }
+
+      // Verified only when we can find a real booking of this exact vehicle by this customer.
+      let bookingId: string | undefined;
+      try {
+        const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
+        const bookings: BookingSnapshot[] = storedBookings ? JSON.parse(storedBookings) : [];
+        const matchingBooking = bookings.find(b => b.vehicleId === carId && b.status !== 'CANCELLED' && b.status !== 'FAILED');
+        bookingId = matchingBooking?.id;
+      } catch (e) {}
+
+      const user = DB.users.find(u => u.id === userId);
+
+      const newReview: StoredReview = {
+        id: `rev_${Date.now()}`,
+        carId,
+        userId,
+        userName: user?.name || 'MySawari Customer',
+        bookingId,
+        rating,
+        text: text.trim(),
+        createdAt: new Date().toISOString(),
+        status: 'pending',
+        isVerified: !!bookingId,
+      };
+
+      allReviews.push(newReview);
+      await AsyncStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(allReviews));
+
+      return { status: 'pending' };
     }
   }
 };

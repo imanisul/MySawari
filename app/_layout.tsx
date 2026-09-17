@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ErrorBoundary, FloatingSupport, UpdateModal } from '@/components';
+import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash } from '@/components';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -26,6 +26,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerBackTitle: 'Back', headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="explore" />
+      <Stack.Screen name="wishlist" />
       <Stack.Screen name="search" />
       <Stack.Screen name="car-details" />
       <Stack.Screen name="booking" />
@@ -146,5 +147,5 @@ function SplashHider({ children, fontsLoaded }: { children: React.ReactNode, fon
     }
   }, [fontsLoaded, isAuthLoading]);
 
-  return <>{children}</>;
+  return <AnimatedSplash isReady={fontsLoaded && !isAuthLoading}>{children}</AnimatedSplash>;
 }

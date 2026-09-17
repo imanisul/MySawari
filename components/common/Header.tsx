@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, Image, Animated, Easing } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Image, Animated } from 'react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -17,7 +17,7 @@ export function Header({
 }) {
   const colors = useColors();
   const router = useRouter();
-  const { unreadCount, sawariCash, isAuthenticated } = useSawari();
+  const { unreadCount, sawariCash, isAuthenticated, favorites } = useSawari();
 
   const flipAnim = useRef(new Animated.Value(0)).current;
   const [showRupee, setShowRupee] = useState(false);
@@ -69,6 +69,25 @@ export function Header({
         <Text style={[styles.appName, { color: colors.foreground }]}>{title}</Text>
       </Pressable>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        
+        {/* Wishlist Badge - Only show if they have items */}
+        {!hideLogo && favorites?.length > 0 && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Wishlist"
+            onPress={() => {
+              Haptics.selectionAsync();
+              router.push('/wishlist');
+            }}
+            style={[
+              styles.notificationButton,
+              { backgroundColor: colors.card, borderColor: colors.border }
+            ]}
+          >
+            <Feather name="heart" size={17} color={colors.foreground} />
+          </Pressable>
+        )}
+
         {/* SawariCash Badge */}
         {!hideLogo && isAuthenticated && (
           <Pressable

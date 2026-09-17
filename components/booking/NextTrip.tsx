@@ -27,7 +27,7 @@ export function NextTrip({ car }: { car: Car }) {
     >
       <Image source={car.image} resizeMode="cover" style={styles.tripImage} />
       <View style={styles.nextTripCopy}>
-        <Text style={[styles.nextTripLabel, { color: colors.primary }]}>Your next trip</Text>
+        <Text style={[styles.nextTripLabel, { color: colors.primaryText }]}>Your next trip</Text>
         <Text style={[styles.nextTripName, { color: colors.warmWhite }]}>{car.name}</Text>
         <Text style={[styles.nextTripDate, { color: colors.mutedForeground }]}>{dateRange.replace('–', '→')}</Text>
       </View>

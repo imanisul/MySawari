@@ -10,10 +10,11 @@ const colors = {
     cardForeground: '#142033',
     primary: '#B7F52E',
     primaryForeground: '#142033',
+    primaryText: '#4D7C0F', // Darker green for legibility on light backgrounds
     secondary: '#EEF0EB',
     secondaryForeground: '#142033',
     muted: '#F0F1EE',
-    mutedForeground: '#78808F',
+    mutedForeground: '#374151', // Darkened for better contrast
     accent: '#E8EDFF',
     accentForeground: '#4F67C8',
     destructive: '#E86B62',
@@ -29,8 +30,8 @@ const colors = {
     lime: '#B7F52E',
     warmWhite: '#FFFFFF',
     photoOverlay: 'rgba(20,32,51,0.08)',
-    mutedOnLight: '#747D8E',
-    optionMutedOnLight: '#727B8C',
+    mutedOnLight: '#374151',
+    optionMutedOnLight: '#374151',
     optionSurface: '#F0F1EE',
     overlay: 'rgba(20,25,34,0.78)',
     gold: '#FFD700',
@@ -57,6 +58,7 @@ const colors = {
     cardForeground: '#FFFFFF',
     primary: '#B7F52E',
     primaryForeground: '#142033',
+    primaryText: '#B7F52E', // Bright lime on dark backgrounds
     secondary: '#1A2942',
     secondaryForeground: '#FFFFFF',
     muted: '#1A2942',

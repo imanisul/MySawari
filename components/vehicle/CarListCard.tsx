@@ -10,7 +10,7 @@ import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { Car } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 
-export const CarListCard = React.memo(function CarListCard({ car, isExplore = true }: { car: Car; isExplore?: boolean }) {
+export const CarListCard = React.memo(function CarListCard({ car, isExplore = true, onIntercept }: { car: Car; isExplore?: boolean; onIntercept?: () => void }) {
   const router = useRouter();
   const { selectCar, dateRange } = useSawari();
   const { scaleAnim, opacityAnim, onPressIn, onPressOut } = usePressAnimation();
@@ -49,7 +49,13 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
     setIsNavigating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     selectCar(car);
-    router.push({ pathname: '/car-details', params: { explore: isExplore ? 'true' : 'false' } });
+    
+    if (!isDateSelected && onIntercept) {
+      onIntercept();
+    } else {
+      router.push('/car-details');
+    }
+    
     setTimeout(() => setIsNavigating(false), 500);
   };
   

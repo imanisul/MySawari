@@ -2,29 +2,31 @@ import React, { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { BookingSnapshot } from '@/services/backend/database';
 import { cars } from '@/utils/sawari';
+import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
+import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 
 export default function BookingDetailScreen() {
   const colors = useColors();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  
-  // Use context fallback for older parts of app, but prioritize API snapshot
-  const { selectedCar, dateRange, pickupTime, returnTime, mode, bookingStatus, completeBooking, cancelBooking } = useSawari();
 
   const [snapshot, setSnapshot] = useState<BookingSnapshot | null>(null);
   const [loading, setLoading] = useState(!!id);
+  const [showCancel, setShowCancel] = useState(false);
+  const [showExtend, setShowExtend] = useState(false);
 
   useEffect(() => {
     if (id) {
-      API.getBooking(id).then(res => {
-        setSnapshot(res);
-        setLoading(false);
-      });
+      API.getBooking(id)
+        .then(res => setSnapshot(res))
+        .catch(() => setSnapshot(null))
+        .finally(() => setLoading(false));
     } else {
       setLoading(false);
     }
@@ -38,9 +40,8 @@ export default function BookingDetailScreen() {
     );
   }
 
-  // Fallback if no snapshot found
-  if (!snapshot && !id) {
-    // This handles old logic for compatibility if needed. (Though we should always have an ID now)
+  // Fallback if no snapshot found (missing id, or the id didn't resolve to a booking)
+  if (!snapshot) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>Booking not found</Text>
@@ -52,7 +53,6 @@ export default function BookingDetailScreen() {
   }
 
   const s = snapshot;
-  if (!s) return null;
 
   // Attempt to find the car image
   const matchedCar = cars.find(c => c.id === s.vehicleId);
@@ -60,11 +60,14 @@ export default function BookingDetailScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={[styles.circle, { borderColor: colors.border }]}><Feather name="chevron-left" size={20} color={colors.foreground} /></Pressable>
           <Text style={[styles.title, { color: colors.foreground }]}>Booking Details</Text>
         </View>
+
+
+
         <View style={[styles.referenceCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.smallLabel, { color: colors.mutedForeground }]}>Booking ID</Text>
@@ -90,14 +93,64 @@ export default function BookingDetailScreen() {
           <View style={[styles.tripBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
             <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>RENTAL DAYS</Text>
             <Text style={[styles.boxValue, { color: colors.foreground }]}>{s.rentalDays} Days</Text>
-            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{s.pickupDate} → {s.returnDate}</Text>
-          </View>
-          <View style={[styles.tripBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-            <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>PICKUP LOCATION</Text>
-            <Text style={[styles.boxValue, { color: colors.foreground }]}>{s.pickupLocationName}</Text>
-            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>{s.pickupType === 'OFFICE' ? 'MySawari Hub' : 'Delivery'}</Text>
+            <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>
+              {s.pickupDate === 'mock-date' ? '15 Sep' : s.pickupDate} → {s.returnDate === 'mock-date' ? '20 Sep' : s.returnDate}
+            </Text>
           </View>
         </View>
+
+        {(!s.pickupCharge && !s.dropCharge) ? (
+          <View style={[styles.tripBoxes, { marginTop: 12 }]}>
+            <View style={[styles.tripBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, width: '100%' }]}>
+              <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>DESTINATION</Text>
+              <Text style={[styles.boxValue, { color: colors.foreground }]}>Self Drive to Location</Text>
+              <Text style={[styles.boxMeta, { color: colors.mutedForeground }]} numberOfLines={1}>{s.dropoffLocationName || 'MySawari Office'}</Text>
+            </View>
+          </View>
+        ) : (
+          <View style={[styles.tripBoxes, { marginTop: 12 }]}>
+            {(s.pickupCharge || 0) > 0 && (
+              <View style={[styles.tripBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, flex: 1 }]}>
+                <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>PICKUP</Text>
+                <Text style={[styles.boxValue, { color: colors.foreground }]}>Delivered</Text>
+                <Text style={[styles.boxMeta, { color: colors.mutedForeground }]} numberOfLines={1}>{s.pickupLocationName}</Text>
+              </View>
+            )}
+            {(s.dropCharge || 0) > 0 && (
+              <View style={[styles.tripBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, flex: 1, marginLeft: (s.pickupCharge || 0) > 0 ? 12 : 0 }]}>
+                <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>DROP</Text>
+                <Text style={[styles.boxValue, { color: colors.foreground }]}>Collected</Text>
+                <Text style={[styles.boxMeta, { color: colors.mutedForeground }]} numberOfLines={1}>{s.dropLocationName}</Text>
+              </View>
+            )}
+          </View>
+        )}
+
+        {s.extensions && s.extensions.length > 0 && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>EXTENSION HISTORY</Text>
+            <View style={[styles.customerCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, padding: 16 }]}>
+              {s.extensions.map((ext, idx) => {
+                const formatDateSafe = (dateStr: string) => {
+                  if (dateStr.includes('T') || dateStr.includes('-')) {
+                    const d = new Date(dateStr);
+                    if (!isNaN(d.getTime())) return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                  }
+                  return dateStr;
+                };
+                
+                return (
+                  <View key={ext.id} style={{ marginBottom: idx < s.extensions!.length - 1 ? 16 : 0 }}>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Extension #{idx + 1}</Text>
+                    <Text style={{ color: colors.mutedForeground, marginTop: 4 }}>Extended until {formatDateSafe(ext.newEndDate)}</Text>
+                    <Text style={{ color: colors.mutedForeground }}>+{ext.additionalDays} Days | ₹{ext.additionalAmount.toLocaleString('en-IN')}</Text>
+                    {idx < s.extensions!.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border, marginTop: 12, marginBottom: 0 }]} />}
+                  </View>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>CUSTOMER</Text>
         <View style={[styles.customerCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
@@ -129,18 +182,47 @@ export default function BookingDetailScreen() {
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>PAYMENT</Text>
         <View style={[styles.paymentCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-          <PaymentRow label={`Trip Cost (${s.distanceKm || 0} km)`} value={`₹${s.rentalAmount.toLocaleString('en-IN')}`} colors={colors} />
+          <PaymentRow label={`Car Rental (${s.rentalDays} days)`} value={`₹${s.rentalAmount.toLocaleString('en-IN')}`} colors={colors} />
           {s.couponDiscount > 0 && <PaymentRow label={`Coupon (${s.couponCode})`} value={`-₹${s.couponDiscount.toLocaleString('en-IN')}`} accent colors={colors} />}
-          {(s.pickupCharge || 0) > 0 && <PaymentRow label={`${s.pickupLocationName} Charge`} value={`₹${(s.pickupCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
+          {(s.pickupCharge || 0) > 0 && <PaymentRow label={`Pickup Service (${s.pickupDistanceKm || 0} km)`} value={`₹${(s.pickupCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
+          {(s.dropCharge || 0) > 0 && <PaymentRow label={`Drop Service (${s.dropDistanceKm || 0} km)`} value={`₹${(s.dropCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
           {s.sawariCashUsed > 0 && <PaymentRow label="SawariCash Applied" value={`-₹${s.sawariCashUsed.toLocaleString('en-IN')}`} accent colors={colors} />}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           
           <PaymentRow label="Online Advance Paid" value={`₹${s.onlinePayableNow.toLocaleString('en-IN')}`} strong colors={colors} />
           <Text style={{ color: colors.mutedForeground, fontSize: 11, textAlign: 'right', marginTop: 2, marginBottom: 8 }}>Transaction ID: {s.razorpayPaymentId}</Text>
           
-          <PaymentRow label="Remaining Rental Amount" value={`₹${s.remainingRentalAmount.toLocaleString('en-IN')}`} strong colors={colors} />
+          <PaymentRow label="Remaining Payable" value={`₹${s.remainingRentalAmount.toLocaleString('en-IN')}`} strong colors={colors} />
           <Text style={{ color: colors.mutedForeground, fontSize: 11, textAlign: 'right', marginTop: 2 }}>Payable at {s.pickupType === 'OFFICE' ? 'Office' : 'Handover'}</Text>
+
+          {s.totalRentalAmount && s.totalRentalAmount > s.rentalAmount ? (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.border, marginTop: 12 }]} />
+              <PaymentRow label="Additional Extensions" value={`₹${(s.totalRentalAmount - s.rentalAmount).toLocaleString('en-IN')}`} colors={colors} />
+              <PaymentRow label="Total Paid" value={`₹${s.totalRentalAmount.toLocaleString('en-IN')}`} strong colors={colors} />
+            </>
+          ) : null}
         </View>
+
+        {s.status === 'CANCELLED' && s.cancellationFee !== undefined && (
+          <>
+            <Text style={[styles.sectionLabel, { color: colors.destructive }]}>CANCELLATION DETAILS</Text>
+            <View style={[styles.customerCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, padding: 16 }]}>
+              <View style={styles.paymentRow}>
+                <Text style={{ color: colors.mutedForeground }}>Cancellation Reason</Text>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{s.cancellationReason}</Text>
+              </View>
+              <View style={styles.paymentRow}>
+                <Text style={{ color: colors.mutedForeground }}>Cancellation Fee</Text>
+                <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium' }}>₹{s.cancellationFee.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={styles.paymentRow}>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Refund Amount</Text>
+                <Text style={{ color: colors.success, fontFamily: 'Inter_600SemiBold' }}>₹{(s.refundAmount || 0).toLocaleString('en-IN')}</Text>
+              </View>
+            </View>
+          </>
+        )}
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>RENTAL INFORMATION</Text>
         <View style={[styles.infoBox, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
@@ -152,17 +234,19 @@ export default function BookingDetailScreen() {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Action buttons if booking is active / upcoming */}
-      {s.status === 'CONFIRMED' || s.status === 'PENDING' ? (
-        <View style={[styles.actionBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
-          <Pressable style={[styles.actionBtn, { borderColor: colors.border, borderWidth: 1 }]}>
-            <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Cancel Booking</Text>
-          </Pressable>
-          <Pressable style={[styles.actionBtn, { backgroundColor: colors.primary }]}>
-            <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>Complete Trip</Text>
-          </Pressable>
-        </View>
-      ) : null}
+      {/* Bottom Sheets */}
+      <CancelBookingSheet 
+        visible={showCancel} 
+        onClose={() => setShowCancel(false)} 
+        booking={s} 
+        onSuccess={setSnapshot} 
+      />
+      <ExtendBookingSheet 
+        visible={showExtend} 
+        onClose={() => setShowExtend(false)} 
+        booking={s} 
+        onSuccess={setSnapshot} 
+      />
     </View>
   );
 }
@@ -188,7 +272,7 @@ function PaymentRow({ label, value, accent, strong, mutedValue, colors }: { labe
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { padding: 24, paddingTop: 60 },
+  content: { padding: 24 },
   topBar: { alignItems: 'center', flexDirection: 'row', gap: 16 },
   circle: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
   title: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
@@ -222,6 +306,6 @@ const styles = StyleSheet.create({
   divider: { height: 1, marginBottom: 12, marginTop: 4, width: '100%' },
   infoBox: { borderRadius: 16, flexDirection: 'row', gap: 12, padding: 16 },
   infoText: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20 },
-  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 16, paddingBottom: 32, flexDirection: 'row', gap: 12 },
+  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 16, flexDirection: 'row', gap: 12 },
   actionBtn: { flex: 1, height: 48, borderRadius: 12, justifyContent: 'center', alignItems: 'center' }
 });

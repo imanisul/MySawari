@@ -1,14 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Animated, FlatList, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
-import { usePressAnimation } from '@/hooks/usePressAnimation';
-import { fetchResultCars, resultCars, Car, Category } from '@/utils/sawari';
+import { fetchResultCars, resultCars } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Header, Page, Skeleton, CarListCard } from '@/components';
 
@@ -81,7 +79,7 @@ export default function SearchResultsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { pickup, dropoff, dateRange, mode, selectCar, vehicleType } = useSawari();
+  const { pickup, dropoff, dateRange, mode, vehicleType } = useSawari();
 
   const [filterVisible, setFilterVisible] = useState(false);
   const [category, setCategory] = useState<string>('All');
@@ -448,17 +446,6 @@ function SkeletonResultCard() {
           <Skeleton height={48} borderRadius={14} />
         </View>
       </View>
-    </View>
-  );
-}
-
-/* ───── Spec Item ───── */
-function SpecItem({ icon, label }: { icon: React.ComponentProps<typeof Feather>['name']; label: string }) {
-  const colors = useColors();
-  return (
-    <View style={styles.specItem}>
-      <Feather name={icon} size={13} color={colors.mutedForeground} />
-      <Text style={[styles.specText, { color: colors.foreground }]}>{label}</Text>
     </View>
   );
 }

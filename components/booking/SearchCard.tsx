@@ -20,7 +20,7 @@ export function SearchCard({
 }) {
   const colors = useColors();
   const router = useRouter();
-  const { vehicleType, setVehicleType, dateRange, duration, pickup, dropoff, pickupTime, returnTime, isAuthenticated, isDeliveryRequested, setIsDeliveryRequested, deliveryMode, setDeliveryMode, returnAddress } = useSawari();
+  const { vehicleType, setVehicleType, dateRange, duration, pickup, dropoff, pickupTime, returnTime, isAuthenticated, isDeliveryRequested, setIsDeliveryRequested, deliveryMode, setDeliveryMode, returnAddress, pricingQuote } = useSawari();
   
   const [startStr, endStr] = dateRange.split(' – ');
   const hasValidDates = startStr && endStr && startStr !== 'Select' && endStr !== 'Select';
@@ -49,7 +49,7 @@ export function SearchCard({
               setVehicleType('car');
             }}
           >
-            <Text style={[styles.segmentText, { color: vehicleType === 'car' ? '#000' : colors.mutedForeground }]}>Cars</Text>
+            <Text style={[styles.segmentText, { color: vehicleType === 'car' ? colors.primaryForeground : '#FFFFFF' }]}>Cars</Text>
           </Pressable>
           <Pressable 
             style={[styles.segmentItem, vehicleType === 'bike' && styles.segmentItemActive, { backgroundColor: vehicleType === 'bike' ? colors.primary : 'transparent' }]} 
@@ -58,7 +58,7 @@ export function SearchCard({
               setVehicleType('bike');
             }}
           >
-            <Text style={[styles.segmentText, { color: vehicleType === 'bike' ? '#000' : colors.mutedForeground }]}>Bikes</Text>
+            <Text style={[styles.segmentText, { color: vehicleType === 'bike' ? colors.primaryForeground : '#FFFFFF' }]}>Bikes</Text>
           </Pressable>
         </View>
       )}
@@ -160,7 +160,7 @@ export function SearchCard({
           {/* Segment Control for Delivery Mode */}
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             {(['delivery', 'return', 'both'] as const).map(m => {
-              const label = m === 'delivery' ? 'Get Delivered' : m === 'return' ? 'Pickup Only' : 'Both';
+              const label = m === 'delivery' ? 'Deliver to Me' : m === 'return' ? 'Collect From Me' : 'Both';
               return (
                 <Pressable
                   key={m}
@@ -210,13 +210,18 @@ export function SearchCard({
                     </Text>
                   </View>
                 </Pressable>
+                {!!pickup?.name && !!pricingQuote?.pickupCharge && (
+                  <Text style={{ fontSize: 10, fontFamily: 'Inter_600SemiBold', color: colors.primaryText, marginTop: 4, marginLeft: 4 }}>
+                    {pricingQuote.pickupDistanceKm} km × ₹20 = ₹{pricingQuote.pickupCharge}
+                  </Text>
+                )}
               </View>
             )}
 
             {/* Pickup Only: show only Drop address */}
             {(deliveryMode === 'return' || deliveryMode === 'both') && (
               <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>Pickup From</Text>
+                <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>Collect From</Text>
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
@@ -235,6 +240,11 @@ export function SearchCard({
                     </Text>
                   </View>
                 </Pressable>
+                {!!returnAddress?.name && !!pricingQuote?.dropCharge && (
+                  <Text style={{ fontSize: 10, fontFamily: 'Inter_600SemiBold', color: colors.primaryText, marginTop: 4, marginLeft: 4 }}>
+                    {pricingQuote.dropDistanceKm} km × ₹20 = ₹{pricingQuote.dropCharge}
+                  </Text>
+                )}
               </View>
             )}
           </View>

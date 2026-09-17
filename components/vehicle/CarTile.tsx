@@ -6,10 +6,13 @@ import { useColors } from '@/hooks/useColors';
 import { Car } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 
-export function CarTile({ car, onPress }: { car: Car; onPress?: () => void }) {
+export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }: { car: Car; onPress?: () => void; onIntercept?: () => void }) {
   const colors = useColors();
   const router = useRouter();
-  const { selectCar } = useSawari();
+  const { selectCar, dateRange } = useSawari();
+  
+  const isDateSelected = !!(dateRange && !dateRange.includes('Select'));
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -18,7 +21,11 @@ export function CarTile({ car, onPress }: { car: Car; onPress?: () => void }) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         selectCar(car);
         onPress?.();
-        router.push('/car-details');
+        if (!isDateSelected && onIntercept) {
+          onIntercept();
+        } else {
+          router.push('/car-details');
+        }
       }}
       style={({ pressed }) => [styles.carTile, pressed && styles.cardPressed]}
     >
@@ -45,7 +52,7 @@ export function CarTile({ car, onPress }: { car: Car; onPress?: () => void }) {
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   carTile: { overflow: 'hidden', width: 270 },

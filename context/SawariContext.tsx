@@ -107,6 +107,10 @@ type SawariContextValue = {
   isAuthLoading: boolean;
   login: (token: string, user: any) => Promise<void>;
   logout: () => Promise<void>;
+  
+  // Favorites
+  favorites: string[];
+  toggleFavorite: (carId: string) => void;
 };
 
 const SawariContext = createContext<SawariContextValue | null>(null);
@@ -159,6 +163,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [hasSeenPermissions, setHasSeenPermissions] = useState<boolean | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   // NEW BOOKING STATE
   const [pricingQuote, setPricingQuote] = useState<PricingQuote | null>(null);
@@ -244,13 +249,14 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       returnTime,
       pickupLocation: pickup,
       dropoffLocation: dropoff,
+      returnLocation: returnAddress,
       couponCode: appliedCouponCode || undefined,
       sawariCashToApply,
       driverMode: mode,
       isDeliveryRequested,
       deliveryMode
     };
-  }, [selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode]);
+  }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode]);
 
   const refreshQuote = useCallback(async () => {
     setIsQuoteLoading(true);
@@ -356,7 +362,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       saveProfile: async (data: Partial<AppCustomer>) => {
         try {
           // 1. Call Backend API
-          const updatedUser = await API.updateProfile({
+          await API.updateProfile({
             fullName: data.name,
             email: data.email,
             dob: data.dob,
@@ -499,10 +505,17 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setEarnedRewards([]);
           setTotalBookings(0);
           setNotifications([]);
+          setFavorites([]);
           setIsAuthenticated(false);
         } catch (e) {
           if (__DEV__) console.warn('Logout failed', e);
         }
+      },
+      favorites,
+      toggleFavorite: (carId: string) => {
+        setFavorites(prev => 
+          prev.includes(carId) ? prev.filter(id => id !== carId) : [...prev, carId]
+        );
       },
     }),
     [
@@ -539,7 +552,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       fuelEstimate,
       refreshQuote,
       vehicleType,
-      quoteParams
+      quoteParams,
+      favorites
     ]
   );
 

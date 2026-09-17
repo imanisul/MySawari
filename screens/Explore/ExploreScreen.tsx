@@ -2,16 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { cars, Category } from '@/utils/sawari';
+import { cars } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
-import { CategoryTabs, CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
+import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
 
 export default function ExploreScreen() {
   const colors = useColors();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<string>('All Dates');
   const { vehicleType: globalVehicleType } = useSawari();
@@ -53,7 +51,17 @@ export default function ExploreScreen() {
 
   const filteredCars = useMemo(() => {
     return cars.filter(car => {
-      const matchDate = selectedDate === 'All Dates' || (car.availabilityDate || 'Available Now') === selectedDate;
+      let matchDate = true;
+      if (selectedDate !== 'All Dates') {
+        const parseDate = (dStr: string) => {
+          if (!dStr || dStr === 'Available Now') return 0;
+          return new Date(`${dStr} ${new Date().getFullYear()}`).getTime();
+        };
+        const selectedTime = parseDate(selectedDate);
+        const carTime = parseDate(car.availabilityDate || 'Available Now');
+        matchDate = carTime <= selectedTime;
+      }
+      
       const matchType = vehicleType === 'All' || 
                         (vehicleType === 'Bikes' && car.type === 'Bike') ||
                         (vehicleType === 'Cars' && car.type === 'Car');

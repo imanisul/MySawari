@@ -8,7 +8,6 @@ import { SheetFrame, SheetHeader } from '../common/SheetFrame';
 import { PrimaryButton } from '../common/PrimaryButton';
 
 export function DriverOptionSheet() {
-  const colors = useColors();
   const { mode, setMode } = useSawari();
   const router = useRouter();
   return (

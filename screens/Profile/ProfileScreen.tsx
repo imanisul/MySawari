@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Pressable, ScrollView, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Page, Header, PrimaryButton } from '@/components';
 import { useColors } from '@/hooks/useColors';
@@ -12,7 +12,7 @@ import { LoginBottomSheet } from '@/components';
 
 export default function ProfileScreen() {
   const colors = useColors();
-  const { customer, logout, earnReward, sawariCash, isAuthenticated } = useSawari();
+  const { customer, sawariCash, isAuthenticated } = useSawari();
   const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();

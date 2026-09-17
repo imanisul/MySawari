@@ -27,16 +27,6 @@ const generateTimes = () => {
 };
 const ALL_TIMES = generateTimes();
 
-const timeToMinutes = (timeStr: string) => {
-  if (!timeStr) return 0;
-  const [time, period] = timeStr.split(' ');
-  const [hours, minutes] = time.split(':').map(Number);
-  let totalMinutes = (hours % 12) * 60 + minutes;
-  if (period === 'PM') totalMinutes += 12 * 60;
-  return totalMinutes;
-};
-const EIGHT_AM_MINUTES = timeToMinutes('8:00 AM');
-
 export function DatesSheet() {
   const colors = useColors();
   const { setDates, setTimes, dateRange, pickupTime, returnTime } = useSawari();

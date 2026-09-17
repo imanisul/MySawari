@@ -65,6 +65,6 @@ export async function fetchOffers(): Promise<Offer[]> {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve(mockOffers);
-    }, 600);
+    }, 50);
   });
 }

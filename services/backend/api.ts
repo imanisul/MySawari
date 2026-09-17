@@ -18,7 +18,7 @@ export const API = {
    * GET /api/pickup-locations
    */
   async getPickupLocations() {
-    await delay(300);
+    await delay(100);
     return DB.pickupLocations.filter(loc => loc.active);
   },
 
@@ -26,7 +26,7 @@ export const API = {
    * GET /api/coupons
    */
   async getCoupons() {
-    await delay(300);
+    await delay(100);
     return DB.coupons.filter(c => c.active);
   },
 
@@ -34,7 +34,7 @@ export const API = {
    * GET /api/config/fuel-price
    */
   async getFuelPrice(type: 'petrol' | 'diesel' = 'petrol') {
-    await delay(200);
+    await delay(100);
     return DB.fuelPrices[type];
   },
 
@@ -42,7 +42,7 @@ export const API = {
    * POST /api/bookings/quote
    */
   async quoteBooking(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<PricingQuote> {
-    await delay(500);
+    await delay(100);
     
     // Fetch the user's SawariCash balance securely
     let availableSawariCash = 0;
@@ -71,7 +71,7 @@ export const API = {
    * POST /api/payments/razorpay/order
    */
   async createRazorpayOrder(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<{ orderId: string, amountPaise: number }> {
-    await delay(800);
+    await delay(100);
     
     // BACKEND VALIDATION: Independently recalculate the quote to prevent frontend manipulation
     const serverQuote = await this.quoteBooking(params);
@@ -94,7 +94,7 @@ export const API = {
    * In a real app, this verifies the HMAC SHA256 signature using the Razorpay Secret
    */
   async verifyPayment(orderId: string, paymentId: string, signature: string): Promise<boolean> {
-    await delay(600);
+    await delay(100);
     // Mock successful verification
     if (!orderId || !paymentId || !signature) {
       throw new Error("Missing payment verification details");
@@ -113,7 +113,7 @@ export const API = {
     paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string },
     fuelEstimateDetails?: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number }
   ): Promise<BookingSnapshot> {
-    await delay(500);
+    await delay(100);
     
     // BACKEND VALIDATION: Recalculate quote to prevent frontend manipulation
     const serverQuote = await this.quoteBooking(params);
@@ -216,7 +216,7 @@ export const API = {
   },
   
   async getBooking(id: string): Promise<BookingSnapshot | null> {
-    await delay(300);
+    await delay(100);
     let userId = null;
     try {
       const { getItemAsync } = require('expo-secure-store');
@@ -232,7 +232,7 @@ export const API = {
   },
 
   async getAllBookings(): Promise<BookingSnapshot[]> {
-    await delay(300);
+    await delay(100);
     let userId = null;
     try {
       const { getItemAsync } = require('expo-secure-store');
@@ -268,7 +268,7 @@ export const API = {
   },
 
   async cancelBooking(id: string, reason?: string): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
-    await delay(600);
+    await delay(100);
     const bookings = await this.getAllBookings();
     const index = bookings.findIndex(b => b.id === id);
     if (index === -1) throw new Error('Booking not found');
@@ -336,7 +336,7 @@ export const API = {
   },
 
   async checkExtensionAvailability(bookingId: string, newReturnDateStr: string): Promise<{ available: boolean; message?: string; additionalDays: number; additionalAmount: number }> {
-    await delay(400);
+    await delay(100);
     const booking = await this.getBooking(bookingId);
     if (!booking) throw new Error('Booking not found');
 
@@ -387,7 +387,7 @@ export const API = {
   },
 
   async extendBooking(bookingId: string, newReturnDateStr: string, additionalAmount: number, additionalDays: number): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
-    await delay(800); // Simulate payment & verification
+    await delay(100); // Simulate payment & verification
     
     const bookings = await this.getAllBookings();
     const index = bookings.findIndex(b => b.id === bookingId);
@@ -438,7 +438,7 @@ export const API = {
    * GET /api/config
    */
   async getAppConfig() {
-    await delay(200);
+    await delay(100);
     return DB.appConfig;
   },
 
@@ -447,7 +447,7 @@ export const API = {
    * Mock login that generates a unique referral code for new users.
    */
   async login(name: string, mobile: string, referralCode?: string) {
-    await delay(500);
+    await delay(100);
     let user = DB.users.find(u => u.mobile === mobile);
     
     if (!user) {
@@ -498,7 +498,7 @@ export const API = {
    * POST /api/auth/send-otp (Mock)
    */
   async sendOtp(mobile: string) {
-    await delay(600);
+    await delay(100);
     return { success: true, message: 'OTP sent successfully (MOCK)' };
   },
 
@@ -506,7 +506,7 @@ export const API = {
    * POST /api/auth/verify-otp (Mock)
    */
   async verifyOtp(mobile: string, otp: string, name?: string) {
-    await delay(600);
+    await delay(100);
     if (otp !== '1234') {
       throw new Error('Invalid OTP (Mock expects 1234)');
     }
@@ -517,7 +517,7 @@ export const API = {
    * GET /api/users/profile
    */
   async getUserProfile(userId: string) {
-    await delay(300);
+    await delay(100);
     return DB.users.find(u => u.id === userId) || null;
   },
 
@@ -525,7 +525,7 @@ export const API = {
    * PUT /api/users/profile (Mock)
    */
   async updateProfile(profileData: { fullName?: string, email?: string, dob?: string, gender?: string, aadhaarNumber?: string, drivingLicenseNumber?: string }) {
-    await delay(400);
+    await delay(100);
     const { getItemAsync } = require('expo-secure-store');
     const userId = await getItemAsync('user_id');
     const user = DB.users.find(u => u.id === userId);
@@ -543,7 +543,7 @@ export const API = {
    * GET /api/users/:id/referrals
    */
   async getReferrals(userId: string) {
-    await delay(300);
+    await delay(100);
     const referrals = DB.referrals.filter(r => r.referrerId === userId);
     
     // Join with referred user details for display
@@ -601,7 +601,7 @@ export const API = {
    */
   reviews: {
     async fetchByCarId(carId: string) {
-      await delay(300);
+      await delay(100);
       try {
         const stored = await AsyncStorage.getItem(REVIEWS_STORAGE_KEY);
         const allReviews: StoredReview[] = stored ? JSON.parse(stored) : [];
@@ -622,7 +622,7 @@ export const API = {
     },
 
     async submit(carId: string, rating: number, text: string): Promise<{ status: 'pending' }> {
-      await delay(500);
+      await delay(100);
 
       let userId: string | null = null;
       try {

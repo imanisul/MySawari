@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View, ScrollView, Dimensions } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View, ScrollView, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -81,7 +82,7 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
           >
             {images.map((img: any, i: number) => (
               <View key={i} style={{ width: cardWidth, height: '100%' }}>
-                <Image source={img} resizeMode="cover" style={styles.carImage} />
+                <Image source={img} contentFit="cover" transition={200} style={styles.carImage} />
               </View>
             ))}
           </ScrollView>

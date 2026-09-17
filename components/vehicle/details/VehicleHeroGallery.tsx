@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
-import { View, Image, ScrollView, Pressable, StyleSheet, Dimensions, Modal, Text } from 'react-native';
+import { View, ScrollView, Pressable, StyleSheet, Dimensions, Modal, Text } from 'react-native';
+import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -42,7 +43,8 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
         <Image 
           source={images[activeIndex]} 
           style={styles.heroImage} 
-          resizeMode="cover" 
+          contentFit="cover" 
+          transition={200}
         />
         <View style={styles.expandIcon}>
           <Feather name="maximize-2" size={16} color="#FFF" />
@@ -66,7 +68,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
                 { backgroundColor: colors.surfaceSoft, borderColor: isActive ? colors.primary : 'transparent' }
               ]}
             >
-              <Image source={img} style={styles.thumbnailImage} resizeMode="cover" />
+              <Image source={img} style={styles.thumbnailImage} contentFit="cover" transition={200} />
               {isActive && <View style={[styles.thumbnailOverlay, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />}
             </Pressable>
           );
@@ -78,7 +80,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
             onPress={openFullScreen}
             style={[styles.thumbnailWrap, { backgroundColor: colors.surfaceSoft, borderColor: 'transparent' }]}
           >
-            <Image source={images[MAX_THUMBNAILS - 1]} style={styles.thumbnailImage} resizeMode="cover" />
+            <Image source={images[MAX_THUMBNAILS - 1]} style={styles.thumbnailImage} contentFit="cover" transition={200} />
             <View style={[styles.thumbnailOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
               <Text style={styles.plusText}>+{remainingCount}</Text>
             </View>
@@ -117,7 +119,8 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
                 <Image 
                   source={img} 
                   style={{ width: '100%', height: width * 0.75 }} 
-                  resizeMode="contain" 
+                  contentFit="contain" 
+                  transition={200}
                 />
               </View>
             ))}

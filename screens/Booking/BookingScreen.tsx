@@ -121,34 +121,61 @@ export default function BookingScreen() {
             isMissing={isMissingDates}
             onPress={() => router.push('/dates')}
           />
-          <View style={{ paddingVertical: 12 }}>
-            <Text style={{ fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground, marginBottom: 12 }}>Driving option</Text>
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              {(['Self Drive', 'With Driver'] as const).map(m => (
-                <Pressable
-                  key={m}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setMode(m);
-                  }}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 12,
-                    alignItems: 'center',
-                    backgroundColor: mode === m ? colors.primary : 'transparent',
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: mode === m ? colors.primary : colors.border,
-                  }}
-                >
-                  <Text style={{ fontSize: 13, fontFamily: mode === m ? 'Inter_600SemiBold' : 'Inter_500Medium', color: mode === m ? '#000' : colors.foreground }}>
-                    {m}
-                  </Text>
-                  <Text style={{ fontSize: 10, fontFamily: 'Inter_400Regular', color: mode === m ? '#333' : colors.mutedForeground, marginTop: 4 }}>
-                    {m === 'Self Drive' ? 'No driver charges' : '₹1400/day'}
-                  </Text>
-                </Pressable>
-              ))}
+          <View style={{ paddingTop: 16, paddingBottom: 8 }}>
+            <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.foreground, marginBottom: 12 }}>Driving option</Text>
+            <View style={{ gap: 12 }}>
+              {(['Self Drive', 'With Driver'] as const).map(m => {
+                const isSelected = mode === m;
+                return (
+                  <Pressable
+                    key={m}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setMode(m);
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 16,
+                        borderRadius: 16,
+                        borderWidth: 2,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        backgroundColor: isSelected ? colors.card : colors.background,
+                        opacity: pressed ? 0.9 : 1,
+                      }
+                    ]}
+                  >
+                    <View style={{
+                      width: 44, height: 44, borderRadius: 22, 
+                      backgroundColor: isSelected ? colors.primary : colors.tintLight,
+                      alignItems: 'center', justifyContent: 'center', marginRight: 14
+                    }}>
+                      <Feather name={m === 'Self Drive' ? 'key' : 'user'} size={20} color={isSelected ? '#000' : colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium', color: colors.foreground }}>
+                        {m}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 4 }}>
+                        {m === 'Self Drive' ? 'Drive yourself, no extra charge' : 'Relax with a professional driver'}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                      <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: isSelected ? colors.primaryText : colors.foreground }}>
+                        {m === 'Self Drive' ? '₹0' : '₹1400/d'}
+                      </Text>
+                      {isSelected ? (
+                        <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
+                          <Feather name="check" size={12} color="#000" />
+                        </View>
+                      ) : (
+                        <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginTop: 6 }} />
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
           </View>
         </View>

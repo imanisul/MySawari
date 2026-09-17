@@ -126,6 +126,7 @@ const baseCars: Car[] = [
     transmission: 'Automatic',
     fuel: 'Petrol',
     mileage: '17 km/l',
+    availabilityDate: 'Available Now',
     images: [
       require('../assets/images/creta.jpg'),
       require('../assets/images/creta.jpg'), // Mocking multiple images
@@ -159,6 +160,7 @@ const baseCars: Car[] = [
     transmission: 'Automatic',
     fuel: 'Diesel',
     mileage: '19 km/l',
+    availabilityDate: 'Available Now',
   },
   {
     id: 'swift',
@@ -172,6 +174,7 @@ const baseCars: Car[] = [
     transmission: 'Manual',
     fuel: 'Petrol',
     mileage: '23 km/l',
+    availabilityDate: getDynamicDate(2),
   },
   {
     id: 'scorpio-s',
@@ -185,6 +188,7 @@ const baseCars: Car[] = [
     transmission: 'Manual',
     fuel: 'Diesel',
     mileage: '15 km/l',
+    availabilityDate: getDynamicDate(5),
   },
   {
     id: 'nexon',
@@ -198,6 +202,7 @@ const baseCars: Car[] = [
     transmission: 'Automatic',
     fuel: 'Petrol',
     mileage: '17 km/l',
+    availabilityDate: 'Available Now',
   },
   {
     id: 'jawa',
@@ -211,6 +216,7 @@ const baseCars: Car[] = [
     transmission: 'Manual',
     fuel: 'Petrol',
     mileage: '35 km/l',
+    availabilityDate: getDynamicDate(1),
   },
   {
     id: 'xpulse',
@@ -224,6 +230,7 @@ const baseCars: Car[] = [
     transmission: 'Manual',
     fuel: 'Petrol',
     mileage: '38 km/l',
+    availabilityDate: getDynamicDate(4),
   },
   {
     id: 'hunter',
@@ -237,13 +244,11 @@ const baseCars: Car[] = [
     transmission: 'Manual',
     fuel: 'Petrol',
     mileage: '36 km/l',
+    availabilityDate: getDynamicDate(3),
   },
 ];
 
-export const cars = baseCars.map((car, index) => ({
-  ...car,
-  availabilityDate: getDynamicDate(index % 7)
-}));
+export const cars = [...baseCars];
 
 export const premiumCollection: Car[] = [
   {
@@ -258,6 +263,7 @@ export const premiumCollection: Car[] = [
     transmission: 'Manual',
     fuel: 'Diesel',
     mileage: '15 km/l',
+    availabilityDate: 'Available Now',
   },
   {
     id: 'nexon',
@@ -271,6 +277,7 @@ export const premiumCollection: Car[] = [
     transmission: 'Automatic',
     fuel: 'Petrol',
     mileage: '17 km/l',
+    availabilityDate: getDynamicDate(2),
   },
   {
     id: 'curvv',
@@ -360,6 +367,7 @@ export const resultCars: Car[] = [
     transmission: 'Automatic',
     fuel: 'Diesel',
     mileage: '15 km/l',
+    availabilityDate: getDynamicDate(2),
   },
   {
     id: 'swift-result',
@@ -373,6 +381,7 @@ export const resultCars: Car[] = [
     transmission: 'Manual',
     fuel: 'Petrol',
     mileage: '23 km/l',
+    availabilityDate: 'Available Now',
   },
   {
     id: 'city-result',
@@ -386,6 +395,7 @@ export const resultCars: Car[] = [
     transmission: 'Automatic',
     fuel: 'Petrol',
     mileage: '18 km/l',
+    availabilityDate: getDynamicDate(4),
   },
   {
     id: 'mercedes-result',

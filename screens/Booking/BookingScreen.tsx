@@ -26,7 +26,7 @@ export default function BookingScreen() {
   const isMissingPickup = needsPickupAddress && !pickup?.name;
   const isMissingDrop = needsDropAddress && !returnAddress?.name;
   const isMissingDates = !dateRange || dateRange.includes('Select');
-  const isMissingDestination = !isDeliveryRequested && !dropoff?.name;
+  const isMissingDestination = !dropoff?.name;
   
   const [startStr] = (dateRange || '').split(' – ');
   const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(selectedCar?.availabilityDate, startStr);
@@ -80,15 +80,14 @@ export default function BookingScreen() {
         </View>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Trip details</Text>
         <View style={styles.tripDetails}>
-          {!isDeliveryRequested ? (
-            <DetailRow
-              icon="map-pin"
-              label="Destination"
-              value={dropoff?.name || 'Select Destination'}
-              isMissing={isMissingDestination}
-              onPress={() => router.push('/dropoff')}
-            />
-          ) : (
+          <DetailRow
+            icon="map-pin"
+            label="Destination"
+            value={dropoff?.name || 'Select Destination'}
+            isMissing={!dropoff?.name}
+            onPress={() => router.push('/dropoff')}
+          />
+          {isDeliveryRequested && (
             <>
               {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
                 <DetailRow

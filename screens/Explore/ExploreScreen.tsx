@@ -3,6 +3,7 @@ import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, Act
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -175,7 +176,9 @@ export default function ExploreScreen() {
   };
 
   const renderCar = useCallback(({ item }: { item: typeof cars[0] }) => (
-    <CarListCard car={item} />
+    <Reanimated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>
+      <CarListCard car={item} />
+    </Reanimated.View>
   ), []);
 
   const activeFilterCount = useMemo(() => {
@@ -329,11 +332,11 @@ export default function ExploreScreen() {
   const listEmptyElement = (() => {
     if (isFetchingCars) {
       return (
-        <View style={{ paddingTop: 16 }}>
+        <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)} style={{ paddingTop: 16 }}>
           {[1, 2, 3].map(i => (
             <CarCardSkeleton key={i} />
           ))}
-        </View>
+        </Reanimated.View>
       );
     }
     

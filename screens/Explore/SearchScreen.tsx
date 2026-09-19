@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
 import { resultCars, checkCarAvailability } from '@/utils/sawari';
@@ -244,13 +245,13 @@ export default function SearchResultsScreen() {
         }
         ListEmptyComponent={
           isLoading ? (
-            <View style={styles.loadingContainer}>
+            <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)} style={styles.loadingContainer}>
               <SkeletonResultCard />
               <SkeletonResultCard />
               <SkeletonResultCard />
-            </View>
+            </Reanimated.View>
           ) : (
-            <View style={styles.emptyContainer}>
+            <Reanimated.View entering={FadeIn.duration(400)} style={styles.emptyContainer}>
               <View style={[styles.emptyIcon, { backgroundColor: colors.muted }]}>
                 <Feather name="search" size={28} color={colors.mutedForeground} />
               </View>
@@ -263,11 +264,13 @@ export default function SearchResultsScreen() {
               >
                 <Text style={[styles.clearButtonText, { color: colors.primaryForeground }]}>Clear All Filters</Text>
               </Pressable>
-            </View>
+            </Reanimated.View>
           )
         }
         renderItem={({ item: car }) => (
-          <CarListCard car={car} isExplore={false} />
+          <Reanimated.View entering={FadeIn.duration(400)} exiting={FadeOut.duration(200)}>
+            <CarListCard car={car} isExplore={false} />
+          </Reanimated.View>
         )}
         ItemSeparatorComponent={() => <View style={{ height: 16 }} />}
       />

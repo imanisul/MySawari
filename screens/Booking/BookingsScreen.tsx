@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
 import { BottomNavigation, PrimaryButton } from '@/components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { BookingSnapshot } from '@/services/backend/database';
 import { useSawari } from '@/context/SawariContext';
 import { LoginBottomSheet } from '@/components';
@@ -123,11 +124,11 @@ export default function BookingsScreen() {
         </View>
         
         {loading ? (
-          <View style={{ paddingTop: 8, paddingBottom: insets.bottom + 100 }}>
+          <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)} style={{ paddingTop: 8, paddingBottom: insets.bottom + 100 }}>
             <BookingSkeleton />
             <BookingSkeleton />
             <BookingSkeleton />
-          </View>
+          </Reanimated.View>
         ) : fetchError ? (
           <View style={styles.emptyContainer}>
             <View style={[styles.emptyCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -150,14 +151,14 @@ export default function BookingsScreen() {
               const dividerColor = isActive ? '#2A364C' : colors.border;
 
               return (
-              <Pressable
-                key={booking.id}
-                onPress={() => router.push(`/booking-detail?id=${booking.id}` as any)}
-                style={[
-                  styles.upcomingCard, 
-                  { 
-                    backgroundColor: cardBg, 
-                    borderColor: cardBorder, 
+              <Reanimated.View key={booking.id} entering={FadeIn.duration(400)}>
+                <Pressable
+                  onPress={() => router.push(`/booking-detail?id=${booking.id}` as any)}
+                  style={[
+                    styles.upcomingCard, 
+                    { 
+                      backgroundColor: cardBg, 
+                      borderColor: cardBorder, 
                     borderWidth: 1 
                   }
                 ]}
@@ -253,6 +254,7 @@ export default function BookingsScreen() {
                   </View>
                 </View>
               </Pressable>
+              </Reanimated.View>
               );
             })}
           </ScrollView>

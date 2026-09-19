@@ -57,7 +57,7 @@ export default function LoginScreen() {
         createdAt: new Date().toISOString()
       };
       
-      await login(mockToken, mockUser);
+      await login(mockToken, 'mock-refresh-token', mockUser);
       if (router.canGoBack()) {
         router.back();
       } else {

@@ -26,7 +26,12 @@ export default function CarDetailsScreen() {
   
   const hasValidDates = !!(dateRange && !dateRange.includes('Select'));
   const [startStr, endStr] = (dateRange || '').split(' – ');
-  const isAvailable = !hasValidDates ? true : checkCarAvailability(selectedCar, startStr, endStr);
+  let isAvailable = true;
+  if (selectedCar?.dbStatus === 'rent' || selectedCar?.dbStatus === 'service' || selectedCar?.dbStatus === 'maintenance') {
+    isAvailable = false;
+  } else {
+    isAvailable = !hasValidDates ? true : checkCarAvailability(selectedCar, startStr, endStr);
+  }
   
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);

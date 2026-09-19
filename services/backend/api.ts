@@ -1,17 +1,130 @@
 import { DB, BookingSnapshot, StoredReview } from './database';
 import { calculateBookingPrice, QuoteParams, PricingQuote } from './pricingEngine';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
+import { Car } from '../../utils/sawari';
+import { Platform } from 'react-native';
 
 // Simulated delay for realistic backend latency
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// For Expo, localhost points to the phone. We need the local IP of the machine running the bundler.
-const debuggerHost = Constants.expoConfig?.hostUri;
-const localIp = debuggerHost?.split(':')[0];
-const BACKEND_URL = localIp ? `http://${localIp}:5001/api` : 'http://localhost:5001/api';
+// Local backend
+const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+const BACKEND_URL = `${BASE_URL}/api`;
+
+// The render backend does not currently expose /locations routes, so
+// location search/reverse-geocode call Photon's public API directly.
+const PHOTON_BASE_URL = 'https://photon.komoot.io';
+const NOMINATIM_BASE_URL = 'https://nominatim.openstreetmap.org';
+
+function formatPhotonAddress(properties: any): string {
+  const parts: string[] = [];
+  if (properties.name) parts.push(properties.name);
+  if (properties.street) parts.push(properties.street);
+  if (properties.district && properties.district !== properties.name) parts.push(properties.district);
+  if (properties.city) parts.push(properties.city);
+  if (properties.state) parts.push(properties.state);
+
+  if (parts.length === 0) {
+    if (properties.country) parts.push(properties.country);
+    else return 'Unknown Location';
+  }
+
+  return parts.join(', ');
+}
+
+function mapPhotonResponse(data: any) {
+  if (!data || !data.features) return [];
+  return data.features.map((feature: any) => ({
+    id: feature.properties.osm_id?.toString() || `osm_${Math.random()}`,
+    name: feature.properties.name || feature.properties.street || feature.properties.city || 'Unknown Place',
+    address: formatPhotonAddress(feature.properties),
+    longitude: feature.geometry.coordinates[0],
+    latitude: feature.geometry.coordinates[1],
+    postcode: feature.properties.postcode || null,
+    country: feature.properties.country || null,
+  }));
+}
 
 const REVIEWS_STORAGE_KEY = '@mysawari_reviews';
+
+let isRefreshing = false;
+let refreshSubscribers: ((token: string) => void)[] = [];
+
+const subscribeTokenRefresh = (cb: (token: string) => void) => {
+  refreshSubscribers.push(cb);
+};
+
+const onRefreshed = (token: string) => {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+};
+
+async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  const { getItemAsync, setItemAsync, deleteItemAsync } = require('expo-secure-store');
+  let token = await getItemAsync('auth_token');
+
+  const headers = new Headers(options.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  
+  let response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    if (!token) {
+      return response;
+    }
+
+    if (!isRefreshing) {
+      isRefreshing = true;
+      try {
+        const refreshToken = await getItemAsync('refresh_token');
+        if (!refreshToken) throw new Error('No refresh token');
+
+        const refreshRes = await fetch(`${BACKEND_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken })
+        });
+
+        if (!refreshRes.ok) throw new Error('Session expired');
+
+        const data = await refreshRes.json();
+        const newToken = data.data.token;
+        const newRefreshToken = data.data.refreshToken;
+
+        await setItemAsync('auth_token', newToken);
+        if (newRefreshToken) await setItemAsync('refresh_token', newRefreshToken);
+        
+        token = newToken;
+        onRefreshed(newToken);
+      } catch (e) {
+        // Force logout
+        await deleteItemAsync('auth_token');
+        await deleteItemAsync('refresh_token');
+        onRefreshed(''); // signal failure
+        
+        // Emit global event for Context to log the user out of the UI
+        const { DeviceEventEmitter } = require('react-native');
+        DeviceEventEmitter.emit('onSessionExpired');
+        
+        throw new Error('Session expired. Please log in again.');
+      } finally {
+        isRefreshing = false;
+      }
+    } else {
+      // Wait for the active refresh to complete
+      token = await new Promise((resolve) => {
+        subscribeTokenRefresh(resolve);
+      });
+      if (!token) throw new Error('Session expired');
+    }
+
+    // Retry original request
+    headers.set('Authorization', `Bearer ${token}`);
+    response = await fetch(url, { ...options, headers });
+  }
+
+  return response;
+}
 
 export const API = {
   /**
@@ -26,88 +139,73 @@ export const API = {
    * GET /api/vehicles
    * Returns vehicles with their dynamically calculated availability range
    */
-  async getVehiclesWithAvailability() {
-    await delay(500); // Simulate network latency
-
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    const parseDate = (dStr: string) => {
-      const parts = dStr.trim().split(' ');
-      if (parts.length < 2) return 0;
-      const day = parseInt(parts[0], 10);
-      const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
-      let month = MONTHS.indexOf(parts[1]);
-      if (month === 12) month = 8;
-      if (month === -1) return 0;
-      return new Date(now.getFullYear(), month, day).getTime();
-    };
-
-    const formatDate = (ts: number) => {
-      const d = new Date(ts);
-      return `${d.getDate()} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.getMonth()].toUpperCase()}`;
-    };
-
-    // Calculate availability for each vehicle
-    const vehiclesWithAvailability = DB.vehicles.map(car => {
-      // 1. Get relevant bookings (active and in the future/ongoing)
-      const activeBookings = DB.bookings.filter(b => 
-        b.vehicleId === car.id && 
-        ['CONFIRMED', 'ONGOING'].includes(b.status)
-      );
-
-      // Extract intervals [start, end] from bookings and blocked dates
-      const intervals = activeBookings.map(b => ({
-        start: parseDate(b.pickupDate),
-        end: parseDate(b.returnDate)
-      }));
-
-      // Add blocked dates (if any)
-      const blocks = DB.blockedDates?.filter(b => b.vehicleId === car.id) || [];
-      blocks.forEach(b => {
-        intervals.push({
-          start: parseDate(b.startDate),
-          end: parseDate(b.endDate)
-        });
-      });
-
-      // Sort intervals chronologically
-      intervals.sort((a, b) => a.start - b.start);
-
-      // 2. Find the first available window
-      let currentCheckTime = now.getTime();
-      let nextAvailableEnd: number | undefined = undefined;
-
-      // Filter out past intervals
-      const futureIntervals = intervals.filter(i => i.end >= currentCheckTime);
-
-      for (const interval of futureIntervals) {
-        if (currentCheckTime < interval.start) {
-          // We found a gap between currentCheckTime and interval.start
-          nextAvailableEnd = interval.start;
-          break;
-        } else {
-          // currentCheckTime falls inside this interval (or exactly on it), push the check forward
-          currentCheckTime = Math.max(currentCheckTime, interval.end);
-        }
-      }
-
-      // If we made it through all intervals and didn't find a gap that ends before an interval,
-      // it means the car is available from currentCheckTime indefinitely.
-      if (!nextAvailableEnd) {
-        nextAvailableEnd = currentCheckTime + 30 * 24 * 60 * 60 * 1000;
+  async getVehiclesWithAvailability(type?: string): Promise<Car[]> {
+    try {
+      let url = `${BACKEND_URL}/vehicles`;
+      
+      const response = await fetchWithAuth(url);
+      
+      if (response.status === 401) {
+        return [];
       }
       
-      return {
-        ...car,
-        availabilityRange: {
-          start: formatDate(currentCheckTime),
-          end: formatDate(nextAvailableEnd)
-        }
-      };
-    });
+      const data = await response.json();
+      
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch vehicles');
+      
+      // Extra safeguard: explicitly filter out any vehicles marked as deleted
+      const dbVehicles = (data.data || []).filter((v: any) => v.isDeleted !== true);
+      
+      return dbVehicles.map((v: any) => {
+        // Robust check for bikes: Seating capacity <= 2 guarantees it's a two-wheeler,
+        // even if someone mistakenly saved it as 'SUV' or 'Luxury' in the DB.
+        const isBike = v.seatingCapacity <= 2 || /^(bike|scooter|cruiser|sports|standard)$/i.test(v.vehicleType);
+        const { getVehicleImage } = require('../../utils/vehicleImages');
+        const fallbackImage = getVehicleImage(v.vehicleName, isBike);
+        const hasImages = v.images && v.images.length > 0 && v.images[0].url;
+        const getFullUrl = (url: string) => {
+          if (!url) return '';
+          return url.startsWith('http') ? url : `${BASE_URL}${url}`;
+        };
+        
+        let availabilityDate = 'Available Now';
+        let availableToDate: string | undefined;
 
-    return vehiclesWithAvailability;
+        if (v.status === 'service' || v.status === 'maintenance') {
+          availabilityDate = 'In Service';
+        } else if (v.status === 'rent' || v.status === 'booked') {
+          availabilityDate = 'Currently Booked';
+        } else {
+          availabilityDate = 'Available Now';
+        }
+
+        return {
+          id: v._id,
+          type: isBike ? 'Bike' : 'Car',
+          name: v.vehicleName,
+          category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : v.vehicleType),
+          price: `₹${v.pricePerDay}`,
+          perDay: v.pricePerDay,
+          image: hasImages ? { uri: getFullUrl(v.images[0].url) } : fallbackImage,
+          images: hasImages ? v.images.map((img: any) => ({ uri: getFullUrl(img.url) })) : [fallbackImage],
+          seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
+          transmission: v.transmission || 'Manual',
+          fuel: v.fuelType || 'Petrol',
+          mileage: 'N/A',
+          availabilityDate,
+          availableToDate,
+          availabilityRange: {
+            start: availabilityDate,
+            end: '31 Dec'
+          },
+          dbStatus: v.status || 'available',
+          bookedRanges: v.bookedRanges || []
+        };
+      });
+    } catch (e: any) {
+      console.error('getVehiclesWithAvailability error:', e);
+      return [];
+    }
   },
 
   /**
@@ -269,22 +367,50 @@ export const API = {
       createdAt: new Date().toISOString(),
     };
     
-    // 3. Save to mock DB
-    DB.bookings.push(snapshot);
-    
-    // Save locally to AsyncStorage for the My Bookings page to see it
-    let existing: BookingSnapshot[] = [];
-    if (userId) {
-      const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
-      existing = storedBookings ? JSON.parse(storedBookings) as BookingSnapshot[] : [];
-      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify([snapshot, ...existing]));
+    // 3. Save to backend DB
+    const dateParser = (dateStr: string) => {
+      const parts = dateStr.split(' ');
+      if (parts.length >= 3) {
+        // Assume format '15 Sep 2024'
+        return new Date(`${parts[1]} ${parts[0]} ${parts[2]}`);
+      }
+      return new Date(dateStr);
+    };
+
+    try {
+      await fetchWithAuth(`${BACKEND_URL}/bookings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          vehicleId: vehicleId,
+          vehicleName: vehicleName,
+          customerName: customerDetails.name,
+          mobileNumber: customerDetails.mobile,
+          tripType: 'local',
+          fromDate: dateParser(params.pickupDateStr).toISOString(),
+          toDate: dateParser(params.returnDateStr).toISOString(),
+          pickupTime: params.pickupTime || '10:00 AM',
+          dropTime: params.returnTime || '10:00 AM',
+          totalDays: quote.rentalDays,
+          payment: {
+            totalAmount: quote.rentalAmount,
+            discountAmount: quote.couponDiscount,
+            bookingAmountPaid: quote.onlinePayableNow,
+            balanceAmount: quote.remainingRentalAmount,
+            paymentMethod: 'online',
+            paymentStatus: 'paid'
+          }
+        })
+      });
+    } catch (e) {
+      console.error('Error saving booking to backend:', e);
     }
     
     // Referral Processing Logic
     const user = DB.users.find(u => u.mobile === customerDetails.mobile);
     if (user && user.referredBy) {
       // Check if this is their first booking
-      const hasPreviousBookings = existing.some(b => b.customerMobile === customerDetails.mobile) || DB.bookings.some(b => b.customerMobile === customerDetails.mobile && b.id !== snapshot.id);
+      const hasPreviousBookings = DB.bookings.some(b => b.customerMobile === customerDetails.mobile && b.id !== snapshot.id);
       
       if (!hasPreviousBookings) {
         const referral = DB.referrals.find(r => r.referredId === user.id && r.status === 'SIGNED_UP');
@@ -320,39 +446,43 @@ export const API = {
   },
 
   async getAllBookings(): Promise<BookingSnapshot[]> {
-    await delay(100);
-    let userId = null;
     try {
-      const { getItemAsync } = require('expo-secure-store');
-      userId = await getItemAsync('user_id');
-    } catch(e) {}
-    
-    if (!userId) return [];
-
-    const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
-    if (!storedBookings) return [];
-    
-    const bookings = JSON.parse(storedBookings) as BookingSnapshot[];
-    
-    // Simulate refund processing funnel
-    let updated = false;
-    const now = new Date().getTime();
-    bookings.forEach(b => {
-      if (b.status === 'CANCELLED' && b.refundStatus === 'PROCESSING' && b.cancelledAt) {
-        // If cancelled more than 15 seconds ago, mark as COMPLETED
-        const cancelTime = new Date(b.cancelledAt).getTime();
-        if (now - cancelTime > 15000) {
-          b.refundStatus = 'COMPLETED';
-          updated = true;
-        }
-      }
-    });
-    
-    if (updated) {
-      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify(bookings));
+      const response = await fetchWithAuth(`${BACKEND_URL}/bookings/my-bookings`);
+      const data = await response.json();
+      
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch bookings');
+      
+      // Map backend booking model to frontend BookingSnapshot
+      return (data.data || []).map((b: any) => {
+        // Simple mapping
+        return {
+          id: b._id,
+          status: b.status.toUpperCase(),
+          vehicleId: b.vehicleId,
+          vehicleName: b.vehicleName || 'Vehicle',
+          pickupDate: new Date(b.fromDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          returnDate: new Date(b.toDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          rentalDays: b.totalDays || 1,
+          dailyRate: 0,
+          rentalAmount: b.payment?.totalAmount || 0,
+          distanceKm: 0,
+          ratePerKm: 0,
+          pickupLocationName: '',
+          dropoffLocationName: '',
+          couponDiscount: b.payment?.discountAmount || 0,
+          sawariCashUsed: 0,
+          bookingAdvance: b.payment?.bookingAmountPaid || 0,
+          onlinePayableNow: b.payment?.bookingAmountPaid || 0,
+          remainingRentalAmount: b.payment?.balanceAmount || 0,
+          customerName: b.customerName,
+          customerMobile: b.mobileNumber,
+          createdAt: b.createdAt
+        } as BookingSnapshot;
+      });
+    } catch (e: any) {
+      console.error('getAllBookings error:', e);
+      return [];
     }
-    
-    return bookings;
   },
 
   async cancelBooking(id: string, reason?: string): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
@@ -588,26 +718,59 @@ export const API = {
 
     // Mock token
     const token = `tok_${user.id}_${Date.now()}`;
-    return { user, token };
+    const refreshToken = `ref_tok_${user.id}_${Date.now()}`;
+    return { user, token, refreshToken };
   },
 
   /**
-   * POST /api/auth/send-otp (Mock)
+   * POST /api/auth/send-otp
    */
   async sendOtp(mobile: string) {
-    await delay(100);
-    return { success: true, message: 'OTP sent successfully (MOCK)' };
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobileNumber: mobile })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
+      return { success: true, message: data.message };
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
   },
 
   /**
-   * POST /api/auth/verify-otp (Mock)
+   * POST /api/auth/verify-otp
    */
   async verifyOtp(mobile: string, otp: string, name?: string) {
-    await delay(100);
-    if (otp !== '1234') {
-      throw new Error('Invalid OTP (Mock expects 1234)');
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobileNumber: mobile, otp, customerName: name })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to verify OTP');
+      
+      const { token, refreshToken, customer } = data.data;
+      
+      const user = {
+        id: customer._id,
+        name: customer.customerName,
+        mobile: customer.mobileNumber,
+        email: customer.email,
+        dob: customer.dob,
+        gender: customer.gender,
+        license: customer.drivingLicenseNumber,
+        referralCode: customer.referralCode,
+        createdAt: customer.createdAt
+      };
+      
+      return { user, token, refreshToken };
+    } catch (e: any) {
+      throw new Error(e.message);
     }
-    return await API.login(name || 'MySawari User', mobile);
   },
 
   /**
@@ -619,21 +782,33 @@ export const API = {
   },
 
   /**
-   * PUT /api/users/profile (Mock)
+   * PUT /api/customers/profile
    */
   async updateProfile(profileData: { fullName?: string, email?: string, dob?: string, gender?: string, aadhaarNumber?: string, drivingLicenseNumber?: string }) {
-    await delay(100);
-    const { getItemAsync } = require('expo-secure-store');
-    const userId = await getItemAsync('user_id');
-    const user = DB.users.find(u => u.id === userId);
-    if (!user) throw new Error('User not found in mock DB');
-    
-    if (profileData.fullName) user.name = profileData.fullName;
-    if (profileData.email) user.email = profileData.email;
-    if (profileData.dob) user.dob = profileData.dob;
-    if (profileData.gender) user.gender = profileData.gender;
-    
-    return user;
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/customers/profile`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileData)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to update profile');
+      
+      const customer = data.data.customer;
+      return {
+        id: customer._id,
+        name: customer.customerName,
+        mobile: customer.mobileNumber,
+        email: customer.email,
+        dob: customer.dob,
+        gender: customer.gender,
+        license: customer.drivingLicenseNumber,
+        referralCode: customer.referralCode,
+        createdAt: customer.createdAt
+      };
+    } catch (e: any) {
+      throw new Error(e.message);
+    }
   },
 
   /**
@@ -654,36 +829,127 @@ export const API = {
   },
 
   /**
-   * GET /api/locations/search (Photon Autocomplete)
+   * Photon Autocomplete (called directly; render backend has no /locations route)
    */
   async searchLocations(input: string, regionId: string = 'guwahati', isDestination: boolean = false, signal?: AbortSignal) {
+    if (!input || input.trim().length < 2) return [];
+    
     try {
-      // Default bias for Guwahati (lat: 26.1445, lon: 91.7362)
-      let url = `${BACKEND_URL}/locations/search?q=${encodeURIComponent(input)}`;
-      url += `&lat=26.1445&lon=91.7362`;
-      
-      const response = await fetch(url, { signal });
+      // Primary: Try Photon API
+      const url = new URL(`${PHOTON_BASE_URL}/api/`);
+      url.searchParams.set('q', input.trim());
+      url.searchParams.set('limit', '8');
+      url.searchParams.set('lat', '26.1445');
+      url.searchParams.set('lon', '91.7362');
+
+      const response = await fetch(url.toString(), {
+        headers: { 'Accept-Language': 'en' },
+        signal,
+      });
+      if (!response.ok) throw new Error(`Photon API responded with status ${response.status}`);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to search locations');
-      return data.data.predictions; // Returns mapped Photon array
+      return mapPhotonResponse(data);
     } catch (e: any) {
-      console.error('searchLocations API error:', e.message);
-      return [];
+      if (e.name === 'AbortError' || e.message === 'Aborted' || (signal && signal.aborted)) {
+        throw e;
+      }
+      
+      console.warn(`Photon search failed: ${e.message}. Falling back to Nominatim...`);
+      
+      try {
+        // Fallback: Nominatim API
+        const url = new URL(`${NOMINATIM_BASE_URL}/search`);
+        url.searchParams.set('q', input.trim());
+        url.searchParams.set('format', 'json');
+        url.searchParams.set('addressdetails', '1');
+        url.searchParams.set('limit', '8');
+        url.searchParams.set('countrycodes', 'in');
+
+        const response = await fetch(url.toString(), {
+          headers: { 'User-Agent': 'MySawariApp/1.0' },
+          signal,
+        });
+        
+        if (!response.ok) throw new Error(`Nominatim API responded with status ${response.status}`);
+        const data = await response.json();
+        
+        return data.map((item: any) => {
+          let name = item.name;
+          if (!name && item.address) {
+            name = item.address.road || item.address.suburb || item.address.city;
+          }
+          
+          return {
+            id: item.osm_id?.toString() || `osm_${Math.random()}`,
+            name: name || 'Unknown Place',
+            address: item.display_name,
+            longitude: parseFloat(item.lon),
+            latitude: parseFloat(item.lat),
+            postcode: item.address?.postcode || null,
+            country: item.address?.country || null,
+          };
+        });
+      } catch (fallbackError: any) {
+        console.error('All location search APIs failed:', fallbackError.message);
+        return [];
+      }
     }
   },
 
   /**
-   * GET /api/locations/reverse (Photon Reverse Geocode)
+   * Photon Reverse Geocode (called directly; render backend has no /locations route)
    */
   async reverseGeocode(latitude: number, longitude: number) {
     try {
-      const response = await fetch(`${BACKEND_URL}/locations/reverse?lat=${latitude}&lon=${longitude}`);
+      // Primary: Try Photon API
+      const url = new URL(`${PHOTON_BASE_URL}/reverse`);
+      url.searchParams.set('lat', latitude.toString());
+      url.searchParams.set('lon', longitude.toString());
+
+      const response = await fetch(url.toString(), {
+        headers: { 'Accept-Language': 'en' },
+      });
+      if (!response.ok) throw new Error(`Photon API responded with status ${response.status}`);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to get reverse geocode');
-      return data.data.location; // Returns mapped Photon object { id, name, address, latitude, longitude }
+      const mapped = mapPhotonResponse(data);
+      return mapped.length > 0 ? mapped[0] : null; 
     } catch (e: any) {
-      console.error('reverseGeocode API error:', e.message);
-      return null;
+      console.warn(`Photon reverse geocode failed: ${e.message}. Falling back to Nominatim...`);
+      
+      try {
+        // Fallback: Nominatim API
+        const url = new URL(`${NOMINATIM_BASE_URL}/reverse`);
+        url.searchParams.set('lat', latitude.toString());
+        url.searchParams.set('lon', longitude.toString());
+        url.searchParams.set('format', 'json');
+        
+        const response = await fetch(url.toString(), {
+          headers: { 'User-Agent': 'MySawariApp/1.0' },
+        });
+        
+        if (!response.ok) throw new Error(`Nominatim API responded with status ${response.status}`);
+        const data = await response.json();
+        
+        if (data.error) return null;
+        
+        let name = data.name;
+        if (!name && data.address) {
+          name = data.address.road || data.address.suburb || data.address.city;
+        }
+        
+        return {
+          id: data.osm_id?.toString() || `osm_${Math.random()}`,
+          name: name || 'Unknown Place',
+          address: data.display_name,
+          latitude: parseFloat(data.lat),
+          longitude: parseFloat(data.lon),
+          postcode: data.address?.postcode || null,
+          country: data.address?.country || null,
+        };
+      } catch (fallbackError: any) {
+        console.error('All reverse geocoding APIs failed:', fallbackError.message);
+        return null;
+      }
     }
   },
 

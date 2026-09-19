@@ -10,7 +10,7 @@ import { SheetFrame, SheetHeader } from '../common/SheetFrame';
 import { LocationResult } from '@/utils/sawari';
 import { API } from '@/services/backend/api';
 
-export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
+export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean; isDestination?: boolean } = {}) {
   const colors = useColors();
   const router = useRouter();
   const { 
@@ -18,29 +18,36 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
     setPickup: setPickupLocation, 
     returnAddress, 
     setReturnAddress,
+    setDropoff,
     deliveryMode
   } = useSawari();
 
-  const [mode, setMode] = useState<'pickup' | 'return'>(isReturn ? 'return' : 'pickup');
+  const [mode, setMode] = useState<'pickup' | 'return' | 'destination'>(isDestination ? 'destination' : (isReturn ? 'return' : 'pickup'));
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isDebouncing, setIsDebouncing] = useState(false);
   const [predictions, setPredictions] = useState<any[]>([]);
   const abortController = useRef<AbortController | null>(null);
 
   // Popular locations as fallback
   const popularLocations = [
-    { id: 'pop1', name: 'Lokpriya Gopinath Bordoloi Airport', address: 'Borjhar, Guwahati, Assam', latitude: 26.1062, longitude: 91.5859 },
-    { id: 'pop2', name: 'Paltan Bazaar', address: 'Guwahati, Assam', latitude: 26.1793, longitude: 91.7516 },
-    { id: 'pop3', name: 'Ganeshguri', address: 'Guwahati, Assam', latitude: 26.1465, longitude: 91.7903 },
-    { id: 'pop4', name: 'ISBT Guwahati', address: 'Guwahati, Assam', latitude: 26.1302, longitude: 91.7410 },
+    { id: 'pop1', name: 'Kaziranga National Park', address: 'Kanchanjuri, Assam', latitude: 26.5775, longitude: 93.1711 },
+    { id: 'pop2', name: 'Shillong', address: 'East Khasi Hills, Meghalaya', latitude: 25.5788, longitude: 91.8933 },
+    { id: 'pop3', name: 'Kamakhya Temple', address: 'Kamakhya, Guwahati, Assam', latitude: 26.1670, longitude: 91.7086 },
+    { id: 'pop4', name: 'Tawang Monastery', address: 'Tawang, Arunachal Pradesh', latitude: 27.5866, longitude: 91.8596 },
+    { id: 'pop5', name: 'Lokpriya Gopinath Bordoloi Airport', address: 'Borjhar, Guwahati, Assam', latitude: 26.1062, longitude: 91.5859 },
+    { id: 'pop6', name: 'Paltan Bazaar (Railway Station)', address: 'Guwahati, Assam', latitude: 26.1793, longitude: 91.7516 },
   ];
 
   useEffect(() => {
-    // Require minimum 3 characters to search
-    if (searchQuery.trim().length < 3) {
+    if (searchQuery.trim().length === 0) {
       setPredictions([]);
+      setIsDebouncing(false);
       return;
     }
+
+    setIsDebouncing(true);
+    setPredictions([]); // Clear stale API results immediately so UI falls back to instant local filtering
 
     if (abortController.current) {
       abortController.current.abort();
@@ -49,12 +56,16 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
     const currentSignal = abortController.current.signal;
 
     const timer = setTimeout(async () => {
+      setIsDebouncing(false);
       setLoading(true);
       
       try {
+        console.log(`Searching for: ${searchQuery}`);
         const results = await API.searchLocations(searchQuery, 'guwahati', mode === 'pickup', currentSignal);
+        console.log(`Search returned ${results?.length} results`, results);
+        
         if (!currentSignal.aborted) {
-          setPredictions(results);
+          setPredictions(results || []);
         }
       } catch (error: any) {
         if (error.name !== 'AbortError' && !currentSignal.aborted) {
@@ -74,14 +85,38 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
   const handleUseCurrentLocation = async () => {
     try {
       setLoading(true);
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      let { status } = await Location.getForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        const req = await Location.requestForegroundPermissionsAsync();
+        status = req.status;
+      }
+      
       if (status !== 'granted') {
         alert('Permission to access location was denied');
         setLoading(false);
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      let location = null;
+      try {
+        location = await Location.getLastKnownPositionAsync();
+        if (!location) {
+          location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        }
+      } catch (err: any) {
+        if (err.message && err.message.includes('Location provider is unavailable')) {
+          alert('Please turn on your device GPS / Location Services.');
+        } else {
+          alert('Could not fetch location. Ensure GPS is on.');
+        }
+        setLoading(false);
+        return;
+      }
+      
+      if (!location || !location.coords) {
+        throw new Error('Location unavailable');
+      }
+      
       const { latitude, longitude } = location.coords;
       
       let addressStr = 'Current Location';
@@ -105,7 +140,10 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
         source: 'gps'
       };
 
-      if (mode === 'pickup') {
+      if (mode === 'destination') {
+        setDropoff(loc);
+        router.back();
+      } else if (mode === 'pickup') {
         setPickupLocation(loc);
         if (deliveryMode === 'both') {
           setMode('return');
@@ -139,7 +177,10 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
       source: 'osm'
     };
 
-    if (mode === 'pickup') {
+    if (mode === 'destination') {
+      setDropoff(loc);
+      router.back();
+    } else if (mode === 'pickup') {
       setPickupLocation(loc);
       if (deliveryMode === 'both') {
         setMode('return'); // Auto switch to return
@@ -153,14 +194,18 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
     }
   };
 
-  const displayList = searchQuery.trim().length > 0 ? predictions : popularLocations;
+  const localFiltered = popularLocations.filter(loc => 
+    loc.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    loc.address.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const displayList = searchQuery.trim().length > 0 ? (predictions.length > 0 ? predictions : localFiltered) : popularLocations;
 
   return (
     <SheetFrame height={700}>
-      <SheetHeader title="Where to?" />
+      <SheetHeader title={mode === 'destination' ? "Where are you going?" : "Where to?"} subtitle={mode === 'destination' ? "Select your destination." : undefined} />
 
-      {/* Tabs - Only show if both are required */}
-      {deliveryMode === 'both' && (
+      {/* Tabs - Only show if both are required and NOT in destination mode */}
+      {deliveryMode === 'both' && mode !== 'destination' && (
         <View style={[styles.tabContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Pressable 
             style={[styles.tab, mode === 'pickup' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
@@ -192,7 +237,7 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
         <Feather name="search" size={20} color={colors.mutedForeground} style={{ marginRight: 12 }} />
         <TextInput
           style={[styles.searchInput, { color: colors.foreground }]}
-          placeholder={mode === 'pickup' ? "Search delivery address..." : "Search collection address..."}
+          placeholder={mode === 'destination' ? "Search destination..." : (mode === 'pickup' ? "Search delivery address..." : "Search collection address...")}
           placeholderTextColor={colors.mutedForeground}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -206,60 +251,71 @@ export function LocationSheet({ isReturn }: { isReturn?: boolean } = {}) {
         )}
       </View>
 
-      <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }}>
+      <ScrollView style={{ flexShrink: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
         {searchQuery.length === 0 && (
           <>
-            <Pressable 
-              style={[styles.resultItem, { borderBottomColor: colors.border }]}
-              onPress={handleUseCurrentLocation}
-            >
-              <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
-                <Feather name="navigation" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.resultTextContainer}>
-                <Text style={[styles.mainText, { color: colors.primary }]}>
-                  Use Current Location
-                </Text>
-                <Text style={[styles.subText, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  Fetch location using GPS
-                </Text>
-              </View>
-            </Pressable>
+            {mode !== 'destination' && (
+              <Pressable 
+                style={[styles.resultItem, { borderBottomColor: colors.border }]}
+                onPress={handleUseCurrentLocation}
+              >
+                <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
+                  <Feather name="navigation" size={18} color={colors.primary} />
+                </View>
+                <View style={styles.resultTextContainer}>
+                  <Text style={[styles.mainText, { color: colors.primary }]}>
+                    Use Current Location
+                  </Text>
+                  <Text style={[styles.subText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    Fetch location using GPS
+                  </Text>
+                </View>
+              </Pressable>
+            )}
             
-            <Text style={[styles.sectionTitle, { color: colors.mutedForeground, marginTop: 16 }]}>Popular locations</Text>
+            <Text style={[styles.sectionTitle, { color: colors.mutedForeground, marginTop: mode !== 'destination' ? 16 : 0 }]}>Popular locations</Text>
           </>
         )}
         
-        {displayList.map((item, index) => {
-          const mainText = item.name || item.structured_formatting?.main_text || item.description;
-          const subText = item.address || item.structured_formatting?.secondary_text || 'Assam, India';
-          
-          return (
-            <Pressable 
-              key={item.id || item.place_id || index} 
-              style={[styles.resultItem, { borderBottomColor: colors.border }]}
-              onPress={() => handleSelectPlace(item, searchQuery.length === 0)}
-            >
-              <View style={[styles.iconBox, { backgroundColor: colors.card }]}>
-                <Feather name="map-pin" size={18} color={colors.mutedForeground} />
-              </View>
-              <View style={styles.resultTextContainer}>
-                <Text style={[styles.mainText, { color: colors.foreground }]} numberOfLines={1}>
-                  {mainText}
-                </Text>
-                <Text style={[styles.subText, { color: colors.mutedForeground }]} numberOfLines={1}>
-                  {subText}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        })}
-        
-        {displayList.length === 0 && !loading && (
-          <View style={{ alignItems: 'center', padding: 40 }}>
-            <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>No places found.</Text>
+        {(loading || isDebouncing) && searchQuery.length > 0 && predictions.length === 0 && (
+          <View style={{ alignItems: 'center', paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Searching online...</Text>
           </View>
         )}
+
+        <>
+          {displayList.map((item, index) => {
+            const mainText = item.name || item.structured_formatting?.main_text || item.description;
+            const subText = item.address || item.structured_formatting?.secondary_text || 'Assam, India';
+            
+            return (
+              <Pressable 
+                key={`${item.id || item.place_id || 'loc'}_${index}`} 
+                style={[styles.resultItem, { borderBottomColor: colors.border }]}
+                onPress={() => handleSelectPlace(item, searchQuery.length === 0)}
+              >
+                <View style={[styles.iconBox, { backgroundColor: colors.card }]}>
+                  <Feather name="map-pin" size={18} color={colors.mutedForeground} />
+                </View>
+                <View style={styles.resultTextContainer}>
+                  <Text style={[styles.mainText, { color: colors.foreground }]} numberOfLines={1}>
+                    {mainText}
+                  </Text>
+                  <Text style={[styles.subText, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {subText}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+          
+          {displayList.length === 0 && !loading && !isDebouncing && (
+            <View style={{ alignItems: 'center', padding: 40 }}>
+              <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>No places found.</Text>
+            </View>
+          )}
+        </>
 
         <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 8 }}>
           <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_400Regular' }}>

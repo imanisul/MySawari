@@ -70,8 +70,8 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
     } else if (step === 3 && name.trim().length > 0) {
       try {
         setLoading(true);
-        const { token, user } = await API.verifyOtp(mobile, otp, name.trim());
-        await login(token, user);
+        const { token, refreshToken, user } = await API.verifyOtp(mobile, otp, name.trim());
+        await login(token, refreshToken, user);
         
         // Request Notifications Permission Just-In-Time
         try {

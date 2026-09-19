@@ -35,7 +35,24 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
   }, [images.length]);
   
   const isDateSelected = dateRange && !dateRange.includes('Select');
-  const availableText = isDateSelected ? `Avail: ${dateRange}` : (car.availabilityDate && car.availabilityDate !== 'Available Now' ? `Avail: ${car.availabilityDate}` : 'Available Now');
+  let availableText = 'AVAILABLE NOW';
+  if (car.dbStatus === 'rent') {
+    availableText = 'ON RENT';
+  } else if (car.dbStatus === 'service') {
+    availableText = 'IN SERVICE';
+  } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
+    if (car.availabilityDate === 'Currently Booked') {
+      availableText = 'ON RENT';
+    } else if (car.availabilityDate === 'In Service') {
+      availableText = 'IN SERVICE';
+    } else {
+      availableText = `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
+    }
+  }
+
+  if (isDateSelected) {
+    availableText = `Avail: ${dateRange}`;
+  }
 
   return (
     <Pressable

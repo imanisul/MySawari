@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
 import { BottomNavigation, PrimaryButton } from '@/components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,6 +12,7 @@ import { LoginBottomSheet } from '@/components';
 import { API } from '@/services/backend/api';
 import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
+import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
 type BookingTab = 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
 
 export default function BookingsScreen() {
@@ -23,35 +25,19 @@ export default function BookingsScreen() {
   const [tab, setTab] = useState<BookingTab>('Upcoming');
   const tabs: BookingTab[] = ['Upcoming', 'Active', 'Completed', 'Cancelled'];
   
-  const [bookings, setBookings] = useState<BookingSnapshot[]>([]);
-  const [loading, setLoading] = useState(true);
-
   const [actionBooking, setActionBooking] = useState<BookingSnapshot | null>(null);
   const [actionType, setActionType] = useState<'cancel' | 'extend' | null>(null);
-
-  // Fetch bookings when screen comes into focus
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const fetchBookings = async () => {
-        try {
-          if (!isAuthenticated) return;
-          const userBookings = await API.getAllBookings();
-          if (isActive) {
-            // Sort by createdAt descending
-            const sorted = userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setBookings(sorted);
-          }
-        } catch (e) {
-          console.error("Failed to load bookings", e);
-        } finally {
-          if (isActive) setLoading(false);
-        }
-      };
-      fetchBookings();
-      return () => { isActive = false; };
-    }, [isAuthenticated])
-  );
+  
+  const { data: bookings = [], isLoading: loading, isError: fetchError, refetch } = useQuery({
+    queryKey: ['bookings'],
+    queryFn: async () => {
+      if (!isAuthenticated) return [];
+      const userBookings = await API.getAllBookings();
+      return userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    },
+    enabled: isAuthenticated === true,
+    staleTime: 60 * 1000, // 1 minute
+  });
 
   const filteredBookings = bookings.filter((b) => {
     const parseDate = (dateStr: string, isEnd = false) => {
@@ -137,7 +123,22 @@ export default function BookingsScreen() {
         </View>
         
         {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 64 }} />
+          <View style={{ paddingTop: 8, paddingBottom: insets.bottom + 100 }}>
+            <BookingSkeleton />
+            <BookingSkeleton />
+            <BookingSkeleton />
+          </View>
+        ) : fetchError ? (
+          <View style={styles.emptyContainer}>
+            <View style={[styles.emptyCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Feather name="alert-circle" size={24} color={colors.destructive} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Connection Error</Text>
+            <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>Could not load your bookings.</Text>
+            <Pressable onPress={() => refetch()} style={{ marginTop: 16, padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}>
+              <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium' }}>Retry</Text>
+            </Pressable>
+          </View>
         ) : filteredBookings.length > 0 ? (
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 8 }} showsVerticalScrollIndicator={false}>
             {filteredBookings.map((booking) => {
@@ -267,7 +268,7 @@ export default function BookingsScreen() {
           onClose={() => { setActionType(null); setActionBooking(null); }}
           booking={actionBooking}
           onSuccess={(updatedBooking) => {
-            setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
+            refetch();
             setActionType(null); setActionBooking(null);
           }}
         />
@@ -278,7 +279,7 @@ export default function BookingsScreen() {
           onClose={() => { setActionType(null); setActionBooking(null); }}
           booking={actionBooking}
           onSuccess={(updatedBooking) => {
-            setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
+            refetch();
             setActionType(null); setActionBooking(null);
           }}
         />

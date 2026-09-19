@@ -43,7 +43,7 @@ export function VehicleHeader({ carName }: { carName: string }) {
         </Pressable>
         
         <Text style={[styles.title, { color: colors.foreground }]} numberOfLines={1}>
-          Car Details
+          {selectedCar?.type === 'Bike' ? 'Bike Details' : 'Car Details'}
         </Text>
         
         <View style={styles.rightActions}>

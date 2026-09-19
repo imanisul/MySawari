@@ -69,7 +69,7 @@ export function StickyBookingBar({
         style={({ pressed }) => [
           styles.bottomButtonPremium, 
           { backgroundColor: !isAvailable ? colors.muted : colors.primary }, 
-          pressed && styles.pressed,
+          pressed && isAvailable && styles.pressed,
           (!isAvailable || isQuoteLoading) && { opacity: 0.5 }
         ]}
       >
@@ -77,9 +77,7 @@ export function StickyBookingBar({
           styles.bottomButtonText,
           { color: !isAvailable ? colors.mutedForeground : colors.primaryForeground }
         ]}>
-          {isAvailable && !isQuoteLoading && pricingQuote
-            ? `Book`
-            : 'Book Now'}
+          Book Now
         </Text>
         <Feather name="arrow-right" size={18} color={!isAvailable ? colors.mutedForeground : colors.primaryForeground} />
       </Pressable>

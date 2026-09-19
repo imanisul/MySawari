@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { FlatList, StyleSheet, Text, View, Animated, Pressable } from 'react-native';
+import { FlatList, StyleSheet, Text, View, Animated, Pressable, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
+import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { premiumCollection } from '@/utils/sawari';
@@ -22,6 +23,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOffers } from '@/services/api/offers';
+import { API } from '@/services/backend/api';
 import * as Location from 'expo-location';
 
 const DESTINATIONS = [
@@ -59,6 +61,27 @@ export default function HomeScreen() {
     queryKey: ['offers'],
     queryFn: fetchOffers,
   });
+
+  const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useQuery({
+    queryKey: ['vehicles'],
+    queryFn: () => API.getVehiclesWithAvailability(),
+  });
+
+  const getStatusRank = (car: any) => {
+    if (car.dbStatus === 'available') return 1;
+    if (car.dbStatus === 'rent') return 2;
+    return 3;
+  };
+
+  const targetCars = ['creta', 'curvv', 'innova', 'brezza'];
+  const displayCars = (fetchedVehicles.length > 0 ? fetchedVehicles : (!isLoadingVehicles ? premiumCollection : []))
+    .filter(v => v.type === 'Car' && targetCars.some(t => v.name.toLowerCase().includes(t)))
+    .sort((a, b) => getStatusRank(a) - getStatusRank(b));
+
+  const targetBikes = ['jawa', 'hunter', 'xpulse', 'ntorq'];
+  const displayBikes = (fetchedVehicles.length > 0 ? fetchedVehicles : (!isLoadingVehicles ? premiumCollection : []))
+    .filter(v => v.type === 'Bike' && targetBikes.some(t => v.name.toLowerCase().includes(t)))
+    .sort((a, b) => getStatusRank(a) - getStatusRank(b));
 
   // ── App Startup Permissions ──
   useEffect(() => {
@@ -191,29 +214,33 @@ export default function HomeScreen() {
           <>
             <SectionHeading title="Special Deals" kicker="EXCLUSIVE SPECIALS" />
             {isLoadingOffers ? (
-              <View style={styles.offerRow}>
-                {Array(3).fill(0).map((_, i) => (
-                  <View key={i} style={{ marginRight: 16 }}>
-                    <Skeleton width={290} height={175} borderRadius={20} />
-                  </View>
-                ))}
-              </View>
+              <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offerRow}>
+                  {Array(3).fill(0).map((_, i) => (
+                    <View key={i} style={{ marginRight: i < 2 ? 14 : 0 }}>
+                      <Skeleton width={290} height={175} borderRadius={20} />
+                    </View>
+                  ))}
+                </ScrollView>
+              </Reanimated.View>
             ) : (
-              <FlatList
-                data={offers}
-                keyExtractor={(item) => item.id}
-                renderItem={renderOffer}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.offerRow}
-                snapToInterval={304}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                removeClippedSubviews
-                initialNumToRender={2}
-                maxToRenderPerBatch={3}
-                windowSize={3}
-              />
+              <Reanimated.View entering={FadeIn.duration(400)}>
+                <FlatList
+                  data={offers}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderOffer}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.offerRow}
+                  snapToInterval={304}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  removeClippedSubviews
+                  initialNumToRender={2}
+                  maxToRenderPerBatch={3}
+                  windowSize={3}
+                />
+              </Reanimated.View>
             )}
           </>
         );
@@ -222,42 +249,70 @@ export default function HomeScreen() {
           return (
             <>
               <SectionHeading title="Explore Cars" kicker="TOP FOUR WHEELERS" action="View all" onAction={() => router.push('/explore')} />
-              <FlatList
-                data={premiumCollection.filter(v => v.type === 'Car')}
-                keyExtractor={(item) => item.id}
-                renderItem={renderLuxury}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.luxuryRow}
-                snapToInterval={256}
-                snapToAlignment="start"
-                decelerationRate="fast"
-                removeClippedSubviews
-                initialNumToRender={3}
-                maxToRenderPerBatch={3}
-                windowSize={3}
-              />
+              {isLoadingVehicles ? (
+                <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.luxuryRow}>
+                    {Array(3).fill(0).map((_, i) => (
+                      <View key={i} style={{ marginRight: i < 2 ? 16 : 0 }}>
+                        <Skeleton width={240} height={220} borderRadius={18} />
+                      </View>
+                    ))}
+                  </ScrollView>
+                </Reanimated.View>
+              ) : (
+                <Reanimated.View entering={FadeIn.duration(400)}>
+                  <FlatList
+                    data={displayCars}
+                    keyExtractor={(item) => item.id}
+                    renderItem={renderLuxury}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.luxuryRow}
+                    snapToInterval={256}
+                    snapToAlignment="start"
+                    decelerationRate="fast"
+                    removeClippedSubviews
+                    initialNumToRender={3}
+                    maxToRenderPerBatch={3}
+                    windowSize={3}
+                  />
+                </Reanimated.View>
+              )}
             </>
           );
         }
         return (
           <>
             <SectionHeading title="Explore Bikes" kicker="TWO WHEELER THRILLS" action="View all" onAction={() => router.push('/explore')} />
-            <FlatList
-              data={premiumCollection.filter(v => v.type === 'Bike')}
-              keyExtractor={(item) => item.id}
-              renderItem={renderLuxury}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.luxuryRow}
-              snapToInterval={256}
-              snapToAlignment="start"
-              decelerationRate="fast"
-              removeClippedSubviews
-              initialNumToRender={3}
-              maxToRenderPerBatch={3}
-              windowSize={3}
-            />
+            {isLoadingVehicles ? (
+              <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.luxuryRow}>
+                  {Array(3).fill(0).map((_, i) => (
+                    <View key={i} style={{ marginRight: i < 2 ? 16 : 0 }}>
+                      <Skeleton width={240} height={220} borderRadius={18} />
+                    </View>
+                  ))}
+                </ScrollView>
+              </Reanimated.View>
+            ) : (
+              <Reanimated.View entering={FadeIn.duration(400)}>
+                <FlatList
+                  data={displayBikes}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderLuxury}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.luxuryRow}
+                  snapToInterval={256}
+                  snapToAlignment="start"
+                  decelerationRate="fast"
+                  removeClippedSubviews
+                  initialNumToRender={3}
+                  maxToRenderPerBatch={3}
+                  windowSize={3}
+                />
+              </Reanimated.View>
+            )}
           </>
         );
       case 'destinations':

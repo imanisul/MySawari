@@ -75,14 +75,14 @@ function AboutTab({ car }: { car: Car }) {
 
   return (
     <View style={styles.tabSection}>
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About this car</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About this {car.type.toLowerCase()}</Text>
       <Text style={[styles.description, { color: colors.mutedForeground }]}>
         {car.description || "A well-maintained vehicle perfect for your trips. Reliable, comfortable, and spacious."}
       </Text>
 
       {highlights.length > 0 && (
         <>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32 }]}>Why this car?</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32 }]}>Why this {car.type.toLowerCase()}?</Text>
           <View style={styles.featuresGrid}>
             {highlights.map(tag => (
               <View key={tag} style={[styles.featureItem, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>

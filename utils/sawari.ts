@@ -42,6 +42,9 @@ export type Car = {
   modelYear?: string;
   ratingDistribution?: RatingDistribution;
   reviews?: Review[];
+  isAvailable?: boolean;
+  dbStatus?: string;
+  bookedRanges?: { start: string; end: string }[];
 };
 
 export interface RatingDistribution {
@@ -347,8 +350,8 @@ export const checkCarAvailability = (car: Car | undefined | null, selectedStartD
   const rangeStartStr = car.availabilityRange?.start || car.availabilityDate;
   const rangeEndStr = car.availabilityRange?.end || car.availableToDate;
 
-  if (!rangeStartStr || rangeStartStr === 'Available Now') return true;
-  if (!selectedStartDate || selectedStartDate.includes('Select') || selectedStartDate === 'Available Now') return true;
+  if (rangeStartStr === 'Currently Booked' || rangeStartStr === 'In Service') return false;
+  if (!selectedStartDate || selectedStartDate.includes('Select') || selectedStartDate === 'Available Now' || selectedStartDate === 'All Dates') return true;
   
   const parseDate = (dStr: string) => {
     const parts = dStr.trim().split(' ');
@@ -364,7 +367,9 @@ export const checkCarAvailability = (car: Car | undefined | null, selectedStartD
   const selectedStart = parseDate(selectedStartDate);
   const selectedEnd = selectedEndDate && !selectedEndDate.includes('Select') ? parseDate(selectedEndDate) : selectedStart;
   
-  if (rangeStartStr !== 'Available Now') {
+  if (rangeStartStr === 'Currently Booked') return false;
+  
+  if (rangeStartStr !== 'Available Now' && rangeStartStr) {
     const carAvailableFrom = parseDate(rangeStartStr);
     if (selectedStart < carAvailableFrom) return false;
   }
@@ -372,6 +377,19 @@ export const checkCarAvailability = (car: Car | undefined | null, selectedStartD
   if (rangeEndStr) {
     const carAvailableTo = parseDate(rangeEndStr);
     if (selectedEnd > carAvailableTo) return false;
+  }
+  
+  if (car.bookedRanges && car.bookedRanges.length > 0) {
+    const isOverlapping = car.bookedRanges.some(range => {
+      const bookedStart = new Date(range.start).getTime();
+      // Reset the time for accurate day-to-day comparison
+      const bookedStartNormalized = new Date(new Date(bookedStart).setHours(0,0,0,0)).getTime();
+      const bookedEnd = new Date(range.end).getTime();
+      const bookedEndNormalized = new Date(new Date(bookedEnd).setHours(23,59,59,999)).getTime();
+      
+      return (selectedStart <= bookedEndNormalized && selectedEnd >= bookedStartNormalized);
+    });
+    if (isOverlapping) return false;
   }
   
   return true;

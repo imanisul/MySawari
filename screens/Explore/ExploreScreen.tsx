@@ -5,10 +5,12 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { cars, premiumCollection, checkCarAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
+import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Car } from '@/utils/sawari';
 
@@ -38,9 +40,6 @@ export default function ExploreScreen() {
 
   
   // Search state
-  const [fetchedCars, setFetchedCars] = useState<Car[]>([]);
-  const [isFetchingCars, setIsFetchingCars] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
@@ -83,8 +82,19 @@ export default function ExploreScreen() {
     return dates;
   }, [selectedDate]);
 
+  const { data: fetchedCars = [], isLoading: isFetchingCars, isError: fetchError, refetch: fetchVehicles } = useQuery({
+    queryKey: ['vehicles'],
+    queryFn: async () => {
+      const data = await API.getVehiclesWithAvailability();
+      return data && data.length > 0 ? data : [...cars, ...premiumCollection];
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
   const filteredCars = useMemo(() => {
-    return fetchedCars.filter(car => {
+    return (fetchedCars || []).reduce((acc: Car[], car: Car) => {
       let matchDate = true;
       if (selectedDate !== 'All Dates') {
         if (selectedDate.includes('–')) {
@@ -106,38 +116,46 @@ export default function ExploreScreen() {
       const carPriceNum = parseInt(car.price.replace(/[^0-9]/g, ''), 10);
       const matchFilterCategory = filters.category === 'All' || car.category === filters.category;
       const matchFilterPrice = filters.maxPrice === 10000 || carPriceNum <= filters.maxPrice;
-      const matchFilterTrans = filters.transmission === 'All' || car.transmission === filters.transmission;
+      const matchFilterTrans = filters.transmission === 'All' || 
+                               car.transmission === filters.transmission ||
+                               (filters.transmission === 'Gearless' && car.transmission === 'Automatic') ||
+                               (filters.transmission === 'Gear' && car.transmission === 'Manual');
       const matchFilterFuel = filters.fuel === 'All' || car.fuel === filters.fuel;
 
-      return matchDate && matchType && matchSearch && matchFilterCategory && matchFilterPrice && matchFilterTrans && matchFilterFuel;
+      if (matchType && matchSearch && matchFilterCategory && matchFilterPrice && matchFilterTrans && matchFilterFuel) {
+        acc.push({
+          ...car,
+          isAvailable: matchDate && car.dbStatus !== 'service' && car.dbStatus !== 'maintenance'
+        });
+      }
+      return acc;
+    }, []).sort((a, b) => {
+      const getStatusRank = (status?: string) => {
+        if (status === 'available') return 1;
+        if (status === 'rent') return 2;
+        if (status === 'service' || status === 'maintenance') return 3;
+        return 4;
+      };
+
+      const rankA = getStatusRank(a.dbStatus);
+      const rankB = getStatusRank(b.dbStatus);
+
+      if (rankA !== rankB) return rankA - rankB;
+      if (a.isAvailable !== b.isAvailable) {
+        return a.isAvailable ? -1 : 1;
+      }
+      
+      const priceA = parseInt(a.price.replace(/[^0-9]/g, ''), 10) || 0;
+      const priceB = parseInt(b.price.replace(/[^0-9]/g, ''), 10) || 0;
+      return filters.maxPrice !== 10000 ? priceB - priceA : priceA - priceB;
     });
-  }, [selectedDate, vehicleType, debouncedQuery, filters]);
+  }, [fetchedCars, selectedDate, vehicleType, debouncedQuery, filters]);
 
   // Pagination slice
   const paginatedCars = useMemo(() => {
     return filteredCars.slice(0, page * PAGE_SIZE);
   }, [filteredCars, page]);
 
-  const fetchVehicles = useCallback(async () => {
-    try {
-      setIsFetchingCars(true);
-      setFetchError(false);
-      const data = await API.getVehiclesWithAvailability();
-      if (data) {
-        setFetchedCars(data);
-      }
-    } catch (e) {
-      console.error(e);
-      setFetchError(true);
-      setFetchedCars(cars);
-    } finally {
-      setIsFetchingCars(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchVehicles();
-  }, [fetchVehicles]);
 
   const handleLoadMore = () => {
     if (paginatedCars.length < filteredCars.length && !isLoadingMore) {
@@ -170,7 +188,7 @@ export default function ExploreScreen() {
   }, [filters]);
 
   /* ─── ListHeaderComponent: Search + Filters + Dates ─── */
-  const ListHeader = useCallback(() => (
+  const listHeaderElement = (
     <View>
       {/* Search Bar */}
       <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -198,6 +216,7 @@ export default function ExploreScreen() {
                 onPress={() => {
                   Haptics.selectionAsync();
                   setVehicleType(type as 'All' | 'Cars' | 'Bikes');
+                  setFilters(defaultFilters);
                   setPage(1);
                 }}
                 style={[
@@ -304,15 +323,15 @@ export default function ExploreScreen() {
         })}
       </ScrollView>
     </View>
-  ), [colors, searchQuery, vehicleType, selectedDate, availableDates, activeFilterCount]);
+  );
 
   /* ─── ListEmptyComponent ─── */
-  const ListEmpty = useCallback(() => {
+  const listEmptyElement = (() => {
     if (isFetchingCars) {
       return (
-        <View style={{ paddingHorizontal: 16 }}>
+        <View style={{ paddingTop: 16 }}>
           {[1, 2, 3].map(i => (
-            <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.card, borderColor: colors.border }]} />
+            <CarCardSkeleton key={i} />
           ))}
         </View>
       );
@@ -326,7 +345,7 @@ export default function ExploreScreen() {
           <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
             DATES UNAVAILABLE. Could not connect to the backend. Please try again.
           </Text>
-          <Pressable style={[styles.clearButton, { backgroundColor: colors.primary, marginTop: 16 }]} onPress={fetchVehicles}>
+          <Pressable style={[styles.clearButton, { backgroundColor: colors.primary, marginTop: 16 }]} onPress={() => fetchVehicles()}>
             <Text style={[styles.clearButtonText, { color: colors.primaryForeground }]}>Retry</Text>
           </Pressable>
         </View>
@@ -364,21 +383,20 @@ export default function ExploreScreen() {
       )}
       </View>
     );
-  }, [colors, debouncedQuery, selectedDate, vehicleType, activeFilterCount, isFetchingCars, fetchError, fetchVehicles]);
-
+  })();
   return (
     <Page bottomNav scroll={false}>
       {/* ── FIXED: Explore Header ── */}
       <Header title="Explore" hideLogo={true} />
 
-      {/* ── SCROLLABLE: Everything else via FlatList ── */}
       <FlatList
         style={{ flex: 1 }}
         data={paginatedCars}
         keyExtractor={(item) => item.id}
         renderItem={renderCar}
-        ListHeaderComponent={ListHeader}
-        ListEmptyComponent={ListEmpty}
+        ListHeaderComponent={listHeaderElement}
+        ListEmptyComponent={listEmptyElement}
+        extraData={`${vehicleType}-${selectedDate}-${debouncedQuery}-${activeFilterCount}`}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 100 }]}
         onEndReached={handleLoadMore}

@@ -1,6 +1,6 @@
 import React from 'react';
-import DropoffScreen from '@/screens/Home/DropoffScreen';
+import { LocationSheet } from '@/components';
 
 export default function Route() {
-  return <DropoffScreen />;
+  return <LocationSheet isDestination />;
 }

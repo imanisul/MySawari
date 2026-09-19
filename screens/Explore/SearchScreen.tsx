@@ -6,43 +6,28 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
-import { fetchResultCars, resultCars } from '@/utils/sawari';
+import { resultCars, checkCarAvailability } from '@/utils/sawari';
+import { API } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import { Header, Page, Skeleton, CarListCard } from '@/components';
 
 type SortOption = 'low-to-high' | 'high-to-low';
-type PriceRange = 'all' | 'under-2000' | '2000-5000' | 'above-5000' | 'under-1000' | '1000-1500' | 'above-1500';
+type PriceRange = number;
 type TransmissionFilter = 'all' | 'Automatic' | 'Manual';
 type FuelFilter = 'all' | 'Petrol' | 'Diesel' | 'EV';
 
-const CAR_CATEGORY_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: 'All', value: 'All' },
-  { label: 'SUV', value: 'SUV' },
-  { label: 'Sedan', value: 'Sedan' },
-  { label: 'Hatchback', value: 'Hatchback' },
-  { label: 'Luxury', value: 'Luxury' },
-  { label: 'Off-road', value: 'Off-road' },
-];
-
-const BIKE_CATEGORY_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: 'All', value: 'All' },
-  { label: 'Cruiser', value: 'Bike' },
-  { label: 'Off-road', value: 'Off-road' },
-  { label: 'Scooter', value: 'Scooter' },
-];
-
 const CAR_PRICE_RANGES: Array<{ label: string; value: PriceRange }> = [
-  { label: 'All Prices', value: 'all' },
-  { label: 'Under ₹2,000', value: 'under-2000' },
-  { label: '₹2,000 – ₹5,000', value: '2000-5000' },
-  { label: 'Above ₹5,000', value: 'above-5000' },
+  { label: 'Any Price', value: 10000 },
+  { label: 'Under ₹2,000', value: 2000 },
+  { label: 'Under ₹3,000', value: 3000 },
+  { label: 'Under ₹4,000', value: 4000 },
 ];
 
 const BIKE_PRICE_RANGES: Array<{ label: string; value: PriceRange }> = [
-  { label: 'All Prices', value: 'all' },
-  { label: 'Under ₹1,000', value: 'under-1000' },
-  { label: '₹1,000 – ₹1,500', value: '1000-1500' },
-  { label: 'Above ₹1,500', value: 'above-1500' },
+  { label: 'Any Price', value: 10000 },
+  { label: 'Under ₹500', value: 500 },
+  { label: 'Under ₹1,000', value: 1000 },
+  { label: 'Under ₹1,500', value: 1500 },
 ];
 
 const CAR_TRANSMISSION: Array<{ label: string; value: TransmissionFilter }> = [
@@ -82,20 +67,29 @@ export default function SearchResultsScreen() {
   const { pickup, dropoff, dateRange, mode, vehicleType } = useSawari();
 
   const [filterVisible, setFilterVisible] = useState(false);
-  const [category, setCategory] = useState<string>('All');
-  const [priceRange, setPriceRange] = useState<PriceRange>('all');
+  const [priceRange, setPriceRange] = useState<PriceRange>(10000);
   const [transmission, setTransmission] = useState<TransmissionFilter>('all');
   const [fuel, setFuel] = useState<FuelFilter>('all');
   const [sort, setSort] = useState<SortOption>('low-to-high');
 
   const { data: fetchedResultCars = resultCars, isLoading } = useQuery({
-    queryKey: ['resultCars'],
-    queryFn: fetchResultCars,
+    queryKey: ['vehicles', vehicleType], // Invalidate when type changes
+    queryFn: async () => {
+      try {
+        const vehicles = await API.getVehiclesWithAvailability(vehicleType === 'bike' ? 'Bike' : 'Car');
+        if (vehicles && vehicles.length > 0) return vehicles;
+        return resultCars;
+      } catch (e) {
+        return resultCars;
+      }
+    },
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 
   const activeFilterCount = [
-    category !== 'All',
-    priceRange !== 'all',
+    priceRange !== 10000,
     transmission !== 'all',
     fuel !== 'all',
   ].filter(Boolean).length;
@@ -110,24 +104,18 @@ export default function SearchResultsScreen() {
       result = result.filter((c) => c.type === 'Car' || !c.type);
     }
 
-    // Category filter
-    if (category !== 'All') {
-      result = result.filter((c) => c.category === category);
+    // Date Availability filter
+    if (dateRange && dateRange !== 'Select Dates') {
+      const dates = dateRange.split(/[-–]/).map(d => d.trim());
+      const pickupDateStr = dates[0];
+      const returnDateStr = dates[1] || dates[0];
+      
+      result = result.filter((c) => checkCarAvailability(c, pickupDateStr, returnDateStr));
     }
 
     // Price filter
-    if (priceRange === 'under-2000') {
-      result = result.filter((c) => c.perDay < 2000);
-    } else if (priceRange === '2000-5000') {
-      result = result.filter((c) => c.perDay >= 2000 && c.perDay <= 5000);
-    } else if (priceRange === 'above-5000') {
-      result = result.filter((c) => c.perDay > 5000);
-    } else if (priceRange === 'under-1000') {
-      result = result.filter((c) => c.perDay < 1000);
-    } else if (priceRange === '1000-1500') {
-      result = result.filter((c) => c.perDay >= 1000 && c.perDay <= 1500);
-    } else if (priceRange === 'above-1500') {
-      result = result.filter((c) => c.perDay > 1500);
+    if (priceRange !== 10000) {
+      result = result.filter((c) => c.perDay <= priceRange);
     }
 
     // Transmission filter
@@ -148,11 +136,10 @@ export default function SearchResultsScreen() {
     }
 
     return result;
-  }, [fetchedResultCars, category, priceRange, transmission, fuel, sort]);
+  }, [fetchedResultCars, priceRange, transmission, fuel, sort, vehicleType, dateRange]);
 
   const clearAllFilters = () => {
-    setCategory('All');
-    setPriceRange('all');
+    setPriceRange(10000);
     setTransmission('all');
     setFuel('all');
     setSort('low-to-high');
@@ -303,19 +290,7 @@ export default function SearchResultsScreen() {
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-              {/* Category */}
-              <FilterSection title="Category" icon="grid">
-                <View style={styles.chipRow}>
-                  {(vehicleType === 'bike' ? BIKE_CATEGORY_OPTIONS : CAR_CATEGORY_OPTIONS).map((opt) => (
-                    <ChipButton
-                      key={opt.value}
-                      label={opt.label}
-                      active={category === opt.value}
-                      onPress={() => { Haptics.selectionAsync(); setCategory(opt.value); }}
-                    />
-                  ))}
-                </View>
-              </FilterSection>
+
 
               {/* Price Range */}
               <FilterSection title="Price Range" icon="tag">
@@ -325,7 +300,13 @@ export default function SearchResultsScreen() {
                       key={opt.value}
                       label={opt.label}
                       active={priceRange === opt.value}
-                      onPress={() => { Haptics.selectionAsync(); setPriceRange(opt.value); }}
+                      onPress={() => { 
+                        Haptics.selectionAsync(); 
+                        setPriceRange(opt.value); 
+                        if (opt.value !== 10000) {
+                          setSort('high-to-low');
+                        }
+                      }}
                     />
                   ))}
                 </View>

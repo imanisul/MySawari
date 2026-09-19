@@ -40,28 +40,74 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
   
   const isDateSelected = dateRange && !dateRange.includes('Select');
   let availableText = 'AVAILABLE NOW';
-  const todayStr = (() => { const d = new Date(); return `${d.getDate()} ${['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()]}`; })();
+  if (car.dbStatus === 'rent') {
+    availableText = 'ON RENT';
+  } else if (car.dbStatus === 'service' || car.dbStatus === 'maintenance') {
+    availableText = 'IN SERVICE';
+  } else if (car.bookedRanges && car.bookedRanges.length > 0) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  if (car.availabilityRange?.start) {
-    const startStr = car.availabilityRange.start.toUpperCase();
-    const endStr = car.availabilityRange.end?.toUpperCase();
-    if (endStr) {
-      if (startStr === endStr) {
-        availableText = `AVAIL: ${startStr}`;
+    const sortedRanges = [...car.bookedRanges]
+      .map(r => ({
+        start: new Date(new Date(r.start).setHours(0,0,0,0)).getTime(),
+        end: new Date(new Date(r.end).setHours(23,59,59,999)).getTime()
+      }))
+      .sort((a, b) => a.start - b.start);
+
+    // Filter out strictly past bookings
+    const upcomingBookings = sortedRanges.filter(r => r.end >= today.getTime());
+
+    if (upcomingBookings.length > 0) {
+      let availStart = today.getTime();
+      let availEnd: number | null = null;
+
+      if (availStart >= upcomingBookings[0].start && availStart <= upcomingBookings[0].end) {
+        // Currently booked
+        let nextStart = new Date(upcomingBookings[0].end);
+        nextStart.setDate(nextStart.getDate() + 1);
+        nextStart.setHours(0,0,0,0);
+        availStart = nextStart.getTime();
+
+        for (let i = 1; i < upcomingBookings.length; i++) {
+          if (availStart >= upcomingBookings[i].start) {
+             let ns = new Date(upcomingBookings[i].end);
+             ns.setDate(ns.getDate() + 1);
+             ns.setHours(0,0,0,0);
+             availStart = ns.getTime();
+          } else {
+             // Found a gap
+             let ne = new Date(upcomingBookings[i].start);
+             ne.setDate(ne.getDate() - 1);
+             ne.setHours(23,59,59,999);
+             availEnd = ne.getTime();
+             break;
+          }
+        }
       } else {
-        availableText = `AVAIL: ${startStr} – ${endStr}`;
+        // Available now, booked in future
+        let ne = new Date(upcomingBookings[0].start);
+        ne.setDate(ne.getDate() - 1);
+        ne.setHours(23,59,59,999);
+        availEnd = ne.getTime();
       }
-    } else {
-      if (startStr === todayStr) {
-        availableText = `AVAILABLE NOW`;
+
+      const formatDate = (ts: number) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
+      
+      if (availStart === today.getTime()) {
+        availableText = availEnd ? `AVAIL UNTIL ${formatDate(availEnd)}` : 'AVAILABLE NOW';
       } else {
-        availableText = `AVAIL FROM ${startStr}`;
+        availableText = availEnd ? `${formatDate(availStart)} - ${formatDate(availEnd)}` : `AVAIL FROM ${formatDate(availStart)}`;
       }
     }
   } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-    availableText = car.availableToDate ? `AVAIL: ${car.availabilityDate.toUpperCase()} – ${car.availableToDate.toUpperCase()}` : `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
-  } else if (car.availableToDate) {
-    availableText = `AVAIL UNTIL ${car.availableToDate.toUpperCase()}`;
+    if (car.availabilityDate === 'Currently Booked') {
+      availableText = 'ON RENT';
+    } else if (car.availabilityDate === 'In Service') {
+      availableText = 'IN SERVICE';
+    } else {
+      availableText = `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
+    }
   }
 
   // Determine badge colors based on category
@@ -105,7 +151,7 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
           >
             {images.map((img: any, i: number) => (
               <View key={i} style={{ width: cardWidth, height: '100%' }}>
-                <Image source={img} contentFit="cover" transition={200} style={styles.carImage} />
+                <Image source={img} contentFit="cover" transition={200} style={[styles.carImage, car.isAvailable === false && { opacity: 0.5 } as any]} />
               </View>
             ))}
           </ScrollView>
@@ -115,10 +161,10 @@ export const CarListCard = React.memo(function CarListCard({ car, isExplore = tr
           />
           
           <View style={styles.topRow}>
-            <BlurView intensity={90} tint="light" style={styles.availableBadge}>
-              <Feather name="calendar" size={12} color="#000" />
-              <Text numberOfLines={1} adjustsFontSizeToFit style={styles.badgeText}>
-                {availableText}
+            <BlurView intensity={90} tint={car.isAvailable === false ? "dark" : "light"} style={[styles.availableBadge, car.isAvailable === false && { backgroundColor: 'rgba(239, 68, 68, 0.5)' }]}>
+              <Feather name={car.isAvailable === false ? "x-circle" : "calendar"} size={12} color={car.isAvailable === false ? "#fff" : "#000"} />
+              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.badgeText, car.isAvailable === false && { color: '#fff' }]}>
+                {car.isAvailable === false && availableText === 'AVAILABLE NOW' ? 'NOT AVAILABLE' : availableText}
               </Text>
             </BlurView>
             <BlurView intensity={90} tint="light" style={styles.categoryBadge}>

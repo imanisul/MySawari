@@ -30,3 +30,5 @@ export * from './booking/NextTrip';
 export * from './common/ErrorFallback';
 export * from './common/ErrorBoundary';
 export * from './common/UpdateModal';
+export * from './loading/CarCardSkeleton';
+export * from './loading/BookingSkeleton';

@@ -85,33 +85,16 @@ export function FilterSheet({
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-            {/* CATEGORY */}
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Category</Text>
-              <View style={styles.chipRow}>
-                {categories.map((cat) => (
-                  <Pressable
-                    key={cat}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setLocalFilters(prev => ({ ...prev, category: cat as Category }));
-                    }}
-                    style={[
-                      styles.chip,
-                      { backgroundColor: localFilters.category === cat ? colors.foreground : colors.card, borderColor: localFilters.category === cat ? colors.foreground : colors.border }
-                    ]}
-                  >
-                    <Text style={[styles.chipText, { color: localFilters.category === cat ? colors.background : colors.foreground }]}>{cat}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
+
 
             {/* PRICE */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Max Price per day</Text>
               <View style={styles.chipRow}>
-                {[{ label: 'Any Price', val: 10000 }, { label: 'Under ₹1500', val: 1500 }, { label: 'Under ₹2500', val: 2500 }, { label: 'Under ₹4000', val: 4000 }].map((price) => (
+                {(isBike 
+                  ? [{ label: 'Any Price', val: 10000 }, { label: 'Under ₹500', val: 500 }, { label: 'Under ₹1000', val: 1000 }, { label: 'Under ₹1500', val: 1500 }]
+                  : [{ label: 'Any Price', val: 10000 }, { label: 'Under ₹2000', val: 2000 }, { label: 'Under ₹3000', val: 3000 }, { label: 'Under ₹4000', val: 4000 }]
+                ).map((price) => (
                   <Pressable
                     key={price.label}
                     onPress={() => {

@@ -7,6 +7,7 @@ import { PricingQuote, QuoteParams } from '@/services/backend/pricingEngine';
 import { BookingSnapshot } from '@/services/backend/database';
 
 import * as SecureStore from 'expo-secure-store';
+import * as Location from 'expo-location';
 
 export type PaymentMethod = string;
 export type BookingStatus = 'upcoming' | 'active' | 'completed' | 'cancelled';
@@ -108,7 +109,7 @@ type SawariContextValue = {
   completeOnboarding: () => Promise<void>;
   isAuthenticated: boolean | null;
   isAuthLoading: boolean;
-  login: (token: string, user: any) => Promise<void>;
+  login: (token: string, refreshToken: string, user: any) => Promise<void>;
   logout: () => Promise<void>;
   
   // Favorites
@@ -169,45 +170,58 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
+
+    const { DeviceEventEmitter } = require('react-native');
+    const sessionExpiryListener = DeviceEventEmitter.addListener('onSessionExpired', async () => {
+      if (isMounted) {
+        setIsAuthenticated(false);
+        setCustomer(null as any);
+      }
+    });
+
     (async () => {
       try {
-        const val = await AsyncStorage.getItem('@has_seen_permissions');
-        if (isMounted) setHasSeenPermissions(val === 'true');
+        // Fetch independent initial data concurrently
+        const [permissionsVal, token, userId] = await Promise.all([
+          AsyncStorage.getItem('@has_seen_permissions'),
+          SecureStore.getItemAsync('auth_token'),
+          SecureStore.getItemAsync('user_id')
+        ]);
         
-        // Authenticate with SecureStore
-        const token = await SecureStore.getItemAsync('auth_token');
-        if (token) {
-          const userId = await SecureStore.getItemAsync('user_id');
-          if (userId) {
-            // For a fully decoupled frontend, read the locally saved customer info
-            const storedProfile = await AsyncStorage.getItem(`@customer_info_${userId}`);
+        if (isMounted) setHasSeenPermissions(permissionsVal === 'true');
+        
+        if (token && userId) {
+          // For a fully decoupled frontend, read the locally saved customer info
+          const storedProfile = await AsyncStorage.getItem(`@customer_info_${userId}`);
+          
+          if (storedProfile && isMounted) {
+            const userProfile = JSON.parse(storedProfile);
+            setCustomer({
+              id: userProfile.id || userId,
+              name: userProfile.name || 'Demo User',
+              mobile: userProfile.mobile || '+91 9999999999',
+              email: userProfile.email || '',
+              license: userProfile.license || '',
+              dob: userProfile.dob || '',
+              gender: userProfile.gender || '',
+              joinedOn: userProfile.joinedOn || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+              referralCode: userProfile.referralCode || 'DEMO123',
+            });
             
-            if (storedProfile && isMounted) {
-              const userProfile = JSON.parse(storedProfile);
-              setCustomer({
-                id: userProfile.id || userId,
-                name: userProfile.name || 'Demo User',
-                mobile: userProfile.mobile || '+91 9999999999',
-                email: userProfile.email || '',
-                license: userProfile.license || '',
-                dob: userProfile.dob || '',
-                gender: userProfile.gender || '',
-                joinedOn: userProfile.joinedOn || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
-                referralCode: userProfile.referralCode || 'DEMO123',
-              });
-              
-              // Only consider them authenticated if the profile successfully fetched
-              setIsAuthenticated(true);
-              
-              // Load other data like rewards/cash using user ID to prevent leaks
-              const storedRewards = await AsyncStorage.getItem(`@earned_rewards_${userId}`);
+            // Only consider them authenticated if the profile successfully fetched
+            setIsAuthenticated(true);
+            
+            // Load other data like rewards/cash concurrently using user ID to prevent leaks
+            const [storedRewards, storedCash, storedBookings] = await Promise.all([
+              AsyncStorage.getItem(`@earned_rewards_${userId}`),
+              AsyncStorage.getItem(`@sawari_cash_${userId}`),
+              AsyncStorage.getItem(`@total_bookings_${userId}`)
+            ]);
+            
+            if (isMounted) {
               if (storedRewards) setEarnedRewards(JSON.parse(storedRewards));
-              const storedCash = await AsyncStorage.getItem(`@sawari_cash_${userId}`);
               if (storedCash) setSawariCash(Number(storedCash));
-              const storedBookings = await AsyncStorage.getItem(`@total_bookings_${userId}`);
               if (storedBookings) setTotalBookings(Number(storedBookings));
-            } else if (isMounted) {
-              setIsAuthenticated(false);
             }
           } else if (isMounted) {
             setIsAuthenticated(false);
@@ -225,8 +239,60 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setIsAuthLoading(false);
         }
       }
+
+      // Automatically fetch GPS location and set as default pickup/return
+      try {
+        let { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          const req = await Location.requestForegroundPermissionsAsync();
+          status = req.status;
+        }
+
+        if (status === 'granted' && isMounted) {
+          // Try last known first for speed, fallback to current position
+          let loc = await Location.getLastKnownPositionAsync();
+          if (!loc) {
+            loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          }
+          
+          if (loc && loc.coords) {
+            const { latitude, longitude } = loc.coords;
+          
+          let addressStr = 'Current Location';
+          let placeName = 'My Current Location';
+          try {
+            const reverseData = await API.reverseGeocode(latitude, longitude);
+            if (reverseData) {
+              addressStr = reverseData.address || addressStr;
+              placeName = reverseData.name || placeName;
+            }
+          } catch (e) {
+            console.warn('Reverse geocode failed during boot', e);
+          }
+
+          const defaultLoc: LocationResult = {
+            id: `current_${Date.now()}`,
+            address: addressStr,
+            latitude,
+            longitude,
+            name: placeName,
+            source: 'gps'
+          };
+
+          if (isMounted) {
+            setPickup((prev) => prev || defaultLoc);
+            setReturnAddress((prev) => prev || defaultLoc);
+          }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to auto-fetch location during boot', e);
+      }
     })();
-    return () => { isMounted = false; };
+    return () => { 
+      isMounted = false; 
+      sessionExpiryListener.remove();
+    };
   }, []);
 
   const quoteParams = useMemo(() => {
@@ -454,10 +520,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       },
       isAuthenticated,
       isAuthLoading,
-      login: async (token: string, user: any) => {
+      login: async (token: string, refreshToken: string, user: any) => {
         try {
           setIsAuthLoading(true);
           await SecureStore.setItemAsync('auth_token', String(token));
+          if (refreshToken) await SecureStore.setItemAsync('refresh_token', String(refreshToken));
           await SecureStore.setItemAsync('user_id', String(user.id));
           
           const newCustomer = {

@@ -1,6 +1,6 @@
 import React from 'react';
-import { PlannerSheet } from '@/components';
+import PlannerScreen from '@/screens/Home/PlannerScreen';
 
-export default function PlannerScreen() {
-  return <PlannerSheet />;
+export default function Route() {
+  return <PlannerScreen />;
 }

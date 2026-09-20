@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import { useSawari } from '@/context/SawariContext';
 
 export function AnimatedSplash({ isReady, children }: { isReady: boolean, children: React.ReactNode }) {
   const colors = useColors();
+  const { isDarkMode } = useSawari();
   
   // State to track if the splash screen should still be mounted
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
@@ -98,7 +100,7 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
           }}>
             <Image 
               source={require('@/assets/images/MySawari_nobg.png')} 
-              style={styles.logoImage} 
+              style={[styles.logoImage, isDarkMode && { tintColor: '#FFFFFF' }]} 
               resizeMode="contain"
             />
           </Animated.View>

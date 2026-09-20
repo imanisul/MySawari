@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
@@ -48,7 +48,7 @@ export default function SafetyScreen() {
           {/* Hero Banner */}
           <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.heroIconBox, { backgroundColor: colors.primary + '15' }]}>
-              <Feather name="shield" size={40} color={colors.primary} />
+              <Feather name="shield" size={40} color={colors.primaryText} />
             </View>
             <Text style={[styles.heroTitle, { color: colors.foreground }]}>Your Safety is Our Priority</Text>
             <Text style={[styles.heroSubtitle, { color: colors.mutedForeground }]}>
@@ -72,10 +72,31 @@ export default function SafetyScreen() {
           </View>
           
           <View style={[styles.contactCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-            <Feather name="phone-call" size={24} color={colors.primary} style={{ marginBottom: 12 }} />
+            <Feather name="shield" size={24} color={colors.primaryText} style={{ marginBottom: 12 }} />
             <Text style={[styles.contactTitle, { color: colors.foreground }]}>Need Emergency Help?</Text>
             <Text style={[styles.contactSubtitle, { color: colors.mutedForeground }]}>Our safety team is always ready to assist you.</Text>
-            <Text style={[styles.contactNumber, { color: colors.primary }]}>+91 1800-SAWARI-99</Text>
+            <Pressable 
+              onPress={() => {
+                import('react-native').then(({ Linking }) => {
+                  Linking.openURL('tel:+911800123456');
+                });
+              }}
+              style={{
+                marginTop: 12,
+                backgroundColor: colors.primary,
+                paddingHorizontal: 24,
+                paddingVertical: 14,
+                borderRadius: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8
+              }}
+            >
+              <Feather name="phone-call" size={18} color={colors.primaryForeground} />
+              <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground, fontSize: 15 }}>
+                Call Emergency Support
+              </Text>
+            </Pressable>
           </View>
 
         </ScrollView>

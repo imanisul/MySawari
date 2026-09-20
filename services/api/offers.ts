@@ -61,10 +61,7 @@ const mockOffers: Offer[] = [
 ];
 
 export async function fetchOffers(): Promise<Offer[]> {
-  // Simulate network delay for realistic loading state testing
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(mockOffers);
-    }, 50);
-  });
+  // Since there is no backend API for offers yet, return an empty array
+  // to avoid showing fake data.
+  return new Promise((resolve) => resolve([]));
 }

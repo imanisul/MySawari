@@ -31,7 +31,7 @@ export function HomeSearchCard({
             setVehicleType('car');
           }}
         >
-          <Text style={[styles.segmentText, { color: vehicleType === 'car' ? '#000' : colors.mutedForeground }]}>Cars</Text>
+          <Text style={[styles.segmentText, { color: vehicleType === 'car' ? colors.primaryForeground : colors.mutedForeground }]}>Cars</Text>
         </Pressable>
         <Pressable 
           style={[styles.segmentItem, vehicleType === 'bike' && styles.segmentItemActive, { backgroundColor: vehicleType === 'bike' ? colors.primary : 'transparent' }]} 
@@ -40,7 +40,7 @@ export function HomeSearchCard({
             setVehicleType('bike');
           }}
         >
-          <Text style={[styles.segmentText, { color: vehicleType === 'bike' ? '#000' : colors.mutedForeground }]}>Bikes</Text>
+          <Text style={[styles.segmentText, { color: vehicleType === 'bike' ? colors.primaryForeground : colors.mutedForeground }]}>Bikes</Text>
         </Pressable>
       </View>
 
@@ -88,11 +88,11 @@ export function HomeSearchCard({
       >
         <Text style={[
           styles.searchButtonText,
-          { color: isSearchDisabled ? colors.mutedForeground : '#000' }
+          { color: isSearchDisabled ? colors.mutedForeground : colors.primaryForeground }
         ]}>
           Search {vehicleType === 'car' ? 'Cars' : 'Bikes'}
         </Text>
-        <Feather name="arrow-right" size={18} color={isSearchDisabled ? colors.mutedForeground : '#000'} style={{ marginLeft: 8 }} />
+        <Feather name="arrow-right" size={18} color={isSearchDisabled ? colors.mutedForeground : colors.primaryForeground} style={{ marginLeft: 8 }} />
       </Pressable>
 
     </View>

@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
-import { DB } from '@/services/backend/database';
+
 import { SheetFrame, SheetHeader } from '../common/SheetFrame';
 
 const MAJOR_DESTINATIONS = [
@@ -28,11 +28,12 @@ export function DropoffSheet() {
   const { setDropoff } = useSawari();
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Combine DB pickup locations and Major Destinations
+  // Combine static pickup locations and Major Destinations
   const ALL_DESTINATIONS = useMemo(() => {
-    const dbLocs = DB.pickupLocations
-      .filter(loc => loc.id !== 'office')
-      .map(loc => ({
+    const dbLocs = [
+      { id: 'airport-t2', name: 'Guwahati Airport Terminal 2', address: 'Guwahati Airport', pickupCharge: 790, active: true },
+      { id: 'railway', name: 'Guwahati Railway Station', address: 'Paltan Bazaar', pickupCharge: 500, active: true }
+    ].map(loc => ({
         id: loc.id,
         name: loc.name,
         desc: loc.address,

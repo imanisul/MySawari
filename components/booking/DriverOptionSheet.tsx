@@ -74,8 +74,8 @@ function OptionCard({
         <Text style={[styles.optionDescription, { color: colors.mutedForeground }]}>{description}</Text>
         <Text style={[styles.optionPrice, { color: colors.foreground }]}>{price}</Text>
       </View>
-      <View style={[styles.radio, { borderColor: selected ? colors.navy : colors.border, backgroundColor: selected ? colors.navy : colors.card }]}>
-        {selected && <Feather name="check" size={13} color={colors.primary} />}
+      <View style={[styles.radio, { borderColor: selected ? colors.primary : colors.border, backgroundColor: selected ? colors.primary : colors.card }]}>
+        {selected && <Feather name="check" size={13} color={colors.primaryForeground} />}
       </View>
     </Pressable>
   );

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
+import { MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { SheetFrame, SheetHeader } from '../common/SheetFrame';
 import { TripField } from './TripField';
 import { PrimaryButton } from '../common/PrimaryButton';
@@ -10,12 +11,17 @@ import { PrimaryButton } from '../common/PrimaryButton';
 export function PlannerSheet() {
   const colors = useColors();
   const router = useRouter();
-  const { pickup, dateRange, pickupTime, returnTime, mode } = useSawari();
+  const { pickup, dateRange, pickupTime, returnTime, mode, isDeliveryRequested, deliveryMode } = useSawari();
+  const wantsDelivery = isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
   return (
     <SheetFrame height={660}>
       <SheetHeader title="Where do you want to go?" subtitle="Find the right car for your journey." />
       <View style={styles.fields}>
-        <TripField icon="map-pin" label="Pickup location" value={pickup?.name || 'Current Location'} onPress={() => router.push('/location')} />
+        {wantsDelivery ? (
+          <TripField icon="map-pin" label="Deliver to" value={pickup?.name || 'Select address'} onPress={() => router.push('/location')} />
+        ) : (
+          <TripField icon="home" label="Pickup location" value={MYSAWARI_HUB_NAME} />
+        )}
         <TripField icon="calendar" label="Dates" value={dateRange} onPress={() => router.push('/dates')} />
         <TripField icon="clock" label="Time" value={`${pickupTime} – ${returnTime}`} onPress={() => router.push('/times')} />
         <TripField icon="aperture" label="Driving Option" value={mode} onPress={() => router.push('/driver-option')} />

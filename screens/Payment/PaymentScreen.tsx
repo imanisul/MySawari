@@ -215,7 +215,7 @@ export default function PaymentScreen() {
             <Switch
               value={useCash}
               onValueChange={toggleSawariCash}
-              disabled={sawariCash <= 0 || (!!pricingQuote && pricingQuote.bookingAdvance + pricingQuote.pickupCharge <= 0)}
+              disabled={sawariCash <= 0 || (!!pricingQuote && pricingQuote.bookingAdvance <= 0)}
               trackColor={{ false: colors.border, true: colors.primary }}
             />
           </View>
@@ -302,11 +302,8 @@ export default function PaymentScreen() {
 
             {pricingQuote && pricingQuote.remainingRentalAmount > 0 && (
               <View style={[styles.row, { marginTop: 16 }]}>
-                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Remaining Payable</Text>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>{formatCurrency(pricingQuote.remainingRentalAmount)}</Text>
-                  <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 4 }}>Payable at {pricingQuote.pickupType === 'OFFICE' ? 'Office' : 'Handover'}</Text>
-                </View>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Remaining Balance</Text>
+                <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>{formatCurrency(pricingQuote.remainingRentalAmount)}</Text>
               </View>
             )}
           </View>
@@ -314,7 +311,7 @@ export default function PaymentScreen() {
 
         <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Online Payable</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Pay now</Text>
             <Text style={{ color: colors.foreground, fontSize: 24, fontFamily: 'Inter_700Bold' }}>
               {formatCurrency(pricingQuote?.onlinePayableNow || 0)}
             </Text>

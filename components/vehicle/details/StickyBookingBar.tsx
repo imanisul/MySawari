@@ -37,7 +37,7 @@ export function StickyBookingBar({
       >
         {!isAvailable ? (
           <View>
-            <Text style={[styles.bottomLabel, { color: '#DC2626', fontFamily: 'Inter_600SemiBold', fontSize: 16 }]}>Not Available</Text>
+            <Text style={[styles.bottomLabel, { color: colors.destructive, fontFamily: 'Inter_600SemiBold', fontSize: 16 }]}>Not Available</Text>
           </View>
         ) : (
           <>

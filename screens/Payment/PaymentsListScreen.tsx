@@ -7,6 +7,8 @@ import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useQuery } from '@tanstack/react-query';
+import { API } from '@/services/backend/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type PaymentMethodItem = { id: string; title: string; subtitle?: string; icon: string };
@@ -28,6 +30,15 @@ export default function PaymentsScreen() {
   const [expiry, setExpiry] = useState('');
   const [cvv, setCvv] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Fetch Wallet Transactions
+  const { data: walletData, isLoading: isLoadingWallet } = useQuery({
+    queryKey: ['wallet'],
+    queryFn: () => API.getWallet(true), // always fresh when the customer opens their wallet history
+    enabled: !!customer?.id
+  });
+
+  const transactions = walletData?.transactions || [];
 
   useEffect(() => {
     loadSavedMethods();
@@ -196,9 +207,52 @@ export default function PaymentsScreen() {
                     { borderColor: paymentMethod === method.id ? colors.primary : colors.border },
                     paymentMethod === method.id && { backgroundColor: colors.primary }
                   ]}>
-                    {paymentMethod === method.id && <Feather name="check" size={14} color="#000" />}
+                    {paymentMethod === method.id && <Feather name="check" size={14} color={colors.primaryForeground} />}
                   </View>
                 </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          {/* Backend Wallet Transactions Section */}
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32 }]}>Wallet History</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
+            Recent SawariCash credits and debits.
+          </Text>
+
+          {isLoadingWallet ? (
+            <ActivityIndicator color={colors.primaryText} style={{ marginTop: 20 }} />
+          ) : transactions.length === 0 ? (
+            <View style={[styles.emptyCard, { borderColor: colors.border }]}>
+              <Feather name="clock" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Transactions</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>Your SawariCash history will appear here.</Text>
+            </View>
+          ) : (
+            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }]}>
+              {transactions.map((tx: any, index: number) => (
+                <View
+                  key={tx.id}
+                  style={[
+                    styles.methodRow,
+                    { justifyContent: 'space-between' },
+                    index !== transactions.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }
+                  ]}
+                >
+                  <View style={{ flex: 1, paddingRight: 16 }}>
+                    <Text style={[styles.methodTitle, { color: colors.foreground }]}>{tx.description}</Text>
+                    <Text style={[styles.methodSubtitle, { color: colors.mutedForeground }]}>
+                      {new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </Text>
+                  </View>
+                  <Text style={{
+                    fontFamily: 'Inter_700Bold',
+                    fontSize: 15,
+                    color: tx.type === 'credit' ? colors.success : colors.destructive
+                  }}>
+                    {tx.type === 'credit' ? '+' : '-'}₹{tx.amount}
+                  </Text>
+                </View>
               ))}
             </View>
           )}
@@ -214,8 +268,8 @@ export default function PaymentsScreen() {
                colors={[colors.primary, colors.primary + 'dd']}
                style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
             />
-            <Feather name="plus-circle" size={20} color="#000" style={{ zIndex: 1 }} />
-            <Text style={[styles.addButtonText, { color: '#000', zIndex: 1 }]}>Add New Payment Method</Text>
+            <Feather name="plus-circle" size={20} color={colors.primaryForeground} style={{ zIndex: 1 }} />
+            <Text style={[styles.addButtonText, { color: colors.primaryForeground, zIndex: 1 }]}>Add New Payment Method</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -240,13 +294,13 @@ export default function PaymentsScreen() {
                 style={[styles.typeBtn, newMethodType === 'upi' ? { backgroundColor: colors.primary } : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
                 onPress={() => setNewMethodType('upi')}
               >
-                <Text style={[styles.typeBtnText, { color: newMethodType === 'upi' ? '#000' : colors.foreground }]}>UPI</Text>
+                <Text style={[styles.typeBtnText, { color: newMethodType === 'upi' ? colors.primaryForeground : colors.foreground }]}>UPI</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.typeBtn, newMethodType === 'card' ? { backgroundColor: colors.primary } : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
                 onPress={() => setNewMethodType('card')}
               >
-                <Text style={[styles.typeBtnText, { color: newMethodType === 'card' ? '#000' : colors.foreground }]}>Card</Text>
+                <Text style={[styles.typeBtnText, { color: newMethodType === 'card' ? colors.primaryForeground : colors.foreground }]}>Card</Text>
               </TouchableOpacity>
             </View>
 
@@ -323,7 +377,7 @@ export default function PaymentsScreen() {
               disabled={isSaving}
             >
               {isSaving ? (
-                <ActivityIndicator color="#000" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
                 <Text style={styles.saveBtnText}>Save Securely</Text>
               )}
@@ -373,5 +427,5 @@ const styles = StyleSheet.create({
   inputBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, height: 56, marginBottom: 16 },
   input: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 16, height: '100%' },
   saveBtn: { height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  saveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#000' }
+  saveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#101B2E' }
 });

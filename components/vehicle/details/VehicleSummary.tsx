@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Car } from '@/utils/sawari';
 
-export function VehicleSummary({ car }: { car: Car }) {
+export function VehicleSummary({ car, isAvailable, availabilityNote }: { car: Car, isAvailable: boolean, availabilityNote?: string }) {
   const colors = useColors();
 
   const rating = car.rating || 4.8;
@@ -27,6 +27,24 @@ export function VehicleSummary({ car }: { car: Car }) {
           <Text style={[styles.reviewCount, { color: colors.mutedForeground }]}>({reviewCount} reviews)</Text>
         </View>
       </View>
+
+      {!!availabilityNote && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 }}>
+          <Feather name={isAvailable ? 'calendar' : 'x-circle'} size={14} color={isAvailable ? colors.primaryText : colors.destructive} />
+          <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: isAvailable ? colors.foreground : colors.destructive }}>
+            {availabilityNote}
+          </Text>
+        </View>
+      )}
+
+      {isAvailable && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 }}>
+          <Feather name="map-pin" size={14} color={colors.primaryText} />
+          <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.mutedForeground }}>
+            MySawari, Kahilipara, Guwahati
+          </Text>
+        </View>
+      )}
     </View>
   );
 }

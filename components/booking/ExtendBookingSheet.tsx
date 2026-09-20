@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, ActivityIndicator, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API } from '@/services/backend/api';
-import { BookingSnapshot } from '@/services/backend/database';
+import { BookingSnapshot } from '@/services/backend/api';
+import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWebView';
 
 export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { visible: boolean; onClose: () => void; booking: BookingSnapshot; onSuccess: (updatedSnapshot: BookingSnapshot) => void }) {
   const colors = useColors();
@@ -19,7 +20,6 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
   const slideAnim = useRef(new Animated.Value(500)).current;
 
   const parseDate = (dateStr: string) => {
-    if (dateStr === 'mock-date') dateStr = '20 Sep';
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const parts = dateStr.split(' ');
     const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
@@ -62,10 +62,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
     setDaysToAdd(days);
     setChecking(true);
     try {
-      const currentReturn = parseDate(booking.returnDate);
-      const newReturn = new Date(currentReturn.getTime() + (days * 24 * 60 * 60 * 1000));
-      
-      const res = await API.checkExtensionAvailability(booking.id, newReturn.toISOString());
+      const res = await API.checkExtensionAvailability(booking.id, days, booking.driverMode === 'With Driver');
       setAvailability(res);
     } catch (e: any) {
       setAvailability({ available: false, message: e.message, additionalAmount: 0 });
@@ -75,27 +72,33 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
   };
 
   const [showRazorpay, setShowRazorpay] = useState(false);
+  const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string; amountPaise: number; keyId: string } | null>(null);
 
-  const handleConfirmPay = () => {
-    if (!availability?.available) return;
-    setShowRazorpay(true);
-  };
-
-  const handleExtend = async () => {
+  const handleConfirmPay = async () => {
     if (!availability?.available) return;
     setLoading(true);
     try {
-      const currentReturn = parseDate(booking.returnDate);
-      const newReturn = new Date(currentReturn.getTime() + (daysToAdd * 24 * 60 * 60 * 1000));
-      const newReturnStr = formatDate(newReturn);
-      
-      const response = await API.extendBooking(booking.id, newReturnStr, availability.additionalAmount, daysToAdd);
+      const order = await API.createRazorpayOrder({ onlinePayableNow: availability.additionalAmount });
+      setRazorpayOrder(order);
+      setShowRazorpay(true);
+    } catch(e: any) {
+      Alert.alert('Payment Init Failed', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExtend = async (paymentDetails: { razorpayOrderId: string; razorpayPaymentId: string }) => {
+    if (!availability?.available) return;
+    setLoading(true);
+    try {
+      const response = await API.extendBooking(booking.id, daysToAdd, booking.driverMode === 'With Driver', paymentDetails);
       if (response.success) {
         onSuccess(response.snapshot);
         onClose();
       }
     } catch (e: any) {
-      Alert.alert('Extension Failed', e.message);
+      Alert.alert('Extension Failed', `${e.message}\n\nIf money was deducted, contact support with payment ID ${paymentDetails.razorpayPaymentId}.`);
     } finally {
       setLoading(false);
       setShowRazorpay(false);
@@ -105,26 +108,43 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
   const currentReturnDate = formatDate(parseDate(booking.returnDate));
   const newReturnDate = formatDate(new Date(parseDate(booking.returnDate).getTime() + (daysToAdd * 24 * 60 * 60 * 1000)));
 
+  const handleRazorpaySuccess = async (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+    try {
+      const isVerified = await API.verifyPayment(data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature);
+      if (isVerified) {
+        await handleExtend({ razorpayOrderId: data.razorpay_order_id, razorpayPaymentId: data.razorpay_payment_id });
+      } else {
+        throw new Error('Signature verification failed');
+      }
+    } catch (e: any) {
+      Alert.alert('Payment Failed', e.message);
+      setShowRazorpay(false);
+    }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <Animated.View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 24), transform: [{ translateY: slideAnim }] }]}>
           
-          {showRazorpay ? (
-            <View style={{ alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
-              <View style={[styles.razorpayMock, { backgroundColor: '#1A1A1A', borderColor: '#333' }]}>
-                <Text style={{ color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', marginBottom: 12 }}>Razorpay (Mock)</Text>
-                <Text style={{ color: '#aaa', fontFamily: 'Inter_500Medium', marginBottom: 24, fontSize: 16 }}>
-                  Payable: ₹{availability?.additionalAmount.toLocaleString('en-IN')}
-                </Text>
-                <TouchableOpacity onPress={handleExtend} disabled={loading} style={[styles.primaryBtn, { backgroundColor: '#3399cc', width: '100%', marginBottom: 12 }]}>
-                  {loading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={[styles.primaryBtnText, { color: '#fff' }]}>Simulate Success</Text>}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setShowRazorpay(false)} disabled={loading} style={[styles.primaryBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#555', width: '100%' }]}>
-                  <Text style={[styles.primaryBtnText, { color: '#aaa' }]}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
+          {showRazorpay && razorpayOrder ? (
+            <View style={{ height: 400, width: '100%', overflow: 'hidden', borderRadius: 12 }}>
+              <RazorpayCheckoutWebView
+                orderId={razorpayOrder.orderId}
+                amount={razorpayOrder.amountPaise}
+                currency="INR"
+                name="MySawari"
+                description={`Extend Booking for ${booking.vehicleName}`}
+                themeColor={colors.primary}
+                razorpayKey={razorpayOrder.keyId}
+                onSuccess={handleRazorpaySuccess}
+                onFailure={(err) => {
+                  Alert.alert('Payment Failed', typeof err === 'string' ? err : 'Transaction failed or cancelled.');
+                  setShowRazorpay(false);
+                }}
+                onClose={() => setShowRazorpay(false)}
+              />
             </View>
           ) : (
             <>
@@ -144,7 +164,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
                   
                   <View style={{ paddingHorizontal: 12 }}>
                     <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="arrow-forward" size={18} color={colors.primary} />
+                      <Ionicons name="arrow-forward" size={18} color={colors.primaryText} />
                     </View>
                   </View>
                   
@@ -174,10 +194,10 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                   <View>
                     <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Additional Rental</Text>
-                    <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 2 }}>Paid online only</Text>
+                    <Text style={{ color: colors.primaryText, fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 2 }}>Paid online only</Text>
                   </View>
                   {checking ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <ActivityIndicator size="small" color={colors.primaryText} />
                   ) : availability?.available ? (
                     <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 16 }}>₹{availability.additionalAmount.toLocaleString('en-IN')}</Text>
                   ) : (
@@ -198,7 +218,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
             </>
           )}
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

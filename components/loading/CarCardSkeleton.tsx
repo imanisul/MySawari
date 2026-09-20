@@ -1,107 +1,55 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { Skeleton } from '@/components/common/Skeleton';
 import { useColors } from '@/hooks/useColors';
+import { shadows } from '@/constants/shadows';
 
-export function CarCardSkeleton() {
+/** Loading placeholder shaped exactly like CarListCard (photo, name + price, specs). */
+export function CarCardSkeleton({ index = 0 }: { index?: number }) {
   const colors = useColors();
+  const delay = index * 100;
 
   return (
     <View style={styles.cardContainer}>
-      <View style={styles.imageContainer}>
-        {/* Background placeholder for the image */}
-        <View style={{ flex: 1, backgroundColor: '#1F2937' }}>
-          <Skeleton width="100%" height="100%" borderRadius={0} />
+      <View style={[styles.card, shadows.level1, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.imageWrap}>
+          <Skeleton width="100%" height="100%" borderRadius={0} delay={delay} />
+          <View style={styles.badgeRow}>
+            <Skeleton width={150} height={28} borderRadius={14} delay={delay + 50} />
+            <Skeleton width={64} height={28} borderRadius={14} delay={delay + 100} />
+          </View>
         </View>
 
-        {/* Top Badges Skeleton */}
-        <View style={styles.topRow}>
-          <Skeleton width={100} height={28} borderRadius={16} />
-          <Skeleton width={60} height={28} borderRadius={16} />
-        </View>
-
-        {/* Info Glass Container Skeleton */}
-        <BlurView intensity={20} tint="dark" style={styles.infoGlassContainer}>
+        <View style={styles.body}>
           <View style={styles.titleRow}>
-            <View style={{ flex: 1 }}>
-              <Skeleton width="70%" height={24} borderRadius={4} />
-            </View>
-            <View style={styles.priceContainer}>
-              <Skeleton width={30} height={10} borderRadius={2} style={{ marginBottom: 4 }} />
-              <Skeleton width={60} height={20} borderRadius={4} />
-            </View>
+            <Skeleton width="55%" height={20} borderRadius={6} delay={delay + 150} />
+            <Skeleton width={72} height={20} borderRadius={6} delay={delay + 200} />
           </View>
-          
-          <View style={styles.divider} />
-          
-          <View style={styles.metaRow}>
-            <Skeleton width={40} height={14} borderRadius={4} />
-            <Skeleton width={60} height={14} borderRadius={4} />
-            <Skeleton width={50} height={14} borderRadius={4} />
+          <View style={styles.specRow}>
+            <Skeleton width={64} height={14} borderRadius={4} delay={delay + 200} />
+            <Skeleton width={72} height={14} borderRadius={4} delay={delay + 250} />
+            <Skeleton width={56} height={14} borderRadius={4} delay={delay + 300} />
           </View>
-        </BlurView>
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  cardContainer: {
-    marginBottom: 24,
-    marginHorizontal: 16,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  imageContainer: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    width: '100%',
-    aspectRatio: 4 / 3,
-    backgroundColor: '#1F2937',
-  },
-  topRow: {
+  cardContainer: { marginBottom: 16, marginHorizontal: 16 },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  imageWrap: { width: '100%', aspectRatio: 16 / 9 },
+  badgeRow: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
+    top: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  infoGlassContainer: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    borderRadius: 20,
-    padding: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  priceContainer: {
-    alignItems: 'flex-end',
-    flexShrink: 0,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    marginVertical: 14,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
+  body: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  specRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 12 },
 });

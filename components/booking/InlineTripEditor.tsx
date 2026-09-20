@@ -246,7 +246,7 @@ export function InlineTripEditor({ onSave }: { onSave: () => void }) {
                     borderRadius: 8, borderWidth: 1, borderColor: deliveryMode === m ? colors.primary : colors.border,
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontFamily: deliveryMode === m ? 'Inter_600SemiBold' : 'Inter_500Medium', color: deliveryMode === m ? '#000' : colors.mutedForeground }}>
+                  <Text style={{ fontSize: 12, fontFamily: deliveryMode === m ? 'Inter_600SemiBold' : 'Inter_500Medium', color: deliveryMode === m ? colors.primaryForeground : colors.mutedForeground }}>
                     {label}
                   </Text>
                 </Pressable>
@@ -265,18 +265,13 @@ export function InlineTripEditor({ onSave }: { onSave: () => void }) {
                   styles.field, { borderColor: colors.border, backgroundColor: pressed ? colors.tintLight : colors.background }
                 ]}
               >
-                <Feather name="map-pin" size={16} color={colors.primary} />
+                <Feather name="map-pin" size={16} color={colors.primaryText} />
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={{ fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.mutedForeground }}>Deliver To</Text>
                   <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: pickup?.name ? colors.foreground : colors.mutedForeground }}>
                     {pickup?.name || 'Search address...'}
                   </Text>
                 </View>
-                {!!pickup?.name && !!pricingQuote?.pickupCharge && (
-                  <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.primaryText }}>
-                    {pricingQuote.pickupDistanceKm} km × ₹20 = ₹{pricingQuote.pickupCharge}
-                  </Text>
-                )}
               </Pressable>
             )}
 
@@ -290,18 +285,13 @@ export function InlineTripEditor({ onSave }: { onSave: () => void }) {
                   styles.field, { borderColor: colors.border, backgroundColor: pressed ? colors.tintLight : colors.background }
                 ]}
               >
-                <Feather name="map-pin" size={16} color={colors.primary} />
+                <Feather name="map-pin" size={16} color={colors.primaryText} />
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={{ fontSize: 11, fontFamily: 'Inter_500Medium', color: colors.mutedForeground }}>Collect From</Text>
                   <Text numberOfLines={1} style={{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: returnAddress?.name ? colors.foreground : colors.mutedForeground }}>
                     {returnAddress?.name || 'Search address...'}
                   </Text>
                 </View>
-                {!!returnAddress?.name && !!pricingQuote?.dropCharge && (
-                  <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: colors.primaryText }}>
-                    {pricingQuote.dropDistanceKm} km × ₹20 = ₹{pricingQuote.dropCharge}
-                  </Text>
-                )}
               </Pressable>
             )}
           </View>
@@ -315,12 +305,12 @@ export function InlineTripEditor({ onSave }: { onSave: () => void }) {
         disabled={!canApply || isMissingLocation} 
       />
       {!canApply && (
-        <Text style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#DC2626', fontFamily: 'Inter_500Medium' }}>
+        <Text style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: colors.destructive, fontFamily: 'Inter_500Medium' }}>
           Please select valid start and end dates.
         </Text>
       )}
       {canApply && isMissingLocation && (
-        <Text style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: '#DC2626', fontFamily: 'Inter_500Medium' }}>
+        <Text style={{ textAlign: 'center', marginTop: 8, fontSize: 12, color: colors.destructive, fontFamily: 'Inter_500Medium' }}>
           Please provide addresses for delivery/pickup.
         </Text>
       )}
@@ -348,7 +338,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: 'rgba(128,140,160,0.25)',
     marginVertical: 16,
   },
   // Calendar styles

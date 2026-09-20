@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, Pres
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
+import { API } from '@/services/backend/api';
 import { PrimaryButton } from '@/components';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -27,11 +28,10 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
     try {
-      // Mock network delay
-      await new Promise(r => setTimeout(r, 1000));
+      await API.sendOtp(mobile);
       setStep('otp');
-    } catch (e) {
-      setError('Error occurred');
+    } catch (e: any) {
+      setError(e.message || 'Error occurred while sending OTP');
     } finally {
       setLoading(false);
     }
@@ -45,26 +45,16 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
     try {
-      // Mock network delay
-      await new Promise(r => setTimeout(r, 1000));
+      const res = await API.verifyOtp(mobile, otp, name);
       
-      // Accept any OTP for demo purposes
-      const mockToken = 'mock-jwt-token-12345';
-      const mockUser = {
-        id: 'u123',
-        mobile: '+91' + mobile,
-        name: name || 'Demo User',
-        createdAt: new Date().toISOString()
-      };
-      
-      await login(mockToken, 'mock-refresh-token', mockUser);
+      await login(res.token, res.refreshToken, res.user);
       if (router.canGoBack()) {
         router.back();
       } else {
         router.replace('/');
       }
-    } catch (e) {
-      setError('Error occurred');
+    } catch (e: any) {
+      setError(e.message || 'Error occurred while verifying OTP');
     } finally {
       setLoading(false);
     }
@@ -77,7 +67,7 @@ export default function LoginScreen() {
     >
       <View style={styles.header}>
         <View style={[styles.iconContainer, { backgroundColor: colors.tintLight }]}>
-          <Feather name="shield" size={32} color={colors.primary} />
+          <Feather name="shield" size={32} color={colors.primaryText} />
         </View>
         <Text style={[styles.title, { color: colors.foreground }]}>
           {step === 'mobile' ? 'Welcome to MySawari' : 'Enter Verification Code'}
@@ -96,7 +86,7 @@ export default function LoginScreen() {
           <>
             <Text style={[styles.label, { color: colors.foreground }]}>Mobile Number</Text>
             <View style={[styles.inputContainer, { borderColor: colors.border, backgroundColor: colors.card }]}>
-              <Text style={[styles.prefix, { color: colors.foreground }]}>+91</Text>
+              <Text style={[styles.prefix, { color: colors.foreground, borderRightColor: colors.border }]}>+91</Text>
               <TextInput
                 style={[styles.input, { color: colors.foreground }]}
                 keyboardType="phone-pad"
@@ -149,7 +139,7 @@ export default function LoginScreen() {
         />
         {step === 'otp' && (
           <Pressable onPress={() => setStep('mobile')} style={{ marginTop: 16, padding: 8 }}>
-            <Text style={{ textAlign: 'center', color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>
+            <Text style={{ textAlign: 'center', color: colors.primaryText, fontFamily: 'Inter_600SemiBold' }}>
               Change Mobile Number
             </Text>
           </Pressable>

@@ -3,6 +3,9 @@
 // distance calculation is measured from this single point.
 export const MYSAWARI_HUB_COORDINATES = { latitude: 26.129, longitude: 91.748 };
 
+/** Shown wherever the customer collects/returns the vehicle themselves. */
+export const MYSAWARI_HUB_NAME = 'MySawari, Kahilipara';
+
 export const PICKUP_DROP_RATE_PER_KM = 20;
 export const BOOKING_ADVANCE_AMOUNT = 500;
 
@@ -250,8 +253,9 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
 
   const totalAmount = calculateTripTotal(discountedRentalAmount, pickup.charge, drop.charge);
 
-  const baseAdvance = calculateAdvanceAmount(discountedRentalAmount);
-  const bookingAdvance = baseAdvance + pickup.charge + drop.charge;
+  // Only the fixed booking amount (₹500, or less if the whole trip costs less) is paid up front.
+  // Everything else — rental, driver, pickup and drop services — is the remaining balance.
+  const bookingAdvance = calculateAdvanceAmount(totalAmount);
   const remainingRentalAmount = calculateRemainingAmount(totalAmount, bookingAdvance);
 
   const verifiedCashToApply = Math.min(Math.max(0, sawariCashToApply || 0), Math.max(0, availableSawariCash || 0));

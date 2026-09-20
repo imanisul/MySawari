@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import * as Location from 'expo-location';
+import { getDevicePosition, POSITION_FAILURE_MESSAGE } from '@/utils/location';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { SheetFrame, SheetHeader } from '../common/SheetFrame';
@@ -60,10 +60,11 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
       setLoading(true);
       
       try {
-        console.log(`Searching for: ${searchQuery}`);
-        const results = await API.searchLocations(searchQuery, 'guwahati', mode === 'pickup', currentSignal);
-        console.log(`Search returned ${results?.length} results`, results);
-        
+        // Delivery / collection addresses must be somewhere we operate; a destination can be anywhere.
+        const results = await API.searchLocations(searchQuery, 'guwahati', mode === 'destination', currentSignal, {
+          restrictToServiceArea: mode !== 'destination',
+        });
+
         if (!currentSignal.aborted) {
           setPredictions(results || []);
         }
@@ -77,52 +78,36 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
           setLoading(false);
         }
       }
-    }, 400); // 400ms debounce
+    }, 300); // 300ms debounce
 
     return () => clearTimeout(timer);
   }, [searchQuery, mode]);
 
   const handleUseCurrentLocation = async () => {
+    if (loading) return; // ignore double taps while a fix is in progress
+    setLoading(true);
     try {
-      setLoading(true);
-      let { status } = await Location.getForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        const req = await Location.requestForegroundPermissionsAsync();
-        status = req.status;
-      }
-      
-      if (status !== 'granted') {
-        alert('Permission to access location was denied');
-        setLoading(false);
+      const result = await getDevicePosition({ preferFresh: true });
+
+      if (!result.ok) {
+        if (result.reason === 'denied') {
+          Alert.alert('Location access needed', POSITION_FAILURE_MESSAGE.denied, [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]);
+        } else {
+          Alert.alert('Could not get your location', POSITION_FAILURE_MESSAGE[result.reason]);
+        }
         return;
       }
 
-      let location = null;
-      try {
-        location = await Location.getLastKnownPositionAsync();
-        if (!location) {
-          location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        }
-      } catch (err: any) {
-        if (err.message && err.message.includes('Location provider is unavailable')) {
-          alert('Please turn on your device GPS / Location Services.');
-        } else {
-          alert('Could not fetch location. Ensure GPS is on.');
-        }
-        setLoading(false);
-        return;
-      }
-      
-      if (!location || !location.coords) {
-        throw new Error('Location unavailable');
-      }
-      
-      const { latitude, longitude } = location.coords;
-      
+      const { latitude, longitude } = result.position.coords;
+
+      // A readable street / area address for the delivery point — never the name of the nearest shop.
       let addressStr = 'Current Location';
       let placeName = 'My Current Location';
       try {
-        const reverseData = await API.reverseGeocode(latitude, longitude);
+        const reverseData = await API.reverseGeocode(latitude, longitude, { areaOnly: true });
         if (reverseData) {
           addressStr = reverseData.address || addressStr;
           placeName = reverseData.name || placeName;
@@ -157,7 +142,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
       }
     } catch (error) {
       console.error('Error fetching location:', error);
-      alert('Could not fetch current location. Please try again.');
+      Alert.alert('Could not get your location', POSITION_FAILURE_MESSAGE.unavailable);
     } finally {
       setLoading(false);
     }
@@ -167,12 +152,17 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
   const handleSelectPlace = async (place: any, isPopular = false) => {
     Haptics.selectionAsync();
     
-    // We already have latitude and longitude from Photon/Fallback array
+    // A place without real coordinates can't be priced or delivered to — never substitute a made-up point.
+    if (!Number.isFinite(place.latitude) || !Number.isFinite(place.longitude)) {
+      Alert.alert('Location not available', 'We could not get the exact position of that place. Please pick another result.');
+      return;
+    }
+
     const loc: LocationResult = {
       id: place.id || place.place_id || `loc_${Date.now()}`,
       address: place.address || place.description,
-      latitude: place.latitude || 26.1445,
-      longitude: place.longitude || 91.7362,
+      latitude: place.latitude,
+      longitude: place.longitude,
       name: place.name || place.structured_formatting?.main_text || 'Selected Location',
       source: 'osm'
     };
@@ -211,7 +201,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
             style={[styles.tab, mode === 'pickup' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
             onPress={() => { setMode('pickup'); setSearchQuery(''); }}
           >
-            <Text style={[styles.tabText, { color: mode === 'pickup' ? colors.primary : colors.mutedForeground }]}>
+            <Text style={[styles.tabText, { color: mode === 'pickup' ? colors.primaryText : colors.mutedForeground }]}>
               Deliver To
             </Text>
             <Text style={[styles.tabSubText, { color: colors.foreground }]} numberOfLines={1}>
@@ -222,7 +212,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
             style={[styles.tab, mode === 'return' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
             onPress={() => { setMode('return'); setSearchQuery(''); }}
           >
-            <Text style={[styles.tabText, { color: mode === 'return' ? colors.primary : colors.mutedForeground }]}>
+            <Text style={[styles.tabText, { color: mode === 'return' ? colors.primaryText : colors.mutedForeground }]}>
               Collect From
             </Text>
             <Text style={[styles.tabSubText, { color: colors.foreground }]} numberOfLines={1}>
@@ -243,7 +233,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
           onChangeText={setSearchQuery}
           autoFocus
         />
-        {loading && <ActivityIndicator size="small" color={colors.primary} />}
+        {loading && <ActivityIndicator size="small" color={colors.primaryText} />}
         {searchQuery.length > 0 && !loading && (
           <Pressable onPress={() => setSearchQuery('')}>
             <Ionicons name="close-circle" size={20} color={colors.mutedForeground} />
@@ -260,10 +250,10 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
                 onPress={handleUseCurrentLocation}
               >
                 <View style={[styles.iconBox, { backgroundColor: colors.primary + '20' }]}>
-                  <Feather name="navigation" size={18} color={colors.primary} />
+                  <Feather name="navigation" size={18} color={colors.primaryText} />
                 </View>
                 <View style={styles.resultTextContainer}>
-                  <Text style={[styles.mainText, { color: colors.primary }]}>
+                  <Text style={[styles.mainText, { color: colors.primaryText }]}>
                     Use Current Location
                   </Text>
                   <Text style={[styles.subText, { color: colors.mutedForeground }]} numberOfLines={1}>
@@ -279,7 +269,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
         
         {(loading || isDebouncing) && searchQuery.length > 0 && predictions.length === 0 && (
           <View style={{ alignItems: 'center', paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
-            <ActivityIndicator size="small" color={colors.primary} />
+            <ActivityIndicator size="small" color={colors.primaryText} />
             <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Searching online...</Text>
           </View>
         )}

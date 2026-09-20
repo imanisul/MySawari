@@ -15,30 +15,30 @@ export function VehicleSpecs({ car }: { car: Car }) {
         contentContainerStyle={styles.scrollContent}
       >
         <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="users" size={15} color={colors.primary} />
+          <Feather name="users" size={15} color={colors.primaryText} />
           <Text style={[styles.specText, { color: colors.foreground }]}>{car.seats}</Text>
         </View>
         
         <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="settings" size={15} color={colors.primary} />
+          <Feather name="settings" size={15} color={colors.primaryText} />
           <Text style={[styles.specText, { color: colors.foreground }]}>{car.transmission}</Text>
         </View>
 
         <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="droplet" size={15} color={colors.primary} />
+          <Feather name="droplet" size={15} color={colors.primaryText} />
           <Text style={[styles.specText, { color: colors.foreground }]}>{car.fuel}</Text>
         </View>
 
         {car.mileage && (
           <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="bar-chart-2" size={15} color={colors.primary} />
+            <Feather name="bar-chart-2" size={15} color={colors.primaryText} />
             <Text style={[styles.specText, { color: colors.foreground }]}>{car.mileage}</Text>
           </View>
         )}
 
         {car.luggage && (
           <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="briefcase" size={15} color={colors.primary} />
+            <Feather name="briefcase" size={15} color={colors.primaryText} />
             <Text style={[styles.specText, { color: colors.foreground }]}>{car.luggage}</Text>
           </View>
         )}

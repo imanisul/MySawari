@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { CarTile, LoginBottomSheet } from '@/components';
 import { TripEditorModal } from '@/components/home/TripEditorModal';
-import { cars, checkCarAvailability } from '@/utils/sawari';
+import { getAvailability, splitDateRange } from '@/utils/sawari';
 
 import { VehicleHeader } from '@/components/vehicle/details/VehicleHeader';
 import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGallery';
@@ -17,6 +17,7 @@ import { DetailsTabs } from '@/components/vehicle/details/DetailsTabs';
 import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
 import { PriceBreakdownSheet } from '@/components/vehicle/details/PriceBreakdownSheet';
 import { SearchSheet } from '@/components/booking/SearchSheet';
+import Reanimated, { FadeInDown } from 'react-native-reanimated';
 
 export default function CarDetailsScreen() {
   const colors = useColors();
@@ -24,15 +25,11 @@ export default function CarDetailsScreen() {
   const insets = useSafeAreaInsets();
   const { selectedCar, pickup, dropoff, dateRange, bookingSource, isDeliveryRequested, setFuelEstimate } = useSawari();
   
-  const hasValidDates = !!(dateRange && !dateRange.includes('Select'));
-  const [startStr, endStr] = (dateRange || '').split(' – ');
-  let isAvailable = true;
-  if (selectedCar?.dbStatus === 'rent' || selectedCar?.dbStatus === 'service' || selectedCar?.dbStatus === 'maintenance') {
-    isAvailable = false;
-  } else {
-    isAvailable = !hasValidDates ? true : checkCarAvailability(selectedCar, startStr, endStr);
-  }
-  
+  // Same rule as the lists: free for the chosen dates (or today if none chosen).
+  const [startStr, endStr] = splitDateRange(dateRange);
+  const availability = getAvailability(selectedCar, startStr, endStr);
+  const isAvailable = availability.available;
+
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -58,67 +55,75 @@ export default function CarDetailsScreen() {
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={[styles.content, { paddingBottom: 70 + Math.max(insets.bottom, 16) + 24 }]}
       >
-        <VehicleHeroGallery car={selectedCar} />
+        <Reanimated.View entering={FadeInDown.delay(0).duration(400)}>
+          <VehicleHeroGallery car={selectedCar} />
+        </Reanimated.View>
         
-        <VehicleSummary car={selectedCar} />
+        <Reanimated.View entering={FadeInDown.delay(100).duration(400)}>
+          <VehicleSummary car={selectedCar} isAvailable={isAvailable} availabilityNote={availability.label} />
+        </Reanimated.View>
 
-        <DetailsTabs car={selectedCar} />
+        <Reanimated.View entering={FadeInDown.delay(200).duration(400)}>
+          <DetailsTabs car={selectedCar} />
+        </Reanimated.View>
 
         {/* Location Card */}
         {isAvailable && (
-          <View style={styles.fuelSection}>
+          <Reanimated.View entering={FadeInDown.delay(300).duration(400)} style={styles.fuelSection}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
               {isDeliveryRequested ? 'Delivery Details' : 'Vehicle Location'}
             </Text>
             
-            {isDeliveryRequested ? (
-              <View style={[styles.locationCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 16 }]}>
+            {/* Always show Vehicle Location */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.locationCard, 
+                { backgroundColor: colors.card, borderColor: colors.border },
+                pressed && { opacity: 0.8 }
+              ]}
+              onPress={() => {
+                Haptics.selectionAsync();
+                import('react-native').then(({ Linking }) => {
+                  Linking.openURL('https://www.google.com/maps/search/?api=1&query=MySawari+-+Self+Drive+Car+Rental+Guwahati,+Kahilipara,+Assam');
+                });
+              }}
+            >
+              <View style={[styles.mapPlaceholder, { backgroundColor: colors.tintLight }]}>
+                <Feather name="map" size={32} color={colors.primaryText} />
+                <View style={styles.mapPinShadow} />
+                <Feather name="map-pin" size={24} color={colors.destructive} style={styles.mapPin} />
+              </View>
+              <View style={styles.locationDetails}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.locationTitle, { color: colors.foreground }]}>Currently Present At</Text>
+                  <Text style={[styles.locationDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
+                    Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019
+                  </Text>
+                </View>
+                <View style={[styles.mapBtn, { backgroundColor: colors.primary }]}>
+                  <Feather name="navigation" size={16} color={colors.primaryForeground} />
+                  <Text style={[styles.mapBtnText, { color: colors.primaryForeground }]}>Directions</Text>
+                </View>
+              </View>
+            </Pressable>
+
+            {/* Show Delivery details if requested */}
+            {isDeliveryRequested && (
+              <View style={[styles.locationCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 16, marginTop: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View style={[styles.mapPlaceholder, { backgroundColor: colors.tintLight, height: 60, width: 60, borderRadius: 30 }]}>
-                    <Feather name="truck" size={24} color={colors.primary} />
+                  <View style={[styles.mapPlaceholder, { backgroundColor: colors.tintLight, height: 48, width: 48, borderRadius: 24 }]}>
+                    <Feather name="map-pin" size={20} color={colors.primaryText} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.locationTitle, { color: colors.foreground }]}>Doorstep Delivery</Text>
-                    <Text style={[styles.locationDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
+                    <Text style={[styles.locationTitle, { color: colors.foreground, fontSize: 14 }]}>Delivery Scheduled To</Text>
+                    <Text style={[styles.locationDesc, { color: colors.mutedForeground, fontSize: 12 }]} numberOfLines={2}>
                       {pickup?.name || 'Your vehicle will be delivered to your selected address.'}
                     </Text>
                   </View>
                 </View>
               </View>
-            ) : (
-              <Pressable 
-                style={({ pressed }) => [
-                  styles.locationCard, 
-                  { backgroundColor: colors.card, borderColor: colors.border },
-                  pressed && { opacity: 0.8 }
-                ]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  import('react-native').then(({ Linking }) => {
-                    Linking.openURL('https://www.google.com/maps/search/?api=1&query=MySawari+-+Self+Drive+Car+Rental+Guwahati,+Kahilipara,+Assam');
-                  });
-                }}
-              >
-                <View style={[styles.mapPlaceholder, { backgroundColor: colors.tintLight }]}>
-                  <Feather name="map" size={32} color={colors.primary} />
-                  <View style={styles.mapPinShadow} />
-                  <Feather name="map-pin" size={24} color="#DC2626" style={styles.mapPin} />
-                </View>
-                <View style={styles.locationDetails}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.locationTitle, { color: colors.foreground }]}>MySawari Guwahati</Text>
-                    <Text style={[styles.locationDesc, { color: colors.mutedForeground }]} numberOfLines={2}>
-                      Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019
-                    </Text>
-                  </View>
-                  <View style={[styles.mapBtn, { backgroundColor: colors.primary }]}>
-                    <Feather name="navigation" size={16} color={colors.primaryForeground} />
-                    <Text style={[styles.mapBtnText, { color: colors.primaryForeground }]}>Directions</Text>
-                  </View>
-                </View>
-              </Pressable>
             )}
-          </View>
+          </Reanimated.View>
         )}
 
       </ScrollView>

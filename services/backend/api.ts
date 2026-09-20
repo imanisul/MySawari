@@ -1,11 +1,66 @@
-import { DB, BookingSnapshot, StoredReview } from './database';
-import { calculateBookingPrice, QuoteParams, PricingQuote } from './pricingEngine';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Car } from '../../utils/sawari';
-import { Platform } from 'react-native';
+export type PendingReview = {
+  bookingId: string;
+  carId: string;
+  vehicleName: string;
+  vehicleImage: string | null;
+  fromDate: string;
+  toDate: string;
+};
 
-// Simulated delay for realistic backend latency
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export type BookingSnapshot = {
+  id: string;
+  status: string;
+  vehicleId: string;
+  vehicleName: string;
+  pickupDate: string;
+  returnDate: string;
+  rentalDays: number;
+  dailyRate: number;
+  rentalAmount: number;
+  distanceKm: number;
+  ratePerKm: number;
+  pickupLocationName: string;
+  dropoffLocationName: string;
+  couponDiscount: number;
+  sawariCashUsed: number;
+  bookingAdvance: number;
+  onlinePayableNow: number;
+  remainingRentalAmount: number;
+  customerName?: string;
+  customerMobile?: string;
+  customerEmail?: string;
+  createdAt: string;
+  // Cancellation fields
+  cancellationReason?: string;
+  cancellationFee?: number;
+  refundAmount?: number;
+  refundStatus?: string;
+  cancelledAt?: string;
+  // Extension fields
+  driverMode?: string;
+  extensions?: any[];
+  totalRentalAmount?: number;
+  driverCharge?: number;
+  // Missing properties from UI
+  pickupCharge?: number;
+  dropCharge?: number;
+  dropDistanceKm?: number;
+  dropLocationName?: string;
+  pickupType?: string;
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  paidAt?: string;
+  couponCode?: string;
+  pickupDistanceKm?: number;
+  estimatedFuelCost?: number;
+  estimatedKm?: number;
+  vehicleMileageUsed?: number;
+  fuelPriceUsed?: number;
+};
+
+import { calculateBookingPrice, QuoteParams, PricingQuote } from './pricingEngine';
+import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
+import { Platform } from 'react-native';
 
 // Local backend
 const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
@@ -32,6 +87,20 @@ function formatPhotonAddress(properties: any): string {
   return parts.join(', ');
 }
 
+/**
+ * Area-level description of a spot (locality / district / city) that never
+ * names a business. The nearest feature to a GPS fix is often a shop or petrol
+ * pump, which is meaningless as "your location".
+ */
+function photonAreaLocation(properties: any) {
+  const area = properties.district || properties.locality || properties.suburb || properties.city || properties.county || properties.state;
+  const parts = [properties.street, properties.district, properties.city, properties.state].filter(Boolean);
+  return {
+    name: area || 'My Current Location',
+    address: parts.length > 0 ? Array.from(new Set(parts)).join(', ') : (area || 'Current Location'),
+  };
+}
+
 function mapPhotonResponse(data: any) {
   if (!data || !data.features) return [];
   return data.features.map((feature: any) => ({
@@ -45,7 +114,33 @@ function mapPhotonResponse(data: any) {
   }));
 }
 
-const REVIEWS_STORAGE_KEY = '@mysawari_reviews';
+// Where MySawari operates (delivery / collection addresses are searched inside this box): [minLon, minLat, maxLon, maxLat].
+const SERVICE_AREA_BBOX = [88.0, 21.5, 97.5, 29.5];
+const SERVICE_CENTER = { latitude: 26.1445, longitude: 91.7362 };
+
+const searchCache = new Map<string, { at: number; results: any[] }>();
+const SEARCH_TTL_MS = 5 * 60 * 1000;
+const reverseCache = new Map<string, { at: number; result: any }>();
+const REVERSE_TTL_MS = 10 * 60 * 1000;
+
+/** Drops places without usable coordinates (they can't be priced or delivered to) and exact duplicates. */
+function dedupeLocations(list: any[]) {
+  const seen = new Set<string>();
+  return list.filter((p) => {
+    if (!Number.isFinite(p.latitude) || !Number.isFinite(p.longitude)) return false;
+    const key = `${p.name}|${p.address}`.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+// Wallet balance cache (cleared whenever the balance can change: booking, cancel, reward).
+let walletCache: { at: number; data: any } | null = null;
+const WALLET_TTL_MS = 20 * 1000;
+export function invalidateWalletCache() {
+  walletCache = null;
+}
 
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
@@ -131,8 +226,11 @@ export const API = {
    * GET /api/pickup-locations
    */
   async getPickupLocations() {
-    await delay(100);
-    return DB.pickupLocations.filter(loc => loc.active);
+    return [
+      { id: 'office', name: 'MySawari Office', address: 'Guwahati, Assam', pickupCharge: 0, active: true },
+      { id: 'airport-t2', name: 'Guwahati Airport Terminal 2', address: 'Guwahati Airport', pickupCharge: 790, active: true },
+      { id: 'railway', name: 'Guwahati Railway Station', address: 'Paltan Bazaar', pickupCharge: 500, active: true }
+    ];
   },
 
   /**
@@ -140,10 +238,13 @@ export const API = {
    * Returns vehicles with their dynamically calculated availability range
    */
   async getVehiclesWithAvailability(type?: string): Promise<Car[]> {
+    return this.mapVehicles(await this.getVehiclesRaw());
+  },
+
+  /** The vehicles exactly as the backend sends them (this is what is saved on the device). */
+  async getVehiclesRaw(): Promise<any[]> {
     try {
-      let url = `${BACKEND_URL}/vehicles`;
-      
-      const response = await fetchWithAuth(url);
+      const response = await fetchWithAuth(`${BACKEND_URL}/vehicles`);
       
       if (response.status === 401) {
         return [];
@@ -154,91 +255,78 @@ export const API = {
       if (!response.ok) throw new Error(data.message || 'Failed to fetch vehicles');
       
       // Extra safeguard: explicitly filter out any vehicles marked as deleted
-      const dbVehicles = (data.data || []).filter((v: any) => v.isDeleted !== true);
-      
-      return dbVehicles.map((v: any) => {
-        // Robust check for bikes: Seating capacity <= 2 guarantees it's a two-wheeler,
-        // even if someone mistakenly saved it as 'SUV' or 'Luxury' in the DB.
-        const isBike = v.seatingCapacity <= 2 || /^(bike|scooter|cruiser|sports|standard)$/i.test(v.vehicleType);
-        const { getVehicleImage } = require('../../utils/vehicleImages');
-        const fallbackImage = getVehicleImage(v.vehicleName, isBike);
-        const hasImages = v.images && v.images.length > 0 && v.images[0].url;
-        const getFullUrl = (url: string) => {
-          if (!url) return '';
-          return url.startsWith('http') ? url : `${BASE_URL}${url}`;
-        };
-        
-        let availabilityDate = 'Available Now';
-        let availableToDate: string | undefined;
-
-        if (v.status === 'service' || v.status === 'maintenance') {
-          availabilityDate = 'In Service';
-        } else if (v.status === 'rent' || v.status === 'booked') {
-          availabilityDate = 'Currently Booked';
-        } else {
-          availabilityDate = 'Available Now';
-        }
-
-        return {
-          id: v._id,
-          type: isBike ? 'Bike' : 'Car',
-          name: v.vehicleName,
-          category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : v.vehicleType),
-          price: `₹${v.pricePerDay}`,
-          perDay: v.pricePerDay,
-          image: hasImages ? { uri: getFullUrl(v.images[0].url) } : fallbackImage,
-          images: hasImages ? v.images.map((img: any) => ({ uri: getFullUrl(img.url) })) : [fallbackImage],
-          seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
-          transmission: v.transmission || 'Manual',
-          fuel: v.fuelType || 'Petrol',
-          mileage: 'N/A',
-          availabilityDate,
-          availableToDate,
-          availabilityRange: {
-            start: availabilityDate,
-            end: '31 Dec'
-          },
-          dbStatus: v.status || 'available',
-          bookedRanges: v.bookedRanges || []
-        };
-      });
+      return (data.data || []).filter((v: any) => v.isDeleted !== true);
     } catch (e: any) {
       console.error('getVehiclesWithAvailability error:', e);
-      return [];
+      throw e;
     }
+  },
+
+  /** Backend vehicles -> the app's Car shape. */
+  mapVehicles(dbVehicles: any[]): Car[] {
+    return dbVehicles.map((v: any) => {
+      // Robust check for bikes: Seating capacity <= 2 guarantees it's a two-wheeler,
+      // even if someone mistakenly saved it as 'SUV' or 'Luxury' in the DB.
+      const isBike = v.seatingCapacity <= 2 || /^(bike|scooter|cruiser|sports|standard)$/i.test(v.vehicleType);
+      const { getVehicleImage } = require('../../utils/vehicleImages');
+      const fallbackImage = getVehicleImage(v.vehicleName, isBike);
+      const hasImages = v.images && v.images.length > 0 && v.images[0].url;
+      const getFullUrl = (url: string) => {
+        if (!url) return '';
+        return url.startsWith('http') ? url : `${BASE_URL}${url}`;
+      };
+      return {
+        id: v._id,
+        type: isBike ? 'Bike' : 'Car',
+        name: v.vehicleName,
+        category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : v.vehicleType),
+        price: `₹${v.pricePerDay}`,
+        perDay: v.pricePerDay,
+        image: hasImages ? { uri: getFullUrl(v.images[0].url) } : fallbackImage,
+        images: hasImages ? v.images.map((img: any) => ({ uri: getFullUrl(img.url) })) : [fallbackImage],
+        seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
+        transmission: v.transmission || 'Manual',
+        fuel: v.fuelType || 'Petrol',
+        mileage: 'N/A',
+        // Availability is derived from these facts (see getAvailability in utils/sawari).
+        dbStatus: v.status || 'available',
+        bookedRanges: v.bookedRanges || [],
+        maintenanceUntil: v.maintenanceUntil || null,
+      };
+    });
   },
 
   /**
    * GET /api/coupons
    */
   async getCoupons() {
-    await delay(100);
-    return DB.coupons.filter(c => c.active);
+    return [
+      { code: 'FIRST100', discountType: 'FLAT', discountValue: 100, minimumBooking: 999, expiryDate: '2027-12-31', active: true },
+      { code: 'SAWARI200', discountType: 'FLAT', discountValue: 200, minimumBooking: 2500, expiryDate: '2027-12-31', active: true },
+      { code: 'FESTIVAL10', discountType: 'PERCENTAGE', discountValue: 10, minimumBooking: 2000, maximumDiscount: 500, expiryDate: '2027-12-31', active: true }
+    ];
   },
 
   /**
    * GET /api/config/fuel-price
    */
   async getFuelPrice(type: 'petrol' | 'diesel' = 'petrol') {
-    await delay(100);
-    return DB.fuelPrices[type];
+    const fuelPrices: Record<string, any> = {
+      petrol: { fuelType: 'petrol', pricePerLitre: 105.45, location: 'Guwahati', updatedAt: new Date().toISOString() },
+      diesel: { fuelType: 'diesel', pricePerLitre: 95.20, location: 'Guwahati', updatedAt: new Date().toISOString() }
+    };
+    return fuelPrices[type];
   },
 
   /**
    * POST /api/bookings/quote
    */
   async quoteBooking(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<PricingQuote> {
-    await delay(100);
-    
     // Fetch the user's SawariCash balance securely
     let availableSawariCash = 0;
     try {
-      const { getItemAsync } = require('expo-secure-store');
-      const userId = await getItemAsync('user_id');
-      if (userId) {
-        const storedCash = await AsyncStorage.getItem(`@sawari_cash_${userId}`);
-        availableSawariCash = storedCash ? Number(storedCash) : 0;
-      }
+      const walletData = await this.getWallet();
+      availableSawariCash = walletData?.walletBalance || 0;
     } catch(e) {}
     
     const quote = await calculateBookingPrice({
@@ -254,38 +342,49 @@ export const API = {
   },
 
   /**
-   * POST /api/payments/razorpay/order
+   * POST /api/payments/create-order
    */
-  async createRazorpayOrder(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<{ orderId: string, amountPaise: number }> {
-    await delay(100);
-    
-    // BACKEND VALIDATION: Independently recalculate the quote to prevent frontend manipulation
-    const serverQuote = await this.quoteBooking(params);
-    
-    if (serverQuote.onlinePayableNow <= 0) {
-      throw new Error("Online payable amount is 0. No Razorpay order required.");
+  async createRazorpayOrder(params: any): Promise<{ orderId: string, amountPaise: number, keyId: string }> {
+    try {
+      const amountToPay = params.onlinePayableNow || params.rentalAmount || 0;
+      if (amountToPay <= 0) {
+        throw new Error('No Razorpay order required for zero amount');
+      }
+
+      const response = await fetchWithAuth(`${BACKEND_URL}/payments/create-order`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: amountToPay })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to create Razorpay order');
+      
+      return { orderId: data.data.id, amountPaise: data.data.amount, keyId: data.data.keyId };
+    } catch (e: any) {
+      throw new Error(e.message);
     }
-    
-    // Razorpay uses paise
-    const amountPaise = serverQuote.onlinePayableNow * 100;
-    
-    // Mock Razorpay Order ID
-    const orderId = `order_${Math.random().toString(36).substring(2, 10)}`;
-    
-    return { orderId, amountPaise };
   },
 
   /**
-   * POST /api/payments/razorpay/verify
-   * In a real app, this verifies the HMAC SHA256 signature using the Razorpay Secret
+   * POST /api/payments/verify-signature
    */
   async verifyPayment(orderId: string, paymentId: string, signature: string): Promise<boolean> {
-    await delay(100);
-    // Mock successful verification
-    if (!orderId || !paymentId || !signature) {
-      throw new Error("Missing payment verification details");
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/payments/verify-signature`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          razorpay_order_id: orderId,
+          razorpay_payment_id: paymentId,
+          razorpay_signature: signature
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Payment verification failed');
+      return true;
+    } catch (e: any) {
+      throw new Error(e.message);
     }
-    return true;
   },
 
   /**
@@ -299,31 +398,14 @@ export const API = {
     paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string },
     fuelEstimateDetails?: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number }
   ): Promise<BookingSnapshot> {
-    await delay(100);
-    
     // BACKEND VALIDATION: Recalculate quote to prevent frontend manipulation
     const serverQuote = await this.quoteBooking(params);
     const quote = serverQuote;
     
-    // 1. Deduct Sawari Cash safely
-    let userId = null;
-    try {
-      const { getItemAsync } = require('expo-secure-store');
-      userId = await getItemAsync('user_id');
-    } catch(e) {}
-
-    if (quote.sawariCashUsed > 0 && userId) {
-      const storedCash = await AsyncStorage.getItem(`@sawari_cash_${userId}`);
-      let currentCash = storedCash ? Number(storedCash) : 0;
-      if (currentCash >= quote.sawariCashUsed) {
-        currentCash -= quote.sawariCashUsed;
-        await AsyncStorage.setItem(`@sawari_cash_${userId}`, currentCash.toString());
-      }
-    }
-    
+    // 1. (Sawari Cash is now managed securely by the backend)
     // 2. Create snapshot
     const snapshot: BookingSnapshot = {
-      id: `MSW-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: '', // replaced with the server's booking id once saved
       status: 'CONFIRMED',
       vehicleId,
       vehicleName,
@@ -367,82 +449,122 @@ export const API = {
       createdAt: new Date().toISOString(),
     };
     
-    // 3. Save to backend DB
-    const dateParser = (dateStr: string) => {
-      const parts = dateStr.split(' ');
-      if (parts.length >= 3) {
-        // Assume format '15 Sep 2024'
-        return new Date(`${parts[1]} ${parts[0]} ${parts[2]}`);
-      }
-      return new Date(dateStr);
+    // 3. Save to backend DB. The server re-validates price, availability and the
+    // Razorpay payment, so a failure here must surface — the user has already paid.
+    // Bookings store calendar days at UTC midnight. Sending the device's local
+    // midnight would land on the previous day for the ops team and availability.
+    const toUtcMidnight = (label: string) => {
+      const day = parseDayLabel(label);
+      if (day === null) throw new Error('Invalid booking date');
+      return new Date(day * 24 * 60 * 60 * 1000);
     };
 
-    try {
-      await fetchWithAuth(`${BACKEND_URL}/bookings`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          vehicleId: vehicleId,
-          vehicleName: vehicleName,
-          customerName: customerDetails.name,
-          mobileNumber: customerDetails.mobile,
-          tripType: 'local',
-          fromDate: dateParser(params.pickupDateStr).toISOString(),
-          toDate: dateParser(params.returnDateStr).toISOString(),
-          pickupTime: params.pickupTime || '10:00 AM',
-          dropTime: params.returnTime || '10:00 AM',
-          totalDays: quote.rentalDays,
-          payment: {
-            totalAmount: quote.rentalAmount,
-            discountAmount: quote.couponDiscount,
-            bookingAmountPaid: quote.onlinePayableNow,
-            balanceAmount: quote.remainingRentalAmount,
-            paymentMethod: 'online',
-            paymentStatus: 'paid'
-          }
-        })
-      });
-    } catch (e) {
-      console.error('Error saving booking to backend:', e);
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        vehicleId: vehicleId,
+        vehicleName: vehicleName,
+        fromDate: toUtcMidnight(params.pickupDateStr).toISOString(),
+        toDate: toUtcMidnight(params.returnDateStr).toISOString(),
+        pickupTime: params.pickupTime || '10:00 AM',
+        dropTime: params.returnTime || '10:00 AM',
+        totalDays: quote.rentalDays,
+        payment: {
+          totalAmount: quote.rentalAmount,
+          discountAmount: quote.couponDiscount,
+          bookingAmountPaid: quote.onlinePayableNow,
+          balanceAmount: quote.remainingRentalAmount,
+        },
+        sawariCashUsed: quote.sawariCashUsed,
+        razorpayOrderId: paymentDetails.razorpayOrderId,
+        razorpayPaymentId: paymentDetails.razorpayPaymentId,
+      })
+    });
+    const saved = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(saved.message || 'Failed to save booking');
     }
-    
-    // Referral Processing Logic
-    const user = DB.users.find(u => u.mobile === customerDetails.mobile);
-    if (user && user.referredBy) {
-      // Check if this is their first booking
-      const hasPreviousBookings = DB.bookings.some(b => b.customerMobile === customerDetails.mobile && b.id !== snapshot.id);
-      
-      if (!hasPreviousBookings) {
-        const referral = DB.referrals.find(r => r.referredId === user.id && r.status === 'SIGNED_UP');
-        if (referral) {
-          referral.status = 'REWARDED';
-          referral.firstBookingAt = snapshot.createdAt;
-          
-          // In a real app, this would be a wallet transaction added to DB.walletTransactions
-          // Since we use AsyncStorage for current user in the frontend, the frontend will refetch profile,
-          // but we simulate it by finding the referrer and noting they got a reward.
-          // Because our mock is limited to the current user's local storage, we just update the DB status here.
-        }
-      }
-    }
+    snapshot.id = saved.data?._id || snapshot.id;
+    invalidateWalletCache(); // SawariCash may have been spent
+
+    // Referral Processing Logic is now handled entirely by the backend upon booking creation.
+
     
     return snapshot;
   },
   
   async getBooking(id: string): Promise<BookingSnapshot | null> {
-    await delay(100);
-    let userId = null;
-    try {
-      const { getItemAsync } = require('expo-secure-store');
-      userId = await getItemAsync('user_id');
-    } catch(e) {}
-    
-    if (!userId) return null;
-
-    const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
-    if (!storedBookings) return null;
-    const bookings = JSON.parse(storedBookings) as BookingSnapshot[];
+    const bookings = await this.getAllBookings();
     return bookings.find(b => b.id === id) || null;
+  },
+
+  // ─── Ride Journey Tracking ───
+
+  async getRideJourney(): Promise<{
+    totalRides: number;
+    completedRides: number;
+    confirmedRides: number;
+    cancelledRides: number;
+    totalSpent: number;
+    tier: string;
+    milestones: Array<{ rides: number; label: string; rewardAmount: number; type: string; unlocked: boolean; claimed: boolean }>;
+    nextMilestone: { label: string; ridesNeeded: number; rewardAmount: number } | null;
+    earnedRewards: Array<{ type: string; label: string; amount: number; earnedAt: string }>;
+    recentRides: Array<{ id: string; vehicleName: string; status: string; fromDate: string; toDate: string; totalDays: number; amount: number; createdAt: string }>;
+  } | null> {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/bookings/ride-journey`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch ride journey');
+      return data.data;
+    } catch (e: any) {
+      console.error('getRideJourney error:', e.message);
+      return null;
+    }
+  },
+
+  async claimMilestoneReward(milestoneLabel: string): Promise<{ message: string; reward: { type: string; label: string; amount: number } } | null> {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/bookings/claim-milestone`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ milestoneLabel }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to claim milestone');
+      invalidateWalletCache();
+      return data.data;
+    } catch (e: any) {
+      console.error('claimMilestoneReward error:', e.message);
+      throw e;
+    }
+  },
+
+  /**
+   * GET /api/customers/wallet
+   */
+  async getWallet(force: boolean = false) {
+    const empty = { walletBalance: 0, transactions: [] };
+    // Price quotes read the wallet on every change; a short cache keeps them instant.
+    if (!force && walletCache && Date.now() - walletCache.at < WALLET_TTL_MS) return walletCache.data;
+    try {
+      // Guests have no wallet — don't hit a protected endpoint without a session.
+      const { getItemAsync } = require('expo-secure-store');
+      if (!(await getItemAsync('auth_token'))) return empty;
+
+      const response = await fetchWithAuth(`${BACKEND_URL}/customers/wallet`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch wallet');
+      walletCache = { at: Date.now(), data: data.data };
+      return data.data;
+    } catch (e: any) {
+      // An expired session is already handled (logout) by fetchWithAuth — not an error here.
+      if (!/session expired|not authorized/i.test(e.message)) {
+        console.error('getWallet error:', e.message);
+      }
+      return empty;
+    }
   },
 
   async getAllBookings(): Promise<BookingSnapshot[]> {
@@ -451,24 +573,27 @@ export const API = {
       const data = await response.json();
       
       if (!response.ok) throw new Error(data.message || 'Failed to fetch bookings');
+
+      // Booking dates are calendar days stored at UTC midnight — format them in UTC so the day never shifts.
+      const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
       
       // Map backend booking model to frontend BookingSnapshot
       return (data.data || []).map((b: any) => {
-        // Simple mapping
         return {
           id: b._id,
-          status: b.status.toUpperCase(),
-          vehicleId: b.vehicleId,
-          vehicleName: b.vehicleName || 'Vehicle',
-          pickupDate: new Date(b.fromDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-          returnDate: new Date(b.toDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          // 'vehicle_handover' = the customer currently has the vehicle.
+          status: b.status === 'vehicle_handover' ? 'ONGOING' : String(b.status).toUpperCase(),
+          vehicleId: b.vehicleId?._id || b.vehicleId,
+          vehicleName: b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle',
+          pickupDate: fmt(b.fromDate),
+          returnDate: fmt(b.toDate),
           rentalDays: b.totalDays || 1,
-          dailyRate: 0,
+          dailyRate: b.vehicleId?.pricePerDay || 0,
           rentalAmount: b.payment?.totalAmount || 0,
           distanceKm: 0,
           ratePerKm: 0,
-          pickupLocationName: '',
-          dropoffLocationName: '',
+          pickupLocationName: b.pickupLocationName || 'MySawari Office',
+          dropoffLocationName: b.dropoffLocationName || 'MySawari Office',
           couponDiscount: b.payment?.discountAmount || 0,
           sawariCashUsed: 0,
           bookingAdvance: b.payment?.bookingAmountPaid || 0,
@@ -476,7 +601,12 @@ export const API = {
           remainingRentalAmount: b.payment?.balanceAmount || 0,
           customerName: b.customerName,
           customerMobile: b.mobileNumber,
-          createdAt: b.createdAt
+          createdAt: b.createdAt,
+          cancellationReason: b.cancellationReason,
+          cancellationFee: b.cancellationFee,
+          refundAmount: b.refundAmount,
+          refundStatus: b.refundStatus,
+          cancelledAt: b.cancelledAt,
         } as BookingSnapshot;
       });
     } catch (e: any) {
@@ -486,241 +616,68 @@ export const API = {
   },
 
   async cancelBooking(id: string, reason?: string): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
-    await delay(100);
-    const bookings = await this.getAllBookings();
-    const index = bookings.findIndex(b => b.id === id);
-    if (index === -1) throw new Error('Booking not found');
-    
-    const booking = bookings[index];
-    if (booking.status !== 'CONFIRMED' && booking.status !== 'PENDING') {
-      throw new Error('Only upcoming bookings can be cancelled');
-    }
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${id}/cancel`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cancellationReason: reason || 'Customer cancelled' }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to cancel booking');
+    invalidateWalletCache(); // cancelled bookings can refund SawariCash
 
-    // Cancellation Policy Logic
-    const parseDate = (dateStr: string) => {
-      if (dateStr === 'mock-date') dateStr = '15 Sep';
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const parts = dateStr.split(' ');
-      const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
-      if (parts.length >= 2 && months.includes(monthPrefix)) {
-        const day = parseInt(parts[0], 10);
-        const month = months.indexOf(monthPrefix);
-        const year = new Date().getFullYear();
-        return new Date(year, month, day);
-      }
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return new Date(`${dateStr} ${new Date().getFullYear()}`);
-      return d;
+    const existing = await this.getBooking(id);
+    const snapshot: BookingSnapshot = {
+      ...(existing as BookingSnapshot),
+      status: 'CANCELLED',
+      cancellationReason: data.data.cancellationReason,
+      cancellationFee: data.data.cancellationFee,
+      refundAmount: data.data.refundAmount,
+      refundStatus: data.data.refundStatus,
+      cancelledAt: data.data.cancelledAt,
     };
-    
-    const pickupDate = parseDate(booking.pickupDate);
-    const now = new Date();
-    const hoursDifference = (pickupDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    let cancellationFee = 0;
-    let refundAmount = 0;
-
-    if (hoursDifference >= 24) {
-      // Full refund of what they paid online
-      cancellationFee = 0;
-      refundAmount = booking.onlinePayableNow;
-    } else {
-      // No refund if cancelled less than 24 hours before pickup
-      cancellationFee = booking.onlinePayableNow;
-      refundAmount = 0;
-    }
-
-    booking.status = 'CANCELLED';
-    booking.cancellationReason = reason || 'Customer cancelled';
-    booking.cancellationFee = cancellationFee;
-    booking.refundAmount = refundAmount;
-    if (refundAmount > 0) {
-      booking.refundStatus = 'PROCESSING';
-    }
-    booking.cancelledAt = new Date().toISOString();
-
-    // Update Async Storage
-    let userId = null;
-    try {
-      const { getItemAsync } = require('expo-secure-store');
-      userId = await getItemAsync('user_id');
-    } catch(e) {}
-    
-    if (userId) {
-      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify(bookings));
-    }
-
-    return { success: true, snapshot: booking };
+    return { success: true, snapshot };
   },
 
-  async checkExtensionAvailability(bookingId: string, newReturnDateStr: string): Promise<{ available: boolean; message?: string; additionalDays: number; additionalAmount: number }> {
-    await delay(100);
-    const booking = await this.getBooking(bookingId);
-    if (!booking) throw new Error('Booking not found');
-
-    const parseDate = (dateStr: string) => {
-      if (dateStr === 'mock-date') dateStr = '20 Sep';
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const parts = dateStr.split(' ');
-      const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
-      if (parts.length >= 2 && months.includes(monthPrefix)) {
-        const day = parseInt(parts[0], 10);
-        const month = months.indexOf(monthPrefix);
-        const year = new Date().getFullYear();
-        return new Date(year, month, day);
-      }
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return new Date(`${dateStr} ${new Date().getFullYear()}`);
-      return d;
-    };
-    
-    const currentReturn = parseDate(booking.returnDate);
-    const newReturn = parseDate(newReturnDateStr);
-    
-    if (newReturn <= currentReturn) {
-      return { available: false, message: 'New return date must be after current return date', additionalDays: 0, additionalAmount: 0 };
-    }
-
-    // Mock overlap check (simulate availability based on dummy logic)
-    // In a real system, we query DB for any booking for this vehicle overlapping the new period.
-    const isAvailable = true; 
-    
-    if (!isAvailable) {
-      return { 
-        available: false, 
-        message: 'This vehicle is already reserved after your current booking and cannot be extended.',
-        additionalDays: 0, 
-        additionalAmount: 0 
-      };
-    }
-
-    const additionalDays = Math.ceil((newReturn.getTime() - currentReturn.getTime()) / (1000 * 60 * 60 * 24));
-    let additionalAmount = additionalDays * booking.dailyRate;
-    
-    // Add driver charge if the original booking included a driver
-    if (booking.driverMode === 'With Driver') {
-      additionalAmount += (1400 * additionalDays);
-    }
-
-    return {
-      available: true,
-      additionalDays,
-      additionalAmount
-    };
+  async checkExtensionAvailability(bookingId: string, additionalDays: number, withDriver?: boolean): Promise<{ available: boolean; message?: string; additionalDays: number; additionalAmount: number }> {
+    const qs = `days=${additionalDays}${withDriver ? '&withDriver=true' : ''}`;
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/extension-check?${qs}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Could not check availability');
+    return data.data;
   },
 
-  async extendBooking(bookingId: string, newReturnDateStr: string, additionalAmount: number, additionalDays: number): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
-    await delay(100); // Simulate payment & verification
-    
-    const bookings = await this.getAllBookings();
-    const index = bookings.findIndex(b => b.id === bookingId);
-    if (index === -1) throw new Error('Booking not found');
-    
-    const booking = bookings[index];
+  async extendBooking(
+    bookingId: string,
+    additionalDays: number,
+    withDriver: boolean | undefined,
+    paymentDetails: { razorpayOrderId: string; razorpayPaymentId: string }
+  ): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/extend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ additionalDays, withDriver: !!withDriver, ...paymentDetails }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Failed to extend booking');
 
-    // Create Extension Record
-    if (!booking.extensions) booking.extensions = [];
-    const extension = {
-      id: `ext_${Date.now()}`,
-      bookingId,
-      previousEndDate: booking.returnDate,
-      newEndDate: newReturnDateStr,
-      additionalDays,
-      additionalAmount,
-      status: 'CONFIRMED' as const,
-      requestedAt: new Date().toISOString(),
-      confirmedAt: new Date().toISOString(),
-      paymentId: `pay_${Date.now()}`
-    };
-    
-    booking.extensions.push(extension);
-    
-    // Update booking state
-    booking.returnDate = newReturnDateStr;
-    booking.rentalDays += additionalDays;
-    booking.totalRentalAmount = (booking.totalRentalAmount || booking.rentalAmount) + additionalAmount;
-    
-    if (booking.driverMode === 'With Driver') {
-      booking.driverCharge = (booking.driverCharge || 0) + (1400 * additionalDays);
-    }
-    
-    // Add extension amount to the remaining balance to be paid at drop-off
-    booking.remainingRentalAmount = (booking.remainingRentalAmount || 0) + additionalAmount;
-    
-    // Update Async Storage
-    let userId = null;
-    try {
-      const { getItemAsync } = require('expo-secure-store');
-      userId = await getItemAsync('user_id');
-    } catch(e) {}
-    
-    if (userId) {
-      await AsyncStorage.setItem(`@my_bookings_${userId}`, JSON.stringify(bookings));
-    }
-
-    return { success: true, snapshot: booking };
+    const snapshot = await this.getBooking(bookingId);
+    if (!snapshot) throw new Error('Booking not found');
+    return { success: true, snapshot };
   },
 
   /**
    * GET /api/config
    */
   async getAppConfig() {
-    await delay(100);
-    return DB.appConfig;
+    return {
+      referralRewardAmount: 10,
+      referralRewardType: 'PERCENTAGE',
+      referralDiscountAmount: 100,
+      referralDiscountType: 'FLAT'
+    };
   },
 
-  /**
-   * POST /api/auth/login
-   * Mock login that generates a unique referral code for new users.
-   */
-  async login(name: string, mobile: string, referralCode?: string) {
-    await delay(100);
-    let user = DB.users.find(u => u.mobile === mobile);
-    
-    if (!user) {
-      // Create new user
-      const uniqueCode = `${name.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, '')}${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-      
-      let referredBy = undefined;
-      if (referralCode) {
-        const referrer = DB.users.find(u => u.referralCode === referralCode);
-        if (referrer) {
-          referredBy = referrer.id;
-        }
-      }
 
-      user = {
-        id: `usr_${Math.random().toString(36).substring(2, 10)}`,
-        name,
-        mobile,
-        referralCode: uniqueCode,
-        referredBy,
-        createdAt: new Date().toISOString()
-      };
-      DB.users.push(user);
-
-      // Create pending referral relation if referred
-      if (referredBy) {
-        DB.referrals.push({
-          id: `ref_${Math.random().toString(36).substring(2, 10)}`,
-          referrerId: referredBy,
-          referredId: user.id,
-          referralCode: referralCode || '',
-          status: 'SIGNED_UP',
-          rewardAmount: DB.appConfig.referralRewardAmount,
-          signupAt: new Date().toISOString(),
-        });
-      }
-    } else {
-      // Update name if changed
-      user.name = name;
-    }
-
-    // Mock token
-    const token = `tok_${user.id}_${Date.now()}`;
-    const refreshToken = `ref_tok_${user.id}_${Date.now()}`;
-    return { user, token, refreshToken };
-  },
 
   /**
    * POST /api/auth/send-otp
@@ -734,7 +691,7 @@ export const API = {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
-      return { success: true, message: data.message };
+      return { success: true, message: data.message, isExistingUser: data.data?.isExistingUser };
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -743,12 +700,12 @@ export const API = {
   /**
    * POST /api/auth/verify-otp
    */
-  async verifyOtp(mobile: string, otp: string, name?: string) {
+  async verifyOtp(mobile: string, otp: string, name?: string, referredByCode?: string) {
     try {
       const res = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobileNumber: mobile, otp, customerName: name })
+        body: JSON.stringify({ mobileNumber: mobile, otp, customerName: name, referredByCode })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to verify OTP');
@@ -762,7 +719,7 @@ export const API = {
         email: customer.email,
         dob: customer.dob,
         gender: customer.gender,
-        license: customer.drivingLicenseNumber,
+        license: customer.documents?.dlNumber || '',
         referralCode: customer.referralCode,
         createdAt: customer.createdAt
       };
@@ -777,14 +734,23 @@ export const API = {
    * GET /api/users/profile
    */
   async getUserProfile(userId: string) {
-    await delay(100);
-    return DB.users.find(u => u.id === userId) || null;
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/customers/profile`);
+      if (res.ok) {
+        const data = await res.json();
+        const customer = data.data?.customer;
+        return customer ? { ...customer, name: customer.customerName } : null;
+      }
+    } catch(e) {
+      console.log('Error fetching profile from backend:', e);
+    }
+    return null;
   },
 
   /**
    * PUT /api/customers/profile
    */
-  async updateProfile(profileData: { fullName?: string, email?: string, dob?: string, gender?: string, aadhaarNumber?: string, drivingLicenseNumber?: string }) {
+  async updateProfile(profileData: { customerName?: string, email?: string, dob?: string, gender?: string, aadhaarNumber?: string, drivingLicenseNumber?: string }) {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/customers/profile`, {
         method: 'PUT',
@@ -802,7 +768,7 @@ export const API = {
         email: customer.email,
         dob: customer.dob,
         gender: customer.gender,
-        license: customer.drivingLicenseNumber,
+        license: customer.documents?.dlNumber || '',
         referralCode: customer.referralCode,
         createdAt: customer.createdAt
       };
@@ -812,35 +778,51 @@ export const API = {
   },
 
   /**
-   * GET /api/users/:id/referrals
+   * GET /api/auth/my-referrals
    */
   async getReferrals(userId: string) {
-    await delay(100);
-    const referrals = DB.referrals.filter(r => r.referrerId === userId);
-    
-    // Join with referred user details for display
-    return referrals.map(ref => {
-      const referredUser = DB.users.find(u => u.id === ref.referredId);
-      return {
-        ...ref,
-        referredName: referredUser?.name || 'Unknown',
-      };
-    });
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-referrals`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch referrals');
+      return data.data || [];
+    } catch (e: any) {
+      console.error('getReferrals error:', e);
+      return [];
+    }
   },
 
   /**
    * Photon Autocomplete (called directly; render backend has no /locations route)
    */
-  async searchLocations(input: string, regionId: string = 'guwahati', isDestination: boolean = false, signal?: AbortSignal) {
-    if (!input || input.trim().length < 2) return [];
-    
+  async searchLocations(
+    input: string,
+    regionId: string = 'guwahati',
+    isDestination: boolean = false,
+    signal?: AbortSignal,
+    options: { restrictToServiceArea?: boolean } = {}
+  ) {
+    const query = input?.trim();
+    if (!query || query.length < 2) return [];
+
+    // Same search twice (typing, deleting, retyping) shouldn't hit the network again.
+    const cacheKey = `${options.restrictToServiceArea ? 'svc' : 'any'}|${query.toLowerCase()}`;
+    const hit = searchCache.get(cacheKey);
+    if (hit && Date.now() - hit.at < SEARCH_TTL_MS) return hit.results;
+    const remember = (results: any[]) => {
+      searchCache.set(cacheKey, { at: Date.now(), results });
+      if (searchCache.size > 60) searchCache.delete(searchCache.keys().next().value as string);
+      return results;
+    };
+
     try {
-      // Primary: Try Photon API
+      // Primary: Photon, biased to Guwahati — and, for delivery/collection addresses, limited to where we operate.
       const url = new URL(`${PHOTON_BASE_URL}/api/`);
-      url.searchParams.set('q', input.trim());
-      url.searchParams.set('limit', '8');
-      url.searchParams.set('lat', '26.1445');
-      url.searchParams.set('lon', '91.7362');
+      url.searchParams.set('q', query);
+      url.searchParams.set('limit', '10');
+      url.searchParams.set('lat', String(SERVICE_CENTER.latitude));
+      url.searchParams.set('lon', String(SERVICE_CENTER.longitude));
+      if (options.restrictToServiceArea) url.searchParams.set('bbox', SERVICE_AREA_BBOX.join(','));
 
       const response = await fetch(url.toString(), {
         headers: { 'Accept-Language': 'en' },
@@ -848,7 +830,7 @@ export const API = {
       });
       if (!response.ok) throw new Error(`Photon API responded with status ${response.status}`);
       const data = await response.json();
-      return mapPhotonResponse(data);
+      return remember(dedupeLocations(mapPhotonResponse(data)));
     } catch (e: any) {
       if (e.name === 'AbortError' || e.message === 'Aborted' || (signal && signal.aborted)) {
         throw e;
@@ -859,11 +841,16 @@ export const API = {
       try {
         // Fallback: Nominatim API
         const url = new URL(`${NOMINATIM_BASE_URL}/search`);
-        url.searchParams.set('q', input.trim());
+        url.searchParams.set('q', query);
         url.searchParams.set('format', 'json');
         url.searchParams.set('addressdetails', '1');
-        url.searchParams.set('limit', '8');
+        url.searchParams.set('limit', '10');
         url.searchParams.set('countrycodes', 'in');
+        if (options.restrictToServiceArea) {
+          // viewbox is left,top,right,bottom
+          url.searchParams.set('viewbox', [SERVICE_AREA_BBOX[0], SERVICE_AREA_BBOX[3], SERVICE_AREA_BBOX[2], SERVICE_AREA_BBOX[1]].join(','));
+          url.searchParams.set('bounded', '1');
+        }
 
         const response = await fetch(url.toString(), {
           headers: { 'User-Agent': 'MySawariApp/1.0' },
@@ -873,7 +860,7 @@ export const API = {
         if (!response.ok) throw new Error(`Nominatim API responded with status ${response.status}`);
         const data = await response.json();
         
-        return data.map((item: any) => {
+        const mapped = data.map((item: any) => {
           let name = item.name;
           if (!name && item.address) {
             name = item.address.road || item.address.suburb || item.address.city;
@@ -889,7 +876,9 @@ export const API = {
             country: item.address?.country || null,
           };
         });
+        return remember(dedupeLocations(mapped));
       } catch (fallbackError: any) {
+        if (fallbackError.name === 'AbortError' || (signal && signal.aborted)) throw fallbackError;
         console.error('All location search APIs failed:', fallbackError.message);
         return [];
       }
@@ -899,7 +888,16 @@ export const API = {
   /**
    * Photon Reverse Geocode (called directly; render backend has no /locations route)
    */
-  async reverseGeocode(latitude: number, longitude: number) {
+  async reverseGeocode(latitude: number, longitude: number, options: { areaOnly?: boolean } = {}) {
+    const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)},${options.areaOnly ? 'a' : 'p'}`;
+    const cached = reverseCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < REVERSE_TTL_MS) return cached.result;
+    const result = await this.reverseGeocodeUncached(latitude, longitude, options);
+    if (result) reverseCache.set(cacheKey, { at: Date.now(), result });
+    return result;
+  },
+
+  async reverseGeocodeUncached(latitude: number, longitude: number, options: { areaOnly?: boolean } = {}) {
     try {
       // Primary: Try Photon API
       const url = new URL(`${PHOTON_BASE_URL}/reverse`);
@@ -911,8 +909,11 @@ export const API = {
       });
       if (!response.ok) throw new Error(`Photon API responded with status ${response.status}`);
       const data = await response.json();
-      const mapped = mapPhotonResponse(data);
-      return mapped.length > 0 ? mapped[0] : null; 
+ const mapped = mapPhotonResponse(data);
+      if (mapped.length === 0) return null;
+      // For an auto-detected position, describe the area — not the nearest business.
+      if (options.areaOnly) return { ...mapped[0], ...photonAreaLocation(data.features[0].properties) };
+      return mapped[0];
     } catch (e: any) {
       console.warn(`Photon reverse geocode failed: ${e.message}. Falling back to Nominatim...`);
       
@@ -933,14 +934,19 @@ export const API = {
         if (data.error) return null;
         
         let name = data.name;
-        if (!name && data.address) {
+        let address = data.display_name;
+        if (options.areaOnly && data.address) {
+          const a = data.address;
+          name = a.suburb || a.neighbourhood || a.city_district || a.village || a.town || a.city || a.state_district || a.state;
+          address = [a.road, a.suburb || a.neighbourhood, a.city || a.town || a.village, a.state].filter(Boolean).join(', ') || data.display_name;
+        } else if (!name && data.address) {
           name = data.address.road || data.address.suburb || data.address.city;
         }
         
         return {
           id: data.osm_id?.toString() || `osm_${Math.random()}`,
           name: name || 'Unknown Place',
-          address: data.display_name,
+          address,
           latitude: parseFloat(data.lat),
           longitude: parseFloat(data.lon),
           postcode: data.address?.postcode || null,
@@ -954,85 +960,112 @@ export const API = {
   },
 
   /**
-   * Reviews endpoints
+   * Reviews endpoints (GET /reviews/:carId, POST /reviews)
    *
-   * Reviews go through moderation: every new review is stored as `pending`
-   * and only ever appears on the public Car Details page once its status is
-   * flipped to `approved` (there is no admin surface in this app yet, so
-   * that flip currently has to happen by editing the stored record directly —
-   * see REVIEWS_STORAGE_KEY below).
+   * Reviews are shared server-side. The backend marks a review "verified"
+   * only when the customer has a real booking of that vehicle.
    */
   reviews: {
     async fetchByCarId(carId: string) {
-      await delay(100);
       try {
-        const stored = await AsyncStorage.getItem(REVIEWS_STORAGE_KEY);
-        const allReviews: StoredReview[] = stored ? JSON.parse(stored) : [];
-        return allReviews
-          .filter(r => r.carId === carId && r.status === 'approved')
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-          .map(r => ({
-            id: r.id,
-            userName: r.userName,
-            rating: r.rating,
-            text: r.text,
-            date: new Date(r.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
-            isVerified: r.isVerified,
-          }));
+        const response = await fetch(`${BACKEND_URL}/reviews/${encodeURIComponent(carId)}`);
+        const data = await response.json();
+        if (!response.ok) return [];
+        // Only well-rated reviews (and their photos) are shown publicly.
+        return (data.data || []).filter((r: any) => Number(r.rating) >= MIN_PUBLIC_REVIEW_RATING).map((r: any) => ({
+          id: r.id,
+          userName: r.userName,
+          rating: r.rating,
+          text: r.text,
+          date: new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          isVerified: r.isVerified,
+          placeVisited: r.placeVisited || undefined,
+          images: (r.images || []) as string[],
+        }));
       } catch (e) {
         return [];
       }
     },
 
-    async submit(carId: string, rating: number, text: string): Promise<{ status: 'pending' }> {
-      await delay(100);
-
-      let userId: string | null = null;
+    /** Ids of trips / vehicles this customer has already reviewed. */
+    async mine(): Promise<{ bookingIds: string[]; legacyCarIds: string[] }> {
       try {
-        const { getItemAsync } = require('expo-secure-store');
-        userId = await getItemAsync('user_id');
-      } catch (e) {}
-
-      if (!userId) {
-        throw new Error('Please log in to submit a review.');
+        const response = await fetchWithAuth(`${BACKEND_URL}/reviews/mine`);
+        const data = await response.json();
+        if (!response.ok) return { bookingIds: [], legacyCarIds: [] };
+        return data.data;
+      } catch (e) {
+        return { bookingIds: [], legacyCarIds: [] };
       }
+    },
 
-      const stored = await AsyncStorage.getItem(REVIEWS_STORAGE_KEY);
-      const allReviews: StoredReview[] = stored ? JSON.parse(stored) : [];
-
-      const alreadyReviewed = allReviews.some(r => r.carId === carId && r.userId === userId && r.status !== 'rejected');
-      if (alreadyReviewed) {
-        throw new Error('You have already reviewed this vehicle.');
-      }
-
-      // Verified only when we can find a real booking of this exact vehicle by this customer.
-      let bookingId: string | undefined;
+    /** Completed trips the customer hasn't reviewed yet. */
+    async pending(): Promise<PendingReview[]> {
       try {
-        const storedBookings = await AsyncStorage.getItem(`@my_bookings_${userId}`);
-        const bookings: BookingSnapshot[] = storedBookings ? JSON.parse(storedBookings) : [];
-        const matchingBooking = bookings.find(b => b.vehicleId === carId && b.status !== 'CANCELLED' && b.status !== 'FAILED');
-        bookingId = matchingBooking?.id;
-      } catch (e) {}
+        const response = await fetchWithAuth(`${BACKEND_URL}/reviews/pending`);
+        const data = await response.json();
+        if (!response.ok) return [];
+        return data.data || [];
+      } catch (e) {
+        return [];
+      }
+    },
 
-      const user = DB.users.find(u => u.id === userId);
+    /** Whether photo uploads are available right now (signed in and uploads configured). */
+    async canAddPhotos(): Promise<{ allowed: boolean; message?: string }> {
+      try {
+        const response = await fetchWithAuth(`${BACKEND_URL}/reviews/upload-signature`);
+        if (response.ok) return { allowed: true };
+        const data = await response.json().catch(() => ({}));
+        return { allowed: false, message: data.message || 'Photos are not available right now' };
+      } catch (e: any) {
+        return { allowed: false, message: 'Could not check photo access. Please try again.' };
+      }
+    },
 
-      const newReview: StoredReview = {
-        id: `rev_${Date.now()}`,
-        carId,
-        userId,
-        userName: user?.name || 'MySawari Customer',
-        bookingId,
-        rating,
-        text: text.trim(),
-        createdAt: new Date().toISOString(),
-        status: 'pending',
-        isVerified: !!bookingId,
-      };
+    /**
+     * Uploads one photo straight to Cloudinary using a signature from our
+     * backend (the Cloudinary secret never leaves the server).
+     */
+    async uploadImage(uri: string, mimeType?: string): Promise<{ url: string; publicId: string }> {
+      const sigRes = await fetchWithAuth(`${BACKEND_URL}/reviews/upload-signature`);
+      const sigData = await sigRes.json();
+      if (!sigRes.ok) throw new Error(sigData.message || 'Could not start the upload');
+      const { cloudName, apiKey, timestamp, folder, signature } = sigData.data;
 
-      allReviews.push(newReview);
-      await AsyncStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(allReviews));
+      const type = mimeType || 'image/jpeg';
+      const ext = type.split('/')[1] || 'jpg';
+      const form = new FormData();
+      form.append('file', { uri, type, name: `trip-${timestamp}.${ext}` } as any);
+      form.append('api_key', String(apiKey));
+      form.append('timestamp', String(timestamp));
+      form.append('folder', folder);
+      form.append('signature', signature);
 
-      return { status: 'pending' };
+      const upload = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: form,
+      });
+      const result = await upload.json();
+      if (!upload.ok || !result.secure_url) {
+        throw new Error(result?.error?.message || 'Photo upload failed');
+      }
+      return { url: result.secure_url, publicId: result.public_id };
+    },
+
+    async submit(
+      carId: string,
+      rating: number,
+      text: string,
+      extras: { bookingId?: string; placeVisited?: string; images?: { url: string; publicId: string }[] } = {}
+    ): Promise<void> {
+      const response = await fetchWithAuth(`${BACKEND_URL}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carId, rating, text: text.trim(), ...extras }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to submit review');
     }
   }
 };

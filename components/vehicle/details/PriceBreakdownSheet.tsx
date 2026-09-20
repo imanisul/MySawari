@@ -80,7 +80,7 @@ export function PriceBreakdownSheet({ visible, onClose }: { visible: boolean; on
                 </View>
 
                 <View style={[styles.row, { marginTop: 8 }]}>
-                  <Text style={[styles.highlightLabel, { color: colors.foreground }]}>Payable at Handover</Text>
+                  <Text style={[styles.highlightLabel, { color: colors.foreground }]}>Remaining Balance</Text>
                   <Text style={[styles.highlightValue, { color: colors.foreground }]}>{formatCurrency(pricingQuote.remainingRentalAmount)}</Text>
                 </View>
               </View>

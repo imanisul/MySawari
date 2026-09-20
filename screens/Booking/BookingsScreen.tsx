@@ -7,13 +7,14 @@ import { useColors } from '@/hooks/useColors';
 import { BottomNavigation, PrimaryButton } from '@/components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
-import { BookingSnapshot } from '@/services/backend/database';
+import { BookingSnapshot } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import { LoginBottomSheet } from '@/components';
 import { API } from '@/services/backend/api';
 import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
+import { ReviewModal, ReviewTrip } from '@/components/booking/ReviewModal';
 type BookingTab = 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
 
 export default function BookingsScreen() {
@@ -28,6 +29,17 @@ export default function BookingsScreen() {
   
   const [actionBooking, setActionBooking] = useState<BookingSnapshot | null>(null);
   const [actionType, setActionType] = useState<'cancel' | 'extend' | null>(null);
+  const [reviewTrip, setReviewTrip] = useState<ReviewTrip | null>(null);
+
+  // Which trips the customer has already reviewed, so every completed trip shows the right action.
+  const { data: myReviews } = useQuery({
+    queryKey: ['myReviews'],
+    queryFn: () => API.reviews.mine(),
+    enabled: isAuthenticated === true,
+    staleTime: 60 * 1000,
+  });
+  const hasReviewed = (b: BookingSnapshot) =>
+    !!myReviews && (myReviews.bookingIds.includes(b.id) || myReviews.legacyCarIds.includes(String(b.vehicleId)));
   
   const { data: bookings = [], isLoading: loading, isError: fetchError, refetch } = useQuery({
     queryKey: ['bookings'],
@@ -37,14 +49,13 @@ export default function BookingsScreen() {
       return userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     },
     enabled: isAuthenticated === true,
-    staleTime: 60 * 1000, // 1 minute
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000, // status changes (e.g. trip completed by the ops team) appear on their own
+    refetchOnWindowFocus: true,
   });
 
   const filteredBookings = bookings.filter((b) => {
-    const parseDate = (dateStr: string, isEnd = false) => {
-      if (dateStr === 'mock-date') {
-        dateStr = isEnd ? '20 Sep' : '15 Sep';
-      }
+    const parseDate = (dateStr: string) => {
       const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
       const parts = dateStr.split(' ');
       const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
@@ -60,8 +71,8 @@ export default function BookingsScreen() {
     };
 
     // Check if the booking is currently ongoing (either explicitly marked or inferred by dates)
-    const pickup = parseDate(b.pickupDate, false);
-    const returnDt = parseDate(b.returnDate, true);
+    const pickup = parseDate(b.pickupDate);
+    const returnDt = parseDate(b.returnDate);
     returnDt.setHours(23, 59, 59, 999); // Cover the entire return day
 
     // Only infer if dates are valid
@@ -125,9 +136,9 @@ export default function BookingsScreen() {
         
         {loading ? (
           <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)} style={{ paddingTop: 8, paddingBottom: insets.bottom + 100 }}>
-            <BookingSkeleton />
-            <BookingSkeleton />
-            <BookingSkeleton />
+            <BookingSkeleton index={0} />
+            <BookingSkeleton index={1} />
+            <BookingSkeleton index={2} />
           </Reanimated.View>
         ) : fetchError ? (
           <View style={styles.emptyContainer}>
@@ -182,7 +193,7 @@ export default function BookingsScreen() {
                   <View style={styles.upcomingMetaRow}>
                     <Feather name="calendar" size={13} color={subtextColor} />
                     <Text style={[styles.upcomingMeta, { color: subtextColor }]}>
-                      {booking.pickupDate === 'mock-date' ? '15 Sep' : booking.pickupDate} - {booking.returnDate === 'mock-date' ? '20 Sep' : booking.returnDate} ({booking.rentalDays} Days)
+                      {booking.pickupDate} - {booking.returnDate} ({booking.rentalDays} Days)
                     </Text>
                   </View>
                   {(!booking.pickupCharge && !booking.dropCharge) ? (
@@ -216,15 +227,15 @@ export default function BookingsScreen() {
                   <View style={{ height: 1, backgroundColor: dividerColor, marginVertical: 12 }} />
                   
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ color: textColor, fontFamily: 'Inter_600SemiBold' }}>₹{booking.onlinePayableNow.toLocaleString('en-IN')} <Text style={{ color: subtextColor, fontFamily: 'Inter_400Regular', fontSize: 13 }}>paid online</Text></Text>
+                    <Text style={{ color: textColor, fontFamily: 'Inter_600SemiBold' }}>₹{booking.onlinePayableNow.toLocaleString('en-IN')} <Text style={{ color: subtextColor, fontFamily: 'Inter_400Regular', fontSize: 13 }}>booking amount paid</Text></Text>
                     {booking.remainingRentalAmount > 0 && (
-                      <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Remaining: ₹{booking.remainingRentalAmount.toLocaleString('en-IN')}</Text>
+                      <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Balance: ₹{booking.remainingRentalAmount.toLocaleString('en-IN')}</Text>
                     )}
                   </View>
                   
                   {booking.status === 'CANCELLED' && booking.refundAmount !== undefined && booking.refundAmount > 0 && (
-                    <View style={{ marginTop: 12, padding: 12, backgroundColor: booking.refundStatus === 'PROCESSING' ? '#FEF3C7' : colors.success + '15', borderRadius: 8 }}>
-                      <Text style={{ color: booking.refundStatus === 'PROCESSING' ? '#D97706' : colors.success, fontFamily: 'Inter_500Medium', fontSize: 13 }}>
+                    <View style={{ marginTop: 12, padding: 12, backgroundColor: booking.refundStatus === 'PROCESSING' ? colors.warning + '14' : colors.success + '1A', borderRadius: 8 }}>
+                      <Text style={{ color: booking.refundStatus === 'PROCESSING' ? colors.warning : colors.success, fontFamily: 'Inter_500Medium', fontSize: 13 }}>
                         {booking.refundStatus === 'PROCESSING' ? 'Refund Processing' : 'Refund Processed'}: ₹{booking.refundAmount.toLocaleString('en-IN')}
                       </Text>
                     </View>
@@ -242,6 +253,36 @@ export default function BookingsScreen() {
                       >
                         <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Cancel Trip</Text>
                       </Pressable>
+                    )}
+                    
+                    {((booking.status === 'CONFIRMED' || booking.status === 'ONGOING') && (booking.pickupCharge || 0) > 0) && (
+                      <Pressable 
+                        onPress={(e) => { 
+                          e.stopPropagation();
+                          import('react-native').then(({ Linking }) => {
+                            Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(booking.pickupLocationName || 'Kahilipara, Guwahati')}`);
+                          });
+                        }}
+                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#047857', marginLeft: 12 }}
+                      >
+                        <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_500Medium', fontSize: 13 }}>Track Vehicle</Text>
+                      </Pressable>
+                    )}
+                    {tab === 'Completed' && booking.status === 'COMPLETED' && (
+                      hasReviewed(booking) ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
+                          <Feather name="check-circle" size={14} color={colors.success} />
+                          <Text style={{ color: colors.success, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Reviewed</Text>
+                        </View>
+                      ) : (
+                        <Pressable
+                          onPress={(e) => { e.stopPropagation(); setReviewTrip({ bookingId: booking.id, carId: String(booking.vehicleId), vehicleName: booking.vehicleName }); }}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary }}
+                        >
+                          <Feather name="star" size={14} color={colors.primaryForeground} />
+                          <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Write a review</Text>
+                        </Pressable>
+                      )
                     )}
                     {(tab === 'Active' || (tab === 'Upcoming' && booking.status === 'CONFIRMED')) && (
                       <Pressable 
@@ -263,6 +304,8 @@ export default function BookingsScreen() {
         )}
       </View>
       <BottomNavigation />
+
+      <ReviewModal trip={reviewTrip} onClose={() => setReviewTrip(null)} />
       
       {actionBooking && actionType === 'cancel' && (
         <CancelBookingSheet

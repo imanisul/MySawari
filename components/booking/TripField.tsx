@@ -12,12 +12,14 @@ export function TripField({
   icon: React.ComponentProps<typeof Feather>['name'];
   label: string;
   value: string;
-  onPress: () => void;
+  /** Omit for a read-only row. */
+  onPress?: () => void;
 }) {
   const colors = useColors();
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={!onPress}
       onPress={onPress}
       style={({ pressed }) => [styles.tripField, { borderBottomColor: colors.border }, pressed && styles.pressed]}
     >
@@ -26,7 +28,7 @@ export function TripField({
         <Text style={[styles.tripFieldLabel, { color: colors.mutedForeground }]}>{label}</Text>
         <Text style={[styles.tripFieldValue, { color: colors.foreground }]}>{value}</Text>
       </View>
-      <Feather name="chevron-right" size={22} color={colors.mutedForeground} />
+      {!!onPress && <Feather name="chevron-right" size={22} color={colors.mutedForeground} />}
     </Pressable>
   );
 }

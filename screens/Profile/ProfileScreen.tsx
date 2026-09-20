@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform, Pressable, Animated, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Page, Header, PrimaryButton } from '@/components';
 import { useColors } from '@/hooks/useColors';
@@ -9,13 +9,72 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoginBottomSheet } from '@/components';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { API } from '@/services/backend/api';
 
 export default function ProfileScreen() {
   const colors = useColors();
-  const { customer, sawariCash, isAuthenticated } = useSawari();
+  const { customer, sawariCash, isAuthenticated, earnSawariCash } = useSawari();
   const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const [showRewardModal, setShowRewardModal] = useState(false);
+  const [rewardAmount, setRewardAmount] = useState<number | null>(null);
+
+  // Gift box pop animation
+  const giftScaleAnim = useRef(new Animated.Value(1)).current;
+  const giftGlowAnim = useRef(new Animated.Value(0)).current;
+
+  // Fetch ride journey data from backend
+  const { data: journey } = useQuery({
+    queryKey: ['ride-journey'],
+    queryFn: () => API.getRideJourney(),
+    enabled: !!isAuthenticated,
+    staleTime: 30_000,
+  });
+
+  const completedCount = journey ? Math.min(journey.totalRides, 4) : 0;
+  const giftUnlocked = completedCount >= 4;
+
+  // Animate the gift box when unlocked
+  useEffect(() => {
+    if (giftUnlocked) {
+      // Pulsing scale
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(giftScaleAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
+          Animated.timing(giftScaleAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        ])
+      ).start();
+      // Glow opacity
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(giftGlowAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+          Animated.timing(giftGlowAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+        ])
+      ).start();
+    }
+  }, [giftUnlocked]);
+
+  const handleGiftPress = async () => {
+    if (!giftUnlocked) return;
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    
+    // Try to claim the 4th ride milestone
+    const milestone = journey?.milestones?.find(m => m.rides === 4);
+    if (milestone && !milestone.claimed) {
+      try {
+        const claimed = await API.claimMilestoneReward(milestone.label);
+        setRewardAmount(claimed?.reward.amount ?? null);
+        earnSawariCash(milestone.rewardAmount);
+        queryClient.invalidateQueries({ queryKey: ['ride-journey'] });
+      } catch (e) {
+        // Already claimed or error — still show modal
+      }
+    }
+    setShowRewardModal(true);
+  };
 
   const menuItems = [
     { id: 'rewards', title: 'My Rewards', icon: 'gift' },
@@ -81,7 +140,7 @@ export default function ProfileScreen() {
           <View style={styles.profileHeader}>
             <View style={styles.avatarContainer}>
               <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
-                <Text style={[styles.avatarText, { color: colors.primary }]}>
+                <Text style={[styles.avatarText, { color: colors.primaryText }]}>
                   {customer.name ? customer.name.charAt(0).toUpperCase() : '?'}
                 </Text>
               </View>
@@ -153,40 +212,90 @@ export default function ProfileScreen() {
           </View>
         </LinearGradient>
 
-        {/* Loyalty Punch Card */}
+        {/* Loyalty Punch Card — Original Design, Data-Driven */}
         <View style={[styles.loyaltyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.loyaltyTitle, { color: colors.foreground }]}>Your Ride Journey</Text>
           <Text style={[styles.loyaltySubtitle, { color: colors.mutedForeground }]}>
-            Complete 4 rides to unlock a special discount!
+            {giftUnlocked 
+              ? '🎉 You unlocked a special reward! Tap the gift to claim!'
+              : `Complete ${4 - completedCount} more ride${4 - completedCount !== 1 ? 's' : ''} to unlock a special discount!`
+            }
           </Text>
           <View style={styles.punchBoxContainer}>
-            {/* Box 1: Car (Completed) */}
-            <View style={[styles.punchBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-              <Feather name="check" size={24} color={colors.primary} />
-            </View>
-            <View style={[styles.punchConnector, { backgroundColor: colors.primary }]} />
+            {/* Box 1 */}
+            {completedCount >= 1 ? (
+              <View style={[styles.punchBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                <Feather name="check" size={24} color={colors.primaryText} />
+              </View>
+            ) : (
+              <View style={[styles.punchBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_600SemiBold' }}>1</Text>
+              </View>
+            )}
+            <View style={[styles.punchConnector, { backgroundColor: completedCount >= 2 ? colors.primary : colors.border }]} />
             
-            {/* Box 2: Bike (Completed) */}
-            <View style={[styles.punchBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
-              <Feather name="check" size={24} color={colors.primary} />
-            </View>
-            <View style={[styles.punchConnector, { backgroundColor: colors.border }]} />
+            {/* Box 2 */}
+            {completedCount >= 2 ? (
+              <View style={[styles.punchBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                <Feather name="check" size={24} color={colors.primaryText} />
+              </View>
+            ) : (
+              <View style={[styles.punchBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_600SemiBold' }}>2</Text>
+              </View>
+            )}
+            <View style={[styles.punchConnector, { backgroundColor: completedCount >= 3 ? colors.primary : colors.border }]} />
             
-            {/* Box 3: Empty */}
-            <View style={[styles.punchBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_600SemiBold' }}>3</Text>
-            </View>
-            <View style={[styles.punchConnector, { backgroundColor: colors.border }]} />
+            {/* Box 3 */}
+            {completedCount >= 3 ? (
+              <View style={[styles.punchBox, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}>
+                <Feather name="check" size={24} color={colors.primaryText} />
+              </View>
+            ) : (
+              <View style={[styles.punchBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_600SemiBold' }}>3</Text>
+              </View>
+            )}
+            <View style={[styles.punchConnector, { backgroundColor: giftUnlocked ? colors.primary : colors.border }]} />
             
-            {/* Box 4: Reward */}
-            <LinearGradient 
-              colors={['#FBBF24', '#F59E0B']}
-              style={[styles.punchBox, { borderColor: '#B45309', borderWidth: 0, shadowColor: '#F59E0B', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 8 }]}
-            >
-              <Feather name="gift" size={22} color="#FFF" />
-            </LinearGradient>
+            {/* Box 4: Gift */}
+            <Pressable onPress={handleGiftPress} disabled={!giftUnlocked}>
+              <Animated.View style={{ transform: [{ scale: giftScaleAnim }] }}>
+                <LinearGradient 
+                  colors={giftUnlocked ? ['#FBBF24', '#F59E0B'] : ['#9CA3AF', '#6B7280']}
+                  style={[styles.punchBox, { borderColor: giftUnlocked ? '#B45309' : colors.border, borderWidth: 0, shadowColor: giftUnlocked ? '#F59E0B' : 'transparent', shadowOffset: { width: 0, height: 4 }, shadowOpacity: giftUnlocked ? 0.4 : 0, shadowRadius: 8, elevation: giftUnlocked ? 8 : 0 }]}
+                >
+                  <Feather name="gift" size={22} color="#FFF" />
+                </LinearGradient>
+              </Animated.View>
+            </Pressable>
           </View>
         </View>
+
+        {/* Reward Pop-up Modal */}
+        <Modal visible={showRewardModal} transparent animationType="fade">
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setShowRewardModal(false)}>
+            <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 28, width: '85%', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.25, shadowRadius: 24, elevation: 12 }}>
+              <View style={{ width: 70, height: 70, borderRadius: 35, backgroundColor: '#FBBF2420', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+                <Feather name="gift" size={36} color="#F59E0B" />
+              </View>
+              <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 22, color: colors.foreground, textAlign: 'center', marginBottom: 8 }}>🎉 Reward Unlocked!</Text>
+              <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 15, color: colors.mutedForeground, textAlign: 'center', marginBottom: 20, lineHeight: 22 }}>
+                {rewardAmount !== null ? (
+                  <>Congratulations! You completed 4 rides and earned <Text style={{ color: colors.primaryText, fontFamily: 'Inter_700Bold' }}>+{rewardAmount} SawariCash</Text> as a special bonus!</>
+                ) : (
+                  <>Congratulations on completing 4 rides! Your reward has already been added to your SawariCash.</>
+                )}
+              </Text>
+              <Pressable 
+                onPress={() => setShowRewardModal(false)}
+                style={{ backgroundColor: colors.primary, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 16 }}
+              >
+                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: colors.primaryForeground }}>Awesome!</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>

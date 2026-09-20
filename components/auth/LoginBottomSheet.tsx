@@ -16,8 +16,10 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [name, setName] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [isExistingUser, setIsExistingUser] = useState(false);
   
   const slideAnim = useRef(new Animated.Value(400)).current;
 
@@ -37,6 +39,7 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
       setMobile('');
       setOtp('');
       setName('');
+      setIsExistingUser(false);
       
       Animated.spring(slideAnim, {
         toValue: 0,
@@ -53,11 +56,36 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
     }
   }, [visible]);
 
+  const performLogin = async (finalName: string) => {
+    try {
+      setLoading(true);
+      const { token, refreshToken, user } = await API.verifyOtp(mobile, otp, finalName, referralCode);
+      await login(token, refreshToken, user);
+      
+      // Request Notifications Permission Just-In-Time
+      try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        if (existingStatus !== 'granted') {
+          await Notifications.requestPermissionsAsync();
+        }
+      } catch (error) {
+        console.warn('Failed to request notification permission:', error);
+      }
+      
+      onClose();
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Invalid OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNext = async () => {
     if (step === 1 && mobile.length >= 10) {
       try {
         setLoading(true);
-        await API.sendOtp(mobile);
+        const res = await API.sendOtp(mobile); console.log("OTP Res:", res);
+        setIsExistingUser(!!res.isExistingUser);
         setStep(2);
         setResendTimer(30);
       } catch (e: any) {
@@ -66,29 +94,13 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
         setLoading(false);
       }
     } else if (step === 2 && otp.length === 4) {
-      setStep(3);
-    } else if (step === 3 && name.trim().length > 0) {
-      try {
-        setLoading(true);
-        const { token, refreshToken, user } = await API.verifyOtp(mobile, otp, name.trim());
-        await login(token, refreshToken, user);
-        
-        // Request Notifications Permission Just-In-Time
-        try {
-          const { status: existingStatus } = await Notifications.getPermissionsAsync();
-          if (existingStatus !== 'granted') {
-            await Notifications.requestPermissionsAsync();
-          }
-        } catch (error) {
-          console.warn('Failed to request notification permission:', error);
-        }
-        
-        onClose();
-      } catch (e: any) {
-        Alert.alert('Error', e.message || 'Invalid OTP');
-      } finally {
-        setLoading(false);
+      if (isExistingUser) {
+        await performLogin('');
+      } else {
+        setStep(3);
       }
+    } else if (step === 3 && name.trim().length > 0) {
+      await performLogin(name.trim());
     }
   };
 
@@ -214,16 +226,28 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
 
               {/* Step 3: Name */}
               {step === 3 && (
-                <View style={[styles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground }]}
-                    placeholder="E.g. Anisul Islam"
-                    placeholderTextColor={colors.mutedForeground}
-                    value={name}
-                    onChangeText={setName}
-                    autoFocus
-                  />
-                </View>
+                <>
+                  <View style={[styles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted, marginBottom: 12 }]}>
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground }]}
+                      placeholder="E.g. Anisul Islam"
+                      placeholderTextColor={colors.mutedForeground}
+                      value={name}
+                      onChangeText={setName}
+                      autoFocus
+                    />
+                  </View>
+                  <View style={[styles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                    <TextInput
+                      style={[styles.input, { color: colors.foreground }]}
+                      placeholder="Referral Code (Optional)"
+                      placeholderTextColor={colors.mutedForeground}
+                      value={referralCode}
+                      onChangeText={setReferralCode}
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                </>
               )}
 
               <TouchableOpacity 
@@ -231,7 +255,7 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
                 disabled={!isButtonEnabled() || loading}
                 onPress={handleNext}
               >
-                <Text style={[styles.actionText, { color: isButtonEnabled() ? '#000' : colors.mutedForeground }]}>
+                <Text style={[styles.actionText, { color: isButtonEnabled() ? colors.primaryForeground : colors.mutedForeground }]}>
                   {getButtonText()}
                 </Text>
               </TouchableOpacity>

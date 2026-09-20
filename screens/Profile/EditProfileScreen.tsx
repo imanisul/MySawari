@@ -10,7 +10,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function EditProfileScreen() {
   const colors = useColors();
-  const { customer, saveProfile } = useSawari();
+  const { customer, saveProfile, isDarkMode } = useSawari();
   const router = useRouter();
 
   const [isLoading, setIsLoading] = useState(false);
@@ -103,8 +103,8 @@ export default function EditProfileScreen() {
             {/* Joined On Badge */}
             <View style={styles.joinedContainer}>
               <View style={[styles.joinedBadge, { backgroundColor: colors.primary, borderColor: colors.primary, borderWidth: 1 }]}>
-                <Feather name="calendar" size={14} color="#000000" style={styles.joinedIcon} />
-                <Text style={[styles.joinedText, { color: "#000000" }]}>Member since {customer.joinedOn || 'recently'}</Text>
+                <Feather name="calendar" size={14} color={colors.primaryForeground} style={styles.joinedIcon} />
+                <Text style={[styles.joinedText, { color: colors.primaryForeground }]}>Member since {customer.joinedOn || 'recently'}</Text>
               </View>
             </View>
 
@@ -159,6 +159,7 @@ export default function EditProfileScreen() {
               </TouchableOpacity>
               {showDatePicker && (
                 <DateTimePicker
+                  themeVariant={isDarkMode ? 'dark' : 'light'}
                   value={dateObject}
                   mode="date"
                   display="default"
@@ -185,7 +186,7 @@ export default function EditProfileScreen() {
                       style={[
                         styles.genderText, 
                         { color: colors.foreground },
-                        gender === option && { color: '#000000' }
+                        gender === option && { color: colors.primaryForeground }
                       ]}
                     >
                       {option}
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
   saveText: {
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
-    color: '#000000',
+    color: '#101B2E',
   },
   scrollContent: {
     padding: 20,

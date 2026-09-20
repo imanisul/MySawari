@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -29,8 +29,9 @@ const ALL_TIMES = generateTimes();
 
 export function DatesSheet() {
   const colors = useColors();
-  const { setDates, setTimes, dateRange, pickupTime, returnTime } = useSawari();
   const router = useRouter();
+  const { returnBack } = useLocalSearchParams();
+  const { setDates, setTimes, dateRange, pickupTime, returnTime } = useSawari();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -150,7 +151,7 @@ export function DatesSheet() {
 
         <View style={{ alignItems: 'center' }}>
           <Feather name="arrow-right" size={20} color={colors.mutedForeground} />
-          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: rentalDays > 0 ? colors.primary : colors.mutedForeground, marginTop: 4 }}>
+          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: rentalDays > 0 ? colors.primaryText : colors.mutedForeground, marginTop: 4 }}>
             {rentalDays} Day{rentalDays !== 1 ? 's' : ''}
           </Text>
         </View>
@@ -332,14 +333,19 @@ export function DatesSheet() {
 
       <View style={{ paddingTop: 16 }}>
         <PrimaryButton 
-          label="Search Cars"
+          label={returnBack === 'true' ? "Confirm Dates" : "Search Cars"}
           disabled={!canApply}
           onPress={() => {
             if (start && end) {
               setDates(`${formatDateStr(start)} – ${formatDateStr(end)}`, `${rentalDays} Days`);
               setTimes(tempPickupTime, tempReturnTime);
-              router.dismissAll();
-              router.push('/search');
+              
+              if (returnBack === 'true') {
+                router.back();
+              } else {
+                router.dismissAll();
+                router.push('/search');
+              }
             }
           }} 
         />
@@ -453,7 +459,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingTop: 8,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e5e5e5',
+    borderTopColor: 'rgba(128,140,160,0.25)',
     marginBottom: 8,
   },
   timeTitle: {

@@ -36,7 +36,7 @@ export function CategoryTabs({
             <Text
               style={[
                 styles.categoryText,
-                { color: active ? '#000000' : colors.foreground },
+                { color: active ? colors.primaryForeground : colors.foreground },
                 active && styles.categoryTextSelected,
               ]}
             >

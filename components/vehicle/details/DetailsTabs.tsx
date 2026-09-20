@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { Car, Review, getCarHighlights } from '@/utils/sawari';
+import { Car, Review, getCarHighlights, MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { API } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import { WriteReviewBottomSheet } from './WriteReviewBottomSheet';
-import { Modal } from 'react-native';
+import { Modal, ScrollView } from 'react-native';
+import { useQuery } from '@tanstack/react-query';
+import { Image as ExpoImage } from 'expo-image';
 
 type DetailsTab = 'about' | 'gallery' | 'reviews';
 
@@ -48,7 +50,7 @@ export function DetailsTabs({
             >
               <Text style={[
                 styles.tabText, 
-                { color: isActive ? colors.primary : colors.mutedForeground },
+                { color: isActive ? colors.primaryText : colors.mutedForeground },
                 isActive && { fontFamily: 'Inter_700Bold' }
               ]}>
                 {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -86,7 +88,7 @@ function AboutTab({ car }: { car: Car }) {
           <View style={styles.featuresGrid}>
             {highlights.map(tag => (
               <View key={tag} style={[styles.featureItem, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>
-                <Feather name="check" size={16} color={colors.primary} />
+                <Feather name="check" size={16} color={colors.primaryText} />
                 <Text style={[styles.featureText, { color: colors.foreground }]}>{tag}</Text>
               </View>
             ))}
@@ -109,7 +111,7 @@ function AboutTab({ car }: { car: Car }) {
       <View style={styles.featuresGrid}>
         {(car.features || ['Air Conditioning', 'Power Steering', 'Bluetooth']).map(feature => (
           <View key={feature} style={[styles.featureItem, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>
-            <Feather name="check" size={16} color={colors.primary} />
+            <Feather name="check" size={16} color={colors.primaryText} />
             <Text style={[styles.featureText, { color: colors.foreground }]}>{feature}</Text>
           </View>
         ))}
@@ -130,8 +132,16 @@ function DetailRow({ label, value }: { label: string, value: string }) {
 
 // --- TAB: GALLERY ---
 function GalleryTab({ car }: { car: Car }) {
+  const colors = useColors();
   const images = car.images || [car.image];
-  
+  const { data: reviews = [] } = useCarReviews(car.id);
+  const [viewer, setViewer] = useState<string | null>(null);
+
+  // Trip photos customers attached to their reviews.
+  const guestPhotos = reviews.flatMap((r: Review) =>
+    (r.images || []).map((url) => ({ url, place: r.placeVisited, by: r.userName }))
+  );
+
   return (
     <View style={styles.tabSection}>
       <View style={styles.galleryGrid}>
@@ -141,7 +151,60 @@ function GalleryTab({ car }: { car: Car }) {
           </View>
         ))}
       </View>
+
+      {guestPhotos.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 24 }]}>From our guests</Text>
+          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 13, color: colors.mutedForeground, marginBottom: 12 }}>
+            Photos shared by guests of this {car.type.toLowerCase()}.
+          </Text>
+          <View style={styles.galleryGrid}>
+            {guestPhotos.map((p, i) => (
+              <Pressable
+                key={p.url + i}
+                accessibilityRole="button"
+                accessibilityLabel={`Photo from ${p.place || 'a guest trip'}, by ${p.by}`}
+                style={[styles.guestCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => setViewer(p.url)}
+              >
+                <ExpoImage source={{ uri: p.url }} style={styles.guestImage} contentFit="cover" transition={200} />
+                <View style={styles.guestCaption}>
+                  <View style={styles.guestPlaceRow}>
+                    <Feather name="map-pin" size={12} color={colors.primaryText} />
+                    <Text numberOfLines={2} style={[styles.guestPlaceName, { color: colors.foreground }]}>
+                      {p.place || 'Guest trip'}
+                    </Text>
+                  </View>
+                  <Text numberOfLines={1} style={[styles.guestBy, { color: colors.mutedForeground }]}>by {p.by}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        </>
+      )}
+
+      <PhotoViewer uri={viewer} onClose={() => setViewer(null)} />
     </View>
+  );
+}
+
+/** Reviews for a vehicle, shared by the Gallery and Reviews tabs (and refreshed after a new review). */
+function useCarReviews(carId: string) {
+  return useQuery({
+    queryKey: ['carReviews', carId],
+    queryFn: () => API.reviews.fetchByCarId(carId) as Promise<Review[]>,
+    staleTime: 60 * 1000,
+  });
+}
+
+function PhotoViewer({ uri, onClose }: { uri: string | null; onClose: () => void }) {
+  return (
+    <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.viewerOverlay} onPress={onClose}>
+        {!!uri && <ExpoImage source={{ uri }} style={{ width: '100%', height: '80%' }} contentFit="contain" />}
+        <View style={styles.viewerClose}><Feather name="x" size={24} color="#FFF" /></View>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -149,19 +212,19 @@ function GalleryTab({ car }: { car: Car }) {
 function ReviewsTab({ car }: { car: Car }) {
   const colors = useColors();
   const { isAuthenticated } = useSawari();
-  const [dbReviews, setDbReviews] = React.useState<Review[]>([]);
+  const { data: dbReviews = [] } = useCarReviews(car.id);
+  // If the customer has an unreviewed completed trip on this vehicle, reviewing from here counts as that trip (and unlocks photos).
+  const { data: pendingTrips = [] } = useQuery({
+    queryKey: ['pendingReviews'],
+    queryFn: () => API.reviews.pending(),
+    enabled: isAuthenticated === true,
+    staleTime: 60 * 1000,
+  });
+  const tripForCar = pendingTrips.find(p => p.carId === car.id);
   const [isWriteModalVisible, setIsWriteModalVisible] = React.useState(false);
   const [showAllReviews, setShowAllReviews] = React.useState(false);
 
-  React.useEffect(() => {
-    API.reviews.fetchByCarId(car.id).then((res) => {
-      if (res && res.length > 0) {
-        setDbReviews(res);
-      }
-    }).catch(() => {});
-  }, [car.id]);
-
-  const reviews = [...(car.reviews || []), ...dbReviews];
+  const reviews = [...(car.reviews || []), ...dbReviews].filter(r => r.rating >= MIN_PUBLIC_REVIEW_RATING);
   const visibleReviews = showAllReviews ? reviews : reviews.slice(0, 3);
   const dist = car.ratingDistribution;
   const total = car.reviewCount ? car.reviewCount + dbReviews.length : reviews.length;
@@ -201,6 +264,8 @@ function ReviewsTab({ car }: { car: Car }) {
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <WriteReviewBottomSheet
                 carId={car.id}
+                bookingId={tripForCar?.bookingId}
+                vehicleName={tripForCar ? car.name : undefined}
                 onClose={() => setIsWriteModalVisible(false)}
               />
             </View>
@@ -263,6 +328,8 @@ function ReviewsTab({ car }: { car: Car }) {
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <WriteReviewBottomSheet
               carId={car.id}
+              bookingId={tripForCar?.bookingId}
+              vehicleName={tripForCar ? car.name : undefined}
               onClose={() => setIsWriteModalVisible(false)}
             />
           </View>
@@ -274,6 +341,7 @@ function ReviewsTab({ car }: { car: Car }) {
 
 function ReviewCard({ review }: { review: Review }) {
   const colors = useColors();
+  const [viewer, setViewer] = useState<string | null>(null);
   const initials = review.userName.substring(0, 2).toUpperCase();
 
   return (
@@ -293,11 +361,27 @@ function ReviewCard({ review }: { review: Review }) {
         </View>
         <View style={styles.starsRow}>
           {Array.from({ length: 5 }).map((_, i) => (
-            <Feather key={i} name="star" size={14} color={i < review.rating ? "#F59E0B" : colors.muted} />
+            <Ionicons key={i} name={i < review.rating ? 'star' : 'star-outline'} size={14} color={i < review.rating ? '#F59E0B' : '#9CA3AF'} />
           ))}
         </View>
       </View>
+      {!!review.placeVisited && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+          <Feather name="map-pin" size={12} color={colors.primaryText} />
+          <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.foreground }}>Visited {review.placeVisited}</Text>
+        </View>
+      )}
       <Text style={[styles.reviewText, { color: colors.foreground }]}>"{review.text}"</Text>
+      {!!review.images && review.images.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 12 }}>
+          {review.images.map((url, i) => (
+            <Pressable key={url + i} onPress={() => setViewer(url)}>
+              <ExpoImage source={{ uri: url }} style={{ width: 88, height: 88, borderRadius: 10 }} contentFit="cover" transition={200} />
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
+      <PhotoViewer uri={viewer} onClose={() => setViewer(null)} />
       <View style={styles.reviewCardFooter}>
         <Text style={[styles.reviewDate, { color: colors.mutedForeground }]}>{review.date}</Text>
       </View>
@@ -306,6 +390,14 @@ function ReviewCard({ review }: { review: Review }) {
 }
 
 const styles = StyleSheet.create({
+  guestCard: { width: '48%', borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  guestImage: { width: '100%', aspectRatio: 1 },
+  guestCaption: { paddingHorizontal: 10, paddingVertical: 8, minHeight: 56 },
+  guestPlaceRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
+  guestPlaceName: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 17 },
+  guestBy: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 3 },
+  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
+  viewerClose: { position: 'absolute', top: 56, right: 20 },
   container: {
     marginTop: 16,
   },
@@ -432,7 +524,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    height: '60%',
+    height: '88%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
   },

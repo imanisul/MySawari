@@ -1,12 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Linking, Pressable, StyleSheet, View, Animated } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { usePathname } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { shadows } from '@/constants/shadows';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
+import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
+import { useSupportFabHidden } from '@/hooks/useSupportFab';
 
 const HIDDEN_ROUTES = [
   '/payment',
@@ -30,13 +31,18 @@ export function FloatingSupport() {
 
 function FloatingSupportInner() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const [isOpen, setIsOpen] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
 
-  // Bottom tab bar's own content height (icon + label + its padding) is ~56px,
-  // plus whatever safe-area inset the device needs, plus a comfortable gap.
-  const bottomOffset = 56 + Math.max(insets.bottom, 7) + 16;
+  // Sits just above the bottom tab bar (its height + the device's safe-area inset).
+  const bottomOffset = useBottomNavHeight() + 16;
+
+  // Lists can tuck the button away while scrolling so it never covers content.
+  const tucked = useSupportFabHidden();
+  const tuck = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(tuck, { toValue: tucked ? 1 : 0, duration: 180, useNativeDriver: true }).start();
+  }, [tucked, tuck]);
 
   const toggleMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -87,7 +93,17 @@ function FloatingSupportInner() {
   });
 
   return (
-    <View style={[styles.container, { bottom: bottomOffset }]} pointerEvents="box-none">
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          bottom: bottomOffset,
+          opacity: tuck.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          transform: [{ translateY: tuck.interpolate({ inputRange: [0, 1], outputRange: [0, 24] }) }],
+        },
+      ]}
+      pointerEvents={tucked ? 'none' : 'box-none'}
+    >
       
       {/* Phone Button */}
       <Animated.View style={phStyle}>
@@ -98,7 +114,7 @@ function FloatingSupportInner() {
           style={[styles.buttonWrap, { display: isOpen ? 'flex' : 'none' }]}
           disabled={!isOpen}
         >
-          <Animated.View style={[styles.miniFab, shadows.level2, { backgroundColor: colors.blue, transform: [{ scale: phScale }], opacity: phOpacity }]}>
+          <Animated.View style={[styles.miniFab, shadows.level2, { backgroundColor: '#3F58C4', transform: [{ scale: phScale }], opacity: phOpacity }]}>
             <Feather name="phone" size={20} color="#FFFFFF" />
           </Animated.View>
         </Pressable>
@@ -138,7 +154,7 @@ function FloatingSupportInner() {
           <Feather name="message-circle" size={26} color={colors.background} />
         </Animated.View>
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 

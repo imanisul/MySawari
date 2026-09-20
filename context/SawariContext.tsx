@@ -1,13 +1,15 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Car, cars, DriverMode, LocationResult } from '@/utils/sawari';
 import { Offer } from '@/services/api/offers';
-import { API } from '@/services/backend/api';
+import { API, invalidateWalletCache } from '@/services/backend/api';
 import { PricingQuote, QuoteParams } from '@/services/backend/pricingEngine';
-import { BookingSnapshot } from '@/services/backend/database';
+import { BookingSnapshot } from '@/services/backend/api';
 
 import * as SecureStore from 'expo-secure-store';
-import * as Location from 'expo-location';
+import { AppState } from 'react-native';
+import { getDevicePosition } from '@/utils/location';
+import { calculateDistanceKm } from '@/services/backend/pricingEngine';
 
 export type PaymentMethod = string;
 export type BookingStatus = 'upcoming' | 'active' | 'completed' | 'cancelled';
@@ -45,6 +47,8 @@ type SawariContextValue = {
   dropoff: LocationResult | null;
   dateRange: string;
   setDateRange: (range: string) => void;
+  selectedDate: string;
+  setSelectedDate: (date: string) => void;
   duration: string;
   durationDays: number;
   pickupTime: string;
@@ -74,6 +78,7 @@ type SawariContextValue = {
   applySawariCash: (amount: number) => void;
   setFuelEstimate: (estimate: SawariContextValue['fuelEstimate']) => void;
   createBookingSnapshot: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }) => Promise<BookingSnapshot | null>;
+  lastBooking: BookingSnapshot | null;
 
   customer: AppCustomer;
   notifications: AppNotification[];
@@ -111,10 +116,15 @@ type SawariContextValue = {
   isAuthLoading: boolean;
   login: (token: string, refreshToken: string, user: any) => Promise<void>;
   logout: () => Promise<void>;
+  fetchWallet: () => Promise<void>;
   
   // Favorites
   favorites: string[];
   toggleFavorite: (carId: string) => void;
+  
+  // Theme
+  isDarkMode: boolean;
+  toggleDarkMode: (value: boolean) => void;
 };
 
 const SawariContext = createContext<SawariContextValue | null>(null);
@@ -128,11 +138,18 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [bookingSource, setBookingSource] = useState<'home' | 'explore' | null>(null);
   const [pickup, setPickup] = useState<LocationResult | null>(null);
+  // Always the latest pickup, for background tasks (GPS refresh) that must not read stale state.
+  const pickupRef = useRef<LocationResult | null>(null);
+  pickupRef.current = pickup;
   const [dropoff, setDropoff] = useState<LocationResult | null>(null);
   const [isDeliveryRequested, setIsDeliveryRequested] = useState(false);
   const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'return' | 'both'>('both');
   const [returnAddress, setReturnAddress] = useState<LocationResult | null>(null);
-  const [dateRange, setDateRange] = useState('Select Dates');
+  
+  const defaultToday = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const [dateRange, setDateRangeState] = useState('Select Dates');
+  const [selectedDate, setSelectedDateState] = useState(defaultToday);
+  
   const [duration, setDuration] = useState('5 days');
   const [pickupTime, setPickupTime] = useState('08:00 AM');
   const [returnTime, setReturnTime] = useState('08:00 AM');
@@ -159,6 +176,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
   // NEW BOOKING STATE
   const [pricingQuote, setPricingQuote] = useState<PricingQuote | null>(null);
@@ -167,28 +185,109 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
   const [sawariCashToApply, setSawariCashToApply] = useState(0);
   const [fuelEstimate, setFuelEstimate] = useState<SawariContextValue['fuelEstimate']>(null);
+  const [lastBooking, setLastBooking] = useState<BookingSnapshot | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
     const { DeviceEventEmitter } = require('react-native');
     const sessionExpiryListener = DeviceEventEmitter.addListener('onSessionExpired', async () => {
+      invalidateWalletCache(); // never show one account's balance to the next
       if (isMounted) {
         setIsAuthenticated(false);
-        setCustomer(null as any);
+        setCustomer({ id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: '' });
       }
+    });
+
+    // Auto-detected default location. Only ever replaces a location that was itself auto-detected
+    // (never one the customer chose), and only when they have actually moved (> 300 m).
+    let lastGpsCheck = 0;
+    const detectGps = async (preferFresh: boolean) => {
+      if (Date.now() - lastGpsCheck < 60 * 1000 && preferFresh) return; // don't hammer the GPS
+      lastGpsCheck = Date.now();
+      try {
+        const result = await getDevicePosition({ preferFresh, askPermission: !preferFresh });
+        if (!result.ok || !isMounted) return;
+        const { latitude, longitude } = result.position.coords;
+
+        const isAuto = (loc: LocationResult | null) => !loc || (loc.source === 'gps' && String(loc.id).startsWith('auto_'));
+        const current = pickupRef.current;
+        if (!isAuto(current)) return; // the customer chose their own location — leave it alone
+        if (current && calculateDistanceKm(current, { latitude, longitude }) <= 0.3) return; // hasn't moved
+
+        let addressStr = 'Current Location';
+        let placeName = 'My Current Location';
+        try {
+          const reverseData = await API.reverseGeocode(latitude, longitude, { areaOnly: true });
+          if (reverseData) {
+            addressStr = reverseData.address || addressStr;
+            placeName = reverseData.name || placeName;
+          }
+        } catch (e) {
+          console.warn('Reverse geocode failed', e);
+        }
+
+        const detected: LocationResult = {
+          id: `auto_${Date.now()}`,
+          address: addressStr,
+          latitude,
+          longitude,
+          name: placeName,
+          source: 'gps',
+        };
+        if (isMounted) {
+          setPickup((prev) => (isAuto(prev) ? detected : prev));
+          setReturnAddress((prev) => (isAuto(prev) ? detected : prev));
+        }
+      } catch (e) {
+        console.warn('Failed to auto-detect location', e);
+      }
+    };
+
+    // Coming back to the app after moving around → refresh the auto-detected location.
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') detectGps(true);
     });
 
     (async () => {
       try {
         // Fetch independent initial data concurrently
-        const [permissionsVal, token, userId] = await Promise.all([
+        const [permissionsVal, token, userId, themeVal, storedSelectedDate, storedDateRange] = await Promise.all([
           AsyncStorage.getItem('@has_seen_permissions'),
           SecureStore.getItemAsync('auth_token'),
-          SecureStore.getItemAsync('user_id')
+          SecureStore.getItemAsync('user_id'),
+          AsyncStorage.getItem('@app_theme_dark'),
+          AsyncStorage.getItem('@sawari_selected_date'),
+          AsyncStorage.getItem('@sawari_date_range')
         ]);
         
-        if (isMounted) setHasSeenPermissions(permissionsVal === 'true');
+        if (isMounted) {
+          setHasSeenPermissions(permissionsVal === 'true');
+          setIsDarkMode(themeVal === 'true');
+          
+          if (storedDateRange) {
+             setDateRangeState(storedDateRange);
+          }
+          
+          if (storedSelectedDate) {
+             // Validate date is not in the past
+             const parts = storedSelectedDate.trim().split(' ');
+             if (parts.length >= 2) {
+               const day = parseInt(parts[0], 10);
+               const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+               let month = MONTHS.indexOf(parts[1]);
+               if (month === 12) month = 8;
+               if (month !== -1 && !isNaN(day)) {
+                 const currentYear = new Date().getFullYear();
+                 const parsedDate = new Date(currentYear, month, day);
+                 const today = new Date(new Date().setHours(0,0,0,0));
+                 if (parsedDate >= today) {
+                   setSelectedDateState(storedSelectedDate);
+                 }
+               }
+             }
+          }
+        }
         
         if (token && userId) {
           // For a fully decoupled frontend, read the locally saved customer info
@@ -211,18 +310,21 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             // Only consider them authenticated if the profile successfully fetched
             setIsAuthenticated(true);
             
-            // Load other data like rewards/cash concurrently using user ID to prevent leaks
-            const [storedRewards, storedCash, storedBookings] = await Promise.all([
+            // Load other data concurrently
+            const [storedRewards, storedBookings] = await Promise.all([
               AsyncStorage.getItem(`@earned_rewards_${userId}`),
-              AsyncStorage.getItem(`@sawari_cash_${userId}`),
-              AsyncStorage.getItem(`@total_bookings_${userId}`)
+              AsyncStorage.getItem(`@total_bookings_${userId}`),
             ]);
             
             if (isMounted) {
               if (storedRewards) setEarnedRewards(JSON.parse(storedRewards));
-              if (storedCash) setSawariCash(Number(storedCash));
               if (storedBookings) setTotalBookings(Number(storedBookings));
             }
+
+            // The wallet loads in the background — the app opens without waiting for the network.
+            API.getWallet().then((walletData) => {
+              if (isMounted && walletData) setSawariCash(walletData.walletBalance || 0);
+            });
           } else if (isMounted) {
             setIsAuthenticated(false);
           }
@@ -240,58 +342,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // Automatically fetch GPS location and set as default pickup/return
-      try {
-        let { status } = await Location.getForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          const req = await Location.requestForegroundPermissionsAsync();
-          status = req.status;
-        }
-
-        if (status === 'granted' && isMounted) {
-          // Try last known first for speed, fallback to current position
-          let loc = await Location.getLastKnownPositionAsync();
-          if (!loc) {
-            loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          }
-          
-          if (loc && loc.coords) {
-            const { latitude, longitude } = loc.coords;
-          
-          let addressStr = 'Current Location';
-          let placeName = 'My Current Location';
-          try {
-            const reverseData = await API.reverseGeocode(latitude, longitude);
-            if (reverseData) {
-              addressStr = reverseData.address || addressStr;
-              placeName = reverseData.name || placeName;
-            }
-          } catch (e) {
-            console.warn('Reverse geocode failed during boot', e);
-          }
-
-          const defaultLoc: LocationResult = {
-            id: `current_${Date.now()}`,
-            address: addressStr,
-            latitude,
-            longitude,
-            name: placeName,
-            source: 'gps'
-          };
-
-          if (isMounted) {
-            setPickup((prev) => prev || defaultLoc);
-            setReturnAddress((prev) => prev || defaultLoc);
-          }
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to auto-fetch location during boot', e);
-      }
+      // Default pickup / return = where the customer is right now (runs after the app is already usable).
+      detectGps(false);
     })();
     return () => { 
       isMounted = false; 
       sessionExpiryListener.remove();
+      appStateSub.remove();
     };
   }, []);
 
@@ -348,7 +405,15 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       pickup,
       dropoff,
       dateRange,
-      setDateRange,
+      setDateRange: (range: string) => {
+        setDateRangeState(range);
+        AsyncStorage.setItem('@sawari_date_range', range).catch(() => {});
+      },
+      selectedDate,
+      setSelectedDate: (date: string) => {
+        setSelectedDateState(date);
+        AsyncStorage.setItem('@sawari_selected_date', date).catch(() => {});
+      },
       bookingSource,
       setBookingSource,
       duration,
@@ -378,25 +443,23 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       applyCoupon: setAppliedCouponCode,
       applySawariCash: setSawariCashToApply,
       setFuelEstimate,
+      lastBooking,
       createBookingSnapshot: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }) => {
         if (!pricingQuote) return null;
-        try {
-          const snapshot = await API.createBooking(
-            quoteParams,
-            selectedCar.id,
-            selectedCar.name,
-            customer,
-            paymentDetails,
-            fuelEstimate || undefined
-          );
-          // Refresh cash from DB
-          const cash = await AsyncStorage.getItem(`@sawari_cash_${customer.id}`);
-          if (cash) setSawariCash(Number(cash));
-          return snapshot;
-        } catch (e) {
-          console.error("Failed to create snapshot", e);
-          return null;
-        }
+        // Errors propagate so the payment screen can tell the user exactly what failed.
+        const snapshot = await API.createBooking(
+          quoteParams,
+          selectedCar.id,
+          selectedCar.name,
+          customer,
+          paymentDetails,
+          fuelEstimate || undefined
+        );
+        setLastBooking(snapshot);
+        // Refresh cash from DB
+        const wallet = await API.getWallet(true);
+        if (wallet) setSawariCash(wallet.walletBalance || 0);
+        return snapshot;
       },
       setMode,
       selectCar: setSelectedCar,
@@ -407,7 +470,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         setDropoff(pickup);
       },
       setDates: (nextDateRange: string, nextDuration: string) => {
-        setDateRange(nextDateRange);
+        setDateRangeState(nextDateRange);
+        AsyncStorage.setItem('@sawari_date_range', nextDateRange).catch(() => {});
         setDuration(nextDuration);
       },
       setTimes: (nextPickupTime: string, nextReturnTime: string) => {
@@ -426,7 +490,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         try {
           // 1. Call Backend API
           await API.updateProfile({
-            fullName: data.name,
+            customerName: data.name,
             email: data.email,
             dob: data.dob,
             gender: data.gender
@@ -451,18 +515,14 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         });
       },
       earnSawariCash: async (amount: number) => {
-        setSawariCash((prev) => {
-          const next = prev + amount;
-          AsyncStorage.setItem(`@sawari_cash_${customer.id || 'guest'}`, next.toString()).catch(() => {});
-          return next;
-        });
+        // Just refresh the backend wallet state
+        const wallet = await API.getWallet(true);
+        if (wallet) setSawariCash(wallet.walletBalance || 0);
       },
       useSawariCash: async (amount: number) => {
-        setSawariCash((prev) => {
-          const next = Math.max(0, prev - amount);
-          AsyncStorage.setItem(`@sawari_cash_${customer.id || 'guest'}`, next.toString()).catch(() => {});
-          return next;
-        });
+        // Real deduction happens in API on booking creation, but we can refresh here
+        const wallet = await API.getWallet(true);
+        if (wallet) setSawariCash(wallet.walletBalance || 0);
       },
       incrementBookings: async () => {
         setTotalBookings((prev) => {
@@ -479,12 +539,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       completeBooking: async () => {
         setBookingStatus('completed');
         if (pricingQuote) {
-          const bonus = Math.floor(pricingQuote.rentalAmount * 0.10);
-          setSawariCash((prev) => {
-            const next = prev + bonus;
-            AsyncStorage.setItem(`@sawari_cash_${customer.id || 'guest'}`, next.toString()).catch(() => {});
-            return next;
-          });
+          // Trigger a wallet refresh because backend may have awarded a bonus
+          const wallet = await API.getWallet(true);
+          if (wallet) setSawariCash(wallet.walletBalance || 0);
         }
       },
       cancelBooking: () => {
@@ -543,9 +600,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           await AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(newCustomer));
           
           // SET CASH AND REWARDS DIRECTLY FROM BACKEND
-          const cash = user.walletBalance || 0;
-          setSawariCash(cash);
-          await AsyncStorage.setItem(`@sawari_cash_${user.id}`, cash.toString());
+          const walletData = await API.getWallet(true);
+          setSawariCash(walletData.walletBalance || 0);
 
           const rewards = user.rewards || [];
           setEarnedRewards(rewards);
@@ -560,7 +616,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       },
       logout: async () => {
         try {
+          invalidateWalletCache();
           await SecureStore.deleteItemAsync('auth_token');
+          await SecureStore.deleteItemAsync('refresh_token');
           await SecureStore.deleteItemAsync('user_id');
           setCustomer({
             id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: ''
@@ -580,6 +638,15 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         setFavorites(prev => 
           prev.includes(carId) ? prev.filter(id => id !== carId) : [...prev, carId]
         );
+      },
+      isDarkMode,
+      toggleDarkMode: (value: boolean) => {
+        setIsDarkMode(value);
+        AsyncStorage.setItem('@app_theme_dark', value ? 'true' : 'false').catch(() => {});
+      },
+      fetchWallet: async () => {
+        const wallet = await API.getWallet(true);
+        if (wallet) setSawariCash(wallet.walletBalance || 0);
       },
     }),
     [
@@ -614,10 +681,12 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       appliedCouponCode,
       sawariCashToApply,
       fuelEstimate,
+      lastBooking,
       refreshQuote,
       vehicleType,
       quoteParams,
-      favorites
+      favorites,
+      isDarkMode
     ]
   );
 

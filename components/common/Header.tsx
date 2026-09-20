@@ -17,7 +17,7 @@ export function Header({
 }) {
   const colors = useColors();
   const router = useRouter();
-  const { unreadCount, sawariCash, isAuthenticated, favorites } = useSawari();
+  const { unreadCount, sawariCash, isAuthenticated, favorites, isDarkMode } = useSawari();
 
   const flipAnim = useRef(new Animated.Value(0)).current;
   const [showRupee, setShowRupee] = useState(false);
@@ -62,7 +62,7 @@ export function Header({
         ) : !hideLogo ? (
           <Image 
             source={require('../../assets/images/MySawari_nobg.png')} 
-            style={styles.logo} 
+            style={[styles.logo, isDarkMode && { tintColor: '#FFFFFF' }]} 
             resizeMode="contain" 
           />
         ) : null}
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -4,
-    backgroundColor: '#E53935',
+    backgroundColor: '#DC2626',
     borderRadius: 10,
     minWidth: 20,
     height: 20,

@@ -1,5 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { LogBox } from 'react-native';
+
+LogBox.ignoreLogs([
+  'ProgressBarAndroid has been extracted from react-native core',
+  'SafeAreaView has been deprecated',
+  'Clipboard has been extracted from react-native core',
+  'PushNotificationIOS has been extracted from react-native core'
+]);
+
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
+import { AppState } from 'react-native';
+import { primeVehicles } from '@/hooks/useVehicles';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,13 +24,32 @@ import {
 } from '@expo-google-fonts/inter';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { SawariProvider, useSawari } from '@/context/SawariContext';
 import { useAppUpdates } from '@/hooks/useAppUpdates';
+import { PostTripReviewPrompt } from '@/components/booking/PostTripReviewPrompt';
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+      gcTime: 10 * 60 * 1000, // keep screens' data for 10 min so going back is instant
+      retry: 2,
+      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
+      refetchOnReconnect: true,
+    },
+  },
+});
+
+// Tell React Query when the app is in the foreground: it re-checks stale data when you come back
+// and pauses background polling while the app is not in use.
+focusManager.setEventListener((handleFocus) => {
+  const sub = AppState.addEventListener('change', (state) => handleFocus(state === 'active'));
+  return () => sub.remove();
+});
 
 function RootLayoutNav() {
   return (
@@ -56,6 +86,12 @@ function RootLayoutNav() {
       <Stack.Screen name="safety" />
     </Stack>
   );
+}
+
+/** Status-bar icons follow the app's own theme (not just the system's). */
+function ThemedStatusBar() {
+  const { isDarkMode } = useSawari();
+  return <StatusBar style={isDarkMode ? 'light' : 'dark'} />;
 }
 
 /**
@@ -108,6 +144,11 @@ function OTAUpdateChecker() {
 }
 
 export default function RootLayout() {
+  // Start loading vehicles straight away (saved copy first, then the network) — before any screen asks.
+  useEffect(() => {
+    primeVehicles(queryClient);
+  }, []);
+
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -128,6 +169,8 @@ export default function RootLayout() {
                   <RootLayoutNav />
                   <FloatingSupport />
                   <OTAUpdateChecker />
+                  <PostTripReviewPrompt />
+                  <ThemedStatusBar />
                 </SplashHider>
               </SawariProvider>
             </KeyboardProvider>

@@ -49,7 +49,7 @@ export default function ReferScreen() {
       <Page>
         <Header title="Refer & Earn" back />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.primaryText} />
         </View>
       </Page>
     );
@@ -155,7 +155,7 @@ export default function ReferScreen() {
       <Page>
         <Header title="Refer & Earn" back />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.primaryText} />
         </View>
       </Page>
     );
@@ -179,9 +179,9 @@ export default function ReferScreen() {
                 <Feather name="gift" size={14} color={colors.emerald} />
                 <Text style={[styles.rewardText, { color: colors.emerald }]}>You earn {rewardAmountText}</Text>
               </View>
-              <View style={[styles.rewardPill, { backgroundColor: colors.blue + '20' }]}>
-                <Feather name="user-plus" size={14} color={colors.blue} />
-                <Text style={[styles.rewardText, { color: colors.blue }]}>Friend gets {discountText}</Text>
+              <View style={[styles.rewardPill, { backgroundColor: 'rgba(157,176,255,0.16)' }]}>
+                <Feather name="user-plus" size={14} color="#9DB0FF" />
+                <Text style={[styles.rewardText, { color: '#9DB0FF' }]}>Friend gets {discountText}</Text>
               </View>
             </View>
 
@@ -219,7 +219,7 @@ export default function ReferScreen() {
         {/* Action Buttons */}
         <View style={styles.actionsContainer}>
           <Pressable style={[styles.mainShareBtn, { backgroundColor: colors.primary }]} onPress={handleNativeShare}>
-            <Feather name="share-2" size={18} color="#000" />
+            <Feather name="share-2" size={18} color="#101B2E" />
             <Text style={styles.mainShareBtnText}>Share Invite</Text>
           </Pressable>
 
@@ -398,7 +398,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   mainShareBtnText: {
-    color: '#000',
+    color: '#101B2E',
     fontFamily: 'Inter_700Bold',
     fontSize: 17,
   },

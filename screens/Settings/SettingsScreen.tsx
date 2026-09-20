@@ -10,13 +10,12 @@ import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { logout } = useSawari();
+  const { logout, isDarkMode, toggleDarkMode } = useSawari();
   const router = useRouter();
 
   // Mock settings state
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [locationEnabled, setLocationEnabled] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -82,12 +81,10 @@ export default function SettingsScreen() {
                 <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>Experience MySawari in dark theme</Text>
               </View>
               <Switch
-                value={darkMode}
+                value={isDarkMode}
                 onValueChange={(val) => {
                   Haptics.selectionAsync();
-                  setDarkMode(val);
-                  Alert.alert('Theme Settings', 'System default theme is currently active.');
-                  setTimeout(() => setDarkMode(false), 500); // Revert for demo purposes
+                  toggleDarkMode(val);
                 }}
                 trackColor={{ false: colors.border, true: colors.primary }}
               />

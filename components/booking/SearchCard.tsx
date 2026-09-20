@@ -99,7 +99,7 @@ export function SearchCard({
             accessibilityRole="button"
             onPress={() => {
               Haptics.selectionAsync();
-              router.push('/dates');
+              router.push({ pathname: '/dates', params: { returnBack: isModal ? 'true' : 'false' } });
             }}
             style={({ pressed }) => [
               styles.field,
@@ -122,7 +122,7 @@ export function SearchCard({
             accessibilityRole="button"
             onPress={() => {
               Haptics.selectionAsync();
-              router.push('/dates');
+              router.push({ pathname: '/dates', params: { returnBack: isModal ? 'true' : 'false' } });
             }}
             style={({ pressed }) => [
               styles.field,
@@ -179,7 +179,7 @@ export function SearchCard({
                     borderColor: deliveryMode === m ? colors.primary : colors.border,
                   }}
                 >
-                  <Text style={{ fontSize: 12, fontFamily: deliveryMode === m ? 'Inter_600SemiBold' : 'Inter_500Medium', color: deliveryMode === m ? '#000' : colors.mutedForeground }}>
+                  <Text style={{ fontSize: 12, fontFamily: deliveryMode === m ? 'Inter_600SemiBold' : 'Inter_500Medium', color: deliveryMode === m ? colors.primaryForeground : colors.mutedForeground }}>
                     {label}
                   </Text>
                 </Pressable>
@@ -203,18 +203,13 @@ export function SearchCard({
                     { paddingHorizontal: 8, borderColor: colors.border, backgroundColor: pressed ? colors.tintLight : colors.background }
                   ]}
                 >
-                  <Feather name="map-pin" size={14} color={colors.primary} />
+                  <Feather name="map-pin" size={14} color={colors.primaryText} />
                   <View style={styles.fieldContent}>
                     <Text numberOfLines={1} style={[styles.fieldValue, { color: pickup?.name ? colors.foreground : colors.mutedForeground }]}>
                       {pickup?.name || 'Search address'}
                     </Text>
                   </View>
                 </Pressable>
-                {!!pickup?.name && !!pricingQuote?.pickupCharge && (
-                  <Text style={{ fontSize: 10, fontFamily: 'Inter_600SemiBold', color: colors.primaryText, marginTop: 4, marginLeft: 4 }}>
-                    {pricingQuote.pickupDistanceKm} km × ₹20 = ₹{pricingQuote.pickupCharge}
-                  </Text>
-                )}
               </View>
             )}
 
@@ -233,18 +228,13 @@ export function SearchCard({
                     { paddingHorizontal: 8, borderColor: colors.border, backgroundColor: pressed ? colors.tintLight : colors.background }
                   ]}
                 >
-                  <Feather name="map-pin" size={14} color={colors.primary} />
+                  <Feather name="map-pin" size={14} color={colors.primaryText} />
                   <View style={styles.fieldContent}>
                     <Text numberOfLines={1} style={[styles.fieldValue, { color: returnAddress?.name ? colors.foreground : colors.mutedForeground }]}>
                       {returnAddress?.name || 'Search address'}
                     </Text>
                   </View>
                 </Pressable>
-                {!!returnAddress?.name && !!pricingQuote?.dropCharge && (
-                  <Text style={{ fontSize: 10, fontFamily: 'Inter_600SemiBold', color: colors.primaryText, marginTop: 4, marginLeft: 4 }}>
-                    {pricingQuote.dropDistanceKm} km × ₹20 = ₹{pricingQuote.dropCharge}
-                  </Text>
-                )}
               </View>
             )}
           </View>
@@ -252,24 +242,26 @@ export function SearchCard({
       )}
 
       {/* Search Button */}
-      <Pressable
-        accessibilityRole="button"
-        testID="search-button"
-        disabled={isSearchDisabled}
-        onPress={onSearch}
-        style={({ pressed }) => [
-          styles.searchButton,
-          { backgroundColor: isSearchDisabled ? colors.muted : colors.primary },
-          pressed && !isSearchDisabled && styles.searchButtonPressed,
-        ]}
-      >
-        <Text style={[
-          styles.searchButtonText,
-          { color: isSearchDisabled ? colors.mutedForeground : '#000' }
-        ]}>
-          Continue to Choose Vehicle
-        </Text>
-      </Pressable>
+      {!isModal && (
+        <Pressable
+          accessibilityRole="button"
+          testID="search-button"
+          disabled={isSearchDisabled}
+          onPress={onSearch}
+          style={({ pressed }) => [
+            styles.searchButton,
+            { backgroundColor: isSearchDisabled ? colors.muted : colors.primary },
+            pressed && !isSearchDisabled && styles.searchButtonPressed,
+          ]}
+        >
+          <Text style={[
+            styles.searchButtonText,
+            { color: isSearchDisabled ? colors.mutedForeground : colors.primaryForeground }
+          ]}>
+            Continue to Choose Vehicle
+          </Text>
+        </Pressable>
+      )}
     </View>
   );
 }

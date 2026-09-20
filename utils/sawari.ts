@@ -44,8 +44,40 @@ export type Car = {
   reviews?: Review[];
   isAvailable?: boolean;
   dbStatus?: string;
-  bookedRanges?: { start: string; end: string }[];
+  /** Open bookings holding this vehicle (ISO dates, calendar day = UTC date). */
+  bookedRanges?: { start: string; end: string; status?: string }[];
+  /** When a vehicle in service is due back (ISO), if known. */
+  maintenanceUntil?: string | null;
+  /** Availability for the dates the user is currently looking at. */
+  availability?: AvailabilityInfo;
 };
+
+export interface AvailabilityInfo {
+  available: boolean;
+  /** Short uppercase text for the card badge, e.g. "AVAILABLE NOW · FREE TILL 22 SEP". */
+  label: string;
+  /** The one status line for the trip being viewed, e.g. "Available for 20 Sep – 21 Sep" or "Available now". */
+  headline: string;
+  /**
+   * Optional secondary line that never contradicts the headline:
+   * "Continuously available until 5 Nov" (when a booking follows) or
+   * "Next available 25 Sep" (when unavailable). Empty when there is nothing to add.
+   */
+  detail: string;
+  /** Why it is unavailable. */
+  reason?: 'booked' | 'service' | 'rented';
+  /** First day the vehicle is free for the requested length of stay (only when unavailable). */
+  nextAvailableFrom?: string;
+  /** Last free day before the next booking (only when available and a booking follows). */
+  freeUntil?: string;
+}
+
+/**
+ * Only reviews with at least this many stars are shown in the app (reviews,
+ * rating summary and the guest photo gallery). Lower-rated feedback is still
+ * sent to the team, it just isn't displayed publicly.
+ */
+export const MIN_PUBLIC_REVIEW_RATING = 4;
 
 export interface RatingDistribution {
   5: number;
@@ -62,6 +94,10 @@ export interface Review {
   text: string;
   date: string;
   isVerified: boolean;
+  /** Where the customer travelled on this trip. */
+  placeVisited?: string;
+  /** Trip photos (Cloudinary URLs). */
+  images?: string[];
 }
 
 const today = new Date();
@@ -344,56 +380,162 @@ export const premiumCollection: Car[] = [
   },
 ];
 
-export const checkCarAvailability = (car: Car | undefined | null, selectedStartDate: string, selectedEndDate?: string): boolean => {
-  if (!car) return false;
-  
-  const rangeStartStr = car.availabilityRange?.start || car.availabilityDate;
-  const rangeEndStr = car.availabilityRange?.end || car.availableToDate;
+// ─── Availability ────────────────────────────────────────────────────────────
+// Everything here works on whole calendar days, expressed as a day number
+// (days since 1970-01-01, UTC). MySawari stores booking dates at UTC midnight,
+// so a booking's UTC date *is* its calendar day. Chosen dates like "15 Sep" map
+// to the same day number, so both sides compare like for like.
 
-  if (rangeStartStr === 'Currently Booked' || rangeStartStr === 'In Service') return false;
-  if (!selectedStartDate || selectedStartDate.includes('Select') || selectedStartDate === 'Available Now' || selectedStartDate === 'All Dates') return true;
-  
-  const parseDate = (dStr: string) => {
-    const parts = dStr.trim().split(' ');
-    if (parts.length < 2) return 0;
-    const day = parseInt(parts[0], 10);
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
-    let month = MONTHS.indexOf(parts[1]);
-    if (month === 12) month = 8; // Handle 'Sept' as 'Sep'
-    if (month === -1) return 0;
-    return new Date(new Date().getFullYear(), month, day).getTime();
-  };
-  
-  const selectedStart = parseDate(selectedStartDate);
-  const selectedEnd = selectedEndDate && !selectedEndDate.includes('Select') ? parseDate(selectedEndDate) : selectedStart;
-  
-  if (rangeStartStr === 'Currently Booked') return false;
-  
-  if (rangeStartStr !== 'Available Now' && rangeStartStr) {
-    const carAvailableFrom = parseDate(rangeStartStr);
-    if (selectedStart < carAvailableFrom) return false;
-  }
-  
-  if (rangeEndStr) {
-    const carAvailableTo = parseDate(rangeEndStr);
-    if (selectedEnd > carAvailableTo) return false;
-  }
-  
-  if (car.bookedRanges && car.bookedRanges.length > 0) {
-    const isOverlapping = car.bookedRanges.some(range => {
-      const bookedStart = new Date(range.start).getTime();
-      // Reset the time for accurate day-to-day comparison
-      const bookedStartNormalized = new Date(new Date(bookedStart).setHours(0,0,0,0)).getTime();
-      const bookedEnd = new Date(range.end).getTime();
-      const bookedEndNormalized = new Date(new Date(bookedEnd).setHours(23,59,59,999)).getTime();
-      
-      return (selectedStart <= bookedEndNormalized && selectedEnd >= bookedStartNormalized);
-    });
-    if (isOverlapping) return false;
-  }
-  
-  return true;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+const toDayNum = (y: number, m: number, d: number) => Math.floor(Date.UTC(y, m, d) / DAY_MS);
+
+export const todayDayNum = () => {
+  const n = new Date();
+  return toDayNum(n.getFullYear(), n.getMonth(), n.getDate());
 };
+
+const isoToDayNum = (iso?: string | null): number => {
+  if (!iso) return NaN;
+  const t = new Date(iso).getTime();
+  return isNaN(t) ? NaN : Math.floor(t / DAY_MS);
+};
+
+export const dayNumToLabel = (n: number) => {
+  const d = new Date(n * DAY_MS);
+  const month = MONTH_NAMES[d.getUTCMonth()];
+  return `${d.getUTCDate()} ${month[0].toUpperCase()}${month.slice(1)}`;
+};
+
+/** Weekday / day / month parts of a day number, for date pickers. */
+export function describeDay(n: number) {
+  const d = new Date(n * DAY_MS);
+  const month = MONTH_NAMES[d.getUTCMonth()];
+  return {
+    weekday: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getUTCDay()],
+    day: d.getUTCDate(),
+    month: `${month[0].toUpperCase()}${month.slice(1)}`,
+  };
+}
+
+/** "15 Sep", "15 Sept" or "15 Sep 2026" -> day number. Year is inferred when missing. */
+export function parseDayLabel(label: string | undefined | null, notBefore?: number): number | null {
+  if (!label) return null;
+  const m = label.trim().match(/^(\d{1,2})\s+([A-Za-z]{3,})\.?(?:\s+(\d{4}))?$/);
+  if (!m) return null;
+  const day = parseInt(m[1], 10);
+  const month = MONTH_NAMES.indexOf(m[2].slice(0, 3).toLowerCase());
+  if (month === -1) return null;
+
+  if (m[3]) return toDayNum(parseInt(m[3], 10), month, day);
+
+  const floor = notBefore ?? todayDayNum();
+  const year = new Date().getFullYear();
+  let n = toDayNum(year, month, day);
+  if (n < floor) n = toDayNum(year + 1, month, day);
+  return n;
+}
+
+/** Splits "15 Sep – 18 Sep" (or a single "15 Sep") into its start / end labels. */
+export function splitDateRange(range?: string | null): [string | undefined, string | undefined] {
+  if (!range) return [undefined, undefined];
+  const [start, end] = range.split(/\s*[–—]\s*/);
+  return [start?.trim() || undefined, end?.trim() || undefined];
+}
+
+/** True when the string is an actual chosen date, not a placeholder like "Select Dates". */
+export const isRealDate = (label?: string | null) => parseDayLabel(label ?? undefined) !== null;
+
+type Block = { start: number; end: number; kind: 'booked' | 'service' | 'rented' };
+
+function buildBlocks(car: Car, today: number): Block[] {
+  const blocks: Block[] = [];
+
+  for (const r of car.bookedRanges || []) {
+    const start = isoToDayNum(r.start);
+    const end = isoToDayNum(r.end);
+    if (isNaN(start) || isNaN(end) || end < today) continue; // past bookings don't matter
+    blocks.push({ start, end, kind: 'booked' });
+  }
+
+  if (car.dbStatus === 'service' || car.dbStatus === 'maintenance') {
+    const until = isoToDayNum(car.maintenanceUntil);
+    blocks.push({ start: today, end: isNaN(until) ? Infinity : until, kind: 'service' });
+  } else if (
+    (car.dbStatus === 'rent' || car.dbStatus === 'booked') &&
+    !blocks.some(b => b.start <= today && b.end >= today)
+  ) {
+    // Marked as out on rent but with no booking on record: unavailable today only.
+    blocks.push({ start: today, end: today, kind: 'rented' });
+  }
+
+  return blocks.sort((a, b) => a.start - b.start);
+}
+
+const overlaps = (b: Block, start: number, end: number) => b.start <= end && b.end >= start;
+
+/**
+ * Is this vehicle free for the chosen dates, and if so for how long / if not,
+ * when is it next free? With no dates chosen it answers for today.
+ */
+export function getAvailability(car: Car | undefined | null, startLabel?: string, endLabel?: string): AvailabilityInfo {
+  if (!car) return { available: false, label: 'NOT AVAILABLE', headline: 'Not available', detail: '' };
+
+  const today = todayDayNum();
+  const start = parseDayLabel(startLabel);
+  const hasDates = start !== null;
+  const windowStart = hasDates ? start! : today;
+  const parsedEnd = hasDates ? parseDayLabel(endLabel, windowStart) : null;
+  const windowEnd = parsedEnd !== null ? parsedEnd : windowStart;
+  const stayDays = windowEnd - windowStart + 1;
+
+  const blocks = buildBlocks(car, today);
+  const conflicts = blocks.filter(b => overlaps(b, windowStart, windowEnd));
+
+  if (conflicts.length === 0) {
+    const next = blocks.find(b => b.start > windowEnd);
+    const freeUntil = next ? next.start - 1 : undefined;
+    const untilText = freeUntil !== undefined ? ` · FREE TILL ${dayNumToLabel(freeUntil)}` : '';
+    const headline = hasDates
+      ? `Available for ${dayNumToLabel(windowStart)}${windowEnd > windowStart ? ` – ${dayNumToLabel(windowEnd)}` : ''}`
+      : 'Available now';
+    const detail = freeUntil !== undefined ? `Continuously available until ${dayNumToLabel(freeUntil)}` : '';
+    return {
+      available: true,
+      headline,
+      detail,
+      label: `${headline}${untilText}`.toUpperCase(),
+      freeUntil: freeUntil !== undefined ? dayNumToLabel(freeUntil) : undefined,
+    };
+  }
+
+  // Unavailable — find the earliest start where the whole stay fits.
+  const candidates = [windowStart, ...blocks.map(b => b.end + 1)].filter(c => c >= windowStart && isFinite(c)).sort((a, b) => a - b);
+  const nextStart = candidates.find(c => !blocks.some(b => overlaps(b, c, c + stayDays - 1)));
+
+  const reason = conflicts[0].kind;
+  const base = reason === 'service' ? 'IN SERVICE' : 'NOT AVAILABLE';
+  return {
+    available: false,
+    reason,
+    headline: base === 'IN SERVICE' ? 'In service' : 'Not available',
+    detail: nextStart !== undefined ? `Next available ${dayNumToLabel(nextStart)}` : '',
+    label: (nextStart !== undefined ? `${base} · NEXT ${dayNumToLabel(nextStart)}` : base).toUpperCase(),
+    nextAvailableFrom: nextStart !== undefined ? dayNumToLabel(nextStart) : undefined,
+  };
+}
+
+export const checkCarAvailability = (car: Car | undefined | null, selectedStartDate: string, selectedEndDate?: string): boolean =>
+  getAvailability(car, selectedStartDate, selectedEndDate).available;
+
+/** Attaches `availability` / `isAvailable` for the dates being viewed. */
+export function withAvailability(cars: Car[], startLabel?: string, endLabel?: string): Car[] {
+  return cars.map(car => {
+    const availability = getAvailability(car, startLabel, endLabel);
+    return { ...car, isAvailable: availability.available, availability };
+  });
+}
 
 export const resultCars: Car[] = [
   { ...cars[0], image: require('../assets/images/creta.jpg') },

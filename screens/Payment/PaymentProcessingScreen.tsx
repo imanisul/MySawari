@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -6,16 +6,23 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 
+import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWebView';
+
 export default function PaymentProcessingScreen() {
   const colors = useColors();
   const router = useRouter();
   const { pricingQuote, quoteParams, createBookingSnapshot, confirmBooking } = useSawari();
 
   const [status, setStatus] = useState<'INITIATING' | 'PAYMENT_PENDING' | 'VERIFYING' | 'SUCCESS' | 'ERROR'>('INITIATING');
-  const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string, amountPaise: number } | null>(null);
+  const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string, amountPaise: number, keyId: string } | null>(null);
+  const started = useRef(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    // The quote can refresh while this screen is open — only ever start one payment.
+    if (started.current) return;
+    started.current = true;
+
     async function startPaymentFlow() {
       if (!pricingQuote) {
         setErrorMsg('Booking quote not found. Please try again.');
@@ -24,9 +31,9 @@ export default function PaymentProcessingScreen() {
       }
       try {
         // Step 1: Create Order
-        const order = await API.createRazorpayOrder(quoteParams);
+        const order = await API.createRazorpayOrder({ onlinePayableNow: pricingQuote.onlinePayableNow });
         setRazorpayOrder(order);
-        setStatus('PAYMENT_PENDING'); // Show Mock Razorpay UI
+        setStatus('PAYMENT_PENDING'); 
       } catch (err: any) {
         // Handle 100% sawari cash / zero online payable flow
         if (err.message.includes('No Razorpay order required')) {
@@ -40,25 +47,19 @@ export default function PaymentProcessingScreen() {
     startPaymentFlow();
   }, [quoteParams, pricingQuote]);
 
-  const simulateRazorpaySuccess = async () => {
-    if (!razorpayOrder) return;
+  const handleRazorpaySuccess = async (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
     setStatus('VERIFYING');
-    
     try {
-      // Step 2: Customer completes payment, backend verifies signature
-      const mockPaymentId = `pay_${Math.random().toString(36).substring(2, 10)}`;
-      const mockSignature = `mock_sig_${Math.random().toString(36).substring(2, 10)}`;
-      
-      const isVerified = await API.verifyPayment(razorpayOrder.orderId, mockPaymentId, mockSignature);
+      const isVerified = await API.verifyPayment(data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature);
       if (isVerified) {
-        completeBookingFlow({ razorpayOrderId: razorpayOrder.orderId, razorpayPaymentId: mockPaymentId });
+        completeBookingFlow({ razorpayOrderId: data.razorpay_order_id, razorpayPaymentId: data.razorpay_payment_id });
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'Payment verification failed');
       setStatus('ERROR');
     }
   };
-  
+
   const completeBookingFlow = async (paymentDetails: { razorpayOrderId?: string, razorpayPaymentId?: string } | null) => {
     setStatus('VERIFYING');
     try {
@@ -74,7 +75,12 @@ export default function PaymentProcessingScreen() {
         throw new Error('Failed to capture booking snapshot');
       }
     } catch (e: any) {
-      setErrorMsg(e.message || 'Failed to confirm booking');
+      const reason = e.message || 'Failed to confirm booking';
+      setErrorMsg(
+        paymentDetails?.razorpayPaymentId
+          ? `Your payment (${paymentDetails.razorpayPaymentId}) was received, but the booking could not be saved: ${reason}. Please contact support with this payment ID.`
+          : reason
+      );
       setStatus('ERROR');
     }
   }
@@ -85,21 +91,22 @@ export default function PaymentProcessingScreen() {
 
   if (status === 'PAYMENT_PENDING' && razorpayOrder) {
     return (
-      <View style={[styles.screen, { backgroundColor: '#101010' }]}>
-        <View style={styles.razorpayMock}>
-          <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: '#3399cc', justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
-             <Feather name="shield" size={24} color="#fff" />
-          </View>
-          <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 22, marginBottom: 8 }}>Secure Payment</Text>
-          <Text style={{ color: '#aaa', fontFamily: 'Inter_500Medium', marginBottom: 24, fontSize: 16 }}>Payable: ₹{(razorpayOrder.amountPaise / 100).toLocaleString('en-IN')}</Text>
-          
-          <Pressable onPress={simulateRazorpaySuccess} style={[styles.btn, { backgroundColor: '#3399cc', marginBottom: 12 }]}>
-            <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Simulate Success</Text>
-          </Pressable>
-          <Pressable onPress={handleCancel} style={[styles.btn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#444' }]}>
-            <Text style={{ color: '#aaa', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Cancel Transaction</Text>
-          </Pressable>
-        </View>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <RazorpayCheckoutWebView
+          orderId={razorpayOrder.orderId}
+          amount={razorpayOrder.amountPaise}
+          currency="INR"
+          name="MySawari"
+          description="Vehicle Rental Booking"
+          themeColor={colors.primary}
+          razorpayKey={razorpayOrder.keyId}
+          onSuccess={handleRazorpaySuccess}
+          onFailure={(err) => {
+            setErrorMsg(typeof err === 'string' ? err : 'Payment failed or cancelled.');
+            setStatus('ERROR');
+          }}
+          onClose={handleCancel}
+        />
       </View>
     );
   }
@@ -128,7 +135,7 @@ export default function PaymentProcessingScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 24 }} />
+      <ActivityIndicator size="large" color={colors.primaryText} style={{ marginBottom: 24 }} />
       <Text style={[styles.title, { color: colors.foreground }]}>
         {status === 'INITIATING' ? 'Initiating Payment...' : 'Verifying Payment...'}
       </Text>

@@ -86,6 +86,30 @@ export function FilterSheet({
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
+            {/* CATEGORY */}
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Category</Text>
+              <View style={styles.chipRow}>
+                {categories.map((cat) => (
+                  <Pressable
+                    key={cat}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setLocalFilters(prev => ({ ...prev, category: cat }));
+                    }}
+                    style={[
+                      styles.chip,
+                      { 
+                        backgroundColor: localFilters.category === cat ? colors.foreground : colors.card, 
+                        borderColor: localFilters.category === cat ? colors.foreground : colors.border 
+                      }
+                    ]}
+                  >
+                    <Text style={[styles.chipText, { color: localFilters.category === cat ? colors.background : colors.foreground }]}>{cat}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
 
             {/* PRICE */}
             <View style={styles.section}>

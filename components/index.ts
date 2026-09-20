@@ -32,3 +32,5 @@ export * from './common/ErrorBoundary';
 export * from './common/UpdateModal';
 export * from './loading/CarCardSkeleton';
 export * from './loading/BookingSkeleton';
+export * from './loading/HomeCarSkeleton';
+export * from './loading/OfferCardSkeleton';

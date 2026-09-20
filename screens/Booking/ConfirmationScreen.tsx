@@ -10,7 +10,7 @@ export default function ConfirmationScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, mode, pickup, dropoff, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, pricingQuote } = useSawari();
+  const { selectedCar, mode, pickup, dropoff, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, pricingQuote, lastBooking } = useSawari();
   
   // Use the backend-validated quote for display
   const payToday = pricingQuote?.onlinePayableNow || 0;
@@ -28,7 +28,7 @@ export default function ConfirmationScreen() {
         <View style={[styles.confirmationCard, { backgroundColor: colors.card }]}>
           <View style={styles.referenceRow}>
             <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>Booking reference</Text>
-            <Text style={[styles.reference, { color: colors.foreground }]}>MS-6816</Text>
+            <Text style={[styles.reference, { color: colors.foreground }]}>{lastBooking?.id ? `MS-${lastBooking.id.slice(-6).toUpperCase()}` : '—'}</Text>
           </View>
           <View style={[styles.carRow, { borderTopColor: colors.border }]}>
             <Image source={selectedCar.image} resizeMode="cover" style={styles.carImage} />

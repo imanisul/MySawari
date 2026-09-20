@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { BottomNavigation } from '../navigation/BottomNavigation';
+import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 
 export function Page({
   children,
@@ -15,6 +16,7 @@ export function Page({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const bottomNavHeight = useBottomNavHeight();
   const content = (
     <View
       style={[
@@ -23,7 +25,7 @@ export function Page({
           paddingTop: insets.top + 9,
           // If bottomNav is true, we pad exact height of the tab bar (approx 56) + the safe area inset.
           // We add an extra 24px of breathing room either way.
-          paddingBottom: scroll ? (bottomNav ? 56 + Math.max(insets.bottom, 7) + 24 : insets.bottom + 24) : 0,
+          paddingBottom: scroll ? (bottomNav ? bottomNavHeight + 24 : insets.bottom + 24) : 0,
         },
       ]}
     >

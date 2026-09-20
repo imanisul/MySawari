@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Car } from '@/utils/sawari';
+import { Car, getAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -35,24 +35,8 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
   }, [images.length]);
   
   const isDateSelected = dateRange && !dateRange.includes('Select');
-  let availableText = 'AVAILABLE NOW';
-  if (car.dbStatus === 'rent') {
-    availableText = 'ON RENT';
-  } else if (car.dbStatus === 'service') {
-    availableText = 'IN SERVICE';
-  } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-    if (car.availabilityDate === 'Currently Booked') {
-      availableText = 'ON RENT';
-    } else if (car.availabilityDate === 'In Service') {
-      availableText = 'IN SERVICE';
-    } else {
-      availableText = `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
-    }
-  }
-
-  if (isDateSelected) {
-    availableText = `Avail: ${dateRange}`;
-  }
+  const availability = car.availability ?? getAvailability(car);
+  const availableText = availability.headline.toUpperCase();
 
   return (
     <Pressable
@@ -69,7 +53,7 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
           router.push('/car-details');
         }
       }}
-      style={styles.card}
+      style={[styles.card, { backgroundColor: colors.card }]}
     >
       {/* Image with overlay gradient */}
       <View style={styles.imageContainer}>
@@ -93,7 +77,7 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
         />
         {/* Premium badge -> Availability Badge */}
         <View style={[styles.premiumBadge, { backgroundColor: 'rgba(255,255,255,0.95)', maxWidth: '90%' }]}>
-          <Feather name="calendar" size={10} color={colors.primary} />
+          <Feather name="calendar" size={10} color={colors.primaryText} />
           <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.premiumText, { color: '#000', flexShrink: 1 }]}>
             {availableText}
           </Text>
@@ -144,6 +128,19 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
             <Text style={[styles.specText, { color: colors.mutedForeground }]}>{car.fuel}</Text>
           </View>
         </View>
+        {!!availability.detail && <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 }}>
+          <Feather
+            name={availability.available ? 'check-circle' : 'clock'}
+            size={11}
+            color={availability.available ? colors.success : colors.destructive}
+          />
+          <Text
+            numberOfLines={1}
+            style={{ flexShrink: 1, fontFamily: 'Inter_600SemiBold', fontSize: 11, color: availability.available ? colors.success : colors.destructive }}
+          >
+            {availability.detail}
+          </Text>
+        </View>}
       </View>
     </Pressable>
   );

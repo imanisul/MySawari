@@ -55,7 +55,7 @@ export function PrimaryButton({
           <Feather 
             name={icon} 
             size={18} 
-            color={isDisabled ? colors.disabledText : '#000'} 
+            color={isDisabled ? colors.disabledText : colors.primaryForeground} 
           />
         )}
       </Animated.View>

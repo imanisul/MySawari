@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Car } from '@/utils/sawari';
+import { Car, getAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 
 export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }: { car: Car; onPress?: () => void; onIntercept?: () => void }) {
@@ -48,31 +48,7 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
         <View style={styles.availableRow}>
           <View style={[styles.availableDot, { backgroundColor: colors.primary }]} />
           <Text style={[styles.availableText, { color: colors.foreground }]}>
-            {(() => {
-              const todayStr = (() => { const d = new Date(); return `${d.getDate()} ${['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'][d.getMonth()]}`; })();
-              if (car.availabilityRange?.start) {
-                const startStr = car.availabilityRange.start.toUpperCase();
-                const endStr = car.availabilityRange.end?.toUpperCase();
-                if (endStr) {
-                  if (startStr === endStr) {
-                    return `AVAIL: ${startStr}`;
-                  } else {
-                    return `AVAIL: ${startStr} – ${endStr}`;
-                  }
-                } else {
-                  if (startStr === todayStr) {
-                    return `AVAILABLE NOW`;
-                  } else {
-                    return `AVAIL FROM ${startStr}`;
-                  }
-                }
-              } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-                return car.availableToDate ? `AVAIL: ${car.availabilityDate.toUpperCase()} – ${car.availableToDate.toUpperCase()}` : `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
-              } else if (car.availableToDate) {
-                return `AVAIL UNTIL ${car.availableToDate.toUpperCase()}`;
-              }
-              return 'AVAILABLE NOW';
-            })()}
+            {(() => { const a = car.availability ?? getAvailability(car); return a.detail ? `${a.headline} · ${a.detail}` : a.headline; })()}
           </Text>
         </View>
       </View>

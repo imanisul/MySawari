@@ -7,17 +7,18 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Car } from '@/utils/sawari';
 
-export function NextTrip({ car }: { car: Car }) {
+export function NextTrip({ car, dateRangeStr }: { car: Car, dateRangeStr?: string }) {
   const colors = useColors();
   const router = useRouter();
   const { dateRange } = useSawari();
+  const displayDate = dateRangeStr || dateRange || '';
   return (
     <Pressable
       accessibilityRole="button"
       testID="next-trip"
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        router.push('/car-details');
+        router.push('/bookings'); // Go to bookings screen instead of car-details
       }}
       style={({ pressed }) => [
         styles.nextTrip,
@@ -27,11 +28,11 @@ export function NextTrip({ car }: { car: Car }) {
     >
       <Image source={car.image} resizeMode="cover" style={styles.tripImage} />
       <View style={styles.nextTripCopy}>
-        <Text style={[styles.nextTripLabel, { color: colors.primaryText }]}>Your next trip</Text>
-        <Text style={[styles.nextTripName, { color: colors.warmWhite }]}>{car.name}</Text>
-        <Text style={[styles.nextTripDate, { color: colors.mutedForeground }]}>{dateRange.replace('–', '→')}</Text>
+        <Text style={[styles.nextTripLabel, { color: colors.primary }]}>Your next trip</Text>
+        <Text style={[styles.nextTripName, { color: '#FFFFFF' }]}>{car.name}</Text>
+        <Text style={[styles.nextTripDate, { color: colors.walletMuted }]}>{displayDate.replace('–', '→')}</Text>
       </View>
-      <Feather name="arrow-right" size={20} color={colors.warmWhite} />
+      <Feather name="arrow-right" size={20} color="#FFFFFF" />
     </Pressable>
   );
 }

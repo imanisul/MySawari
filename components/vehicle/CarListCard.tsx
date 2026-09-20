@@ -1,378 +1,206 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View, ScrollView, Dimensions } from 'react-native';
+import React, { useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
-import { Car } from '@/utils/sawari';
+import { Car, getAvailability } from '@/utils/sawari';
+import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useSawari } from '@/context/SawariContext';
+import { shadows } from '@/constants/shadows';
 
-export const CarListCard = React.memo(function CarListCard({ car, isExplore = true, onIntercept }: { car: Car; isExplore?: boolean; onIntercept?: () => void }) {
+/**
+ * Vehicle result card: photo (with the type badge and ONE availability badge),
+ * then name + price, a spec row, and an optional secondary availability line.
+ * Availability comes from `car.availability` (set by the list screen for the
+ * dates being viewed) or the shared getAvailability() — nothing is invented here.
+ */
+export const CarListCard = React.memo(function CarListCard({
+  car,
+  onIntercept,
+}: {
+  car: Car;
+  /** Kept for existing callers. */
+  isExplore?: boolean;
+  onIntercept?: () => void;
+}) {
+  const colors = useColors();
   const router = useRouter();
   const { selectCar, dateRange } = useSawari();
   const { scaleAnim, opacityAnim, onPressIn, onPressOut } = usePressAnimation();
   const [isNavigating, setIsNavigating] = useState(false);
-  
-  const scrollRef = useRef<ScrollView>(null);
-  const [activeIndex, setActiveIndex] = useState(0);
-  
-  const screenWidth = Dimensions.get('window').width;
-  const cardWidth = screenWidth - 32; // marginHorizontal: 16 on both sides
-  
-  // Use car.images if available, else duplicate the single image 3 times to simulate a gallery
-  const images = (car as any).images || [car.image, car.image, car.image];
 
-  useEffect(() => {
-    if (images.length <= 1) return;
-    const interval = setInterval(() => {
-      setActiveIndex(current => {
-        const next = (current + 1) % images.length;
-        scrollRef.current?.scrollTo({ x: next * cardWidth, animated: true });
-        return next;
-      });
-    }, 3500 + Math.random() * 1000); // Stagger slightly so they don't all slide at exactly the same time
-    return () => clearInterval(interval);
-  }, [images.length, cardWidth]);
-  
-  const isDateSelected = dateRange && !dateRange.includes('Select');
-  let availableText = 'AVAILABLE NOW';
-  if (car.dbStatus === 'rent') {
-    availableText = 'ON RENT';
-  } else if (car.dbStatus === 'service' || car.dbStatus === 'maintenance') {
-    availableText = 'IN SERVICE';
-  } else if (car.bookedRanges && car.bookedRanges.length > 0) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const availability = car.availability ?? getAvailability(car);
+  const unavailable = car.isAvailable === false || !availability.available;
+  const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
 
-    const sortedRanges = [...car.bookedRanges]
-      .map(r => ({
-        start: new Date(new Date(r.start).setHours(0,0,0,0)).getTime(),
-        end: new Date(new Date(r.end).setHours(23,59,59,999)).getTime()
-      }))
-      .sort((a, b) => a.start - b.start);
+  const image = (car as any).images?.[0] ?? car.image;
+  const price = car.perDay ? formatCurrency(car.perDay) : car.price;
 
-    // Filter out strictly past bookings
-    const upcomingBookings = sortedRanges.filter(r => r.end >= today.getTime());
-
-    if (upcomingBookings.length > 0) {
-      let availStart = today.getTime();
-      let availEnd: number | null = null;
-
-      if (availStart >= upcomingBookings[0].start && availStart <= upcomingBookings[0].end) {
-        // Currently booked
-        let nextStart = new Date(upcomingBookings[0].end);
-        nextStart.setDate(nextStart.getDate() + 1);
-        nextStart.setHours(0,0,0,0);
-        availStart = nextStart.getTime();
-
-        for (let i = 1; i < upcomingBookings.length; i++) {
-          if (availStart >= upcomingBookings[i].start) {
-             let ns = new Date(upcomingBookings[i].end);
-             ns.setDate(ns.getDate() + 1);
-             ns.setHours(0,0,0,0);
-             availStart = ns.getTime();
-          } else {
-             // Found a gap
-             let ne = new Date(upcomingBookings[i].start);
-             ne.setDate(ne.getDate() - 1);
-             ne.setHours(23,59,59,999);
-             availEnd = ne.getTime();
-             break;
-          }
-        }
-      } else {
-        // Available now, booked in future
-        let ne = new Date(upcomingBookings[0].start);
-        ne.setDate(ne.getDate() - 1);
-        ne.setHours(23,59,59,999);
-        availEnd = ne.getTime();
-      }
-
-      const formatDate = (ts: number) => new Date(ts).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
-      
-      if (availStart === today.getTime()) {
-        availableText = availEnd ? `AVAIL UNTIL ${formatDate(availEnd)}` : 'AVAILABLE NOW';
-      } else {
-        availableText = availEnd ? `${formatDate(availStart)} - ${formatDate(availEnd)}` : `AVAIL FROM ${formatDate(availStart)}`;
-      }
-    }
-  } else if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-    if (car.availabilityDate === 'Currently Booked') {
-      availableText = 'ON RENT';
-    } else if (car.availabilityDate === 'In Service') {
-      availableText = 'IN SERVICE';
-    } else {
-      availableText = `AVAIL FROM ${car.availabilityDate.toUpperCase()}`;
-    }
-  }
-
-  // Determine badge colors based on category
-  const isBike = car.category === 'Bike' || car.category === 'Off-road';
-  const categoryColor = isBike ? '#D97706' : '#2563EB';
-
-  const handlePress = async () => {
+  const handlePress = () => {
     if (isNavigating) return;
     setIsNavigating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     selectCar(car);
-    
+
     if (!isDateSelected && onIntercept) {
       onIntercept();
     } else {
       router.push('/car-details');
     }
-    
     setTimeout(() => setIsNavigating(false), 500);
   };
-  
+
   return (
     <Animated.View style={[styles.cardContainer, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={`${car.name}, ${price} per day, ${availability.headline}. ${car.seats}, ${car.transmission}, ${car.fuel}`}
         testID={`list-car-${car.id}`}
         disabled={isNavigating}
         onPress={handlePress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
-        style={styles.pressableArea}
+        style={[styles.card, shadows.level1, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
-        <View style={styles.imageContainer}>
-          <ScrollView
-            ref={scrollRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            scrollEnabled={false} // Disable manual scroll to not interfere with card press
-            scrollEventThrottle={16}
-          >
-            {images.map((img: any, i: number) => (
-              <View key={i} style={{ width: cardWidth, height: '100%' }}>
-                <Image source={img} contentFit="cover" transition={200} style={[styles.carImage, car.isAvailable === false && { opacity: 0.5 } as any]} />
-              </View>
-            ))}
-          </ScrollView>
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.85)']}
-            style={styles.gradientOverlay}
+        {/* Photo */}
+        <View style={[styles.imageWrap, { backgroundColor: colors.muted }]}>
+          <Image
+            source={image}
+            contentFit="cover"
+            transition={200}
+            style={[styles.image, unavailable && { opacity: 0.55 }]}
           />
-          
-          <View style={styles.topRow}>
-            <BlurView intensity={90} tint={car.isAvailable === false ? "dark" : "light"} style={[styles.availableBadge, car.isAvailable === false && { backgroundColor: 'rgba(239, 68, 68, 0.5)' }]}>
-              <Feather name={car.isAvailable === false ? "x-circle" : "calendar"} size={12} color={car.isAvailable === false ? "#fff" : "#000"} />
-              <Text numberOfLines={1} adjustsFontSizeToFit style={[styles.badgeText, car.isAvailable === false && { color: '#fff' }]}>
-                {car.isAvailable === false && availableText === 'AVAILABLE NOW' ? 'NOT AVAILABLE' : availableText}
+          {/* Soft top gradient so the badges stay readable on any photo */}
+          <LinearGradient colors={['rgba(0,0,0,0.38)', 'transparent']} style={styles.topGradient} pointerEvents="none" />
+
+          <View style={styles.badgeRow}>
+            <View
+              style={[
+                styles.availBadge,
+                { backgroundColor: unavailable ? '#DC2626' : 'rgba(255,255,255,0.96)' },
+              ]}
+            >
+              <Feather
+                name={unavailable ? 'x-circle' : 'check-circle'}
+                size={13}
+                color={unavailable ? '#FFFFFF' : '#047857'}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.availBadgeText, { color: unavailable ? '#FFFFFF' : '#047857' }]}
+              >
+                {availability.headline}
               </Text>
-            </BlurView>
-            <BlurView intensity={90} tint="light" style={styles.categoryBadge}>
-              <Text style={[styles.categoryText, { color: categoryColor }]}>{car.category}</Text>
-            </BlurView>
+            </View>
+
+            <View style={styles.typeBadge}>
+              <Text numberOfLines={1} style={styles.typeBadgeText}>{car.category}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Details */}
+        <View style={styles.body}>
+          <View style={styles.titleRow}>
+            <Text numberOfLines={1} style={[styles.name, { color: colors.foreground }]}>{car.name}</Text>
+            <View style={styles.priceWrap}>
+              <Text style={[styles.price, { color: colors.foreground }]}>{price}</Text>
+              <Text style={[styles.perDay, { color: colors.mutedForeground }]}>/day</Text>
+            </View>
           </View>
 
-          {/* Pagination Dots */}
-          {images.length > 1 && (
-            <View style={styles.paginationDots}>
-              {images.map((_: any, i: number) => (
-                <View 
-                  key={i} 
-                  style={[
-                    styles.dot, 
-                    activeIndex === i ? styles.activeDot : {}
-                  ]} 
-                />
-              ))}
+          <View style={styles.specRow}>
+            <Spec icon="users" text={car.seats} color={colors.mutedForeground} />
+            <Spec icon="settings" text={car.transmission} color={colors.mutedForeground} />
+            <Spec icon="droplet" text={car.fuel} color={colors.mutedForeground} />
+          </View>
+
+          {!!availability.detail && (
+            <View style={[styles.detailRow, { borderTopColor: colors.border }]}>
+              <Feather
+                name={unavailable ? 'clock' : 'calendar'}
+                size={13}
+                color={unavailable ? colors.destructive : colors.success}
+              />
+              <Text
+                numberOfLines={1}
+                style={[styles.detailText, { color: unavailable ? colors.destructive : colors.success }]}
+              >
+                {availability.detail}
+              </Text>
             </View>
           )}
-
-          <BlurView intensity={50} tint="dark" style={styles.infoGlassContainer}>
-            <View style={styles.titleRow}>
-              <Text numberOfLines={1} style={styles.carName}>{car.name}</Text>
-              <View style={styles.priceContainer}>
-                <Text style={styles.startingFrom}>Starting from</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                  <Text numberOfLines={1} style={styles.carPrice}>{car.price}</Text>
-                  <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginLeft: 2, fontFamily: 'Inter_400Regular' }}>/day</Text>
-                </View>
-              </View>
-            </View>
-            
-            <View style={styles.divider} />
-            
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <Feather name="users" size={14} color="#D1D5DB" />
-                <Text style={styles.carMeta}>{car.seats}</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <Feather name="settings" size={14} color="#D1D5DB" />
-                <Text style={styles.carMeta}>{car.transmission}</Text>
-              </View>
-              <View style={styles.metaItem}>
-                <Feather name="droplet" size={14} color="#D1D5DB" />
-                <Text style={styles.carMeta}>{car.fuel}</Text>
-              </View>
-            </View>
-          </BlurView>
         </View>
       </Pressable>
     </Animated.View>
   );
 });
 
-const styles = StyleSheet.create({
-  cardContainer: {
-    marginBottom: 24,
-    marginHorizontal: 16,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  pressableArea: {
-    width: '100%',
-  },
-  imageContainer: {
-    borderRadius: 24,
-    overflow: 'hidden',
-    width: '100%',
-    aspectRatio: 4 / 3,
-    backgroundColor: '#1F2937',
-  },
-  carImage: {
-    height: '100%',
-    width: '100%',
-  },
-  gradientOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  topRow: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  availableBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    gap: 6,
-    overflow: 'hidden',
-    maxWidth: '70%',
-  },
-  badgeText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    color: '#000',
-    flexShrink: 1,
-  },
-  categoryBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  categoryText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 10,
-    textTransform: 'uppercase',
-  },
-  infoGlassContainer: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
-    borderRadius: 20,
-    padding: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  carName: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 20,
-    color: '#FFF',
-    flexShrink: 1,
-    marginTop: 2,
-  },
-  priceContainer: {
-    alignItems: 'flex-end',
-    flexShrink: 0,
-  },
-  startingFrom: {
-    fontSize: 10,
-    color: '#D1D5DB',
-    fontFamily: 'Inter_500Medium',
-    marginBottom: 2,
-  },
-  carPrice: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 18,
-    color: '#FFF',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    marginVertical: 14,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  carMeta: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: '#F3F4F6',
-  },
-  carPriceSuffix: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-    color: '#9CA3AF',
-  },
-  paginationDots: {
-    position: 'absolute',
-    bottom: 125, // Just above the glass info container
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  activeDot: {
-    width: 16,
-    height: 6,
-    backgroundColor: '#FFF',
-  },
-});
+function Spec({ icon, text, color }: { icon: React.ComponentProps<typeof Feather>['name']; text: string; color: string }) {
+  return (
+    <View style={styles.spec}>
+      <Feather name={icon} size={14} color={color} />
+      <Text numberOfLines={1} style={[styles.specText, { color }]}>{text}</Text>
+    </View>
+  );
+}
 
+const styles = StyleSheet.create({
+  cardContainer: { marginBottom: 16, marginHorizontal: 16 },
+  card: { borderRadius: 20, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  imageWrap: { width: '100%', aspectRatio: 16 / 9 },
+  image: { width: '100%', height: '100%' },
+  topGradient: { position: 'absolute', top: 0, left: 0, right: 0, height: 72 },
+  badgeRow: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  availBadge: {
+    flexShrink: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 14,
+  },
+  availBadgeText: { flexShrink: 1, fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  typeBadge: {
+    flexShrink: 0,
+    maxWidth: '40%',
+    paddingHorizontal: 10,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(17,26,43,0.88)',
+  },
+  typeBadgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: '#FFFFFF' },
+  body: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14 },
+  titleRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
+  name: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.2 },
+  priceWrap: { flexDirection: 'row', alignItems: 'baseline', flexShrink: 0 },
+  price: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: -0.3 },
+  perDay: { fontFamily: 'Inter_500Medium', fontSize: 12, marginLeft: 2 },
+  specRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 8 },
+  spec: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  specText: { fontFamily: 'Inter_500Medium', fontSize: 13, flexShrink: 1 },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  detailText: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 12.5 },
+});

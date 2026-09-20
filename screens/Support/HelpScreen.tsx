@@ -93,7 +93,7 @@ export default function HelpScreen() {
 
           <View style={[styles.supportCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
             <View style={styles.supportHeader}>
-              <Feather name="message-circle" size={24} color={colors.primary} />
+              <Feather name="message-circle" size={24} color={colors.primaryText} />
               <Text style={[styles.supportTitle, { color: colors.foreground }]}>Still need help?</Text>
             </View>
             <Text style={[styles.supportSubtitle, { color: colors.mutedForeground }]}>
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatButtonText: {
-    color: '#000000',
+    color: '#101B2E',
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
   }

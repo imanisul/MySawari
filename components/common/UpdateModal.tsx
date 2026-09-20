@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import type { UpdateStatus } from '@/hooks/useAppUpdates';
+import { useColors } from '@/hooks/useColors';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ export function UpdateModal({
   onLater,
   onRetry,
 }: UpdateModalProps) {
+  const colors = useColors();
   // Spinner rotation
   const spinAnim = useRef(new Animated.Value(0)).current;
 
@@ -69,26 +71,26 @@ export function UpdateModal({
       onRequestClose={isProcessing ? undefined : onLater}
     >
       <View style={styles.overlay}>
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
           {/* ── Header Icon ── */}
           <View style={styles.iconContainer}>
             {isError ? (
               <View style={[styles.iconCircle, styles.iconCircleError]}>
-                <Feather name="alert-triangle" size={28} color="#EF4444" />
+                <Feather name="alert-triangle" size={28} color={colors.destructive} />
               </View>
             ) : isProcessing ? (
               <Animated.View style={[styles.iconCircle, styles.iconCircleProcessing, { transform: [{ rotate: spin }] }]}>
-                <Feather name="refresh-cw" size={28} color="#6178D8" />
+                <Feather name="refresh-cw" size={28} color={colors.blue} />
               </Animated.View>
             ) : (
               <View style={[styles.iconCircle, styles.iconCircleAvailable]}>
-                <Feather name="download-cloud" size={28} color="#B7F52E" />
+                <Feather name="download-cloud" size={28} color={colors.primaryText} />
               </View>
             )}
           </View>
 
           {/* ── Title ── */}
-          <Text style={styles.title}>
+          <Text style={[styles.title, { color: colors.foreground }]}>
             {isError
               ? 'Update Failed'
               : status === 'restarting'
@@ -101,7 +103,7 @@ export function UpdateModal({
           </Text>
 
           {/* ── Subtitle ── */}
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
             {isError
               ? errorMessage || 'Something went wrong. Please try again.'
               : status === 'restarting'
@@ -116,7 +118,7 @@ export function UpdateModal({
           {/* ── Progress Bar (downloading) ── */}
           {status === 'downloading' && (
             <View style={styles.progressBarContainer}>
-              <View style={styles.progressBarTrack}>
+              <View style={[styles.progressBarTrack, { backgroundColor: colors.border }]}>
                 <Animated.View style={[styles.progressBarFill, { width: '100%' }]} />
               </View>
             </View>
@@ -131,14 +133,14 @@ export function UpdateModal({
                     style={[styles.button, styles.primaryButton]}
                     onPress={onRetry}
                   >
-                    <Feather name="refresh-cw" size={16} color="#142033" style={{ marginRight: 6 }} />
+                    <Feather name="refresh-cw" size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                     <Text style={styles.primaryButtonText}>Try Again</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.button, styles.secondaryButton]}
                     onPress={onLater}
                   >
-                    <Text style={styles.secondaryButtonText}>Later</Text>
+                    <Text style={[styles.secondaryButtonText, { color: colors.mutedForeground }]}>Later</Text>
                   </Pressable>
                 </>
               ) : (
@@ -147,14 +149,14 @@ export function UpdateModal({
                     style={[styles.button, styles.primaryButton]}
                     onPress={onUpdateNow}
                   >
-                    <Feather name="download" size={16} color="#142033" style={{ marginRight: 6 }} />
+                    <Feather name="download" size={16} color={colors.primaryForeground} style={{ marginRight: 6 }} />
                     <Text style={styles.primaryButtonText}>Update Now</Text>
                   </Pressable>
                   <Pressable
                     style={[styles.button, styles.secondaryButton]}
                     onPress={onLater}
                   >
-                    <Text style={styles.secondaryButtonText}>Later</Text>
+                    <Text style={[styles.secondaryButtonText, { color: colors.mutedForeground }]}>Later</Text>
                   </Pressable>
                 </>
               )}

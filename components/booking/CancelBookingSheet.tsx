@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API } from '@/services/backend/api';
-import { BookingSnapshot } from '@/services/backend/database';
+import { BookingSnapshot } from '@/services/backend/api';
 
 export function CancelBookingSheet({ visible, onClose, booking, onSuccess }: { visible: boolean; onClose: () => void; booking: BookingSnapshot; onSuccess: (updatedSnapshot: BookingSnapshot) => void }) {
   const colors = useColors();
@@ -37,7 +37,6 @@ export function CancelBookingSheet({ visible, onClose, booking, onSuccess }: { v
   };
 
   const parseDate = (dateStr: string) => {
-    if (dateStr === 'mock-date') dateStr = '15 Sep';
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const parts = dateStr.split(' ');
     const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';

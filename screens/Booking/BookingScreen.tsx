@@ -151,7 +151,7 @@ export default function BookingScreen() {
                       backgroundColor: isSelected ? colors.primary : colors.tintLight,
                       alignItems: 'center', justifyContent: 'center', marginRight: 14
                     }}>
-                      <Feather name={m === 'Self Drive' ? 'key' : 'user'} size={20} color={isSelected ? '#000' : colors.primary} />
+                      <Feather name={m === 'Self Drive' ? 'key' : 'user'} size={20} color={isSelected ? colors.primaryForeground : colors.primaryText} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 15, fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium', color: colors.foreground }}>
@@ -167,7 +167,7 @@ export default function BookingScreen() {
                       </Text>
                       {isSelected ? (
                         <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
-                          <Feather name="check" size={12} color="#000" />
+                          <Feather name="check" size={12} color={colors.primaryForeground} />
                         </View>
                       ) : (
                         <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginTop: 6 }} />
@@ -181,9 +181,9 @@ export default function BookingScreen() {
         </View>
 
         {!isVehicleAvailable && !isMissingDates && (
-          <View style={{ backgroundColor: '#FEE2E2', padding: 16, borderRadius: 12, marginTop: 16 }}>
-            <Text style={{ color: '#DC2626', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Not Available</Text>
-            <Text style={{ color: '#991B1B', fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4 }}>
+          <View style={{ backgroundColor: colors.destructive + '12', borderColor: colors.destructive + '40', borderWidth: 1, padding: 16, borderRadius: 12, marginTop: 16 }}>
+            <Text style={{ color: colors.destructive, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Not Available</Text>
+            <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4 }}>
               Sorry, this vehicle is no longer available for your selected dates. Please change your dates.
             </Text>
           </View>

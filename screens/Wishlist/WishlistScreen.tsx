@@ -42,7 +42,7 @@ export default function WishlistScreen() {
       >
         <Animated.View style={{ transform: [{ scale: pulseAnim }], marginBottom: 24 }}>
           <View style={[styles.iconCircle, { backgroundColor: colors.tintLight }]}>
-            <Ionicons name="heart" size={42} color={colors.primary} />
+            <Ionicons name="heart" size={42} color={colors.primaryText} />
           </View>
         </Animated.View>
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Your Wishlist is Empty</Text>

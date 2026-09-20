@@ -2,11 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react'
 import { FlatList, StyleSheet, Text, View, Animated, Pressable, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
-import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { useFocusEffect, useRouter } from 'expo-router';
+import Reanimated, { FadeIn, FadeOut, FadeInRight, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { premiumCollection } from '@/utils/sawari';
+import { getAvailability, splitDateRange } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import {
   Header,
@@ -17,6 +17,8 @@ import {
   OfferCard,
   LuxuryCarTile,
   Skeleton,
+  HomeCarSkeleton,
+  OfferCardSkeleton,
   DestinationCard,
   LoginBottomSheet,
 } from '@/components';
@@ -24,6 +26,7 @@ import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { fetchOffers } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
+import { useVehicles } from '@/hooks/useVehicles';
 import * as Location from 'expo-location';
 
 const DESTINATIONS = [
@@ -40,7 +43,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated, setBookingSource } = useSawari();
+  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated, setBookingSource, selectedDate, isAuthLoading } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -51,10 +54,22 @@ export default function HomeScreen() {
     return 'Good evening';
   }, []);
 
-  const renderOffer = useCallback(({ item }: any) => <OfferCard offer={item} />, []);
-  const renderLuxury = useCallback(({ item }: any) => <LuxuryCarTile car={item} />, []);
-  const renderDest = useCallback(({ item }: any) => (
-    <DestinationCard image={item.image} title={item.title} subtitle={item.subtitle} places={item.places} />
+  const renderOffer = useCallback(({ item, index }: any) => (
+    <Reanimated.View entering={FadeInRight.delay(index * 50).duration(400)}>
+      <OfferCard offer={item} />
+    </Reanimated.View>
+  ), []);
+  
+  const renderLuxury = useCallback(({ item, index }: any) => (
+    <Reanimated.View entering={FadeInRight.delay(index * 50).duration(400)}>
+      <LuxuryCarTile car={item} />
+    </Reanimated.View>
+  ), []);
+  
+  const renderDest = useCallback(({ item, index }: any) => (
+    <Reanimated.View entering={FadeInRight.delay(index * 50).duration(400)}>
+      <DestinationCard image={item.image} title={item.title} subtitle={item.subtitle} places={item.places} />
+    </Reanimated.View>
   ), []);
 
   const { data: offers = [], isLoading: isLoadingOffers } = useQuery({
@@ -62,26 +77,65 @@ export default function HomeScreen() {
     queryFn: fetchOffers,
   });
 
-  const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useQuery({
-    queryKey: ['vehicles'],
-    queryFn: () => API.getVehiclesWithAvailability(),
+  const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useVehicles();
+
+  const { data: upcomingBooking, refetch: refetchUpcomingBooking } = useQuery({
+    queryKey: ['upcomingBooking'],
+    queryFn: async () => {
+      const bookings = await API.getAllBookings();
+      const upcoming = bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'PENDING').sort((a, b) => {
+        return new Date(a.pickupDate).getTime() - new Date(b.pickupDate).getTime();
+      });
+      return upcoming.length > 0 ? upcoming[0] : null;
+    },
+    enabled: !!(isAuthenticated && !isAuthLoading),
+    staleTime: 15 * 1000,
+    refetchInterval: 60 * 1000,
+    refetchOnWindowFocus: true,
   });
 
-  const getStatusRank = (car: any) => {
-    if (car.dbStatus === 'available') return 1;
-    if (car.dbStatus === 'rent') return 2;
-    return 3;
+  const upcomingCar = useMemo(() => {
+    if (!upcomingBooking || fetchedVehicles.length === 0) return null;
+    return fetchedVehicles.find(v => v.id === upcomingBooking.vehicleId) || null;
+  }, [upcomingBooking, fetchedVehicles]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthLoading) {
+        if (isAuthenticated) refetchUpcomingBooking();
+      }
+    }, [isAuthLoading, isAuthenticated, refetchUpcomingBooking])
+  );
+
+  // Only vehicles that are free for the chosen date (or today) are shown, each
+  // carrying its availability so the tile can say when it is free.
+  const processVehicles = (vehicles: any[], type: string, favourites: string[]) => {
+    const [startStr, endStr] = selectedDate === 'All Dates' ? [undefined, undefined] : splitDateRange(selectedDate);
+    const available = vehicles
+      .filter(v => v && v.name && v.type === type)
+      .map(v => ({ ...v, availability: getAvailability(v, startStr, endStr) }))
+      .filter(v => v.availability.available)
+      .map(v => ({ ...v, isAvailable: true }));
+
+    // Popular models first, then everything else that is available.
+    const rank = (v: any) => {
+      const i = favourites.findIndex(name => v.name.toLowerCase().includes(name));
+      return i === -1 ? favourites.length : i;
+    };
+    return available.sort((a, b) => rank(a) - rank(b)).slice(0, 6);
   };
 
-  const targetCars = ['creta', 'curvv', 'innova', 'brezza'];
-  const displayCars = (fetchedVehicles.length > 0 ? fetchedVehicles : (!isLoadingVehicles ? premiumCollection : []))
-    .filter(v => v.type === 'Car' && targetCars.some(t => v.name.toLowerCase().includes(t)))
-    .sort((a, b) => getStatusRank(a) - getStatusRank(b));
+  const peopleChoiceCars = useMemo(() => ['curvv', 'venue', 'brezza', 'innova', 'creta'], []);
+  const displayCars = useMemo(
+    () => processVehicles(fetchedVehicles, 'Car', peopleChoiceCars),
+    [fetchedVehicles, peopleChoiceCars, selectedDate]
+  );
 
-  const targetBikes = ['jawa', 'hunter', 'xpulse', 'ntorq'];
-  const displayBikes = (fetchedVehicles.length > 0 ? fetchedVehicles : (!isLoadingVehicles ? premiumCollection : []))
-    .filter(v => v.type === 'Bike' && targetBikes.some(t => v.name.toLowerCase().includes(t)))
-    .sort((a, b) => getStatusRank(a) - getStatusRank(b));
+  const peopleChoiceBikes = useMemo(() => ['xpulse', 'xpluse', 'ntorq', 'hunter', 'jawa'], []);
+  const displayBikes = useMemo(
+    () => processVehicles(fetchedVehicles, 'Bike', peopleChoiceBikes),
+    [fetchedVehicles, peopleChoiceBikes, selectedDate]
+  );
 
   // ── App Startup Permissions ──
   useEffect(() => {
@@ -151,10 +205,11 @@ export default function HomeScreen() {
     { type: 'footer', key: 'footer' },
   ], []);
 
-  const renderSection = useCallback(({ item }: any) => {
+  const renderSection = useCallback(({ item, index }: any) => {
+    let content = null;
     switch (item.type) {
       case 'header':
-        return (
+        content = (
           <>
             <Header />
             <View style={{ position: 'relative', overflow: 'visible', zIndex: -1 }}>
@@ -200,123 +255,135 @@ export default function HomeScreen() {
             />
           </>
         );
+        break;
       case 'referEarn':
-        return <AnimatedReferBanner router={router} />;
+        content = <AnimatedReferBanner router={router} />;
+        break;
       case 'nextTrip':
-        if (!bookingConfirmed || !selectedCar) return null;
-        return (
+        const carToDisplay = (bookingConfirmed && selectedCar) ? selectedCar : upcomingCar;
+        if (!carToDisplay) break;
+        
+        let dateRangeStr = undefined;
+        if (!bookingConfirmed && upcomingBooking) {
+          dateRangeStr = `${upcomingBooking.pickupDate} – ${upcomingBooking.returnDate}`;
+        }
+        
+        content = (
           <View style={styles.sectionPad}>
-            <NextTrip car={selectedCar} />
+            <NextTrip car={carToDisplay} dateRangeStr={dateRangeStr} />
           </View>
         );
+        break;
       case 'offers':
-        return (
+        content = (
           <>
             <SectionHeading title="Special Deals" kicker="EXCLUSIVE SPECIALS" />
-            {isLoadingOffers ? (
-              <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.offerRow}>
-                  {Array(3).fill(0).map((_, i) => (
-                    <View key={i} style={{ marginRight: i < 2 ? 14 : 0 }}>
-                      <Skeleton width={290} height={175} borderRadius={20} />
-                    </View>
-                  ))}
-                </ScrollView>
-              </Reanimated.View>
-            ) : (
-              <Reanimated.View entering={FadeIn.duration(400)}>
-                <FlatList
-                  data={offers}
-                  keyExtractor={(item) => item.id}
-                  renderItem={renderOffer}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.offerRow}
-                  snapToInterval={304}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
-                  removeClippedSubviews
-                  initialNumToRender={2}
-                  maxToRenderPerBatch={3}
-                  windowSize={3}
-                />
-              </Reanimated.View>
-            )}
-          </>
-        );
-      case 'exploreVehicles':
-        if (vehicleType === 'car') {
-          return (
-            <>
-              <SectionHeading title="Explore Cars" kicker="TOP FOUR WHEELERS" action="View all" onAction={() => router.push('/explore')} />
-              {isLoadingVehicles ? (
-                <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.luxuryRow}>
+            <FlatList
+              data={isLoadingOffers ? [] : offers}
+              keyExtractor={(item, index) => item?.id || String(index)}
+              renderItem={renderOffer}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.offerRow}
+              snapToInterval={304}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              removeClippedSubviews
+              initialNumToRender={2}
+              maxToRenderPerBatch={3}
+              windowSize={3}
+              ListEmptyComponent={
+                isLoadingOffers ? (
+                  <View style={{ flexDirection: 'row' }}>
                     {Array(3).fill(0).map((_, i) => (
-                      <View key={i} style={{ marginRight: i < 2 ? 16 : 0 }}>
-                        <Skeleton width={240} height={220} borderRadius={18} />
+                      <View key={i} style={{ marginRight: i < 2 ? 14 : 0 }}>
+                        <OfferCardSkeleton delay={i * 100} />
                       </View>
                     ))}
-                  </ScrollView>
-                </Reanimated.View>
-              ) : (
-                <Reanimated.View entering={FadeIn.duration(400)}>
-                  <FlatList
-                    data={displayCars}
-                    keyExtractor={(item) => item.id}
-                    renderItem={renderLuxury}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.luxuryRow}
-                    snapToInterval={256}
-                    snapToAlignment="start"
-                    decelerationRate="fast"
-                    removeClippedSubviews
-                    initialNumToRender={3}
-                    maxToRenderPerBatch={3}
-                    windowSize={3}
-                  />
-                </Reanimated.View>
-              )}
+                  </View>
+                ) : null
+              }
+            />
+          </>
+        );
+        break;
+      case 'exploreVehicles':
+        if (vehicleType === 'car') {
+          content = (
+            <>
+              <SectionHeading title="People's Choice" kicker="TOP FOUR WHEELERS" action="View all" onAction={() => router.push('/explore')} />
+              <FlatList
+                data={isLoadingVehicles ? [] : displayCars}
+                keyExtractor={(item, index) => item?.id || String(index)}
+                renderItem={renderLuxury}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.luxuryRow}
+                snapToInterval={256}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                removeClippedSubviews
+                initialNumToRender={3}
+                maxToRenderPerBatch={3}
+                windowSize={3}
+                ListEmptyComponent={
+                  isLoadingVehicles ? (
+                    <View style={{ flexDirection: 'row' }}>
+                      {Array(3).fill(0).map((_, i) => (
+                        <View key={i} style={{ marginRight: i < 2 ? 16 : 0 }}>
+                          <HomeCarSkeleton delay={i * 100} />
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={[styles.emptyVehicles, { color: colors.mutedForeground }]}>
+                      {selectedDate === 'All Dates' ? 'None available right now.' : `None available on ${selectedDate}.`} Try another date.
+                    </Text>
+                  )
+                }
+              />
+            </>
+          );
+        } else {
+          content = (
+            <>
+              <SectionHeading title="People's Choice" kicker="TWO WHEELER THRILLS" action="View all" onAction={() => router.push('/explore')} />
+              <FlatList
+                data={isLoadingVehicles ? [] : displayBikes}
+                keyExtractor={(item, index) => item?.id || String(index)}
+                renderItem={renderLuxury}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.luxuryRow}
+                snapToInterval={256}
+                snapToAlignment="start"
+                decelerationRate="fast"
+                removeClippedSubviews
+                initialNumToRender={3}
+                maxToRenderPerBatch={3}
+                windowSize={3}
+                ListEmptyComponent={
+                  isLoadingVehicles ? (
+                    <View style={{ flexDirection: 'row' }}>
+                      {Array(3).fill(0).map((_, i) => (
+                        <View key={i} style={{ marginRight: i < 2 ? 16 : 0 }}>
+                          <HomeCarSkeleton delay={i * 100} />
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={[styles.emptyVehicles, { color: colors.mutedForeground }]}>
+                      {selectedDate === 'All Dates' ? 'None available right now.' : `None available on ${selectedDate}.`} Try another date.
+                    </Text>
+                  )
+                }
+              />
             </>
           );
         }
-        return (
-          <>
-            <SectionHeading title="Explore Bikes" kicker="TWO WHEELER THRILLS" action="View all" onAction={() => router.push('/explore')} />
-            {isLoadingVehicles ? (
-              <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)}>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.luxuryRow}>
-                  {Array(3).fill(0).map((_, i) => (
-                    <View key={i} style={{ marginRight: i < 2 ? 16 : 0 }}>
-                      <Skeleton width={240} height={220} borderRadius={18} />
-                    </View>
-                  ))}
-                </ScrollView>
-              </Reanimated.View>
-            ) : (
-              <Reanimated.View entering={FadeIn.duration(400)}>
-                <FlatList
-                  data={displayBikes}
-                  keyExtractor={(item) => item.id}
-                  renderItem={renderLuxury}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.luxuryRow}
-                  snapToInterval={256}
-                  snapToAlignment="start"
-                  decelerationRate="fast"
-                  removeClippedSubviews
-                  initialNumToRender={3}
-                  maxToRenderPerBatch={3}
-                  windowSize={3}
-                />
-              </Reanimated.View>
-            )}
-          </>
-        );
+        break;
       case 'destinations':
-        return (
+        content = (
           <>
             <SectionHeading title="Explore Northeast" kicker="TOP DESTINATIONS" />
             <FlatList
@@ -336,8 +403,9 @@ export default function HomeScreen() {
             />
           </>
         );
+        break;
       case 'footer':
-        return (
+        content = (
           <View style={[styles.footer, { position: 'relative', overflow: 'hidden', width: '100%' }]}>
             <View style={[styles.footerDivider, { backgroundColor: colors.border }]} />
             
@@ -347,16 +415,18 @@ export default function HomeScreen() {
 
             <Text style={[styles.footerTagline, { color: colors.mutedForeground }]}>Your ride, your way.</Text>
             <View style={styles.footerMadeIn}>
-              <Feather name="map-pin" size={12} color={colors.primary} />
+              <Feather name="map-pin" size={12} color={colors.primaryText} />
               <Text style={[styles.footerLocation, { color: colors.mutedForeground }]}>Developed in Guwahati, Assam</Text>
             </View>
             <Text style={[styles.footerCopy, { color: colors.mutedForeground }]}>© {new Date().getFullYear()} MySawari. All rights reserved.</Text>
           </View>
         );
-      default:
-        return null;
+        break;
     }
-  }, [colors, greeting, customer?.name, isAuthenticated, pickup, dropoff, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, renderOffer, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim]);
+    
+    if (!content) return null;
+    return content;
+  }, [colors, greeting, customer?.name, isAuthenticated, pickup, dropoff, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, renderOffer, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, upcomingBooking, upcomingCar]);
 
   return (
     <Page bottomNav scroll={false}>
@@ -381,6 +451,7 @@ const styles = StyleSheet.create({
   greeting: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 22, paddingHorizontal: 20 },
   heading: { fontFamily: 'Inter_700Bold', fontSize: 26, letterSpacing: -0.8, lineHeight: 32, marginTop: 6, paddingHorizontal: 20 },
   sectionPad: { paddingHorizontal: 16 },
+  emptyVehicles: { fontFamily: 'Inter_500Medium', fontSize: 13, paddingVertical: 24 },
   offerRow: { gap: 14, paddingBottom: 6, paddingTop: 12, paddingHorizontal: 20 },
   luxuryRow: { gap: 16, paddingBottom: 24, paddingTop: 10, paddingHorizontal: 20 },
   destRow: { paddingBottom: 32, paddingTop: 10, paddingHorizontal: 20 },

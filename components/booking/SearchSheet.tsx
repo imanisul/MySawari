@@ -6,7 +6,7 @@ import { useColors } from '@/hooks/useColors';
 import { SearchCard } from './SearchCard';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { useSawari } from '@/context/SawariContext';
-import { checkCarAvailability } from '@/utils/sawari';
+import { getAvailability } from '@/utils/sawari';
 
 export function SearchSheet({
   visible,
@@ -32,8 +32,8 @@ export function SearchSheet({
   }
 
   // Check if selected car is available on these dates
-  const isAvailable = checkCarAvailability(selectedCar, startStr, endStr);
-  // Note: in a real app, this date validation logic would be more robust.
+  const availability = getAvailability(selectedCar, startStr, endStr);
+  const isAvailable = availability.available;
   
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -54,16 +54,16 @@ export function SearchSheet({
             </View>
 
             {hasValidDates && !isAvailable && (
-              <View style={styles.errorBox}>
-                <Feather name="alert-circle" size={16} color="#DC2626" />
-                <Text style={styles.errorText}>This {selectedCar?.category.toLowerCase()} is not available on your selected dates. It is available on: {selectedCar?.availabilityDate}.</Text>
+              <View style={[styles.errorBox, { backgroundColor: colors.destructive + '12' }]}>
+                <Feather name="alert-circle" size={16} color={colors.destructive} />
+                <Text style={[styles.errorText, { color: colors.destructive }]}>This {selectedCar?.category.toLowerCase()} is not available on your selected dates. {availability.nextAvailableFrom ? `It is next available from ${availability.nextAvailableFrom}.` : 'Please choose different dates.'}</Text>
               </View>
             )}
             
             {hasValidDates && isAvailable && (
-              <View style={styles.successBox}>
-                <Feather name="check-circle" size={16} color="#16A34A" />
-                <Text style={styles.successText}>Available! You can proceed to booking.</Text>
+              <View style={[styles.successBox, { backgroundColor: colors.success + '1A' }]}>
+                <Feather name="check-circle" size={16} color={colors.success} />
+                <Text style={[styles.successText, { color: colors.success }]}>Available! You can proceed to booking.</Text>
               </View>
             )}
 

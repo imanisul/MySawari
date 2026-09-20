@@ -10,7 +10,7 @@ export default function PaymentErrorScreen() {
   const router = useRouter();
   return (
       <SheetFrame centered height={400}>
-      <Feather name="alert-triangle" size={24} color={colors.destructive} style={styles.alertIcon} />
+      <Feather name="alert-triangle" size={24} color={colors.destructive} style={[styles.alertIcon, { backgroundColor: colors.destructive + '12' }]} />
       <Text style={[styles.title, { color: colors.foreground }]}>Payment didn’t go through</Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>No money was charged to your booking.</Text>
       <Pressable onPress={() => router.replace('/payment')} style={[styles.tryButton, { backgroundColor: colors.primary }]}>

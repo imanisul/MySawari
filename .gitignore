@@ -39,3 +39,6 @@ yarn-error.*
 .vercel
 
 .env
+
+# Backend lives in its own repository: github.com/mysawari/mysawari_customer_backend
+/mysawari_customer_backend/

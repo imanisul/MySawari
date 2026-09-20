@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoginBottomSheet } from '@/components';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
+import { Reveal } from '@/components/common/Reveal';
+import { LoyaltySkeleton } from '@/components/loading/ScreenSkeletons';
 
 export default function ProfileScreen() {
   const colors = useColors();
@@ -27,7 +29,7 @@ export default function ProfileScreen() {
   const giftGlowAnim = useRef(new Animated.Value(0)).current;
 
   // Fetch ride journey data from backend
-  const { data: journey } = useQuery({
+  const { data: journey, isLoading: isJourneyLoading } = useQuery({
     queryKey: ['ride-journey'],
     queryFn: () => API.getRideJourney(),
     enabled: !!isAuthenticated,
@@ -135,6 +137,7 @@ export default function ProfileScreen() {
       <Header title="Profile" hideLogo={true} back={false} />
       
       <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
+        <Reveal delay={0}>
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.profileHeader}>
@@ -168,6 +171,9 @@ export default function ProfileScreen() {
           </View>
         </View>
 
+        </Reveal>
+
+        <Reveal delay={90}>
         {/* SawariCash Wallet */}
         <LinearGradient 
           colors={['#1F2937', '#111827']} 
@@ -212,9 +218,16 @@ export default function ProfileScreen() {
           </View>
         </LinearGradient>
 
+        </Reveal>
+
+        <Reveal delay={180}>
         {/* Loyalty Punch Card — Original Design, Data-Driven */}
         <View style={[styles.loyaltyCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[styles.loyaltyTitle, { color: colors.foreground }]}>Your Ride Journey</Text>
+          {isJourneyLoading ? (
+            <LoyaltySkeleton />
+          ) : (
+          <>
           <Text style={[styles.loyaltySubtitle, { color: colors.mutedForeground }]}>
             {giftUnlocked 
               ? '🎉 You unlocked a special reward! Tap the gift to claim!'
@@ -270,7 +283,11 @@ export default function ProfileScreen() {
               </Animated.View>
             </Pressable>
           </View>
+          </>
+          )}
         </View>
+
+        </Reveal>
 
         {/* Reward Pop-up Modal */}
         <Modal visible={showRewardModal} transparent animationType="fade">
@@ -297,6 +314,7 @@ export default function ProfileScreen() {
           </Pressable>
         </Modal>
 
+        <Reveal delay={270}>
         {/* Menu Items */}
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => (
@@ -320,6 +338,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        </Reveal>
         <View style={{ height: insets.bottom + 80 }} />
       </ScrollView>
     </Page>

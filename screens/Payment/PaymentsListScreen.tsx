@@ -8,6 +8,8 @@ import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { Reveal } from '@/components/common/Reveal';
+import { PaymentsSkeleton } from '@/components/loading/ScreenSkeletons';
 import { API } from '@/services/backend/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -221,7 +223,7 @@ export default function PaymentsScreen() {
           </Text>
 
           {isLoadingWallet ? (
-            <ActivityIndicator color={colors.primaryText} style={{ marginTop: 20 }} />
+            <PaymentsSkeleton />
           ) : transactions.length === 0 ? (
             <View style={[styles.emptyCard, { borderColor: colors.border }]}>
               <Feather name="clock" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
@@ -229,6 +231,7 @@ export default function PaymentsScreen() {
               <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>Your SawariCash history will appear here.</Text>
             </View>
           ) : (
+            <Reveal>
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 24 }]}>
               {transactions.map((tx: any, index: number) => (
                 <View
@@ -255,6 +258,7 @@ export default function PaymentsScreen() {
                 </View>
               ))}
             </View>
+            </Reveal>
           )}
 
           <TouchableOpacity 

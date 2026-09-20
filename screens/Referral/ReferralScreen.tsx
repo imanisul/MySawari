@@ -10,6 +10,8 @@ import ViewShot from 'react-native-view-shot';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { useRouter } from 'expo-router';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
+import { ReferralSkeleton } from '@/components/loading/ScreenSkeletons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function ReferScreen() {
@@ -48,9 +50,7 @@ export default function ReferScreen() {
     return (
       <Page>
         <Header title="Refer & Earn" back />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primaryText} />
-        </View>
+        <ReferralSkeleton />
       </Page>
     );
   }
@@ -154,9 +154,7 @@ export default function ReferScreen() {
     return (
       <Page>
         <Header title="Refer & Earn" back />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primaryText} />
-        </View>
+        <ReferralSkeleton />
       </Page>
     );
   }
@@ -168,6 +166,7 @@ export default function ReferScreen() {
     <Page scroll={false}>
       <Header title="Refer & Earn" back />
       
+      <Reanimated.View entering={FadeIn.duration(450)} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
         <ViewShot ref={viewShotRef} options={{ format: "jpg", quality: 0.9 }}>
@@ -284,6 +283,7 @@ export default function ReferScreen() {
 
         <View style={{ height: insets.bottom + 80 }} />
       </ScrollView>
+      </Reanimated.View>
     </Page>
   );
 }

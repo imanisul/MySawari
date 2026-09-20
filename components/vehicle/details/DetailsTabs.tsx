@@ -8,6 +8,8 @@ import { API } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import { WriteReviewBottomSheet } from './WriteReviewBottomSheet';
 import { Modal, ScrollView } from 'react-native';
+import { Reveal } from '@/components/common/Reveal';
+import { ReviewListSkeleton } from '@/components/loading/ScreenSkeletons';
 import { useQuery } from '@tanstack/react-query';
 import { Image as ExpoImage } from 'expo-image';
 
@@ -212,7 +214,7 @@ function PhotoViewer({ uri, onClose }: { uri: string | null; onClose: () => void
 function ReviewsTab({ car }: { car: Car }) {
   const colors = useColors();
   const { isAuthenticated } = useSawari();
-  const { data: dbReviews = [] } = useCarReviews(car.id);
+  const { data: dbReviews = [], isLoading: isLoadingReviews } = useCarReviews(car.id);
   // If the customer has an unreviewed completed trip on this vehicle, reviewing from here counts as that trip (and unlocks photos).
   const { data: pendingTrips = [] } = useQuery({
     queryKey: ['pendingReviews'],
@@ -243,6 +245,15 @@ function ReviewsTab({ car }: { car: Car }) {
     }
     setIsWriteModalVisible(true);
   };
+
+  // Wait for the reviews before deciding there are none (car.reviews are the built-in ones and are instant).
+  if (isLoadingReviews && reviews.length === 0) {
+    return (
+      <View style={styles.tabSection}>
+        <ReviewListSkeleton />
+      </View>
+    );
+  }
 
   if (reviews.length === 0) {
     return (
@@ -311,7 +322,11 @@ function ReviewsTab({ car }: { car: Car }) {
       </View>
 
       <View style={styles.reviewList}>
-        {visibleReviews.map((r, i) => <ReviewCard key={r.id || i} review={r} />)}
+        {visibleReviews.map((r, i) => (
+          <Reveal key={r.id || i} delay={Math.min(i, 5) * 60}>
+            <ReviewCard review={r} />
+          </Reveal>
+        ))}
       </View>
 
       {!showAllReviews && reviews.length > 3 && (

@@ -7,6 +7,8 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { formatCurrency } from '@/services/backend/pricingEngine';
+import { Reveal } from '@/components/common/Reveal';
+import { PriceSummarySkeleton } from '@/components/loading/ScreenSkeletons';
 
 export default function PaymentScreen() {
   const colors = useColors();
@@ -221,6 +223,10 @@ export default function PaymentScreen() {
           </View>
 
 
+          {!pricingQuote ? (
+            <PriceSummarySkeleton />
+          ) : (
+          <Reveal>
           {/* BOOKING SUMMARY */}
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Booking Summary</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -307,6 +313,8 @@ export default function PaymentScreen() {
               </View>
             )}
           </View>
+          </Reveal>
+          )}
         </ScrollView>
 
         <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>

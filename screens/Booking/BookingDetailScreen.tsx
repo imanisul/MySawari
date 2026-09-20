@@ -10,6 +10,8 @@ import { cars } from '@/utils/sawari';
 import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal } from '@/components/booking/ReviewModal';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
+import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
 import { useQuery } from '@tanstack/react-query';
 
 export default function BookingDetailScreen() {
@@ -44,8 +46,14 @@ export default function BookingDetailScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primaryText} />
+      <View style={[styles.screen, { backgroundColor: colors.background }]}>
+        <View style={[styles.content, { paddingTop: insets.top + 16 }]}>
+          <View style={styles.topBar}>
+            <View style={[styles.circle, { borderColor: colors.border }]}><Feather name="chevron-left" size={20} color={colors.foreground} /></View>
+            <Text style={[styles.title, { color: colors.foreground }]}>Booking Details</Text>
+          </View>
+          <BookingDetailSkeleton />
+        </View>
       </View>
     );
   }
@@ -69,7 +77,7 @@ export default function BookingDetailScreen() {
   const carImage = matchedCar ? matchedCar.image : cars[0].image;
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+    <Reanimated.View entering={FadeIn.duration(400)} style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={[styles.circle, { borderColor: colors.border }]}><Feather name="chevron-left" size={20} color={colors.foreground} /></Pressable>
@@ -316,7 +324,7 @@ export default function BookingDetailScreen() {
           )}
         </View>
       )}
-    </View>
+    </Reanimated.View>
   );
 }
 

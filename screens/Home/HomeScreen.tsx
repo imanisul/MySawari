@@ -27,6 +27,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchOffers } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
+import { Reveal } from '@/components/common/Reveal';
+import { SocialLinks } from '@/components/common/SocialLinks';
 import * as Location from 'expo-location';
 
 const DESTINATIONS = [
@@ -414,6 +416,7 @@ export default function HomeScreen() {
             </View>
 
             <Text style={[styles.footerTagline, { color: colors.mutedForeground }]}>Your ride, your way.</Text>
+            <SocialLinks />
             <View style={styles.footerMadeIn}>
               <Feather name="map-pin" size={12} color={colors.primaryText} />
               <Text style={[styles.footerLocation, { color: colors.mutedForeground }]}>Developed in Guwahati, Assam</Text>
@@ -425,7 +428,8 @@ export default function HomeScreen() {
     }
     
     if (!content) return null;
-    return content;
+    // Each section eases in a beat after the one above it, so the page builds top to bottom.
+    return <Reveal delay={Math.min(index, 6) * 70}>{content}</Reveal>;
   }, [colors, greeting, customer?.name, isAuthenticated, pickup, dropoff, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, renderOffer, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, upcomingBooking, upcomingCar]);
 
   return (

@@ -63,7 +63,15 @@ import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari
 import { Platform } from 'react-native';
 
 // Local backend
-const BASE_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+// The backend is a separate project. Point the app at it with EXPO_PUBLIC_API_BASE_URL
+// (e.g. https://api.example.com, or http://<your-computer's-LAN-IP>:5001 to test on a real phone).
+// Without it we fall back to a backend running on the same computer: localhost on the
+// iOS simulator, 10.0.2.2 on the Android emulator.
+const LOCAL_DEV_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
+const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || LOCAL_DEV_URL).replace(/\/+$/, '');
+if (!__DEV__ && !process.env.EXPO_PUBLIC_API_BASE_URL) {
+  console.warn('EXPO_PUBLIC_API_BASE_URL is not set — this build is talking to a local development server.');
+}
 const BACKEND_URL = `${BASE_URL}/api`;
 
 // The render backend does not currently expose /locations routes, so

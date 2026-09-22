@@ -75,41 +75,93 @@ export function DetailsTabs({
 // --- TAB: ABOUT ---
 function AboutTab({ car }: { car: Car }) {
   const colors = useColors();
-  const highlights = getCarHighlights(car);
+  const isBike = car.type === 'Bike';
+  const highlights = car.highlights || getCarHighlights(car);
 
   return (
     <View style={styles.tabSection}>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About this {car.type.toLowerCase()}</Text>
       <Text style={[styles.description, { color: colors.mutedForeground }]}>
-        {car.description || "A well-maintained vehicle perfect for your trips. Reliable, comfortable, and spacious."}
+        {car.description || `A well-maintained ${car.type.toLowerCase()} perfect for your trips. Reliable, comfortable, and ready to go.`}
       </Text>
 
       {highlights.length > 0 && (
         <>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32 }]}>Why this {car.type.toLowerCase()}?</Text>
-          <View style={styles.featuresGrid}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28 }]}>Good for</Text>
+          <View style={styles.highlightsRow}>
             {highlights.map(tag => (
-              <View key={tag} style={[styles.featureItem, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>
-                <Feather name="check" size={16} color={colors.primaryText} />
-                <Text style={[styles.featureText, { color: colors.foreground }]}>{tag}</Text>
+              <View key={tag} style={[styles.highlightChip, { backgroundColor: colors.tintLight, borderColor: colors.primary + '30' }]}>
+                <Feather name="zap" size={13} color={colors.primaryText} />
+                <Text style={[styles.highlightChipText, { color: colors.primaryText }]}>{tag}</Text>
               </View>
             ))}
           </View>
         </>
       )}
 
-      <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32 }]}>Vehicle Details</Text>
-      <View style={[styles.grid, { borderColor: colors.border, backgroundColor: colors.card }]}>
-        <DetailRow label="Transmission" value={car.transmission} />
-        <DetailRow label="Fuel" value={car.fuel} />
-        <DetailRow label="Seats" value={car.seats} />
-        {car.mileage && <DetailRow label="Mileage" value={car.mileage} />}
-        {car.luggage && <DetailRow label="Luggage" value={car.luggage} />}
-        {car.doors && <DetailRow label="Doors" value={car.doors} />}
-        {car.modelYear && <DetailRow label="Model Year" value={car.modelYear} />}
+      <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28 }]}>
+        {isBike ? 'Bike Specifications' : 'Vehicle Specifications'}
+      </Text>
+      <View style={[styles.specsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Row 1: Core specs */}
+        <View style={styles.specsGrid}>
+          <SpecBox icon="settings" label="Transmission" value={car.transmission} colors={colors} />
+          <SpecBox icon="droplet" label="Fuel Type" value={car.fuel} colors={colors} />
+          <SpecBox icon="users" label={isBike ? 'Riders' : 'Seating'} value={car.seats} colors={colors} />
+          {car.engine && <SpecBox icon="cpu" label="Engine" value={car.engine} colors={colors} />}
+        </View>
+
+        <View style={[styles.specsDivider, { backgroundColor: colors.border }]} />
+
+        {/* Row 2: Performance */}
+        <View style={styles.specsGrid}>
+          {car.mileage && car.mileage !== 'N/A' && <SpecBox icon="bar-chart-2" label="Mileage" value={car.mileage} colors={colors} />}
+          {car.topSpeed && <SpecBox icon="wind" label="Top Speed" value={car.topSpeed} colors={colors} />}
+          {car.acceleration && <SpecBox icon="zap" label="0-100 km/h" value={car.acceleration} colors={colors} />}
+          {car.tankCapacity && <SpecBox icon="battery" label={car.fuel === 'EV' ? 'Battery' : 'Tank'} value={car.tankCapacity} colors={colors} />}
+        </View>
+
+        {/* Row 3: Build (only if we have data) */}
+        {(car.groundClearance || car.kerbWeight || car.bootSpace || car.airbags) && (
+          <>
+            <View style={[styles.specsDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.specsGrid}>
+              {car.groundClearance && <SpecBox icon="arrow-up" label="Clearance" value={car.groundClearance} colors={colors} />}
+              {car.kerbWeight && <SpecBox icon="box" label="Weight" value={car.kerbWeight} colors={colors} />}
+              {!isBike && car.bootSpace && <SpecBox icon="briefcase" label="Boot Space" value={car.bootSpace} colors={colors} />}
+              {!isBike && car.airbags && <SpecBox icon="shield" label="Airbags" value={car.airbags} colors={colors} />}
+            </View>
+          </>
+        )}
+
+        {/* Row 4: Wheels & Brakes */}
+        {(car.brakes || car.tyreSize) && (
+          <>
+            <View style={[styles.specsDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.specsGrid}>
+              {car.brakes && <SpecBox icon="disc" label="Brakes" value={car.brakes} colors={colors} />}
+              {car.tyreSize && <SpecBox icon="circle" label="Tyre Size" value={car.tyreSize} colors={colors} />}
+            </View>
+          </>
+        )}
       </View>
 
-      <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32 }]}>Features & Amenities</Text>
+      {/* Vehicle Info — from DB */}
+      {(car.color || car.registrationYear || car.manufacturer || car.variant || (!isBike && car.doors) || car.luggage) && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28 }]}>Vehicle Info</Text>
+          <View style={[styles.grid, { borderColor: colors.border, backgroundColor: colors.card }]}>
+            {car.manufacturer && <DetailRow label="Manufacturer" value={car.manufacturer} />}
+            {car.variant && <DetailRow label="Variant" value={car.variant} />}
+            {car.color && <DetailRow label="Colour" value={car.color} />}
+            {car.registrationYear && <DetailRow label="Reg. Year" value={car.registrationYear} />}
+            {!isBike && car.doors && <DetailRow label="Doors" value={car.doors} />}
+            {car.luggage && <DetailRow label="Luggage" value={car.luggage} />}
+          </View>
+        </>
+      )}
+
+      <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28 }]}>Features & Amenities</Text>
       <View style={styles.featuresGrid}>
         {(car.features || ['Air Conditioning', 'Power Steering', 'Bluetooth']).map(feature => (
           <View key={feature} style={[styles.featureItem, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>
@@ -118,6 +170,18 @@ function AboutTab({ car }: { car: Car }) {
           </View>
         ))}
       </View>
+    </View>
+  );
+}
+
+function SpecBox({ icon, label, value, colors }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; colors: any }) {
+  return (
+    <View style={styles.specBox}>
+      <View style={[styles.specIconWrap, { backgroundColor: colors.tintLight }]}>
+        <Feather name={icon} size={16} color={colors.primaryText} />
+      </View>
+      <Text numberOfLines={1} style={[styles.specLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text numberOfLines={2} style={[styles.specValue, { color: colors.foreground }]}>{value}</Text>
     </View>
   );
 }
@@ -452,6 +516,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
+
   detailRow: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -485,6 +550,67 @@ const styles = StyleSheet.create({
   featureText: {
     fontFamily: 'Inter_500Medium',
     fontSize: 14,
+    flexShrink: 1,
+  },
+  // Highlight chips (Good for)
+  highlightsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  highlightChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  highlightChipText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+  },
+  // Specs card
+  specsCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    overflow: 'hidden',
+  },
+  specsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  specBox: {
+    width: '48%',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  specIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  specLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  specValue: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  specsDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: 8,
   },
   galleryGrid: {
     flexDirection: 'row',

@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { FlatList, StyleSheet, Text, View, Animated, Pressable, ScrollView } from 'react-native';
+import { FlatList, StyleSheet, Text, View, Animated, Pressable, ScrollView, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useFocusEffect, useRouter } from 'expo-router';
-import Reanimated, { FadeIn, FadeOut, FadeInRight, FadeInDown } from 'react-native-reanimated';
+import Reanimated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { getAvailability, splitDateRange } from '@/utils/sawari';
@@ -15,7 +15,7 @@ import {
   SearchCard,
   SectionHeading,
   OfferCard,
-  LuxuryCarTile,
+  CarListCard,
   Skeleton,
   HomeCarSkeleton,
   OfferCardSkeleton,
@@ -30,6 +30,7 @@ import { useVehicles } from '@/hooks/useVehicles';
 import { Reveal } from '@/components/common/Reveal';
 import { SocialLinks } from '@/components/common/SocialLinks';
 import * as Location from 'expo-location';
+import { rise } from '@/components/common/motion';
 
 const DESTINATIONS = [
   { id: '1', title: 'Assam', subtitle: 'Northeast India', image: require('../../assets/images/kaziranga.jpg'), places: ['Kaziranga National Park', 'Kamakhya Temple', 'Majuli', 'Manas National Park', 'Sivasagar'] },
@@ -45,7 +46,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated, setBookingSource, selectedDate, isAuthLoading } = useSawari();
+  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -56,45 +57,47 @@ export default function HomeScreen() {
     return 'Good evening';
   }, []);
 
-  const renderOffer = useCallback(({ item, index }: any) => (
-    <Reanimated.View entering={FadeInRight.delay(index * 50).duration(400)}>
-      <OfferCard offer={item} />
-    </Reanimated.View>
+  const renderOffer = useCallback(({ item }: any) => (
+    <OfferCard offer={item} />
   ), []);
   
-  const renderLuxury = useCallback(({ item, index }: any) => (
-    <Reanimated.View entering={FadeInRight.delay(index * 50).duration(400)}>
-      <LuxuryCarTile car={item} />
-    </Reanimated.View>
+  const renderLuxury = useCallback(({ item }: any) => (
+    <CarListCard car={item} style={{ width: 280, marginHorizontal: 8, marginBottom: 0 }} />
   ), []);
   
-  const renderDest = useCallback(({ item, index }: any) => (
-    <Reanimated.View entering={FadeInRight.delay(index * 50).duration(400)}>
-      <DestinationCard image={item.image} title={item.title} subtitle={item.subtitle} places={item.places} />
-    </Reanimated.View>
+  const renderDest = useCallback(({ item }: any) => (
+    <DestinationCard image={item.image} title={item.title} subtitle={item.subtitle} places={item.places} />
   ), []);
 
   const { data: offers = [], isLoading: isLoadingOffers } = useQuery({
     queryKey: ['offers'],
     queryFn: fetchOffers,
+    // There is no offers backend yet, so start from an empty list: no one-frame skeleton flash before
+    // the (instant) empty result. Real offers, when they exist, still replace this on the first fetch.
+    initialData: [] as Awaited<ReturnType<typeof fetchOffers>>,
+    initialDataUpdatedAt: 0,
   });
 
   const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useVehicles();
 
-  const { data: upcomingBooking, refetch: refetchUpcomingBooking } = useQuery({
-    queryKey: ['upcomingBooking'],
+  const { data: bookings = [], refetch: refetchBookings, isFetching: isFetchingBookings } = useQuery({
+    queryKey: ['bookings'],
     queryFn: async () => {
-      const bookings = await API.getAllBookings();
-      const upcoming = bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'PENDING').sort((a, b) => {
-        return new Date(a.pickupDate).getTime() - new Date(b.pickupDate).getTime();
-      });
-      return upcoming.length > 0 ? upcoming[0] : null;
+      const userBookings = await API.getAllBookings();
+      return userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     },
     enabled: !!(isAuthenticated && !isAuthLoading),
     staleTime: 15 * 1000,
     refetchInterval: 60 * 1000,
     refetchOnWindowFocus: true,
   });
+
+  const upcomingBooking = useMemo(() => {
+    const upcoming = bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'PENDING').sort((a, b) => {
+      return new Date(a.pickupDate).getTime() - new Date(b.pickupDate).getTime();
+    });
+    return upcoming.length > 0 ? upcoming[0] : null;
+  }, [bookings]);
 
   const upcomingCar = useMemo(() => {
     if (!upcomingBooking || fetchedVehicles.length === 0) return null;
@@ -103,28 +106,38 @@ export default function HomeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setBookingSource('home');
       if (!isAuthLoading) {
-        if (isAuthenticated) refetchUpcomingBooking();
+        if (isAuthenticated) refetchBookings();
       }
-    }, [isAuthLoading, isAuthenticated, refetchUpcomingBooking])
+    }, [isAuthLoading, isAuthenticated, refetchBookings, setBookingSource])
   );
 
-  // Only vehicles that are free for the chosen date (or today) are shown, each
-  // carrying its availability so the tile can say when it is free.
+  // People's Choice: show curated favourites (even if unavailable) plus available
+  // vehicles to fill up to 6 slots. Tiles already display availability status.
   const processVehicles = (vehicles: any[], type: string, favourites: string[]) => {
-    const [startStr, endStr] = selectedDate === 'All Dates' ? [undefined, undefined] : splitDateRange(selectedDate);
-    const available = vehicles
+    const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
+    const typed = vehicles
       .filter(v => v && v.name && v.type === type)
-      .map(v => ({ ...v, availability: getAvailability(v, startStr, endStr) }))
-      .filter(v => v.availability.available)
-      .map(v => ({ ...v, isAvailable: true }));
+      .map(v => {
+        const availability = getAvailability(v, startStr, endStr);
+        return { ...v, availability, isAvailable: availability.available };
+      });
 
-    // Popular models first, then everything else that is available.
+    const isFavourite = (v: any) => favourites.some(name => v.name.toLowerCase().includes(name));
+    const favs = typed.filter(isFavourite);
+
+    // Sort favourites by the curated order
     const rank = (v: any) => {
       const i = favourites.findIndex(name => v.name.toLowerCase().includes(name));
       return i === -1 ? favourites.length : i;
     };
-    return available.sort((a, b) => rank(a) - rank(b)).slice(0, 6);
+    favs.sort((a, b) => rank(a) - rank(b));
+
+    // Deduplicate by id
+    const seen = new Set<string>();
+    const unique = favs.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
+    return unique.slice(0, 6);
   };
 
   const peopleChoiceCars = useMemo(() => ['curvv', 'venue', 'brezza', 'innova', 'creta'], []);
@@ -200,6 +213,7 @@ export default function HomeScreen() {
   const sections = useMemo(() => [
     { type: 'header', key: 'header' },
     { type: 'nextTrip', key: 'nextTrip' },
+    { type: 'membershipPromo', key: 'membershipPromo' },
     { type: 'offers', key: 'offers' },
     { type: 'exploreVehicles', key: 'exploreVehicles' },
     { type: 'referEarn', key: 'referEarn' },
@@ -267,7 +281,9 @@ export default function HomeScreen() {
         
         let dateRangeStr = undefined;
         if (!bookingConfirmed && upcomingBooking) {
-          dateRangeStr = `${upcomingBooking.pickupDate} – ${upcomingBooking.returnDate}`;
+          const pTime = upcomingBooking.pickupTime || '8:00 AM';
+          const rTime = upcomingBooking.dropTime || (upcomingBooking as any).returnTime || '8:00 AM';
+          dateRangeStr = `${upcomingBooking.pickupDate} ${pTime} – ${upcomingBooking.returnDate} ${rTime}`;
         }
         
         content = (
@@ -276,6 +292,100 @@ export default function HomeScreen() {
           </View>
         );
         break;
+      case 'membershipPromo': {
+        const mem = customer?.membership || {};
+        const isMemActive = mem.plan && mem.expiresAt && new Date(mem.expiresAt) > new Date();
+        
+        if (isMemActive) {
+          const planDisplay = mem.plan.toUpperCase();
+          const cap = mem.plan === 'pro' ? 20000 : mem.plan === 'plus' ? 15000 : 10000;
+          const saved = mem.totalSaved || 0;
+          const progress = Math.min(100, (saved / cap) * 100);
+          
+          content = (
+            <View style={[styles.sectionPad, { marginTop: 16, marginBottom: 8 }]}>
+              <Pressable onPress={() => router.push('/membership')}>
+                <LinearGradient
+                  colors={['#111827', '#1F2937']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    borderRadius: 16,
+                    padding: 20,
+                    shadowColor: colors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 12,
+                    elevation: 5,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <Feather name="award" size={14} color={colors.primary} />
+                        <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: colors.primary, letterSpacing: 1.2 }}>MYSAWARI {planDisplay}</Text>
+                      </View>
+                      <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFF' }}>
+                        ₹{saved.toLocaleString('en-IN')} Saved
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: 'rgba(255, 215, 0, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.3)' }}>
+                      <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.primary }}>View Progress</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={{ height: 6, backgroundColor: '#374151', borderRadius: 3, overflow: 'hidden' }}>
+                    <Animated.View style={{ height: '100%', width: `${progress}%`, backgroundColor: colors.primary, borderRadius: 3 }} />
+                  </View>
+                  <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 11, color: '#9CA3AF', marginTop: 8 }}>
+                    You are {progress.toFixed(0)}% of the way to your ₹{cap.toLocaleString('en-IN')} limit!
+                  </Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          );
+        } else {
+          content = (
+            <View style={[styles.sectionPad, { marginTop: 16, marginBottom: 8 }]}>
+              <Pressable onPress={() => router.push('/membership')}>
+                <LinearGradient
+                  colors={['#111827', '#1F2937']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    borderRadius: 16,
+                    padding: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    shadowColor: colors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 12,
+                    elevation: 5,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <Feather name="award" size={14} color={colors.primary} />
+                      <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: colors.primary, letterSpacing: 1.2 }}>MYSAWARI PLUS</Text>
+                    </View>
+                    <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFF', marginBottom: 4 }}>
+                      Save up to ₹20,000
+                    </Text>
+                    <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 12, color: '#9CA3AF' }}>
+                      Join the membership and get up to 12.5% off on every ride!
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 }}>
+                    <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 13, color: '#000' }}>Join Now</Text>
+                  </View>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          );
+        }
+        break;
+      }
       case 'offers':
         content = (
           <>
@@ -320,8 +430,8 @@ export default function HomeScreen() {
                 renderItem={renderLuxury}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.luxuryRow}
-                snapToInterval={256}
+                contentContainerStyle={{ paddingHorizontal: 8 }}
+                snapToInterval={296}
                 snapToAlignment="start"
                 decelerationRate="fast"
                 removeClippedSubviews
@@ -356,8 +466,8 @@ export default function HomeScreen() {
                 renderItem={renderLuxury}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.luxuryRow}
-                snapToInterval={256}
+                contentContainerStyle={{ paddingHorizontal: 8 }}
+                snapToInterval={296}
                 snapToAlignment="start"
                 decelerationRate="fast"
                 removeClippedSubviews
@@ -429,7 +539,7 @@ export default function HomeScreen() {
     
     if (!content) return null;
     // Each section eases in a beat after the one above it, so the page builds top to bottom.
-    return <Reveal delay={Math.min(index, 6) * 70}>{content}</Reveal>;
+    return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
   }, [colors, greeting, customer?.name, isAuthenticated, pickup, dropoff, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, renderOffer, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, upcomingBooking, upcomingCar]);
 
   return (
@@ -442,6 +552,15 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         removeClippedSubviews={false} // don't clip vertical sections
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetchingBookings}
+            onRefresh={() => {
+              if (isAuthenticated) refetchBookings();
+            }}
+            tintColor={colors.primary}
+          />
+        }
       />
 
 

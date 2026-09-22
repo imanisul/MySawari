@@ -1,18 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSawari } from '@/context/SawariContext';
-
-// How long the finished brand animation stays before the app fades in.
-const SPLASH_HOLD_MS = 1000;
 
 export function AnimatedSplash({ isReady, children }: { isReady: boolean, children: React.ReactNode }) {
   const colors = useColors();
-  const { isDarkMode } = useSawari();
   
-  // The app is built underneath the splash as it starts to fade, so the screens' own entrance
-  // animations play as the splash lifts (instead of the app appearing only after it has gone).
-  const [showChildren, setShowChildren] = useState(false);
   // State to track if the splash screen should still be mounted
   const [isAnimationComplete, setIsAnimationComplete] = useState(false);
   
@@ -72,26 +64,26 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
 
   // Exit Animation triggered when app is ready
   useEffect(() => {
-    if (!isReady) return;
-    // Short hold so the brand animation is seen; the vehicles are loading in the background meanwhile.
-    const hold = setTimeout(() => {
-      setShowChildren(true); // mount the app under the splash…
-      Animated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 500,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsAnimationComplete(true); // …and remove the splash once it has faded out
-      });
-    }, SPLASH_HOLD_MS);
-    return () => clearTimeout(hold);
+    if (isReady) {
+      // Small delay so the user can see the text if it loaded too fast
+      setTimeout(() => {
+        Animated.timing(opacityAnim, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start(() => {
+          setIsAnimationComplete(true);
+        });
+      }, 1500); // Hold for 1.5s so they can admire it!
+    }
   }, [isReady]);
 
+  if (isAnimationComplete) {
+    return <>{children}</>;
+  }
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Always the same position in the tree, so the app never remounts when the splash goes away. */}
-      {showChildren ? children : null}
-      {!isAnimationComplete && (
+    <View style={styles.container}>
       <Animated.View style={[
         styles.splashScreen, 
         { 
@@ -106,7 +98,7 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
           }}>
             <Image 
               source={require('@/assets/images/MySawari_nobg.png')} 
-              style={[styles.logoImage, isDarkMode && { tintColor: '#FFFFFF' }]} 
+              style={styles.logoImage} 
               resizeMode="contain"
             />
           </Animated.View>
@@ -128,7 +120,6 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
           </Animated.View>
         </View>
       </Animated.View>
-      )}
     </View>
   );
 }

@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { API } from '@/services/backend/api';
-import { BookingSnapshot } from '@/services/backend/api';
+import { API, BookingSnapshot } from '@/services/backend/api';
 import { cars } from '@/utils/sawari';
 import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal } from '@/components/booking/ReviewModal';
-import Reanimated, { FadeIn } from 'react-native-reanimated';
+import { StatusBarScrim } from '@/components/common/StatusBarScrim';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
+import * as Notifications from 'expo-notifications';
+import { MockRequests, PendingExtension, PendingRefund } from '@/utils/mockRequests';
 import { useQuery } from '@tanstack/react-query';
+import { useVehicles } from '@/hooks/useVehicles';
+import { LoadingImage } from '@/components/common/LoadingImage';
 
 export default function BookingDetailScreen() {
   const colors = useColors();
@@ -25,6 +28,71 @@ export default function BookingDetailScreen() {
   const [showCancel, setShowCancel] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  
+  const [pendingExtension, setPendingExtension] = useState<PendingExtension | null>(null);
+  const [pendingRefund, setPendingRefund] = useState<PendingRefund | null>(null);
+
+  const fetchMockRequests = React.useCallback(async () => {
+    if (!id) return;
+    const ext = await MockRequests.getExtensionForBooking(id);
+    setPendingExtension(ext);
+    
+    const refund = await MockRequests.getRefundForBooking(id);
+    setPendingRefund(refund);
+  }, [id, snapshot]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchMockRequests();
+    }, [fetchMockRequests])
+  );
+
+  const handleApproveExtension = async () => {
+    if (!pendingExtension || !snapshot) return;
+    setLoading(true);
+    try {
+      // Hit the real backend API with a mock payment detail
+      await API.extendBooking(snapshot.id, pendingExtension.daysToAdd, snapshot.driverMode === 'With Driver', {
+        razorpayOrderId: 'mock_order_123',
+        razorpayPaymentId: 'mock_payment_123'
+      });
+      await MockRequests.approveExtension(snapshot.id);
+      const res = await API.getBooking(snapshot.id);
+      setSnapshot(res);
+      await fetchMockRequests();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveRefund = async () => {
+    if (!pendingRefund || !snapshot) return;
+    setLoading(true);
+    try {
+      await MockRequests.approveRefund(snapshot.id);
+      await fetchMockRequests();
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoPush = async () => {
+    alert('Push Notification scheduled! Minimise or close the app now to see it arrive in 5 seconds.');
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Operations App Update',
+        body: 'This is a simulated notification from the operations app. Your vehicle is ready for pickup.',
+        sound: true,
+      },
+      trigger: {
+        seconds: 5,
+      },
+    });
+  };
 
   // Whether this (completed) trip has already been reviewed.
   const { data: myReviews } = useQuery({
@@ -32,6 +100,9 @@ export default function BookingDetailScreen() {
     queryFn: () => API.reviews.mine(),
     staleTime: 60 * 1000,
   });
+
+  // The real vehicle photos (the same list Home and Explore use), so the booking shows its own car.
+  const { data: vehicles = [] } = useVehicles();
 
   useEffect(() => {
     if (id) {
@@ -72,12 +143,12 @@ export default function BookingDetailScreen() {
 
   const s = snapshot;
 
-  // Attempt to find the car image
-  const matchedCar = cars.find(c => c.id === s.vehicleId);
-  const carImage = matchedCar ? matchedCar.image : cars[0].image;
+  // The booked vehicle's own photo. If it can't be matched we show a neutral placeholder rather than some other car.
+  const matchedCar = vehicles.find(c => c.id === s.vehicleId) || cars.find(c => c.id === s.vehicleId);
+  const carImage = matchedCar?.image;
 
   return (
-    <Reanimated.View entering={FadeIn.duration(400)} style={[styles.screen, { backgroundColor: colors.background }]}>
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={[styles.circle, { borderColor: colors.border }]}><Feather name="chevron-left" size={20} color={colors.foreground} /></Pressable>
@@ -97,9 +168,34 @@ export default function BookingDetailScreen() {
           </View>
         </View>
 
+        {/* DEMO BUTTON */}
+        <Pressable
+          onPress={handleDemoPush}
+          style={({ pressed }) => [
+            {
+              backgroundColor: colors.blue,
+              borderRadius: 12,
+              padding: 16,
+              alignItems: 'center',
+              marginTop: 16,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+        >
+          <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 14 }}>
+            DEMO: Trigger Operation App Notification (5s delay)
+          </Text>
+        </Pressable>
+
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>VEHICLE</Text>
         <View style={[styles.vehicleCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
-          <Image source={carImage} resizeMode="cover" style={styles.hero} />
+          <View style={[styles.hero, { backgroundColor: colors.muted, alignItems: 'center', justifyContent: 'center' }]}>
+            {carImage ? (
+              <LoadingImage source={carImage} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+            ) : (
+              <Feather name="image" size={32} color={colors.mutedForeground} />
+            )}
+          </View>
           <View style={styles.vehicleBody}>
             <Text style={[styles.vehicleName, { color: colors.foreground }]}>{s.vehicleName}</Text>
             <View style={[styles.metaItem, { marginTop: 8 }]}><Feather name="refresh-cw" size={13} color={colors.mutedForeground} /><Text style={[styles.metaText, { color: colors.mutedForeground }]}>Unlimited km</Text></View>
@@ -112,7 +208,7 @@ export default function BookingDetailScreen() {
             <Text style={[styles.boxLabel, { color: colors.mutedForeground }]}>RENTAL DAYS</Text>
             <Text style={[styles.boxValue, { color: colors.foreground }]}>{s.rentalDays} Days</Text>
             <Text style={[styles.boxMeta, { color: colors.mutedForeground }]}>
-              {s.pickupDate} → {s.returnDate}
+              {s.pickupDate}{s.pickupTime ? `, ${s.pickupTime}` : ''} → {s.returnDate}{s.dropTime ? `, ${s.dropTime}` : ''}
             </Text>
           </View>
         </View>
@@ -204,13 +300,23 @@ export default function BookingDetailScreen() {
           {s.couponDiscount > 0 && <PaymentRow label={`Coupon (${s.couponCode})`} value={`-₹${s.couponDiscount.toLocaleString('en-IN')}`} accent colors={colors} />}
           {(s.pickupCharge || 0) > 0 && <PaymentRow label={`Pickup Service (${s.pickupDistanceKm || 0} km)`} value={`₹${(s.pickupCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
           {(s.dropCharge || 0) > 0 && <PaymentRow label={`Drop Service (${s.dropDistanceKm || 0} km)`} value={`₹${(s.dropCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
+          {(s.fastagAmount || 0) > 0 && <PaymentRow label="Fastag" value={`₹${(s.fastagAmount || 0).toLocaleString('en-IN')}`} colors={colors} />}
+          {(s.securityDeposit || 0) > 0 && <PaymentRow label="Security Deposit" value={`₹${(s.securityDeposit || 0).toLocaleString('en-IN')}`} colors={colors} />}
           {s.sawariCashUsed > 0 && <PaymentRow label="SawariCash Applied" value={`-₹${s.sawariCashUsed.toLocaleString('en-IN')}`} accent colors={colors} />}
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           
           <PaymentRow label="Booking Amount Paid" value={`₹${s.onlinePayableNow.toLocaleString('en-IN')}`} strong colors={colors} />
+          {(s.totalCollected || 0) > s.onlinePayableNow && (
+            <PaymentRow label="Total Paid So Far" value={`₹${(s.totalCollected || 0).toLocaleString('en-IN')}`} strong colors={colors} />
+          )}
           {!!s.razorpayPaymentId && <Text style={{ color: colors.mutedForeground, fontSize: 11, textAlign: 'right', marginTop: 2, marginBottom: 8 }}>Transaction ID: {s.razorpayPaymentId}</Text>}
-          
-          <PaymentRow label="Remaining Balance" value={`₹${s.remainingRentalAmount.toLocaleString('en-IN')}`} strong colors={colors} />
+          <PaymentRow 
+            label="Remaining Balance" 
+            value={s.remainingRentalAmount <= 0 ? 'Paid' : `₹${s.remainingRentalAmount.toLocaleString('en-IN')}`} 
+            accent={s.remainingRentalAmount <= 0}
+            strong 
+            colors={colors} 
+          />
 
           {s.totalRentalAmount && s.totalRentalAmount > s.rentalAmount ? (
             <>
@@ -233,10 +339,26 @@ export default function BookingDetailScreen() {
                 <Text style={{ color: colors.mutedForeground }}>Cancellation Fee</Text>
                 <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium' }}>₹{s.cancellationFee.toLocaleString('en-IN')}</Text>
               </View>
-              <View style={styles.paymentRow}>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Refund Amount</Text>
-                <Text style={{ color: colors.success, fontFamily: 'Inter_600SemiBold' }}>₹{(s.refundAmount || 0).toLocaleString('en-IN')}</Text>
-              </View>
+              
+              {pendingRefund ? (
+                <>
+                  <View style={[styles.paymentRow, { backgroundColor: '#F59E0B20', padding: 8, borderRadius: 8, marginHorizontal: -8, alignItems: 'center' }]}>
+                    <Text style={{ color: '#B45309', fontFamily: 'Inter_600SemiBold', flex: 1 }}>Refund Requested</Text>
+                    <Text style={{ color: '#B45309', fontFamily: 'Inter_700Bold' }}>₹{(s.refundAmount || 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                  <Pressable 
+                    style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center', marginTop: 8 }}
+                    onPress={handleApproveRefund}
+                  >
+                    <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Refund</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <View style={styles.paymentRow}>
+                  <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Refund Amount Received</Text>
+                  <Text style={{ color: colors.success, fontFamily: 'Inter_600SemiBold' }}>₹{(s.refundAmount || 0).toLocaleString('en-IN')}</Text>
+                </View>
+              )}
             </View>
           </>
         )}
@@ -292,39 +414,62 @@ export default function BookingDetailScreen() {
 
       {(s.status === 'CONFIRMED' || s.status === 'ONGOING' || s.status === 'PENDING') && (
         <View style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
-          {(s.status === 'CONFIRMED' || s.status === 'PENDING') && (
-            <Pressable 
-              style={[styles.actionBtn, { borderWidth: 1, borderColor: colors.border }]}
-              onPress={() => setShowCancel(true)}
-            >
-              <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.foreground }}>Cancel</Text>
-            </Pressable>
+          
+          {/* Pending Extension Demo UI */}
+          {pendingExtension && (
+            <View style={{ width: '100%', marginBottom: 12, padding: 12, backgroundColor: '#F59E0B20', borderRadius: 12, borderWidth: 1, borderColor: '#F59E0B50' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <Feather name="clock" size={16} color="#B45309" />
+                <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#B45309' }}>Extension Requested</Text>
+              </View>
+              <Text style={{ fontFamily: 'Inter_400Regular', color: colors.foreground, fontSize: 13, marginBottom: 12 }}>
+                Request to add {pendingExtension.daysToAdd} days sent to Operations.
+              </Text>
+              <Pressable 
+                style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center' }}
+                onPress={handleApproveExtension}
+              >
+                <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Request</Text>
+              </Pressable>
+            </View>
           )}
 
-          {((s.status === 'CONFIRMED' || s.status === 'ONGOING') && (s.pickupCharge || 0) > 0) && (
-            <Pressable 
-              style={[styles.actionBtn, { backgroundColor: '#047857' }]}
-              onPress={() => {
-                import('react-native').then(({ Linking }) => {
-                  Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.pickupLocationName || 'Kahilipara, Guwahati')}`);
-                });
-              }}
-            >
-              <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' }}>Track Vehicle</Text>
-            </Pressable>
-          )}
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            {(s.status === 'CONFIRMED' || s.status === 'PENDING') && (
+              <Pressable 
+                style={[styles.actionBtn, { borderWidth: 1, borderColor: colors.border, flex: 1 }]}
+                onPress={() => setShowCancel(true)}
+              >
+                <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.foreground }}>Cancel</Text>
+              </Pressable>
+            )}
 
-          {(s.status === 'CONFIRMED' || s.status === 'ONGOING') && (
-            <Pressable 
-              style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-              onPress={() => setShowExtend(true)}
-            >
-              <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>Extend Trip</Text>
-            </Pressable>
-          )}
+            {((s.status === 'CONFIRMED' || s.status === 'ONGOING') && (s.pickupCharge || 0) > 0) && (
+              <Pressable 
+                style={[styles.actionBtn, { backgroundColor: '#047857', flex: 1 }]}
+                onPress={() => {
+                  import('react-native').then(({ Linking }) => {
+                    Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.pickupLocationName || 'Kahilipara, Guwahati')}`);
+                  });
+                }}
+              >
+                <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' }}>Track Vehicle</Text>
+              </Pressable>
+            )}
+
+            {(s.status === 'CONFIRMED' || s.status === 'ONGOING') && !pendingExtension && (
+              <Pressable 
+                style={[styles.actionBtn, { backgroundColor: colors.primary, flex: 1 }]}
+                onPress={() => setShowExtend(true)}
+              >
+                <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>Extend Trip</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       )}
-    </Reanimated.View>
+      <StatusBarScrim />
+    </View>
   );
 }
 

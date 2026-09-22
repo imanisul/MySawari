@@ -261,6 +261,16 @@ export default function PaymentScreen() {
               </View>
             )}
 
+            {pricingQuote && pricingQuote.subscriptionDiscount > 0 && (
+              <View style={[styles.row, { marginTop: 12 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="award" size={14} color={colors.primary} />
+                  <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium' }}>Membership Discount</Text>
+                </View>
+                <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>- {formatCurrency(pricingQuote.subscriptionDiscount)}</Text>
+              </View>
+            )}
+
             {pricingQuote && pricingQuote.pickupCharge > 0 && (
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Pickup Service</Text>

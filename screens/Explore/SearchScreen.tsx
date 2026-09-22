@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import Reanimated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
 import {
   Car,
@@ -22,6 +22,7 @@ import { useBrandColors } from '@/components/search/useBrandColors';
 import { calculateRentalDays } from '@/services/backend/pricingEngine';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
+import { rise } from '@/components/common/motion';
 
 type SortOption = 'low-to-high' | 'high-to-low';
 type PriceRange = number;
@@ -91,6 +92,17 @@ export default function SearchResultsScreen() {
   const [fuel, setFuel] = useState<FuelFilter>('all');
   const [sort, setSort] = useState<SortOption>('low-to-high');
 
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   // ── Data: the existing vehicles API. Availability for any date is derived from it. ──
   // Real data only — no placeholder vehicles if the backend has none or is unreachable.
   const { data: fetchedCars, isLoading, isError, isFetching, refetch } = useVehicles();
@@ -133,11 +145,18 @@ export default function SearchResultsScreen() {
       .filter(matchesStaticFilters)
       .map((c) => ({ ...c, availability: getAvailability(c, startLabel, hasRange ? endLabel : undefined) }))
       .filter((c) => c.availability.available)
+      .filter((c) => {
+        const query = debouncedQuery.toLowerCase();
+        return query === '' ||
+               c.name.toLowerCase().includes(query) ||
+               c.category.toLowerCase().includes(query) ||
+               (c.manufacturer && c.manufacturer.toLowerCase().includes(query));
+      })
       .map((c) => ({ ...c, isAvailable: true }));
 
     result.sort((a, b) => (sort === 'low-to-high' ? a.perDay - b.perDay : b.perDay - a.perDay));
     return result;
-  }, [fetchedCars, matchesStaticFilters, startLabel, endLabel, hasRange, sort]);
+  }, [fetchedCars, matchesStaticFilters, startLabel, endLabel, hasRange, sort, debouncedQuery]);
 
   // Would anything be available for these dates if no price/transmission/fuel filter applied?
   const availableIgnoringFilters = useMemo(() => {
@@ -200,7 +219,7 @@ export default function SearchResultsScreen() {
 
   const renderCar = useCallback(
     ({ item, index }: { item: Car; index: number }) => (
-      <Reanimated.View entering={FadeInDown.delay(Math.min(index, 4) * 40).duration(300)}>
+      <Reanimated.View entering={rise(Math.min(index, 4) * 40)}>
         <CarListCard car={item} isExplore={false} />
       </Reanimated.View>
     ),
@@ -218,6 +237,20 @@ export default function SearchResultsScreen() {
   const count = filteredCars.length;
   const listHeader = (
     <View>
+      {/* Search Bar */}
+      <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <TextInput
+          placeholder={`Search ${vehicleWord} by name or brand...`}
+          placeholderTextColor={colors.mutedForeground}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          style={[styles.searchText, { color: colors.foreground }]}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+        />
+        <Feather name="search" size={20} color={colors.foreground} />
+      </View>
+
       {/* Filter + sort. Scrolls sideways so nothing is ever clipped; extra right padding keeps the last chip visible. */}
       <ScrollView
         horizontal
@@ -280,7 +313,7 @@ export default function SearchResultsScreen() {
   );
 
   const listEmpty = isLoading ? (
-    <Reanimated.View entering={FadeIn.duration(300)}>
+    <Reanimated.View entering={FadeIn.duration(200)}>
       {[0, 1, 2].map((i) => (
         <CarCardSkeleton key={i} index={i} />
       ))}
@@ -482,7 +515,9 @@ function ChipButton({ label, active, onPress }: { label: string; active: boolean
 
 /* ═══════════════ STYLES ═══════════════ */
 const styles = StyleSheet.create({
-  sectionGap: { marginBottom: 12 },
+  searchBar: { alignItems: 'center', borderRadius: 15, borderWidth: 1, flexDirection: 'row', marginTop: 12, marginHorizontal: 20, paddingHorizontal: 16, paddingVertical: 12 },
+  searchText: { fontFamily: 'Inter_400Regular', fontSize: 14, flex: 1, paddingVertical: 4 },
+  sectionGap: { marginTop: 16, marginBottom: 12 },
 
   // Filter / sort row
   controlsRow: { paddingLeft: 16, paddingRight: 24, gap: 8, marginTop: 12, alignItems: 'center' },

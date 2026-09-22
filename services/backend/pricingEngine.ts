@@ -35,6 +35,10 @@ export type QuoteParams = {
   driverMode?: 'Self Drive' | 'With Driver';
   deliveryMode?: 'delivery' | 'pickup' | 'both' | 'return';
   isDeliveryRequested?: boolean;
+  membership?: {
+    plan: 'starter' | 'plus' | 'pro';
+    totalSaved: number;
+  } | null;
 };
 
 export type PricingQuote = {
@@ -72,6 +76,8 @@ export type PricingQuote = {
   dropCharge: number;
   dropDistanceKm: number;
   dropLocationName: string;
+
+  subscriptionDiscount: number;
 
   error?: string;
 };
@@ -239,7 +245,7 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const {
     dailyRate, pickupDateStr, returnDateStr, pickupTime, returnTime,
     pickupLocation, dropoffLocation, returnLocation, couponCode, sawariCashToApply, availableSawariCash,
-    driverMode = 'Self Drive', deliveryMode, isDeliveryRequested,
+    driverMode = 'Self Drive', deliveryMode, isDeliveryRequested, membership,
   } = params;
 
   const rentalDays = calculateRentalDays(pickupDateStr, returnDateStr, pickupTime, returnTime);
@@ -253,14 +259,42 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
 
   const totalAmount = calculateTripTotal(discountedRentalAmount, pickup.charge, drop.charge);
 
+  // ── Membership subscription discount ───────────────────────────────────────
+  const MEMBERSHIP_PLANS: Record<string, { discountRate: number; annualCap: number }> = {
+    starter: { discountRate: 0.05,  annualCap: 10000 },
+    plus:    { discountRate: 0.10,  annualCap: 15000 },
+    pro:     { discountRate: 0.125, annualCap: 20000 },
+  };
+  const PER_TRIP_CAP = 999;
+  let subscriptionDiscount = 0;
+  if (membership?.plan && MEMBERSHIP_PLANS[membership.plan]) {
+    const { discountRate, annualCap } = MEMBERSHIP_PLANS[membership.plan];
+    const remaining = Math.max(0, annualCap - (membership.totalSaved || 0));
+    subscriptionDiscount = Math.min(
+      Math.round(discountedRentalAmount * discountRate),
+      PER_TRIP_CAP,
+      remaining
+    );
+  }
+  const totalAfterSubscription = Math.max(0, totalAmount - subscriptionDiscount);
+
   // Only the fixed booking amount (₹500, or less if the whole trip costs less) is paid up front.
   // Everything else — rental, driver, pickup and drop services — is the remaining balance.
-  const bookingAdvance = calculateAdvanceAmount(totalAmount);
-  const remainingRentalAmount = calculateRemainingAmount(totalAmount, bookingAdvance);
+  const bookingAdvance = calculateAdvanceAmount(totalAfterSubscription);
 
+  // 45% of the base rental amount can be paid with SawariCash
+  const maxSawariCashAllowed = rentalAmount * 0.45;
   const verifiedCashToApply = Math.min(Math.max(0, sawariCashToApply || 0), Math.max(0, availableSawariCash || 0));
-  const sawariCashUsed = Math.min(verifiedCashToApply, bookingAdvance);
-  const onlinePayableNow = Math.max(0, bookingAdvance - sawariCashUsed);
+  const sawariCashUsed = Math.min(verifiedCashToApply, maxSawariCashAllowed);
+
+  // Apply SawariCash to the booking advance first
+  const appliedToAdvance = Math.min(sawariCashUsed, bookingAdvance);
+  const onlinePayableNow = Math.max(0, bookingAdvance - appliedToAdvance);
+
+  // Apply the remainder of the used SawariCash to the remaining balance
+  const appliedToRemaining = Math.max(0, sawariCashUsed - appliedToAdvance);
+  let remainingRentalAmount = calculateRemainingAmount(totalAfterSubscription, bookingAdvance);
+  remainingRentalAmount = Math.max(0, remainingRentalAmount - appliedToRemaining);
 
   return {
     rentalDays,
@@ -285,5 +319,6 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
     dropCharge: drop.charge,
     dropDistanceKm: drop.distanceKm,
     dropLocationName: returnLocation?.name || 'MySawari Office',
+    subscriptionDiscount,
   };
 }

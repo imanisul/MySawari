@@ -50,7 +50,7 @@ export function DatesSheet() {
   const initialEnd = parseDateStr(dateRange.split(' – ')[1]);
 
   const [start, setStart] = useState<Date | null>(initialStart && initialStart >= today ? initialStart : null);
-  const [end, setEnd] = useState<Date | null>(initialEnd && initialStart && initialEnd > initialStart ? initialEnd : null);
+  const [end, setEnd] = useState<Date | null>(initialEnd && initialStart && initialEnd >= initialStart ? initialEnd : null);
   
   const [tempPickupTime, setTempPickupTime] = useState(pickupTime || '8:00 AM');
   const [tempReturnTime, setTempReturnTime] = useState(returnTime || '8:00 AM');
@@ -123,8 +123,9 @@ export function DatesSheet() {
     return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
   };
 
-  const rentalDays = start && end ? calculateRentalDays(formatDateStr(start), formatDateStr(end), tempPickupTime, tempReturnTime) : 0;
-  const canApply = start && end && start < end;
+  const effectiveEnd = end || start;
+  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime, tempReturnTime) : 0;
+  const canApply = start !== null;
 
   return (
     <SheetFrame height="95%">
@@ -140,7 +141,7 @@ export function DatesSheet() {
       {/* Selected Dates Display */}
       <View style={[styles.selectedHeader, { borderColor: colors.border, backgroundColor: colors.card }]}>
         <View style={styles.selectedCol}>
-          <Text style={[styles.selectedLabel, { color: colors.mutedForeground }]}>Start Sawari</Text>
+          <Text style={[styles.selectedLabel, { color: colors.mutedForeground }]}>Start</Text>
           <Text style={[styles.selectedValue, { color: start ? colors.foreground : colors.mutedForeground }]}>
             {formatDateStr(start)}
           </Text>
@@ -157,12 +158,12 @@ export function DatesSheet() {
         </View>
 
         <View style={styles.selectedCol}>
-          <Text style={[styles.selectedLabel, { color: colors.mutedForeground }]}>End Sawari</Text>
-          <Text style={[styles.selectedValue, { color: end ? colors.foreground : colors.mutedForeground }]}>
-            {formatDateStr(end)}
+          <Text style={[styles.selectedLabel, { color: colors.mutedForeground }]}>End</Text>
+          <Text style={[styles.selectedValue, { color: effectiveEnd ? colors.foreground : colors.mutedForeground }]}>
+            {formatDateStr(effectiveEnd)}
           </Text>
-          <Text style={[styles.timeLabel, { color: end ? colors.blue : colors.mutedForeground }]}>
-            {end ? tempReturnTime : '--:--'}
+          <Text style={[styles.timeLabel, { color: effectiveEnd ? colors.blue : colors.mutedForeground }]}>
+            {effectiveEnd ? tempReturnTime : '--:--'}
           </Text>
         </View>
       </View>
@@ -227,7 +228,7 @@ export function DatesSheet() {
           <Text style={[styles.timeTitle, { color: colors.foreground }]}>Select Duration (Days)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
             {[1, 2, 3, 4, 5, 7, 10, 15, 30].map(numDays => {
-              const diffDays = (start && end) ? Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+              const diffDays = start ? Math.round((effectiveEnd!.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0;
               const isSelected = diffDays === numDays;
               return (
                 <Pressable
@@ -336,8 +337,8 @@ export function DatesSheet() {
           label={returnBack === 'true' ? "Confirm Dates" : "Search Cars"}
           disabled={!canApply}
           onPress={() => {
-            if (start && end) {
-              setDates(`${formatDateStr(start)} – ${formatDateStr(end)}`, `${rentalDays} Days`);
+            if (start) {
+              setDates(`${formatDateStr(start)} – ${formatDateStr(effectiveEnd)}`, `${rentalDays} Day${rentalDays !== 1 ? 's' : ''}`);
               setTimes(tempPickupTime, tempReturnTime);
               
               if (returnBack === 'true') {
@@ -347,7 +348,7 @@ export function DatesSheet() {
                 router.push('/search');
               }
             }
-          }} 
+          }}
         />
       </View>
     </SheetFrame>

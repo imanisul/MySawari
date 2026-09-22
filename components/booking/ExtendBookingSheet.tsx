@@ -5,7 +5,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API } from '@/services/backend/api';
 import { BookingSnapshot } from '@/services/backend/api';
-import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWebView';
+import { MockRequests } from '@/utils/mockRequests';
 
 export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { visible: boolean; onClose: () => void; booking: BookingSnapshot; onSuccess: (updatedSnapshot: BookingSnapshot) => void }) {
   const colors = useColors();
@@ -58,6 +58,9 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
     if (daysToAdd > 1) checkAvailability(daysToAdd - 1);
   };
 
+  const dailyRate = booking.dailyRate || Math.round(booking.rentalAmount / booking.rentalDays) || 0;
+  const estimatedTotal = dailyRate * daysToAdd;
+
   const checkAvailability = async (days: number) => {
     setDaysToAdd(days);
     setChecking(true);
@@ -65,91 +68,46 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
       const res = await API.checkExtensionAvailability(booking.id, days, booking.driverMode === 'With Driver');
       setAvailability(res);
     } catch (e: any) {
-      setAvailability({ available: false, message: e.message, additionalAmount: 0 });
+      setAvailability({ available: false, message: e.message, additionalAmount: estimatedTotal });
     } finally {
       setChecking(false);
     }
   };
 
-  const [showRazorpay, setShowRazorpay] = useState(false);
-  const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string; amountPaise: number; keyId: string } | null>(null);
-
-  const handleConfirmPay = async () => {
-    if (!availability?.available) return;
+  const handleRequestExtension = async () => {
     setLoading(true);
     try {
-      const order = await API.createRazorpayOrder({ onlinePayableNow: availability.additionalAmount });
-      setRazorpayOrder(order);
-      setShowRazorpay(true);
+      await MockRequests.requestExtension({
+        bookingId: booking.id,
+        daysToAdd,
+        additionalAmount: availability?.additionalAmount || estimatedTotal,
+        requestedAt: new Date().toISOString()
+      });
+      // Notify parent that a request was made
+      onSuccess(booking); // We don't have the updated snapshot yet, but this triggers a refresh in the parent
+      onClose();
     } catch(e: any) {
-      Alert.alert('Payment Init Failed', e.message);
+      Alert.alert('Request Failed', e.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleExtend = async (paymentDetails: { razorpayOrderId: string; razorpayPaymentId: string }) => {
-    if (!availability?.available) return;
-    setLoading(true);
-    try {
-      const response = await API.extendBooking(booking.id, daysToAdd, booking.driverMode === 'With Driver', paymentDetails);
-      if (response.success) {
-        onSuccess(response.snapshot);
-        onClose();
-      }
-    } catch (e: any) {
-      Alert.alert('Extension Failed', `${e.message}\n\nIf money was deducted, contact support with payment ID ${paymentDetails.razorpayPaymentId}.`);
-    } finally {
-      setLoading(false);
-      setShowRazorpay(false);
     }
   };
 
   const currentReturnDate = formatDate(parseDate(booking.returnDate));
   const newReturnDate = formatDate(new Date(parseDate(booking.returnDate).getTime() + (daysToAdd * 24 * 60 * 60 * 1000)));
-
-  const handleRazorpaySuccess = async (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
-    try {
-      const isVerified = await API.verifyPayment(data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature);
-      if (isVerified) {
-        await handleExtend({ razorpayOrderId: data.razorpay_order_id, razorpayPaymentId: data.razorpay_payment_id });
-      } else {
-        throw new Error('Signature verification failed');
-      }
-    } catch (e: any) {
-      Alert.alert('Payment Failed', e.message);
-      setShowRazorpay(false);
-    }
-  };
+  const dropTimeStr = booking.dropTime ? ` at ${booking.dropTime}` : '';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <Animated.View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 24), transform: [{ translateY: slideAnim }] }]}>
-          
-          {showRazorpay && razorpayOrder ? (
-            <View style={{ height: 400, width: '100%', overflow: 'hidden', borderRadius: 12 }}>
-              <RazorpayCheckoutWebView
-                orderId={razorpayOrder.orderId}
-                amount={razorpayOrder.amountPaise}
-                currency="INR"
-                name="MySawari"
-                description={`Extend Booking for ${booking.vehicleName}`}
-                themeColor={colors.primary}
-                razorpayKey={razorpayOrder.keyId}
-                onSuccess={handleRazorpaySuccess}
-                onFailure={(err) => {
-                  Alert.alert('Payment Failed', typeof err === 'string' ? err : 'Transaction failed or cancelled.');
-                  setShowRazorpay(false);
-                }}
-                onClose={() => setShowRazorpay(false)}
-              />
-            </View>
-          ) : (
-            <>
+                    <>
               <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.foreground }]}>Extend Booking</Text>
+                <View>
+                  <Text style={[styles.title, { color: colors.foreground }]}>Extend Trip</Text>
+                  <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium', marginTop: 4 }}>{booking.vehicleName}</Text>
+                </View>
                 <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
                   <Feather name="x" size={24} color={colors.mutedForeground} />
                 </TouchableOpacity>
@@ -158,19 +116,21 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 16 }}>
                   <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 6 }}>Current Return</Text>
-                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{currentReturnDate}</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 6, textAlign: 'center' }}>Current Return</Text>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 16, textAlign: 'center' }}>{currentReturnDate}</Text>
+                    {!!booking.dropTime && <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 2, textAlign: 'center' }}>{booking.dropTime}</Text>}
                   </View>
                   
                   <View style={{ paddingHorizontal: 12 }}>
-                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
-                      <Ionicons name="arrow-forward" size={18} color={colors.primaryText} />
+                    <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name="arrow-forward" size={16} color={colors.primaryText} />
                     </View>
                   </View>
                   
                   <View style={{ flex: 1, alignItems: 'center' }}>
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 }}>New Return</Text>
-                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 18 }}>{newReturnDate}</Text>
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_600SemiBold', marginBottom: 6, textAlign: 'center' }}>New Return</Text>
+                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 16, textAlign: 'center' }}>{newReturnDate}</Text>
+                    {!!booking.dropTime && <Text style={{ color: colors.primaryText, fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: 2, textAlign: 'center' }}>{booking.dropTime}</Text>}
                   </View>
                 </View>
 
@@ -194,29 +154,35 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
                   <View>
                     <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_500Medium' }}>Additional Rental</Text>
-                    <Text style={{ color: colors.primaryText, fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 2 }}>Paid online only</Text>
+                    <Text style={{ color: colors.primaryText, fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 2 }}>
+                      {`₹${dailyRate.toLocaleString('en-IN')} / day`}
+                    </Text>
                   </View>
                   {checking ? (
                     <ActivityIndicator size="small" color={colors.primaryText} />
-                  ) : availability?.available ? (
-                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 16 }}>₹{availability.additionalAmount.toLocaleString('en-IN')}</Text>
                   ) : (
-                    <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{availability?.message || 'Unavailable'}</Text>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 16 }}>₹{(availability?.additionalAmount || estimatedTotal).toLocaleString('en-IN')}</Text>
+                      {!availability?.available && (
+                        <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 10, marginTop: 2, maxWidth: 160, textAlign: 'right' }} numberOfLines={2}>
+                          Extension request is subject to approval
+                        </Text>
+                      )}
+                    </View>
                   )}
                 </View>
               </View>
 
               <TouchableOpacity 
-                style={[styles.primaryBtn, { backgroundColor: availability?.available ? colors.primary : colors.mutedForeground }]} 
-                onPress={handleConfirmPay}
-                disabled={loading || checking || !availability?.available}
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]} 
+                onPress={handleRequestExtension}
+                disabled={loading || checking}
               >
                 <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
-                  {availability?.available ? `Confirm Pay` : 'Unavailable'}
+                  Request Extension
                 </Text>
               </TouchableOpacity>
             </>
-          )}
         </Animated.View>
       </KeyboardAvoidingView>
     </Modal>

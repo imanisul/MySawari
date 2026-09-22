@@ -79,8 +79,8 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
+    { id: 'membership', title: 'Membership', icon: 'award' },
     { id: 'rewards', title: 'My Rewards', icon: 'gift' },
-    { id: 'payments', title: 'Payments', icon: 'credit-card' },
     { id: 'refer', title: 'Refer and Earn', icon: 'users' },
     { id: 'safety', title: 'Safety', icon: 'shield' },
     { id: 'settings', title: 'Settings', icon: 'settings' },
@@ -91,10 +91,10 @@ export default function ProfileScreen() {
 
   const handleMenuPress = async (item: any) => {
     Haptics.selectionAsync();
-    if (item.id === 'rewards') {
+    if (item.id === 'membership') {
+      router.push('/membership');
+    } else if (item.id === 'rewards') {
       router.push('/rewards');
-    } else if (item.id === 'payments') {
-      router.push('/payments');
     } else if (item.id === 'refer') {
       router.push('/refer');
     } else if (item.id === 'settings') {

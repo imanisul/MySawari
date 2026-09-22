@@ -7,6 +7,7 @@ import { PricingQuote, QuoteParams } from '@/services/backend/pricingEngine';
 import { BookingSnapshot } from '@/services/backend/api';
 
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 import { AppState } from 'react-native';
 import { getDevicePosition } from '@/utils/location';
 import { calculateDistanceKm } from '@/services/backend/pricingEngine';
@@ -178,6 +179,31 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  // --- Start Push Notification Listener ---
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener((notification) => {
+      const { title, body } = notification.request.content;
+      const id = notification.request.identifier;
+      
+      setNotifications((prev) => {
+        // Prevent duplicates
+        if (prev.some((n) => n.id === id)) return prev;
+        return [
+          {
+            id,
+            title: title || 'Update from MySawari',
+            body: body || '',
+            date: new Date().toISOString(),
+            read: false,
+          },
+          ...prev,
+        ];
+      });
+    });
+    return () => sub.remove();
+  }, []);
+  // --- End Push Notification Listener ---
+
   // NEW BOOKING STATE
   const [pricingQuote, setPricingQuote] = useState<PricingQuote | null>(null);
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
@@ -270,19 +296,24 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           }
           
           if (storedSelectedDate) {
-             // Validate date is not in the past
-             const parts = storedSelectedDate.trim().split(' ');
-             if (parts.length >= 2) {
-               const day = parseInt(parts[0], 10);
-               const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
-               let month = MONTHS.indexOf(parts[1]);
-               if (month === 12) month = 8;
-               if (month !== -1 && !isNaN(day)) {
-                 const currentYear = new Date().getFullYear();
-                 const parsedDate = new Date(currentYear, month, day);
-                 const today = new Date(new Date().setHours(0,0,0,0));
-                 if (parsedDate >= today) {
-                   setSelectedDateState(storedSelectedDate);
+             // 'All Dates' is deprecated; default to today's date
+             if (storedSelectedDate === 'All Dates') {
+               setSelectedDateState(defaultToday);
+             } else {
+               // Validate date is not in the past
+               const parts = storedSelectedDate.trim().split(' ');
+               if (parts.length >= 2) {
+                 const day = parseInt(parts[0], 10);
+                 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+                 let month = MONTHS.indexOf(parts[1]);
+                 if (month === 12) month = 8;
+                 if (month !== -1 && !isNaN(day)) {
+                   const currentYear = new Date().getFullYear();
+                   const parsedDate = new Date(currentYear, month, day);
+                   const today = new Date(new Date().setHours(0,0,0,0));
+                   if (parsedDate >= today) {
+                     setSelectedDateState(storedSelectedDate);
+                   }
                  }
                }
              }

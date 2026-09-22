@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
-import { Image } from 'expo-image';
+import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -34,9 +34,23 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
     return () => clearInterval(interval);
   }, [images.length]);
   
-  const isDateSelected = dateRange && !dateRange.includes('Select');
+  const isDateSelected = dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
   const availability = car.availability ?? getAvailability(car);
-  const availableText = availability.headline.toUpperCase();
+  let availableText = availability.headline.toUpperCase();
+  
+  if (availability.available) {
+    const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    if (isDateSelected) {
+      const [start, end] = dateRange.split(' - ');
+      if (end) {
+        availableText = `AVAIL - ${start} - ${end}`.toUpperCase();
+      } else {
+        availableText = `AVAIL - ${start} - ${availability.freeUntil ? availability.freeUntil : 'ONWARDS'}`.toUpperCase();
+      }
+    } else {
+      availableText = `AVAIL - ${todayStr} - ${availability.freeUntil ? availability.freeUntil : 'ONWARDS'}`.toUpperCase();
+    }
+  }
 
   return (
     <Pressable
@@ -67,7 +81,7 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
         >
           {images.map((img: any, i: number) => (
             <View key={i} style={{ width: cardWidth, height: '100%' }}>
-              <Image source={img} contentFit="cover" transition={200} style={styles.image} />
+              <LoadingImage source={img} contentFit="cover" transition={200} style={styles.image} />
             </View>
           ))}
         </ScrollView>

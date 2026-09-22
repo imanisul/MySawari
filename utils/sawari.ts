@@ -31,6 +31,27 @@ export type Car = {
     end?: string;
   };
 
+  // DB fields
+  manufacturer?: string;
+  model?: string;
+  variant?: string;
+  color?: string;
+  registrationYear?: string;
+  vehicleNumber?: string;
+
+  // Enriched specs (from knowledge base)
+  engine?: string;
+  bootSpace?: string;
+  groundClearance?: string;
+  kerbWeight?: string;
+  airbags?: string;
+  tankCapacity?: string;
+  topSpeed?: string;
+  acceleration?: string;
+  tyreSize?: string;
+  brakes?: string;
+  highlights?: string[];
+
   // New UI features
   images?: ImageSourcePropType[];
   rating?: number;
@@ -54,10 +75,17 @@ export type Car = {
 
 export interface AvailabilityInfo {
   available: boolean;
+  /** The date the availability check starts from (either selected date or today). */
+  startDate?: string;
   /** Short uppercase text for the card badge, e.g. "AVAILABLE NOW · FREE TILL 22 SEP". */
   label: string;
   /** The one status line for the trip being viewed, e.g. "Available for 20 Sep – 21 Sep" or "Available now". */
   headline: string;
+  /**
+   * When available: the whole free window from the start date to the day before the next booking or
+   * service block, e.g. "Available 20 Sep – 5 Nov", or "Available from 20 Sep" when nothing follows.
+   */
+  rangeHeadline?: string;
   /**
    * Optional secondary line that never contradicts the headline:
    * "Continuously available until 5 Nov" (when a booking follows) or
@@ -470,6 +498,26 @@ function buildBlocks(car: Car, today: number): Block[] {
     blocks.push({ start: today, end: today, kind: 'rented' });
   }
 
+  // --- Mock Database Compatibility ---
+  // Some mock cars define their availability via availabilityDate and availableToDate
+  // instead of explicit bookedRanges. We must respect these by creating virtual blocks.
+  
+  if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
+    const availStart = parseDayLabel(car.availabilityDate);
+    if (availStart !== null && availStart > today) {
+      // Car is NOT available from today until the day before availabilityDate
+      blocks.push({ start: today, end: availStart - 1, kind: 'booked' });
+    }
+  }
+
+  if (car.availableToDate) {
+    const availEnd = parseDayLabel(car.availableToDate);
+    if (availEnd !== null && availEnd >= today) {
+      // Car is NOT available after availableToDate
+      blocks.push({ start: availEnd + 1, end: Infinity, kind: 'booked' });
+    }
+  }
+
   return blocks.sort((a, b) => a.start - b.start);
 }
 
@@ -480,7 +528,7 @@ const overlaps = (b: Block, start: number, end: number) => b.start <= end && b.e
  * when is it next free? With no dates chosen it answers for today.
  */
 export function getAvailability(car: Car | undefined | null, startLabel?: string, endLabel?: string): AvailabilityInfo {
-  if (!car) return { available: false, label: 'NOT AVAILABLE', headline: 'Not available', detail: '' };
+  if (!car) return { available: false, label: 'ON A TRIP', headline: 'On a trip', detail: '' };
 
   const today = todayDayNum();
   const start = parseDayLabel(startLabel);
@@ -501,9 +549,18 @@ export function getAvailability(car: Car | undefined | null, startLabel?: string
       ? `Available for ${dayNumToLabel(windowStart)}${windowEnd > windowStart ? ` – ${dayNumToLabel(windowEnd)}` : ''}`
       : 'Available now';
     const detail = freeUntil !== undefined ? `Continuously available until ${dayNumToLabel(freeUntil)}` : '';
+    const fromText = hasDates ? dayNumToLabel(windowStart) : 'now';
+    const rangeHeadline =
+      freeUntil === undefined
+        ? (hasDates ? `Available from ${fromText}` : 'Available now')
+        : freeUntil <= windowStart
+          ? (hasDates ? `Available ${fromText} only` : 'Available today only')
+          : `Available ${fromText} – ${dayNumToLabel(freeUntil)}`;
     return {
       available: true,
+      startDate: hasDates ? dayNumToLabel(windowStart) : 'Today',
       headline,
+      rangeHeadline,
       detail,
       label: `${headline}${untilText}`.toUpperCase(),
       freeUntil: freeUntil !== undefined ? dayNumToLabel(freeUntil) : undefined,
@@ -515,11 +572,11 @@ export function getAvailability(car: Car | undefined | null, startLabel?: string
   const nextStart = candidates.find(c => !blocks.some(b => overlaps(b, c, c + stayDays - 1)));
 
   const reason = conflicts[0].kind;
-  const base = reason === 'service' ? 'IN SERVICE' : 'NOT AVAILABLE';
+  const base = reason === 'service' ? 'IN SERVICE' : 'ON A TRIP';
   return {
     available: false,
     reason,
-    headline: base === 'IN SERVICE' ? 'In service' : 'Not available',
+    headline: base === 'IN SERVICE' ? 'In service' : 'On a trip',
     detail: nextStart !== undefined ? `Next available ${dayNumToLabel(nextStart)}` : '',
     label: (nextStart !== undefined ? `${base} · NEXT ${dayNumToLabel(nextStart)}` : base).toUpperCase(),
     nextAvailableFrom: nextStart !== undefined ? dayNumToLabel(nextStart) : undefined,

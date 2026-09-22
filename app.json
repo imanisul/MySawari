@@ -16,11 +16,6 @@
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0
     },
-    "splash": {
-      "image": "./assets/images/splash_final.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FAFAF9"
-    },
     "ios": {
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
@@ -54,6 +49,15 @@
         "expo-router",
         {
           "origin": "https://mysawari.app/"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash_logo.png",
+          "imageWidth": 190,
+          "resizeMode": "contain",
+          "backgroundColor": "#FAFAF9"
         }
       ],
       "expo-font",

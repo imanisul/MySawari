@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
 import { BottomNavigation, PrimaryButton } from '@/components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Reanimated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { BookingSnapshot } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import { LoginBottomSheet } from '@/components';
@@ -15,6 +15,7 @@ import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
 import { ReviewModal, ReviewTrip } from '@/components/booking/ReviewModal';
+import { rise } from '@/components/common/motion';
 type BookingTab = 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
 
 export default function BookingsScreen() {
@@ -54,41 +55,12 @@ export default function BookingsScreen() {
     refetchOnWindowFocus: true,
   });
 
+  // A booking is Active only once the operations app has handed the vehicle to the customer
+  // (status vehicle_handover, mapped to ONGOING). Reaching the start date never moves it: until the
+  // handover it stays in Upcoming.
   const filteredBookings = bookings.filter((b) => {
-    const parseDate = (dateStr: string) => {
-      const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      const parts = dateStr.split(' ');
-      const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
-      if (parts.length >= 2 && months.includes(monthPrefix)) {
-        const day = parseInt(parts[0], 10);
-        const month = months.indexOf(monthPrefix);
-        const year = new Date().getFullYear();
-        return new Date(year, month, day);
-      }
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return new Date(`${dateStr} ${new Date().getFullYear()}`);
-      return d;
-    };
-
-    // Check if the booking is currently ongoing (either explicitly marked or inferred by dates)
-    const pickup = parseDate(b.pickupDate);
-    const returnDt = parseDate(b.returnDate);
-    returnDt.setHours(23, 59, 59, 999); // Cover the entire return day
-
-    // Only infer if dates are valid
-    const isOngoingInferred = !isNaN(pickup.getTime()) && !isNaN(returnDt.getTime()) 
-      && b.status === 'CONFIRMED' 
-      && pickup <= new Date() 
-      && returnDt >= new Date();
-      
-    const isOngoing = b.status === 'ONGOING' || isOngoingInferred;
-
-    if (tab === 'Upcoming') {
-      return (b.status === 'CONFIRMED' || b.status === 'PENDING') && !isOngoing;
-    }
-    if (tab === 'Active') {
-      return isOngoing;
-    }
+    if (tab === 'Upcoming') return b.status === 'CONFIRMED' || b.status === 'PENDING';
+    if (tab === 'Active') return b.status === 'ONGOING';
     if (tab === 'Completed') return b.status === 'COMPLETED';
     if (tab === 'Cancelled') return b.status === 'CANCELLED' || b.status === 'FAILED';
     return false;
@@ -135,7 +107,7 @@ export default function BookingsScreen() {
         </View>
         
         {loading ? (
-          <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)} style={{ paddingTop: 8, paddingBottom: insets.bottom + 100 }}>
+          <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 8, paddingBottom: insets.bottom + 100 }}>
             <BookingSkeleton index={0} />
             <BookingSkeleton index={1} />
             <BookingSkeleton index={2} />
@@ -162,7 +134,7 @@ export default function BookingsScreen() {
               const dividerColor = isActive ? '#2A364C' : colors.border;
 
               return (
-              <Reanimated.View key={booking.id} entering={FadeIn.duration(400)}>
+              <Reanimated.View key={booking.id} entering={rise()}>
                 <Pressable
                   onPress={() => router.push(`/booking-detail?id=${booking.id}` as any)}
                   style={[
@@ -193,7 +165,7 @@ export default function BookingsScreen() {
                   <View style={styles.upcomingMetaRow}>
                     <Feather name="calendar" size={13} color={subtextColor} />
                     <Text style={[styles.upcomingMeta, { color: subtextColor }]}>
-                      {booking.pickupDate} - {booking.returnDate} ({booking.rentalDays} Days)
+                      {booking.pickupDate} {booking.pickupTime || '8:00 AM'} - {booking.returnDate} {booking.dropTime || '8:00 AM'} ({booking.rentalDays} Days)
                     </Text>
                   </View>
                   {(!booking.pickupCharge && !booking.dropCharge) ? (

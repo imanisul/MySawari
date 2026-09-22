@@ -3,7 +3,7 @@ import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, Act
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Reanimated, { FadeIn, FadeOut, FadeInDown } from 'react-native-reanimated';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -17,6 +17,7 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 import { Car } from '@/utils/sawari';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
+import { rise } from '@/components/common/motion';
 
 export default function ExploreScreen() {
   const colors = useColors();
@@ -24,8 +25,12 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
-  const { vehicleType: globalVehicleType, setBookingSource, setDateRange, dateRange, selectedDate, setSelectedDate, isAuthLoading, isDarkMode } = useSawari();
+  const { vehicleType: globalVehicleType, setBookingSource, setSelectedDate: setGlobalSelectedDate, isAuthLoading, isDarkMode } = useSawari();
   const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>(globalVehicleType === 'car' ? 'Cars' : 'Bikes');
+
+  // Fully local date state — completely independent from the Home/Index page
+  const defaultToday = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const [exploreDate, setExploreDate] = useState(defaultToday);
 
   useFocusEffect(
     useCallback(() => {
@@ -61,18 +66,45 @@ export default function ExploreScreen() {
 
   const handleDateSelect = useCallback((date: string) => {
     Haptics.selectionAsync();
-    if (date === selectedDate) return;
+    if (date === exploreDate) return;
     
+    // 1. Immediately show skeleton and visually select the date chip
     setIsFiltering(true);
-    setSelectedDate(date);
-    if (date !== 'All Dates') setDateRange(date);
-    setPage(1);
-
-    // Give the UI time to show the skeleton before intensive recalculation
+    setExploreDate(date);
+    
+    // 2. Defer the heavy list filtering to the next JS tick
+    // This allows the skeleton to render immediately without dropping frames
     setTimeout(() => {
-      setIsFiltering(false);
-    }, 450);
-  }, [selectedDate, setDateRange]);
+      setGlobalSelectedDate(date);
+      setPage(1);
+
+      // Keep skeleton up slightly longer so the list layout doesn't flash jarringly
+      setTimeout(() => {
+        setIsFiltering(false);
+      }, 150);
+    }, 0);
+  }, [exploreDate, setGlobalSelectedDate]);
+
+  const currentSelectedDateObj = useMemo(() => {
+    let d = new Date();
+    if (exploreDate && !exploreDate.includes('–')) {
+      const parts = exploreDate.trim().split(' ');
+      if (parts.length >= 2) {
+        const day = parseInt(parts[0], 10);
+        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+        let month = MONTHS.indexOf(parts[1]);
+        if (month === 12) month = 8;
+        if (month !== -1 && !isNaN(day)) {
+          const currentYear = new Date().getFullYear();
+          d = new Date(currentYear, month, day);
+          if (d < new Date(new Date().setHours(0,0,0,0))) {
+            d.setFullYear(currentYear + 1);
+          }
+        }
+      }
+    }
+    return d;
+  }, [exploreDate]);
 
   const onDateChange = (event: DateTimePickerEvent, selectedDateObj?: Date) => {
     setShowDatePicker(false);
@@ -82,60 +114,47 @@ export default function ExploreScreen() {
     }
   };
 
-  const availableDates = useMemo(() => {
-    const dates = ['All Dates'];
-    let startDate = new Date();
+  const default90Dates = useMemo(() => {
+    const dates: string[] = [];
+    const today = new Date();
     
-    if (selectedDate !== 'All Dates' && !selectedDate.includes('–')) {
-      const parts = selectedDate.trim().split(' ');
-      if (parts.length >= 2) {
-        const day = parseInt(parts[0], 10);
-        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
-        let month = MONTHS.indexOf(parts[1]);
-        if (month === 12) month = 8; // Handle 'Sept'
-        
-        if (month !== -1 && !isNaN(day)) {
-          const currentYear = new Date().getFullYear();
-          const parsedDate = new Date(currentYear, month, day);
-          
-          if (parsedDate < new Date(new Date().setHours(0,0,0,0))) {
-            parsedDate.setFullYear(currentYear + 1);
-          }
-          // Do not override startDate so the list always starts from today
-        }
-      }
-    }
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(startDate);
-      d.setDate(startDate.getDate() + i);
+    // Generate the next 90 days starting exactly from today
+    for (let i = 0; i < 90; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
       dates.push(d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
     }
-    
-    if (selectedDate.includes('–') && !dates.includes(selectedDate)) {
-      dates.splice(1, 0, selectedDate);
-    }
-    
     return dates;
-  }, [selectedDate]);
+  }, []);
+
+  const availableDates = useMemo(() => {
+    // If it's a date range (e.g. "21 Sep – 25 Sep") or a date beyond 90 days, add it to the front
+    if (exploreDate && !default90Dates.includes(exploreDate)) {
+      return [exploreDate, ...default90Dates];
+    }
+    return default90Dates;
+  }, [exploreDate, default90Dates]);
 
   // Availability for any date is derived from the same fetched data, so the date is not part of the key.
   const { data: fetchedCars = [], isLoading: isFetchingCars, isError: fetchError, refetch: fetchVehicles } = useVehicles();
 
   const filteredCars = useMemo(() => {
+    const isAllDates = false; // All Dates is removed
+    const [startStr, endStr] = isAllDates ? [undefined, undefined] : splitDateRange(exploreDate);
+
     return (fetchedCars || []).reduce((acc: Car[], car: Car) => {
-      // Only vehicles that are actually free for the chosen date(s) are listed
-      // ("All Dates" means: free today).
-      const [startStr, endStr] = selectedDate === 'All Dates' ? [undefined, undefined] : splitDateRange(selectedDate);
+      // Compute availability for the selected date
       const availability = getAvailability(car, startStr, endStr);
-      if (!availability.available) return acc;
+      const isAvailable = availability.available;
 
       const matchType = vehicleType === 'All' || 
                         (vehicleType === 'Bikes' && car.type === 'Bike') ||
                         (vehicleType === 'Cars' && car.type === 'Car');
-      const matchSearch = debouncedQuery === '' || 
-                          car.name.toLowerCase().includes(debouncedQuery.toLowerCase()) ||
-                          car.category.toLowerCase().includes(debouncedQuery.toLowerCase());
+      const query = debouncedQuery.toLowerCase();
+      const matchSearch = query === '' || 
+                          car.name.toLowerCase().includes(query) ||
+                          car.category.toLowerCase().includes(query) ||
+                          (car.manufacturer && car.manufacturer.toLowerCase().includes(query));
       
       const carPriceNum = parseInt(car.price.replace(/[^0-9]/g, ''), 10);
       const matchFilterCategory = filters.category === 'All' || car.category === filters.category;
@@ -146,16 +165,22 @@ export default function ExploreScreen() {
                                (filters.transmission === 'Gear' && car.transmission === 'Manual');
       const matchFilterFuel = filters.fuel === 'All' || car.fuel === filters.fuel;
 
-      if (matchType && matchSearch && matchFilterCategory && matchFilterPrice && matchFilterTrans && matchFilterFuel) {
-        acc.push({ ...car, isAvailable: true, availability });
+      // If the user is actively searching, only show cars that are actually available
+      const matchSearchAvailability = debouncedQuery === '' || isAvailable;
+
+      if (matchType && matchSearch && matchSearchAvailability && matchFilterCategory && matchFilterPrice && matchFilterTrans && matchFilterFuel) {
+        acc.push({ ...car, isAvailable, availability });
       }
       return acc;
     }, []).sort((a, b) => {
+      // Available vehicles always come first
+      if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
+      // Within the same availability group, sort by price
       const priceA = parseInt(a.price.replace(/[^0-9]/g, ''), 10) || 0;
       const priceB = parseInt(b.price.replace(/[^0-9]/g, ''), 10) || 0;
       return filters.maxPrice !== 10000 ? priceB - priceA : priceA - priceB;
     });
-  }, [fetchedCars, selectedDate, vehicleType, debouncedQuery, filters]);
+  }, [fetchedCars, exploreDate, vehicleType, debouncedQuery, filters]);
 
   // Pagination slice
   const paginatedCars = useMemo(() => {
@@ -169,9 +194,9 @@ export default function ExploreScreen() {
       setIsLoadingMore(true);
       // Simulate network latency for loading more
       setTimeout(() => {
-        setPage(p => p + 1);
+        setPage(prev => prev + 1);
         setIsLoadingMore(false);
-      }, 400);
+      }, 500);
     }
   };
 
@@ -181,11 +206,9 @@ export default function ExploreScreen() {
     setIsRefreshing(false);
   };
 
-  const renderCar = useCallback(({ item, index }: { item: typeof cars[0], index: number }) => (
-    <Reanimated.View entering={FadeInDown.delay(index * 50).duration(400)} exiting={FadeOut.duration(200)}>
-      <CarListCard car={item} />
-    </Reanimated.View>
-  ), []);
+  const renderCar = useCallback(({ item }: { item: typeof cars[0] }) => (
+    <CarListCard car={item} effectiveDateRange={exploreDate} />
+  ), [exploreDate]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -198,7 +221,7 @@ export default function ExploreScreen() {
 
   /* ─── ListHeaderComponent: Search + Filters + Dates ─── */
   const listHeaderElement = (
-    <Reanimated.View entering={FadeInDown.duration(400)}>
+    <Reanimated.View entering={rise()}>
       {/* Search Bar */}
       <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <TextInput 
@@ -291,7 +314,7 @@ export default function ExploreScreen() {
         {showDatePicker && (
           <DateTimePicker
             themeVariant={isDarkMode ? 'dark' : 'light'}
-            value={new Date()}
+            value={currentSelectedDateObj}
             mode="date"
             display="default"
             minimumDate={new Date()}
@@ -299,7 +322,8 @@ export default function ExploreScreen() {
           />
         )}
         {availableDates.map((date) => {
-          const active = date === selectedDate;
+          const active = date === exploreDate;
+          const isAllDates = date === 'All Dates';
           return (
             <Pressable
               key={date}
@@ -309,21 +333,46 @@ export default function ExploreScreen() {
               onPress={() => handleDateSelect(date)}
               style={({ pressed }) => [
                 styles.dateChip,
-                {
-                  backgroundColor: active ? colors.foreground : colors.card,
-                  borderColor: active ? colors.foreground : colors.border,
-                },
+                active
+                  ? {
+                      backgroundColor: colors.primary,
+                      borderColor: colors.primary,
+                      // Elevated shadow for active chip
+                      shadowColor: colors.primary,
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.35,
+                      shadowRadius: 6,
+                      elevation: 4,
+                      transform: [{ scale: 1.05 }],
+                    }
+                  : {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
                 pressed && styles.chipPressed,
               ]}
             >
-              <Text
-                style={[
-                  styles.dateChipText,
-                  { color: active ? colors.background : colors.foreground },
-                ]}
-              >
-                {date}
-              </Text>
+              <View style={styles.dateChipContent}>
+                {isAllDates && (
+                  <Feather
+                    name="layers"
+                    size={13}
+                    color={active ? colors.primaryForeground : colors.foreground}
+                    style={{ marginRight: 5 }}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.dateChipText,
+                    {
+                      color: active ? colors.primaryForeground : colors.foreground,
+                      fontFamily: active ? 'Inter_700Bold' : 'Inter_500Medium',
+                    },
+                  ]}
+                >
+                  {date}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -335,7 +384,7 @@ export default function ExploreScreen() {
   const listEmptyElement = (() => {
     if (isFetchingCars || isFiltering) {
       return (
-        <Reanimated.View entering={FadeIn.duration(300)} exiting={FadeOut.duration(200)} style={{ paddingTop: 16 }}>
+        <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 16 }}>
           {[1, 2, 3].map(i => (
             <CarCardSkeleton key={i} index={i} />
           ))}
@@ -367,19 +416,18 @@ export default function ExploreScreen() {
         <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
           {debouncedQuery !== ''
             ? `No results matching "${debouncedQuery}". Try adjusting your search.`
-            : selectedDate !== 'All Dates'
-            ? `No ${vehicleType === 'Bikes' ? 'bikes' : vehicleType === 'Cars' ? 'cars' : 'vehicles'} are available on ${selectedDate}. Try another date.`
-            : `No vehicles found. Try adjusting your filters.`
+            : `No ${vehicleType === 'Bikes' ? 'bikes' : vehicleType === 'Cars' ? 'cars' : 'vehicles'} are available on ${exploreDate}. Try another date.`
           }
         </Text>
-      {(debouncedQuery !== '' || selectedDate !== 'All Dates' || activeFilterCount > 0) && (
+      {(debouncedQuery !== '' || activeFilterCount > 0) && (
         <Pressable
           accessibilityRole="button"
           style={[styles.clearButton, { backgroundColor: colors.primary }]}
           onPress={() => {
             setSearchQuery('');
             setDebouncedQuery('');
-            setSelectedDate('All Dates');
+            setExploreDate(defaultToday);
+            setGlobalSelectedDate(defaultToday);
             setFilters(defaultFilters);
             setPage(1);
           }}
@@ -402,7 +450,7 @@ export default function ExploreScreen() {
         renderItem={renderCar}
         ListHeaderComponent={listHeaderElement}
         ListEmptyComponent={listEmptyElement}
-        extraData={`${vehicleType}-${selectedDate}-${debouncedQuery}-${activeFilterCount}`}
+        extraData={`${vehicleType}-${exploreDate}-${debouncedQuery}-${activeFilterCount}`}
         showsVerticalScrollIndicator={false}
         // Last card must clear the fixed tab bar (+ safe area) and the floating support button.
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomNavHeight + 88 }]}
@@ -458,6 +506,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dateChipText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  dateChipContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   chipPressed: { opacity: 0.7 },
 
   listContent: { paddingBottom: 24 },

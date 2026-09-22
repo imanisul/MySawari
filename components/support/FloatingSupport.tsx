@@ -15,6 +15,10 @@ const HIDDEN_ROUTES = [
   '/car-details',
   '/booking-detail',
   '/booking',
+  // Pickers with a search field: the button would sit on top of the results.
+  '/location',
+  '/return-location',
+  '/dropoff',
 ];
 
 export function FloatingSupport() {

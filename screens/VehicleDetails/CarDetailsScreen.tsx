@@ -17,18 +17,25 @@ import { DetailsTabs } from '@/components/vehicle/details/DetailsTabs';
 import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
 import { PriceBreakdownSheet } from '@/components/vehicle/details/PriceBreakdownSheet';
 import { SearchSheet } from '@/components/booking/SearchSheet';
-import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import Reanimated from 'react-native-reanimated';
+import { rise } from '@/components/common/motion';
 
 export default function CarDetailsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, pickup, dropoff, dateRange, bookingSource, isDeliveryRequested, setFuelEstimate } = useSawari();
+  const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate } = useSawari();
+  
+  // Use the Explore page's independent date if navigating from there, otherwise use the main booking date range
+  const effectiveDateRange = bookingSource === 'explore' ? selectedDate : dateRange;
   
   // Same rule as the lists: free for the chosen dates (or today if none chosen).
-  const [startStr, endStr] = splitDateRange(dateRange);
+  const [startStr, endStr] = splitDateRange(effectiveDateRange);
   const availability = getAvailability(selectedCar, startStr, endStr);
   const isAvailable = availability.available;
+
+  // Enrich the car with the computed availability so child components can access nextAvailableFrom etc.
+  const enrichedCar = selectedCar ? { ...selectedCar, availability, isAvailable } : selectedCar;
 
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -55,21 +62,21 @@ export default function CarDetailsScreen() {
         showsVerticalScrollIndicator={false} 
         contentContainerStyle={[styles.content, { paddingBottom: 70 + Math.max(insets.bottom, 16) + 24 }]}
       >
-        <Reanimated.View entering={FadeInDown.delay(0).duration(400)}>
-          <VehicleHeroGallery car={selectedCar} />
+        <Reanimated.View entering={rise(0)}>
+          <VehicleHeroGallery car={enrichedCar} />
         </Reanimated.View>
         
-        <Reanimated.View entering={FadeInDown.delay(100).duration(400)}>
-          <VehicleSummary car={selectedCar} isAvailable={isAvailable} availabilityNote={availability.label} />
+        <Reanimated.View entering={rise(100)}>
+          <VehicleSummary car={enrichedCar} isAvailable={isAvailable} availabilityNote={availability.label} />
         </Reanimated.View>
 
-        <Reanimated.View entering={FadeInDown.delay(200).duration(400)}>
-          <DetailsTabs car={selectedCar} />
+        <Reanimated.View entering={rise(200)}>
+          <DetailsTabs car={enrichedCar} />
         </Reanimated.View>
 
         {/* Location Card */}
         {isAvailable && (
-          <Reanimated.View entering={FadeInDown.delay(300).duration(400)} style={styles.fuelSection}>
+          <Reanimated.View entering={rise(300)} style={styles.fuelSection}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
               {isDeliveryRequested ? 'Delivery Details' : 'Vehicle Location'}
             </Text>

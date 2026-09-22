@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, Dimensions, Modal, Text } from 'react-native';
 import { Image } from 'expo-image';
+import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -40,7 +41,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
     <View style={styles.container}>
       {/* Main Large Image */}
       <Pressable onPress={openFullScreen} style={[styles.heroWrap, { backgroundColor: colors.surfaceSoft }]}>
-        <Image 
+        <LoadingImage 
           source={images[activeIndex]} 
           style={styles.heroImage} 
           contentFit="cover" 

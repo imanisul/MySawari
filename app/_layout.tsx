@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { LogBox } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { LogBox, View } from 'react-native';
 
 LogBox.ignoreLogs([
   'ProgressBarAndroid has been extracted from react-native core',
@@ -22,15 +22,30 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
+import { Feather, FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import * as Notifications from 'expo-notifications';
 import { SawariProvider, useSawari } from '@/context/SawariContext';
 import { useAppUpdates } from '@/hooks/useAppUpdates';
+import { useColors } from '@/hooks/useColors';
 import { PostTripReviewPrompt } from '@/components/booking/PostTripReviewPrompt';
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+// The native splash is the only splash. It stays up until the first usable screen is ready (see AppGate).
+SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Set up how foreground notifications are handled
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+/** booting: splash stays up, nothing renders · ready: app is shown · error: fonts failed, app still opens on system fonts. */
+type AppStatus = 'booting' | 'ready' | 'error';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -52,10 +67,13 @@ focusManager.setEventListener((handleFocus) => {
 });
 
 function RootLayoutNav() {
+  const colors = useColors();
   return (
-    <Stack screenOptions={{ headerBackTitle: 'Back', headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="explore" />
+    // contentStyle: the screen behind a transition is the app background, never a blank white frame.
+    <Stack screenOptions={{ headerBackTitle: 'Back', headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+      {/* Bottom-tab screens swap instantly (no cross-fade), so no half-faded ghost of the old screen shows. */}
+      <Stack.Screen name="index" options={{ animation: 'none' }} />
+      <Stack.Screen name="explore" options={{ animation: 'none' }} />
       <Stack.Screen name="wishlist" />
       <Stack.Screen name="search" />
       <Stack.Screen name="car-details" />
@@ -72,10 +90,10 @@ function RootLayoutNav() {
       <Stack.Screen name="payment-processing" />
       <Stack.Screen name="payment-error" options={{ presentation: 'modal' }} />
       <Stack.Screen name="confirmation" />
-      <Stack.Screen name="bookings" />
+      <Stack.Screen name="bookings" options={{ animation: 'none' }} />
       <Stack.Screen name="booking-detail" />
       <Stack.Screen name="login" />
-      <Stack.Screen name="profile" />
+      <Stack.Screen name="profile" options={{ animation: 'none' }} />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="settings" />
       <Stack.Screen name="notifications" />
@@ -144,9 +162,11 @@ function OTAUpdateChecker() {
 }
 
 export default function RootLayout() {
-  // Start loading vehicles straight away (saved copy first, then the network) — before any screen asks.
+  // Restore the saved vehicles before the splash lifts, so Home/Explore open with content instead of
+  // a flash of placeholders. The network refresh starts in the background and is not waited for.
+  const [cacheReady, setCacheReady] = useState(false);
   useEffect(() => {
-    primeVehicles(queryClient);
+    primeVehicles(queryClient).finally(() => setCacheReady(true));
   }, []);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -154,6 +174,11 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    // Icon fonts load with the splash still up, so no screen ever shows empty circles where icons belong.
+    ...Feather.font,
+    ...Ionicons.font,
+    ...FontAwesome.font,
+    ...FontAwesome5.font,
   });
 
   if (!fontsLoaded && !fontError) return null;
@@ -165,13 +190,13 @@ export default function RootLayout() {
           <GestureHandlerRootView>
             <KeyboardProvider>
               <SawariProvider>
-                <SplashHider fontsLoaded={fontsLoaded}>
+                <AppGate fontError={!!fontError && !fontsLoaded} cacheReady={cacheReady}>
                   <RootLayoutNav />
                   <FloatingSupport />
                   <OTAUpdateChecker />
                   <PostTripReviewPrompt />
                   <ThemedStatusBar />
-                </SplashHider>
+                </AppGate>
               </SawariProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>
@@ -181,14 +206,40 @@ export default function RootLayout() {
   );
 }
 
-function SplashHider({ children, fontsLoaded }: { children: React.ReactNode, fontsLoaded: boolean }) {
+/**
+ * The single readiness gate. Nothing is rendered while booting (fonts, saved session and settings,
+ * saved vehicles), and the native splash is hidden exactly once, after the first ready frame is laid out.
+ */
+function AppGate({
+  children,
+  fontError,
+  cacheReady,
+}: {
+  children: React.ReactNode;
+  fontError: boolean;
+  cacheReady: boolean;
+}) {
   const { isAuthLoading } = useSawari();
+  const colors = useColors();
+  const splashHidden = useRef(false);
 
-  useEffect(() => {
-    if (fontsLoaded && !isAuthLoading) {
-      SplashScreen.hideAsync().catch(console.warn);
-    }
-  }, [fontsLoaded, isAuthLoading]);
+  const status: AppStatus = isAuthLoading || !cacheReady ? 'booting' : fontError ? 'error' : 'ready';
 
-  return <AnimatedSplash isReady={fontsLoaded && !isAuthLoading}>{children}</AnimatedSplash>;
+  const onLayout = useCallback(() => {
+    // AnimatedSplash handles its own visual lifecycle, so we only need to hide the native splash
+    // exactly once, when the app gate (the headless logic root) becomes ready.
+    if (status === 'booting' || splashHidden.current) return;
+    splashHidden.current = true;
+    SplashScreen.hideAsync().catch(() => {});
+  }, [status]);
+
+  if (status === 'booting') return null;
+
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayout}>
+      <AnimatedSplash isReady={status === 'ready' || status === 'error'}>
+        {children}
+      </AnimatedSplash>
+    </View>
+  );
 }

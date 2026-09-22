@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Image } from 'expo-image';
+import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
-import { Car, getAvailability } from '@/utils/sawari';
+import { Car, getAvailability, dayNumToLabel, todayDayNum } from '@/utils/sawari';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useSawari } from '@/context/SawariContext';
 import { shadows } from '@/constants/shadows';
@@ -20,21 +20,32 @@ import { shadows } from '@/constants/shadows';
  */
 export const CarListCard = React.memo(function CarListCard({
   car,
+  isExplore,
+  effectiveDateRange,
   onIntercept,
+  style,
 }: {
   car: Car;
-  /** Kept for existing callers. */
   isExplore?: boolean;
+  effectiveDateRange?: string;
   onIntercept?: () => void;
+  style?: any;
 }) {
   const colors = useColors();
   const router = useRouter();
-  const { selectCar, dateRange } = useSawari();
+  const { selectCar, dateRange: globalDateRange, setDateRange } = useSawari();
+  const dateRange = effectiveDateRange ?? globalDateRange;
   const { scaleAnim, opacityAnim, onPressIn, onPressOut } = usePressAnimation();
   const [isNavigating, setIsNavigating] = useState(false);
 
   const availability = car.availability ?? getAvailability(car);
   const unavailable = car.isAvailable === false || !availability.available;
+  // Badge: "Avail · [start date] – [end date]" for available, or the unavailability headline.
+  const badgeText = !unavailable
+    ? (availability.freeUntil
+        ? `Avail · ${availability.startDate} – ${availability.freeUntil}`
+        : `Avail · ${availability.startDate} – Onwards`)
+    : availability.headline;
   const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
 
   const image = (car as any).images?.[0] ?? car.image;
@@ -49,16 +60,19 @@ export const CarListCard = React.memo(function CarListCard({
     if (!isDateSelected && onIntercept) {
       onIntercept();
     } else {
+      if (effectiveDateRange && effectiveDateRange !== globalDateRange) {
+        setDateRange(effectiveDateRange);
+      }
       router.push('/car-details');
     }
     setTimeout(() => setIsNavigating(false), 500);
   };
 
   return (
-    <Animated.View style={[styles.cardContainer, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}>
+    <Animated.View style={[styles.cardContainer, style, { transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${car.name}, ${price} per day, ${availability.headline}. ${car.seats}, ${car.transmission}, ${car.fuel}`}
+        accessibilityLabel={`${car.name}, ${price} per day, ${badgeText}. ${car.seats}, ${car.transmission}, ${car.fuel}`}
         testID={`list-car-${car.id}`}
         disabled={isNavigating}
         onPress={handlePress}
@@ -68,11 +82,11 @@ export const CarListCard = React.memo(function CarListCard({
       >
         {/* Photo */}
         <View style={[styles.imageWrap, { backgroundColor: colors.muted }]}>
-          <Image
+          <LoadingImage
             source={image}
             contentFit="cover"
             transition={200}
-            style={[styles.image, unavailable && { opacity: 0.55 }]}
+            style={styles.image}
           />
           {/* Soft top gradient so the badges stay readable on any photo */}
           <LinearGradient colors={['rgba(0,0,0,0.38)', 'transparent']} style={styles.topGradient} pointerEvents="none" />
@@ -93,7 +107,7 @@ export const CarListCard = React.memo(function CarListCard({
                 numberOfLines={1}
                 style={[styles.availBadgeText, { color: unavailable ? '#FFFFFF' : '#047857' }]}
               >
-                {availability.headline}
+                {badgeText}
               </Text>
             </View>
 
@@ -119,16 +133,17 @@ export const CarListCard = React.memo(function CarListCard({
             <Spec icon="droplet" text={car.fuel} color={colors.mutedForeground} />
           </View>
 
-          {!!availability.detail && (
+          {/* Only show detail row for unavailable vehicles (e.g. "Next available 25 Sep") */}
+          {!!availability.detail && unavailable && (
             <View style={[styles.detailRow, { borderTopColor: colors.border }]}>
               <Feather
-                name={unavailable ? 'clock' : 'calendar'}
+                name="clock"
                 size={13}
-                color={unavailable ? colors.destructive : colors.success}
+                color={colors.destructive}
               />
               <Text
                 numberOfLines={1}
-                style={[styles.detailText, { color: unavailable ? colors.destructive : colors.success }]}
+                style={[styles.detailText, { color: colors.destructive }]}
               >
                 {availability.detail}
               </Text>

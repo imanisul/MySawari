@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,9 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { checkCarAvailability } from '@/utils/sawari';
 import { KeyboardAwareScrollViewCompat } from '@/components';
+import { LoadingImage } from '@/components/common/LoadingImage';
+import { StatusBarScrim } from '@/components/common/StatusBarScrim';
+import { API } from '@/services/backend/api';
 
 export default function BookingScreen() {
   const colors = useColors();
@@ -21,6 +24,18 @@ export default function BookingScreen() {
 
   const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (customer?.mobile && selectedCar) {
+      API.trackLead({
+        mobileNumber: customer.mobile,
+        customerName: customer.name,
+        vehicleId: selectedCar.id,
+        vehicleName: selectedCar.name,
+        lastPageVisited: 'checkout'
+      });
+    }
+  }, [customer?.mobile, selectedCar?.id]);
 
   // The pricing quote is automatically managed in SawariContext now based on these details
 
@@ -76,7 +91,9 @@ export default function BookingScreen() {
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Review booking</Text>
         </View>
         <View style={[styles.carSummary, { backgroundColor: colors.card }]}>
-          <Image source={selectedCar.image} style={styles.carThumb} resizeMode="cover" />
+          <View style={[styles.carThumb, { backgroundColor: colors.muted, overflow: 'hidden' }]}>
+            <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          </View>
           <View style={styles.carCopy}>
             <Text style={[styles.carName, { color: colors.foreground }]}>{selectedCar.name}</Text>
             <Text style={[styles.carMeta, { color: colors.mutedForeground }]}>{selectedCar.category} · {selectedCar.seats} · {selectedCar.transmission}</Text>
@@ -214,6 +231,7 @@ export default function BookingScreen() {
           )}
         </Pressable>
       </KeyboardAwareScrollViewCompat>
+      <StatusBarScrim />
     </View>
   );
 }

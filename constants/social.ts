@@ -18,5 +18,5 @@ export const SOCIAL_LINKS: SocialLink[] = [
   { id: 'x', label: 'X', image: require('../assets/images/social/x.png'), themed: true, url: '' },
   { id: 'instagram', label: 'Instagram', image: require('../assets/images/social/instagram.png'), url: 'https://www.instagram.com/mysawari' },
   { id: 'linkedin', label: 'LinkedIn', image: require('../assets/images/social/linkedin.png'), url: 'https://www.linkedin.com/company/mysawari' },
-  { id: 'facebook', label: 'Facebook', image: require('../assets/images/social/facebook.png'), url: 'https://www.facebook.com/share/14pcaLN3qK/' },
+  { id: 'facebook', label: 'Facebook', image: require('../assets/images/social/facebook.png'), url: 'https://www.facebook.com/share/1cobmf7nKh/' },
 ];

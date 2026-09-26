@@ -1,0 +1,321 @@
+import React, { useState, useEffect } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import Reanimated from 'react-native-reanimated';
+import { useColors } from '@/hooks/useColors';
+import { useSawari } from '@/context/SawariContext';
+import { checkCarAvailability } from '@/utils/sawari';
+import { KeyboardAwareScrollViewCompat } from '@/components';
+import { LoadingImage } from '@/components/common/LoadingImage';
+import { StatusBarScrim } from '@/components/common/StatusBarScrim';
+import { rise } from '@/components/common/motion';
+import { API } from '@/services/backend/api';
+
+export default function BookingScreen() {
+  const colors = useColors();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { 
+    mode, 
+    setMode,
+    selectedCar, 
+    pickup, dropoff, returnAddress, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
+
+  const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string}>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    // Wait for a plausible full number (not every keystroke) and settle briefly before tracking,
+    // so typing a mobile number doesn't fire a request per digit.
+    if (!selectedCar || !/^\d{10}$/.test(customer?.mobile || '')) return;
+    const timer = setTimeout(() => {
+      API.trackLead({
+        mobileNumber: customer.mobile,
+        customerName: customer.name,
+        vehicleId: selectedCar.id,
+        vehicleName: selectedCar.name,
+        lastPageVisited: 'checkout'
+      });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [customer?.mobile, selectedCar?.id]);
+
+  // The pricing quote is automatically managed in SawariContext now based on these details
+
+  // A pickup/drop address is only required when the customer actually asked for
+  // that service — Self Pickup / Self Drop (the default) never needs an address.
+  const needsPickupAddress = isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
+  const needsDropAddress = isDeliveryRequested && (deliveryMode === 'return' || deliveryMode === 'both');
+  const isMissingPickup = needsPickupAddress && !pickup?.name;
+  const isMissingDrop = needsDropAddress && !returnAddress?.name;
+  const isMissingDates = !dateRange || dateRange.includes('Select');
+  const isMissingDestination = !dropoff?.name;
+  
+  const [startStr, endStr] = (dateRange || '').split(' – ');
+  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(selectedCar, startStr, endStr);
+
+  const validateAndProceed = () => {
+    if (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) {
+      Alert.alert('Missing Details', 'Please select your trip locations and travel dates before continuing.');
+      return;
+    }
+    
+    if (!isVehicleAvailable) {
+      Alert.alert('Not Available', 'Sorry, this vehicle is no longer available for your selected dates.');
+      return;
+    }
+
+    const newErrors: typeof errors = {};
+    if (!customer.name.trim()) newErrors.name = 'Name is required';
+    if (!customer.mobile.trim() || !/^\d{10}$/.test(customer.mobile)) newErrors.mobile = 'Enter a valid 10-digit mobile number';
+    if (customer.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) newErrors.email = 'Enter a valid email';
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+    } else {
+      setErrors({});
+      setIsSubmitting(true);
+      router.push('/payment');
+      setTimeout(() => setIsSubmitting(false), 1000);
+    }
+  };
+
+  return (
+    <View style={[styles.screen, { backgroundColor: colors.background }]}>
+      <KeyboardAwareScrollViewCompat
+        bottomOffset={72}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+      >
+        <View style={styles.topBar}>
+          <Pressable accessibilityLabel="Back" onPress={() => router.back()} style={[styles.circle, { borderColor: colors.border }]}>
+            <Feather name="chevron-left" size={20} color={colors.foreground} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Review booking</Text>
+        </View>
+        <Reanimated.View entering={rise(0)} style={[styles.carSummary, { backgroundColor: colors.card }]}>
+          <View style={[styles.carThumb, { backgroundColor: colors.muted, overflow: 'hidden' }]}>
+            <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+          </View>
+          <View style={styles.carCopy}>
+            <Text style={[styles.carName, { color: colors.foreground }]}>{selectedCar.name}</Text>
+            <Text style={[styles.carMeta, { color: colors.mutedForeground }]}>{selectedCar.category} · {selectedCar.seats} · {selectedCar.transmission}</Text>
+            <Text style={[styles.carMode, { color: colors.foreground }]}>{mode}</Text>
+          </View>
+        </Reanimated.View>
+        <Reanimated.View entering={rise(100)}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Trip details</Text>
+        <View style={styles.tripDetails}>
+          <DetailRow
+            icon="map-pin"
+            label="Destination"
+            value={dropoff?.name || 'Select Destination'}
+            isMissing={!dropoff?.name}
+            onPress={() => router.push('/dropoff')}
+          />
+          {isDeliveryRequested && (
+            <>
+              {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
+                <DetailRow
+                  icon="map-pin"
+                  label="Drop off"
+                  value={pickup?.name || 'Select Location'}
+                  isMissing={isMissingPickup}
+                  onPress={() => router.push('/location')}
+                />
+              )}
+              {(deliveryMode === 'both' || deliveryMode === 'return') && (
+                <DetailRow
+                  icon="map-pin"
+                  label="Pick up"
+                  value={returnAddress?.name || 'Select Location'}
+                  isMissing={isMissingDrop}
+                  onPress={() => router.push('/return-location')}
+                />
+              )}
+            </>
+          )}
+          <DetailRow
+            icon="calendar"
+            label="Dates & Time"
+            value={isMissingDates ? 'Select Dates' : `${dateRange} · ${duration}\n${pickupTime} – ${returnTime}`}
+            isMissing={isMissingDates}
+            onPress={() => router.push('/dates')}
+          />
+          <View style={{ paddingTop: 16, paddingBottom: 8 }}>
+            <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.foreground, marginBottom: 12 }}>Driving option</Text>
+            <View style={{ gap: 12 }}>
+              {(['Self Drive', 'With Driver'] as const).map(m => {
+                const isSelected = mode === m;
+                return (
+                  <Pressable
+                    key={m}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setMode(m);
+                    }}
+                    style={({ pressed }) => [
+                      {
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        padding: 16,
+                        borderRadius: 16,
+                        borderWidth: 2,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        backgroundColor: isSelected ? colors.card : colors.background,
+                        opacity: pressed ? 0.9 : 1,
+                      }
+                    ]}
+                  >
+                    <View style={{
+                      width: 44, height: 44, borderRadius: 22, 
+                      backgroundColor: isSelected ? colors.primary : colors.tintLight,
+                      alignItems: 'center', justifyContent: 'center', marginRight: 14
+                    }}>
+                      <Feather name={m === 'Self Drive' ? 'key' : 'user'} size={20} color={isSelected ? colors.primaryForeground : colors.primaryText} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 15, fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium', color: colors.foreground }}>
+                        {m}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 4 }}>
+                        {m === 'Self Drive' ? 'Drive yourself, no extra charge' : 'Relax with a professional driver'}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                      <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: isSelected ? colors.primaryText : colors.foreground }}>
+                        {m === 'Self Drive' ? '₹0' : '₹1400/d'}
+                      </Text>
+                      {isSelected ? (
+                        <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
+                          <Feather name="check" size={12} color={colors.primaryForeground} />
+                        </View>
+                      ) : (
+                        <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginTop: 6 }} />
+                      )}
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+
+        {!isVehicleAvailable && !isMissingDates && (
+          <View style={{ backgroundColor: colors.destructive + '12', borderColor: colors.destructive + '40', borderWidth: 1, padding: 16, borderRadius: 12, marginTop: 16 }}>
+            <Text style={{ color: colors.destructive, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Not Available</Text>
+            <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4 }}>
+              Sorry, this vehicle is no longer available for your selected dates. Please change your dates.
+            </Text>
+          </View>
+        )}
+        </Reanimated.View>
+        <Reanimated.View entering={rise(200)}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customer details</Text>
+        <Input label="Full name" value={customer.name} error={errors.name} onChangeText={(value) => updateCustomer('name', value)} />
+        <Input label="Mobile number" value={customer.mobile} placeholder="10-digit mobile number" keyboardType="phone-pad" error={errors.mobile} onChangeText={(value) => updateCustomer('mobile', value)} />
+        <Input label="Email (Optional)" value={customer.email} keyboardType="email-address" error={errors.email} onChangeText={(value) => updateCustomer('email', value)} />
+        <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 8, marginBottom: 16, fontStyle: 'italic', lineHeight: 16 }}>
+          Note: Original Driving Licence and Aadhar Card verification is mandatory at the time of vehicle handover.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          testID="continue-to-payment"
+          onPress={validateAndProceed}
+          disabled={isSubmitting}
+          style={({ pressed }) => [
+            styles.paymentButton,
+            { backgroundColor: (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination || !isVehicleAvailable || isSubmitting) ? colors.muted : colors.primary },
+            pressed && !isSubmitting && styles.pressed
+          ]}
+        >
+          <Text style={[styles.paymentButtonText, { color: (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination || !isVehicleAvailable || isSubmitting) ? colors.mutedForeground : colors.primaryForeground }]}>
+            {(isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) ? 'Missing Trip Details' : !isVehicleAvailable ? 'Vehicle Not Available' : 'Continue to payment'}
+          </Text>
+          {(!isMissingPickup && !isMissingDrop && !isMissingDates && !isMissingDestination && isVehicleAvailable) && (
+            <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
+          )}
+        </Pressable>
+        </Reanimated.View>
+      </KeyboardAwareScrollViewCompat>
+      <StatusBarScrim />
+    </View>
+  );
+}
+
+function DetailRow({ icon, label, value, last = false, isMissing = false, onPress }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; last?: boolean; isMissing?: boolean; onPress?: () => void }) {
+  const colors = useColors();
+  const content = (
+    <View style={[styles.detailRow]}>
+      <Feather name={icon} size={16} color={isMissing ? colors.destructive : colors.mutedForeground} />
+      <Text style={[styles.detailLabel, { color: isMissing ? colors.destructive : colors.mutedForeground }]}>{label}</Text>
+      <Text style={[styles.detailValue, { color: isMissing ? colors.destructive : colors.foreground }]}>{value}</Text>
+      {onPress && <Feather name="chevron-right" size={16} color={isMissing ? colors.destructive : colors.mutedForeground} style={{ marginLeft: 4 }} />}
+    </View>
+  );
+  
+  if (onPress) {
+    return (
+      <Pressable onPress={onPress} style={({pressed}) => [pressed && {opacity: 0.7}]}>
+        {content}
+      </Pressable>
+    );
+  }
+  
+  return content;
+}
+
+function Input({ label, value, placeholder, keyboardType, error, onChangeText }: { label: string; value: string; placeholder?: string; keyboardType?: 'default' | 'phone-pad' | 'email-address'; error?: string; onChangeText: (value: string) => void }) {
+  const colors = useColors();
+  return (
+    <View style={styles.inputGroup}>
+      <Text style={[styles.inputLabel, { color: colors.foreground }]}>{label}</Text>
+      <TextInput
+        value={value}
+        placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground}
+        keyboardType={keyboardType}
+        onChangeText={onChangeText}
+        style={[styles.input, { backgroundColor: colors.card, borderColor: error ? colors.destructive : colors.border, color: colors.foreground }]}
+      />
+      {error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
+    </View>
+  );
+}
+
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  content: { paddingBottom: 40, paddingHorizontal: 24 },
+  topBar: { alignItems: 'center', flexDirection: 'row', gap: 16 },
+  circle: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
+  headerTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
+  carSummary: { alignItems: 'center', borderRadius: 20, flexDirection: 'row', marginTop: 24, padding: 16 },
+  carThumb: { borderRadius: 12, height: 70, width: 90 },
+  carCopy: { marginLeft: 16, flex: 1 },
+  carName: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
+  carMeta: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4 },
+  carMode: { fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 6 },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, marginTop: 32 },
+  tripDetails: { marginTop: 12 },
+  detailRow: { alignItems: 'center', minHeight: 46, flexDirection: 'row', gap: 12 },
+  detailLabel: { fontFamily: 'Inter_400Regular', fontSize: 14, flex: 1 },
+  detailValue: { fontFamily: 'Inter_500Medium', fontSize: 14, maxWidth: '65%', textAlign: 'right' },
+  inputGroup: { marginTop: 16 },
+  inputLabel: { fontFamily: 'Inter_500Medium', fontSize: 13, marginBottom: 8 },
+  input: { borderRadius: 12, borderWidth: 1, fontFamily: 'Inter_400Regular', fontSize: 14, height: 52, paddingHorizontal: 16 },
+  priceSummary: { marginTop: 16 },
+  priceRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  priceLabel: { fontFamily: 'Inter_400Regular', fontSize: 14 },
+  priceText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
+  payRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 20 },
+  payLabel: { fontFamily: 'Inter_500Medium', fontSize: 15 },
+  payValue: { fontFamily: 'Inter_700Bold', fontSize: 24, letterSpacing: -0.5 },
+  paymentButton: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', height: 56, justifyContent: 'center', marginTop: 24 },
+  paymentButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 8 },
+  pressed: { opacity: 0.7 },
+  errorText: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 6 },
+});

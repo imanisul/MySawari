@@ -1,6 +1,6 @@
 import React from 'react';
-import { DriverOptionSheet } from '@/components';
+import DriverOptionScreen from '@/screens/Booking/DriverOptionScreen';
 
-export default function DriverOptionScreen() {
-  return <DriverOptionSheet />;
+export default function Route() {
+  return <DriverOptionScreen />;
 }

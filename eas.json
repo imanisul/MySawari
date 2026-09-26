@@ -6,10 +6,16 @@
   "build": {
     "preview": {
       "node": "20.20.2",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       }
     },
-    "production": {}
+    "production": {
+      "channel": "production",
+      "android": {
+        "buildType": "apk"
+      }
+    }
   }
 }

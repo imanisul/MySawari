@@ -14,7 +14,7 @@ export default function NotFoundScreen() {
         </Text>
 
         <Link href="/" style={styles.link}>
-          <Text style={[styles.linkText, { color: colors.primary }]}>
+          <Text style={[styles.linkText, { color: colors.primaryText }]}>
             Go to home screen!
           </Text>
         </Link>

@@ -79,9 +79,12 @@ export default function MembershipScreen() {
   const [successPlanName, setSuccessPlanName] = useState('');
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   // Animated progress bar
   const progressAnim = useRef(new Animated.Value(0)).current;
+
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const fetchMembership = useCallback(async () => {
     try {
@@ -100,7 +103,7 @@ export default function MembershipScreen() {
     if (membership) {
       const plan = getPlanDef(membership.plan);
       if (plan) {
-        const pct = Math.min(1, membership.totalSaved / plan.annualCap);
+        const pct = plan.annualCap > 0 ? Math.min(1, membership.totalSaved / plan.annualCap) : 0;
         Animated.timing(progressAnim, {
           toValue: pct,
           duration: 1200,
@@ -218,6 +221,7 @@ export default function MembershipScreen() {
     <Page>
       <Header title="Membership" back={true} />
       <ScrollView
+        ref={scrollViewRef}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
@@ -270,7 +274,7 @@ export default function MembershipScreen() {
                   />
                   {/* Milestone markers */}
                   {[0.25, 0.5, 0.75].map(pct => {
-                    const isActive = membership.totalSaved / activePlan.annualCap >= pct;
+                    const isActive = activePlan && activePlan.annualCap > 0 ? (membership.totalSaved / activePlan.annualCap >= pct) : false;
                     return (
                       <View
                         key={pct}
@@ -285,10 +289,6 @@ export default function MembershipScreen() {
                   })}
                 </View>
 
-                <View style={styles.progressLabels}>
-                  <Text style={styles.progressLabelLight}>{formatCurrency(0)}</Text>
-                  <Text style={styles.progressLabelLight}>{formatCurrency(activePlan.annualCap)}</Text>
-                </View>
               </View>
 
               <View style={styles.heroStatsRow}>
@@ -310,6 +310,32 @@ export default function MembershipScreen() {
                   <Text style={styles.heroStatLabel}>Annual Cap</Text>
                 </View>
               </View>
+
+              {activePlan.key !== 'pro' && (
+                <Pressable
+                  style={({ pressed }) => [
+                    {
+                      marginTop: 12,
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      paddingVertical: 10,
+                      borderRadius: 12,
+                      alignItems: 'center',
+                      flexDirection: 'row',
+                      justifyContent: 'center',
+                      gap: 8,
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.3)',
+                    },
+                    pressed && { opacity: 0.8, backgroundColor: 'rgba(255,255,255,0.3)' }
+                  ]}
+                  onPress={() => {
+                    setShowUpgradeModal(true);
+                  }}
+                >
+                  <Feather name="arrow-up-circle" size={18} color="#fff" />
+                  <Text style={{ color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Upgrade Your Plan</Text>
+                </Pressable>
+              )}
             </LinearGradient>
           </Reanimated.View>
         )}
@@ -336,13 +362,13 @@ export default function MembershipScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           snapToInterval={SCREEN_WIDTH * 0.70 + 12}
+          snapToAlignment="start"
           decelerationRate="fast"
           contentContainerStyle={{ paddingRight: 20, paddingBottom: 16 }}
         >
-          {PLANS.map((plan, idx) => {
-            const isActive = activePlan?.key === plan.key;
-            const isUpgrade = activePlan && PLANS.indexOf(activePlan) < idx;
-            const isDowngrade = activePlan && PLANS.indexOf(activePlan) > idx;
+          {PLANS.filter(plan => plan.key !== activePlan?.key).map((plan, idx) => {
+            const isUpgrade = activePlan && PLANS.indexOf(activePlan) < PLANS.indexOf(plan);
+            const isDowngrade = activePlan && PLANS.indexOf(activePlan) > PLANS.indexOf(plan);
 
             return (
               <Reanimated.View
@@ -354,15 +380,10 @@ export default function MembershipScreen() {
                   styles.planCard,
                   {
                     backgroundColor: colors.card,
-                    borderColor: isActive ? plan.gradient[0] : colors.border,
-                    borderWidth: isActive ? 2 : 1,
+                    borderColor: colors.border,
+                    borderWidth: 1,
                   },
                 ]}>
-                  {isActive && (
-                    <View style={[styles.activeBadge, { backgroundColor: plan.gradient[0] }]}>
-                      <Text style={styles.activeBadgeText}>ACTIVE</Text>
-                    </View>
-                  )}
 
                   <View style={styles.planHeader}>
                     <Text style={{ fontSize: 28 }}>{plan.icon}</Text>
@@ -397,7 +418,7 @@ export default function MembershipScreen() {
                     </Text>
                   </View>
 
-                  {!isActive && !isDowngrade && (
+                  {!isDowngrade && (
                     <Pressable
                       onPress={() => handleActivate(plan.key)}
                       disabled={!!activating}
@@ -456,6 +477,57 @@ export default function MembershipScreen() {
         ))}
       </ScrollView>
 
+      {/* Upgrade Modal */}
+      <Modal
+        visible={showUpgradeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUpgradeModal(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}>
+          <View style={{ width: '90%', backgroundColor: colors.card, borderRadius: 16, padding: 24, paddingBottom: 32 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+              <Text style={{ fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.foreground }}>Select Upgrade</Text>
+              <Pressable onPress={() => setShowUpgradeModal(false)} hitSlop={12}>
+                <Feather name="x" size={24} color={colors.mutedForeground} />
+              </Pressable>
+            </View>
+            <View style={{ gap: 12 }}>
+              {PLANS.filter((p, i) => !activePlan || PLANS.indexOf(activePlan) < i).map(plan => (
+                <Pressable
+                  key={plan.key}
+                  onPress={() => {
+                    setShowUpgradeModal(false);
+                    setTimeout(() => handleActivate(plan.key), 300);
+                  }}
+                  style={({ pressed }) => [
+                    {
+                      padding: 16,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: plan.gradient[0],
+                      backgroundColor: plan.gradient[0] + '10',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                    },
+                    pressed && { opacity: 0.8 }
+                  ]}
+                >
+                  <Text style={{ fontSize: 32, marginRight: 16 }}>{plan.icon}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontFamily: 'Inter_600SemiBold', color: colors.foreground }}>{plan.name}</Text>
+                    <Text style={{ fontSize: 13, color: colors.mutedForeground }}>{plan.discountPct} off every trip</Text>
+                  </View>
+                  <Text style={{ fontSize: 16, fontFamily: 'Inter_700Bold', color: plan.gradient[0] }}>
+                    {formatCurrency(plan.price)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ── Success Modal ── */}
       <Modal visible={showSuccessModal} transparent animationType="fade">
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' }}>
@@ -507,17 +579,17 @@ const styles = StyleSheet.create({
 
   // Hero card
   heroCard: {
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 28,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
   },
   heroBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  heroIcon: { fontSize: 28 },
+  heroIcon: { fontSize: 24 },
   heroBadgePill: {
     backgroundColor: 'rgba(255,255,255,0.2)',
     paddingHorizontal: 12,
@@ -533,23 +605,23 @@ const styles = StyleSheet.create({
   heroTitle: {
     color: '#fff',
     fontFamily: 'Inter_700Bold',
-    fontSize: 24,
+    fontSize: 20,
     letterSpacing: -0.3,
   },
   heroSub: {
     color: 'rgba(255,255,255,0.85)',
     fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-    marginTop: 4,
+    fontSize: 12,
+    marginTop: 2,
   },
   heroDivider: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.15)',
-    marginVertical: 18,
+    marginVertical: 10,
   },
 
   // Progress
-  progressSection: { marginBottom: 18 },
+  progressSection: { marginBottom: 12 },
   progressLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -5,7 +5,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
-import * as Notifications from 'expo-notifications';
+import Notifications from '@/utils/notifications';
 
 export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const colors = useColors();

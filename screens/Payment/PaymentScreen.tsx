@@ -29,8 +29,12 @@ export default function PaymentScreen() {
     sawariCashToApply,
     dropoff,
     isDeliveryRequested,
-    deliveryMode
+    deliveryMode,
+    isAuthenticated
   } = useSawari();
+
+  // Same checks the booking screen makes before opening checkout; a direct link here skips that screen.
+  const isTripIncomplete = !dateRange || dateRange.includes('Select') || !dropoff?.name || isAuthenticated !== true;
   
   // Coupon State
   const [couponInput, setCouponInput] = useState('');
@@ -42,7 +46,7 @@ export default function PaymentScreen() {
 
   useEffect(() => {
     // Fetch coupons
-    API.getCoupons().then(res => setAvailableCoupons(res));
+    API.getCoupons().then(res => setAvailableCoupons(res)).catch(() => setAvailableCoupons([]));
   }, []);
 
   const handleApplyCoupon = (code: string) => {
@@ -193,7 +197,7 @@ export default function PaymentScreen() {
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{c.code}</Text>
                           <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>
-                            {c.discountType === 'FLAT' ? `₹${c.discountValue} OFF` : `${c.discountValue}% OFF (Max ₹${c.maximumDiscount})`}
+                            {c.discountType === 'FLAT' ? `₹${c.discountValue} OFF` : `${c.discountValue}% OFF${c.maximumDiscount ? ` (Max ₹${c.maximumDiscount})` : ''}`}
                           </Text>
                           <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>Min booking ₹{c.minimumBooking}</Text>
                         </View>
@@ -335,9 +339,9 @@ export default function PaymentScreen() {
             </Text>
           </View>
           <Pressable
-            disabled={isQuoteLoading || !pricingQuote}
+            disabled={isQuoteLoading || !pricingQuote || isTripIncomplete}
             onPress={() => router.push('/payment-processing')}
-            style={[styles.payButton, { backgroundColor: isQuoteLoading ? colors.muted : colors.primary }]}
+            style={[styles.payButton, { backgroundColor: isQuoteLoading || isTripIncomplete ? colors.muted : colors.primary }]}
           >
             {isQuoteLoading ? (
               <ActivityIndicator color={colors.primaryForeground} />

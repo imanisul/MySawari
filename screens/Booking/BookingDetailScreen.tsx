@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import Animated, { FadeIn, FadeInDown, FadeInUp, Layout } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,7 +12,7 @@ import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { StatusBarScrim } from '@/components/common/StatusBarScrim';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
-import * as Notifications from 'expo-notifications';
+import Notifications from '@/utils/notifications';
 import { MockRequests, PendingExtension, PendingRefund } from '@/utils/mockRequests';
 import { useQuery } from '@tanstack/react-query';
 import { useVehicles } from '@/hooks/useVehicles';
@@ -48,7 +49,7 @@ export default function BookingDetailScreen() {
   );
 
   const handleApproveExtension = async () => {
-    if (!pendingExtension || !snapshot) return;
+    if (!__DEV__ || !pendingExtension || !snapshot) return;
     setLoading(true);
     try {
       // Hit the real backend API with a mock payment detail
@@ -68,7 +69,7 @@ export default function BookingDetailScreen() {
   };
 
   const handleApproveRefund = async () => {
-    if (!pendingRefund || !snapshot) return;
+    if (!__DEV__ || !pendingRefund || !snapshot) return;
     setLoading(true);
     try {
       await MockRequests.approveRefund(snapshot.id);
@@ -81,6 +82,7 @@ export default function BookingDetailScreen() {
   };
 
   const handleDemoPush = async () => {
+    if (!__DEV__) return;
     alert('Push Notification scheduled! Minimise or close the app now to see it arrive in 5 seconds.');
     await Notifications.scheduleNotificationAsync({
       content: {
@@ -89,6 +91,7 @@ export default function BookingDetailScreen() {
         sound: true,
       },
       trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
         seconds: 5,
       },
     });
@@ -149,7 +152,11 @@ export default function BookingDetailScreen() {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}>
+      <Animated.ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
+        entering={FadeIn.duration(400)}
+      >
         <View style={styles.topBar}>
           <Pressable onPress={() => router.back()} style={[styles.circle, { borderColor: colors.border }]}><Feather name="chevron-left" size={20} color={colors.foreground} /></Pressable>
           <Text style={[styles.title, { color: colors.foreground }]}>Booking Details</Text>
@@ -168,8 +175,8 @@ export default function BookingDetailScreen() {
           </View>
         </View>
 
-        {/* DEMO BUTTON */}
-        <Pressable
+        {/* DEMO BUTTON — development builds only; never shipped to customers */}
+        {__DEV__ && <Pressable
           onPress={handleDemoPush}
           style={({ pressed }) => [
             {
@@ -185,7 +192,7 @@ export default function BookingDetailScreen() {
           <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 14 }}>
             DEMO: Trigger Operation App Notification (5s delay)
           </Text>
-        </Pressable>
+        </Pressable>}
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>VEHICLE</Text>
         <View style={[styles.vehicleCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
@@ -346,12 +353,14 @@ export default function BookingDetailScreen() {
                     <Text style={{ color: '#B45309', fontFamily: 'Inter_600SemiBold', flex: 1 }}>Refund Requested</Text>
                     <Text style={{ color: '#B45309', fontFamily: 'Inter_700Bold' }}>₹{(s.refundAmount || 0).toLocaleString('en-IN')}</Text>
                   </View>
-                  <Pressable 
-                    style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center', marginTop: 8 }}
-                    onPress={handleApproveRefund}
-                  >
-                    <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Refund</Text>
-                  </Pressable>
+                  {__DEV__ && (
+                    <Pressable
+                      style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center', marginTop: 8 }}
+                      onPress={handleApproveRefund}
+                    >
+                      <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Refund</Text>
+                    </Pressable>
+                  )}
                 </>
               ) : (
                 <View style={styles.paymentRow}>
@@ -372,7 +381,7 @@ export default function BookingDetailScreen() {
         </View>
         {/* Room for the pinned action bar so the last section is never covered */}
         <View style={{ height: 110 }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Bottom Sheets */}
       <CancelBookingSheet 
@@ -394,7 +403,7 @@ export default function BookingDetailScreen() {
       />
 
       {s.status === 'COMPLETED' && (
-        <View style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
           {myReviews && (myReviews.bookingIds.includes(s.id) || myReviews.legacyCarIds.includes(String(s.vehicleId))) ? (
             <View style={[styles.actionBtn, { flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: colors.border }]}>
               <Feather name="check-circle" size={16} color={colors.success} />
@@ -409,11 +418,11 @@ export default function BookingDetailScreen() {
               <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>Write a review</Text>
             </Pressable>
           )}
-        </View>
+        </Animated.View>
       )}
 
       {(s.status === 'CONFIRMED' || s.status === 'ONGOING' || s.status === 'PENDING') && (
-        <View style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <Animated.View entering={FadeInDown.delay(300).springify()} style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
           
           {/* Pending Extension Demo UI */}
           {pendingExtension && (
@@ -425,12 +434,14 @@ export default function BookingDetailScreen() {
               <Text style={{ fontFamily: 'Inter_400Regular', color: colors.foreground, fontSize: 13, marginBottom: 12 }}>
                 Request to add {pendingExtension.daysToAdd} days sent to Operations.
               </Text>
-              <Pressable 
-                style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center' }}
-                onPress={handleApproveExtension}
-              >
-                <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Request</Text>
-              </Pressable>
+              {__DEV__ && (
+                <Pressable
+                  style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center' }}
+                  onPress={handleApproveExtension}
+                >
+                  <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Request</Text>
+                </Pressable>
+              )}
             </View>
           )}
 
@@ -466,7 +477,7 @@ export default function BookingDetailScreen() {
               </Pressable>
             )}
           </View>
-        </View>
+        </Animated.View>
       )}
       <StatusBarScrim />
     </View>

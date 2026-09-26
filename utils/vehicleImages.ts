@@ -41,7 +41,7 @@ export const vehicleImages: Record<string, any> = {
 };
 
 export const getVehicleImage = (vehicleName: string, isBike: boolean) => {
-  const normalized = vehicleName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const normalized = String(vehicleName || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
   
   // Try exact match
   if (vehicleImages[normalized]) return vehicleImages[normalized];

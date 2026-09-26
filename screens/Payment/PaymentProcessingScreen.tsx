@@ -11,11 +11,27 @@ import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWe
 export default function PaymentProcessingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { pricingQuote, quoteParams, createBookingSnapshot, confirmBooking } = useSawari();
+  const { pricingQuote, quoteParams, createBookingSnapshot, confirmBookingPayment, confirmBooking } = useSawari();
 
   const [status, setStatus] = useState<'INITIATING' | 'PAYMENT_PENDING' | 'VERIFYING' | 'SUCCESS' | 'ERROR'>('INITIATING');
   const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string, amountPaise: number, keyId: string } | null>(null);
   const started = useRef(false);
+  const holdId = useRef<string | null>(null);
+  const paid = useRef(false);
+
+  // Keep the car soft-locked for this customer while the payment sheet is open (renewed every 45s,
+  // the server caps it at 10 minutes). Stops as soon as the sheet closes or this screen goes away.
+  useEffect(() => {
+    if (status !== 'PAYMENT_PENDING' || !holdId.current) return;
+    const id = holdId.current;
+    const timer = setInterval(() => { API.keepHoldAlive(id); }, 45 * 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
+  // Leaving checkout without paying frees the car for other customers straight away.
+  const releaseHold = () => {
+    if (holdId.current && !paid.current) API.releaseHold(holdId.current);
+  };
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,13 +46,18 @@ export default function PaymentProcessingScreen() {
         return;
       }
       try {
-        // Step 1: Create Order
+        // Step 1: Secure Vehicle Hold (Atomic OCC)
+        const snapshot = await createBookingSnapshot();
+        if (!snapshot) throw new Error('Failed to secure vehicle lock. Please try again.');
+        holdId.current = snapshot.id;
+
+        // Step 2: Create Order
         const order = await API.createRazorpayOrder({ onlinePayableNow: pricingQuote.onlinePayableNow });
         setRazorpayOrder(order);
         setStatus('PAYMENT_PENDING'); 
       } catch (err: any) {
         // Handle 100% sawari cash / zero online payable flow
-        if (err.message.includes('No Razorpay order required')) {
+        if (String(err?.message || '').includes('No Razorpay order required')) {
           completeBookingFlow(null); // Bypass Razorpay entirely
         } else {
           setErrorMsg(err.message || 'Failed to initiate payment');
@@ -48,11 +69,16 @@ export default function PaymentProcessingScreen() {
   }, [quoteParams, pricingQuote]);
 
   const handleRazorpaySuccess = async (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+    paid.current = true; // money has moved: never release this hold from the app
     setStatus('VERIFYING');
     try {
       const isVerified = await API.verifyPayment(data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature);
       if (isVerified) {
         completeBookingFlow({ razorpayOrderId: data.razorpay_order_id, razorpayPaymentId: data.razorpay_payment_id });
+      } else {
+        // Never actually left unresolved: if the payment was really deducted, the ID is shown so support can trace it.
+        setErrorMsg(`Payment verification failed for payment ${data.razorpay_payment_id}. If the amount was deducted, please contact support with this payment ID.`);
+        setStatus('ERROR');
       }
     } catch (e: any) {
       setErrorMsg(e.message || 'Payment verification failed');
@@ -63,17 +89,14 @@ export default function PaymentProcessingScreen() {
   const completeBookingFlow = async (paymentDetails: { razorpayOrderId?: string, razorpayPaymentId?: string } | null) => {
     setStatus('VERIFYING');
     try {
-      // Step 3: Create Booking Snapshot securely
-      const snapshot = await createBookingSnapshot(paymentDetails || {});
-      if (snapshot) {
-        confirmBooking();
-        setStatus('SUCCESS');
-        setTimeout(() => {
-          router.replace('/confirmation');
-        }, 1500);
-      } else {
-        throw new Error('Failed to capture booking snapshot');
-      }
+      // Step 3: Confirm Booking Payment securely
+      await confirmBookingPayment(paymentDetails || {}, holdId.current || undefined);
+      
+      confirmBooking();
+      setStatus('SUCCESS');
+      setTimeout(() => {
+        router.replace('/confirmation');
+      }, 1500);
     } catch (e: any) {
       const reason = e.message || 'Failed to confirm booking';
       setErrorMsg(
@@ -86,6 +109,7 @@ export default function PaymentProcessingScreen() {
   }
 
   const handleCancel = () => {
+    releaseHold();
     router.back(); // Go back to payment page to retry
   };
 
@@ -102,6 +126,7 @@ export default function PaymentProcessingScreen() {
           razorpayKey={razorpayOrder.keyId}
           onSuccess={handleRazorpaySuccess}
           onFailure={(err) => {
+            releaseHold();
             setErrorMsg(typeof err === 'string' ? err : 'Payment failed or cancelled.');
             setStatus('ERROR');
           }}

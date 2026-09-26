@@ -1,21 +1,46 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, Pressable } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useSawari } from '@/context/SawariContext';
+import { NotificationsAPI, BackendNotification } from '@/services/api/notifications';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function NotificationsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { notifications, markAllAsRead } = useSawari();
+  const [notifications, setNotifications] = useState<BackendNotification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Mark all as read when screen is opened
-  useEffect(() => {
-    markAllAsRead();
-  }, []);
+  const fetchNotifications = async () => {
+    const data = await NotificationsAPI.getNotifications();
+    setNotifications(data);
+    setLoading(false);
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchNotifications();
+    }, [])
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchNotifications();
+    setRefreshing(false);
+  };
+
+  const handlePressNotification = async (item: BackendNotification) => {
+    if (!item.isRead) {
+      const success = await NotificationsAPI.markAsRead(item.id);
+      if (success) {
+        setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, isRead: true } : n));
+      }
+    }
+  };
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -26,6 +51,14 @@ export default function NotificationsScreen() {
       </Text>
     </View>
   );
+
+  if (loading && notifications.length === 0) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
@@ -42,16 +75,24 @@ export default function NotificationsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.list, notifications.length === 0 && { flex: 1 }]}
         ListEmptyComponent={renderEmpty}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         renderItem={({ item }) => {
-          const date = new Date(item.date);
+          const date = new Date(item.createdAt);
           const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const dateString = date.toLocaleDateString([], { day: 'numeric', month: 'short' });
 
           return (
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Pressable 
+              onPress={() => handlePressNotification(item)}
+              style={({ pressed }) => [
+                styles.card, 
+                { backgroundColor: item.isRead ? colors.card : colors.tintLight, borderColor: colors.border },
+                pressed && { opacity: 0.8 }
+              ]}
+            >
               <View style={styles.cardHeader}>
-                <View style={[styles.iconBox, { backgroundColor: colors.tintLight }]}>
-                  <Feather name="bell" size={16} color={colors.foreground} />
+                <View style={[styles.iconBox, { backgroundColor: colors.tint }]}>
+                  <Feather name="bell" size={16} color="#fff" />
                 </View>
                 <View style={styles.headerTextWrap}>
                   <Text style={[styles.cardTitle, { color: colors.foreground }]}>{item.title}</Text>
@@ -59,17 +100,17 @@ export default function NotificationsScreen() {
                     {dateString} • {timeString}
                   </Text>
                 </View>
-                {!item.read && <View style={styles.unreadDot} />}
+                {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
               </View>
 
-              {item.image && (
-                <Image source={{ uri: item.image }} style={styles.attachedImage} resizeMode="cover" />
+              {item.data?.image && (
+                <Image source={{ uri: item.data.image }} style={styles.attachedImage} resizeMode="cover" />
               )}
               
               {!!item.body && (
                 <Text style={[styles.cardBody, { color: colors.mutedForeground }]}>{item.body}</Text>
               )}
-            </View>
+            </Pressable>
           );
         }}
       />

@@ -11,7 +11,7 @@ import { Modal, ScrollView } from 'react-native';
 import { Reveal } from '@/components/common/Reveal';
 import { ReviewListSkeleton } from '@/components/loading/ScreenSkeletons';
 import { useQuery } from '@tanstack/react-query';
-import { Image as ExpoImage } from 'expo-image';
+import { LoadingImage } from '@/components/common/LoadingImage';
 
 type DetailsTab = 'about' | 'gallery' | 'reviews';
 
@@ -233,7 +233,9 @@ function GalleryTab({ car }: { car: Car }) {
                 style={[styles.guestCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                 onPress={() => setViewer(p.url)}
               >
-                <ExpoImage source={{ uri: p.url }} style={styles.guestImage} contentFit="cover" transition={200} />
+                <View style={[styles.guestImage, { overflow: 'hidden' }]}>
+                  <LoadingImage source={{ uri: p.url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+                </View>
                 <View style={styles.guestCaption}>
                   <View style={styles.guestPlaceRow}>
                     <Feather name="map-pin" size={12} color={colors.primaryText} />
@@ -267,7 +269,11 @@ function PhotoViewer({ uri, onClose }: { uri: string | null; onClose: () => void
   return (
     <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.viewerOverlay} onPress={onClose}>
-        {!!uri && <ExpoImage source={{ uri }} style={{ width: '100%', height: '80%' }} contentFit="contain" />}
+        {!!uri && (
+          <View style={{ width: '100%', height: '80%' }}>
+            <LoadingImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+          </View>
+        )}
         <View style={styles.viewerClose}><Feather name="x" size={24} color="#FFF" /></View>
       </Pressable>
     </Modal>
@@ -455,7 +461,9 @@ function ReviewCard({ review }: { review: Review }) {
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 12 }}>
           {review.images.map((url, i) => (
             <Pressable key={url + i} onPress={() => setViewer(url)}>
-              <ExpoImage source={{ uri: url }} style={{ width: 88, height: 88, borderRadius: 10 }} contentFit="cover" transition={200} />
+              <View style={{ width: 88, height: 88, borderRadius: 10, overflow: 'hidden' }}>
+                <LoadingImage source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+              </View>
             </Pressable>
           ))}
         </ScrollView>

@@ -50,12 +50,7 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style,
   const reduceMotion = useReducedMotion();
   const [w, setW] = useState(0);
 
-  const appear = useSharedValue(0);
   const sweep = useSharedValue(0);
-
-  useEffect(() => {
-    appear.value = withDelay(Math.min(delay, 400), withTiming(1, { duration: 300 }));
-  }, [delay, appear]);
 
   useEffect(() => {
     if (reduceMotion || w === 0) return;
@@ -72,8 +67,6 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style,
     return () => cancelAnimation(sweep);
   }, [reduceMotion, w, sweep]);
 
-  const rContainer = useAnimatedStyle(() => ({ opacity: appear.value }));
-
   const rBand = useAnimatedStyle(() => ({
     transform: [{ translateX: -w + sweep.value * w * 2 }],
   }));
@@ -83,7 +76,7 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style,
   return (
     <Reanimated.View
       onLayout={(e: LayoutChangeEvent) => setW(Math.round(e.nativeEvent.layout.width))}
-      style={[styles.flat, { width, height, borderRadius, backgroundColor: colors.muted }, style, rContainer]}
+      style={[styles.flat, { width, height, borderRadius, backgroundColor: colors.muted }, style]}
     >
       {!reduceMotion && w > 0 && (
         <Reanimated.View style={[{ width: w, height: '100%' }, rBand]} pointerEvents="none">
@@ -104,10 +97,8 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style,
  * data arrives quickly (the usual case) the skeleton is never seen at all instead of flashing for a frame.
  */
 export function SkeletonGroup({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
-  const visible = useSharedValue(0);
-  useEffect(() => {
-    visible.value = withDelay(150, withTiming(1, { duration: 200 }));
-  }, [visible]);
+  // Start visible immediately so there's no blank gap (which looks like a white flash) while loading.
+  const visible = useSharedValue(1);
   const rStyle = useAnimatedStyle(() => ({ opacity: visible.value }));
   return <Reanimated.View style={[style, rStyle]}>{children}</Reanimated.View>;
 }

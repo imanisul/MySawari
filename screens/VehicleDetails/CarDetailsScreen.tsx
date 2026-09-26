@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { CarTile, LoginBottomSheet } from '@/components';
 import { TripEditorModal } from '@/components/home/TripEditorModal';
-import { getAvailability, splitDateRange } from '@/utils/sawari';
+import { cars, getAvailability, splitDateRange } from '@/utils/sawari';
 
 import { VehicleHeader } from '@/components/vehicle/details/VehicleHeader';
 import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGallery';
@@ -26,8 +26,8 @@ export default function CarDetailsScreen() {
   const insets = useSafeAreaInsets();
   const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate } = useSawari();
   
-  // Use the Explore page's independent date if navigating from there, otherwise use the main booking date range
-  const effectiveDateRange = bookingSource === 'explore' ? selectedDate : dateRange;
+  // CarListCard already syncs the Explore page's date to dateRange before navigation.
+  const effectiveDateRange = dateRange;
   
   // Same rule as the lists: free for the chosen dates (or today if none chosen).
   const [startStr, endStr] = splitDateRange(effectiveDateRange);
@@ -52,6 +52,19 @@ export default function CarDetailsScreen() {
   useEffect(() => {
     mainScrollRef.current?.scrollTo({ y: 0, animated: true });
   }, [selectedCar?.id]);
+
+  // The app starts with a sample car selected. Reaching this screen without picking a real one
+  // (a stale link, a web refresh) must not show that sample as if it were bookable.
+  if (!selectedCar || selectedCar === cars[0]) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>Car not found</Text>
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={{ marginTop: 20, padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}>
+          <Text style={{ color: colors.primaryForeground }}>Go Back</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>

@@ -36,6 +36,10 @@ export function RazorpayCheckoutWebView({
   onClose
 }: RazorpayCheckoutWebViewProps) {
   
+  // Encoded as real JS literals (not interpolated into quotes) so a name/description containing a
+  // quote or backslash (e.g. an apostrophe in a customer's name) can never break the generated script.
+  const jsString = (v: string | undefined) => JSON.stringify(v || '');
+
   const checkoutHtml = `
     <!DOCTYPE html>
     <html lang="en">
@@ -54,13 +58,13 @@ export function RazorpayCheckoutWebView({
         <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script>
             var options = {
-                "key": "${razorpayKey}",
-                "amount": "${amount}",
-                "currency": "${currency}",
-                "name": "${name}",
-                "description": "${description}",
-                "image": "${image || ''}",
-                "order_id": "${orderId}",
+                "key": ${jsString(razorpayKey)},
+                "amount": ${jsString(String(amount))},
+                "currency": ${jsString(currency)},
+                "name": ${jsString(name)},
+                "description": ${jsString(description)},
+                "image": ${jsString(image)},
+                "order_id": ${jsString(orderId)},
                 "handler": function (response){
                     window.ReactNativeWebView.postMessage(JSON.stringify({
                       event: 'success',
@@ -68,12 +72,12 @@ export function RazorpayCheckoutWebView({
                     }));
                 },
                 "prefill": {
-                    "name": "${prefill?.name || ''}",
-                    "email": "${prefill?.email || ''}",
-                    "contact": "${prefill?.contact || ''}"
+                    "name": ${jsString(prefill?.name)},
+                    "email": ${jsString(prefill?.email)},
+                    "contact": ${jsString(prefill?.contact)}
                 },
                 "theme": {
-                    "color": "${themeColor}"
+                    "color": ${jsString(themeColor)}
                 },
                 "modal": {
                     "ondismiss": function(){

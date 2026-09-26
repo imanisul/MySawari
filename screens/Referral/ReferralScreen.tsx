@@ -89,6 +89,7 @@ export default function ReferScreen() {
   
   // Wallet
   const [walletBalance, setWalletBalance] = useState(0);
+  const [withdrawableBalance, setWithdrawableBalance] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
 
   // QR
@@ -111,7 +112,7 @@ export default function ReferScreen() {
     [transactions],
   );
   // Real wallet balance from backend overrides local calculation
-  const availableToWithdraw = walletBalance;
+  const availableToWithdraw = withdrawableBalance;
 
   // Earnings rows: combine referral rewards with actual wallet transactions
   const earningsHistory = useMemo(() => {
@@ -136,6 +137,7 @@ export default function ReferScreen() {
     try {
       const w = await API.getWallet(true);
       setWalletBalance(w.walletBalance || 0);
+      setWithdrawableBalance(w.withdrawableBalance || 0);
       setTransactions(w.transactions || []);
     } catch {}
   }, [isAuthenticated, customer.id]);
@@ -192,10 +194,6 @@ export default function ReferScreen() {
   const handleAddFriend = async () => {
     const mobile = friendMobile.replace(/\D/g, '').slice(-10);
     setAddedMessage('');
-    if (!friendName.trim()) {
-      setAddError("Please enter your friend's name");
-      return;
-    }
     if (!/^[6-9]\d{9}$/.test(mobile)) {
       setAddError('Enter a valid 10-digit mobile number');
       return;

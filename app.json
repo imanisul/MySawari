@@ -17,24 +17,22 @@
       "fallbackToCacheTimeout": 0
     },
     "ios": {
+      "backgroundColor": "#FAFAF9",
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "MySawari uses your location to find nearby drivers and set pickup points.",
         "NSCameraUsageDescription": "MySawari uses your camera so you can take photos of your trip for reviews, and verify your identity or driver's license for rentals.",
-        "NSPhotoLibraryUsageDescription": "MySawari uses your photo library so you can add trip photos to your reviews and upload documents for identity verification.",
-        "NSMicrophoneUsageDescription": "MySawari does not use the microphone."
+        "NSPhotoLibraryUsageDescription": "MySawari uses your photo library so you can add trip photos to your reviews and upload documents for identity verification."
       }
     },
     "android": {
+      "backgroundColor": "#FAFAF9",
       "package": "com.anisul17.mysawari",
-      "usesCleartextTraffic": true,
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "CAMERA"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",

@@ -4,12 +4,14 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import Reanimated from 'react-native-reanimated';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { checkCarAvailability } from '@/utils/sawari';
 import { KeyboardAwareScrollViewCompat } from '@/components';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { StatusBarScrim } from '@/components/common/StatusBarScrim';
+import { rise } from '@/components/common/motion';
 import { API } from '@/services/backend/api';
 
 export default function BookingScreen() {
@@ -26,7 +28,10 @@ export default function BookingScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (customer?.mobile && selectedCar) {
+    // Wait for a plausible full number (not every keystroke) and settle briefly before tracking,
+    // so typing a mobile number doesn't fire a request per digit.
+    if (!selectedCar || !/^\d{10}$/.test(customer?.mobile || '')) return;
+    const timer = setTimeout(() => {
       API.trackLead({
         mobileNumber: customer.mobile,
         customerName: customer.name,
@@ -34,7 +39,8 @@ export default function BookingScreen() {
         vehicleName: selectedCar.name,
         lastPageVisited: 'checkout'
       });
-    }
+    }, 600);
+    return () => clearTimeout(timer);
   }, [customer?.mobile, selectedCar?.id]);
 
   // The pricing quote is automatically managed in SawariContext now based on these details
@@ -90,7 +96,7 @@ export default function BookingScreen() {
           </Pressable>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Review booking</Text>
         </View>
-        <View style={[styles.carSummary, { backgroundColor: colors.card }]}>
+        <Reanimated.View entering={rise(0)} style={[styles.carSummary, { backgroundColor: colors.card }]}>
           <View style={[styles.carThumb, { backgroundColor: colors.muted, overflow: 'hidden' }]}>
             <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
           </View>
@@ -99,7 +105,8 @@ export default function BookingScreen() {
             <Text style={[styles.carMeta, { color: colors.mutedForeground }]}>{selectedCar.category} · {selectedCar.seats} · {selectedCar.transmission}</Text>
             <Text style={[styles.carMode, { color: colors.foreground }]}>{mode}</Text>
           </View>
-        </View>
+        </Reanimated.View>
+        <Reanimated.View entering={rise(100)}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Trip details</Text>
         <View style={styles.tripDetails}>
           <DetailRow
@@ -205,6 +212,8 @@ export default function BookingScreen() {
             </Text>
           </View>
         )}
+        </Reanimated.View>
+        <Reanimated.View entering={rise(200)}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customer details</Text>
         <Input label="Full name" value={customer.name} error={errors.name} onChangeText={(value) => updateCustomer('name', value)} />
         <Input label="Mobile number" value={customer.mobile} placeholder="10-digit mobile number" keyboardType="phone-pad" error={errors.mobile} onChangeText={(value) => updateCustomer('mobile', value)} />
@@ -230,6 +239,7 @@ export default function BookingScreen() {
             <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
           )}
         </Pressable>
+        </Reanimated.View>
       </KeyboardAwareScrollViewCompat>
       <StatusBarScrim />
     </View>

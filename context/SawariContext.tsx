@@ -6,8 +6,8 @@ import { API, invalidateWalletCache } from '@/services/backend/api';
 import { PricingQuote, QuoteParams } from '@/services/backend/pricingEngine';
 import { BookingSnapshot } from '@/services/backend/api';
 
-import * as SecureStore from 'expo-secure-store';
-import * as Notifications from 'expo-notifications';
+import * as SecureStore from '@/utils/secureStore';
+import Notifications from '@/utils/notifications';
 import { AppState } from 'react-native';
 import { getDevicePosition } from '@/utils/location';
 import { calculateDistanceKm } from '@/services/backend/pricingEngine';
@@ -35,6 +35,14 @@ export type AppCustomer = {
   joinedOn: string;
   referralCode: string;
 };
+
+/** Lives on the wallet record, not the customer profile — fetched alongside SawariCash. */
+export type Membership = {
+  plan: 'starter' | 'plus' | 'pro';
+  activatedAt: string;
+  expiresAt: string;
+  totalSaved: number;
+} | null;
 
 type SawariContextValue = {
   vehicleType: 'car' | 'bike';
@@ -78,7 +86,8 @@ type SawariContextValue = {
   applyCoupon: (code: string | null) => void;
   applySawariCash: (amount: number) => void;
   setFuelEstimate: (estimate: SawariContextValue['fuelEstimate']) => void;
-  createBookingSnapshot: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }) => Promise<BookingSnapshot | null>;
+  createBookingSnapshot: () => Promise<BookingSnapshot | null>;
+  confirmBookingPayment: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => Promise<void>;
   lastBooking: BookingSnapshot | null;
 
   customer: AppCustomer;
@@ -87,6 +96,7 @@ type SawariContextValue = {
   expoPushToken: string | null;
   earnedRewards: Offer[];
   sawariCash: number;
+  membership: Membership;
   totalBookings: number;
   incrementBookings: () => void;
   setMode: (mode: DriverMode) => void;
@@ -171,6 +181,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [earnedRewards, setEarnedRewards] = useState<Offer[]>([]);
   const [sawariCash, setSawariCash] = useState(0);
+  const [membership, setMembership] = useState<Membership>(null);
+  // Wallet balance and membership status arrive together from the same endpoint — keep them in sync.
+  const applyWallet = useCallback((wallet: { walletBalance?: number; membership?: Membership } | null | undefined) => {
+    if (!wallet) return;
+    setSawariCash(wallet.walletBalance || 0);
+    setMembership(wallet.membership || null);
+  }, []);
   const [totalBookings, setTotalBookings] = useState(0);
   const [expoPushToken, setPushToken] = useState<string | null>(null);
   const [hasSeenPermissions, setHasSeenPermissions] = useState<boolean | null>(null);
@@ -354,7 +371,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
 
             // The wallet loads in the background — the app opens without waiting for the network.
             API.getWallet().then((walletData) => {
-              if (isMounted && walletData) setSawariCash(walletData.walletBalance || 0);
+              if (isMounted) applyWallet(walletData);
             });
           } else if (isMounted) {
             setIsAuthenticated(false);
@@ -406,17 +423,23 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     };
   }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode]);
 
+  // Only the newest quote may update the screen: when details change quickly, an older, slower quote
+  // used to finish last and overwrite the correct price.
+  const quoteSeq = useRef(0);
   const refreshQuote = useCallback(async () => {
+    const seq = ++quoteSeq.current;
     setIsQuoteLoading(true);
     setQuoteError(null);
     try {
       const quote = await API.quoteBooking(quoteParams);
+      if (seq !== quoteSeq.current) return;
       setPricingQuote(quote);
     } catch (e: any) {
+      if (seq !== quoteSeq.current) return;
       setQuoteError(e.message || 'Failed to calculate pricing');
       setPricingQuote(null);
     } finally {
-      setIsQuoteLoading(false);
+      if (seq === quoteSeq.current) setIsQuoteLoading(false);
     }
   }, [quoteParams]);
 
@@ -462,6 +485,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       setReturnAddress,
       customer,
       sawariCash,
+      membership,
       totalBookings,
       pricingQuote,
       quoteParams,
@@ -475,22 +499,29 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       applySawariCash: setSawariCashToApply,
       setFuelEstimate,
       lastBooking,
-      createBookingSnapshot: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }) => {
+      createBookingSnapshot: async () => {
         if (!pricingQuote) return null;
-        // Errors propagate so the payment screen can tell the user exactly what failed.
         const snapshot = await API.createBooking(
           quoteParams,
           selectedCar.id,
           selectedCar.name,
           customer,
-          paymentDetails,
+          {}, // Payment details no longer needed here (it's a hold)
           fuelEstimate || undefined
         );
         setLastBooking(snapshot);
-        // Refresh cash from DB
-        const wallet = await API.getWallet(true);
-        if (wallet) setSawariCash(wallet.walletBalance || 0);
+        // Refresh cash from DB to reflect pending hold (if backend updates wallet)
+        applyWallet(await API.getWallet(true));
         return snapshot;
+      },
+      confirmBookingPayment: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => {
+        // The id is passed in by the payment screen: reading `lastBooking` here could see an old copy of
+        // state (it is set moments earlier in the same flow), which failed with "No active booking hold".
+        const id = bookingId || lastBooking?.id;
+        if (!id) throw new Error('No active booking hold found');
+        await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId);
+        // Refresh cash to reflect deduction
+        applyWallet(await API.getWallet(true));
       },
       setMode,
       selectCar: setSelectedCar,
@@ -513,7 +544,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       updateCustomer: async (field: string, val: string) => {
         setCustomer((prev) => {
           const next = { ...prev, [field]: val };
-          AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(next)).catch(() => {});
+          // License is never persisted to AsyncStorage (unencrypted) — see login() for why.
+          const { license: _license, ...cacheable } = next;
+          AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(cacheable)).catch(() => {});
           return next;
         });
       },
@@ -526,11 +559,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             dob: data.dob,
             gender: data.gender
           } as any);
-          
+
           // 2. Update local state seamlessly
           setCustomer((prev) => {
             const next = { ...prev, ...data };
-            AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(next)).catch(() => {});
+            // License is never persisted to AsyncStorage (unencrypted) — see login() for why.
+            const { license: _license, ...cacheable } = next;
+            AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(cacheable)).catch(() => {});
             return next;
           });
         } catch (e) {
@@ -547,13 +582,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       },
       earnSawariCash: async (amount: number) => {
         // Just refresh the backend wallet state
-        const wallet = await API.getWallet(true);
-        if (wallet) setSawariCash(wallet.walletBalance || 0);
+        applyWallet(await API.getWallet(true));
       },
       useSawariCash: async (amount: number) => {
         // Real deduction happens in API on booking creation, but we can refresh here
-        const wallet = await API.getWallet(true);
-        if (wallet) setSawariCash(wallet.walletBalance || 0);
+        applyWallet(await API.getWallet(true));
       },
       incrementBookings: async () => {
         setTotalBookings((prev) => {
@@ -571,8 +604,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         setBookingStatus('completed');
         if (pricingQuote) {
           // Trigger a wallet refresh because backend may have awarded a bonus
-          const wallet = await API.getWallet(true);
-          if (wallet) setSawariCash(wallet.walletBalance || 0);
+          applyWallet(await API.getWallet(true));
         }
       },
       cancelBooking: () => {
@@ -628,11 +660,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           };
           
           setCustomer(newCustomer);
-          await AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(newCustomer));
+          // AsyncStorage is unencrypted on-device storage — a driving license number is a government ID
+          // and nothing in the app reads it back from this cache, so it's kept in memory only, never persisted.
+          const { license: _license, ...cacheableCustomer } = newCustomer;
+          await AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(cacheableCustomer));
           
           // SET CASH AND REWARDS DIRECTLY FROM BACKEND
-          const walletData = await API.getWallet(true);
-          setSawariCash(walletData.walletBalance || 0);
+          applyWallet(await API.getWallet(true));
 
           const rewards = user.rewards || [];
           setEarnedRewards(rewards);
@@ -648,6 +682,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         try {
           invalidateWalletCache();
+          // Revoke the session server-side too (a copied refresh token stops working right away).
+          const refreshToken = await SecureStore.getItemAsync('refresh_token').catch(() => null);
+          API.logoutServer(refreshToken);
           await SecureStore.deleteItemAsync('auth_token');
           await SecureStore.deleteItemAsync('refresh_token');
           await SecureStore.deleteItemAsync('user_id');
@@ -655,6 +692,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: ''
           });
           setSawariCash(0);
+          setMembership(null);
           setEarnedRewards([]);
           setTotalBookings(0);
           setNotifications([]);
@@ -676,12 +714,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.setItem('@app_theme_dark', value ? 'true' : 'false').catch(() => {});
       },
       fetchWallet: async () => {
-        const wallet = await API.getWallet(true);
-        if (wallet) setSawariCash(wallet.walletBalance || 0);
+        applyWallet(await API.getWallet(true));
       },
     }),
     [
       mode,
+      selectedDate,
+      bookingSource,
       selectedCar,
       bookingConfirmed,
       pickup,
@@ -702,6 +741,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       expoPushToken,
       earnedRewards,
       sawariCash,
+      membership,
       totalBookings,
       hasSeenPermissions,
       isAuthenticated,

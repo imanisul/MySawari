@@ -23,10 +23,11 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { Feather, FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import * as Notifications from 'expo-notifications';
+import Notifications from '@/utils/notifications';
 import { SawariProvider, useSawari } from '@/context/SawariContext';
 import { useAppUpdates } from '@/hooks/useAppUpdates';
 import { useColors } from '@/hooks/useColors';
@@ -38,7 +39,8 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // Set up how foreground notifications are handled
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
@@ -68,8 +70,35 @@ focusManager.setEventListener((handleFocus) => {
 
 function RootLayoutNav() {
   const colors = useColors();
+  const { isDarkMode } = useSawari();
+
+  // React Navigation's own NavigationContainer (which expo-router's <Stack> wraps) is never told about
+  // our palette otherwise, so it silently falls back to its built-in DefaultTheme — whose `card` colour
+  // (the native screen surface every Stack.Screen paints behind React's content) is plain white,
+  // regardless of the app's own dark/light state. That native-level white is what was still showing
+  // through on screen mount/transition even after contentStyle was set below: contentStyle only styles
+  // the JS content view, not the underlying native screen surface. Reusing our own colours here for
+  // `background`/`card` is what actually removes it.
+  const navTheme = React.useMemo(() => {
+    const base = isDarkMode ? DarkTheme : DefaultTheme;
+    return {
+      ...base,
+      dark: isDarkMode,
+      colors: {
+        ...base.colors,
+        primary: colors.primary,
+        background: colors.background,
+        card: colors.background,
+        text: colors.foreground,
+        border: colors.border,
+        notification: colors.destructive,
+      },
+    };
+  }, [isDarkMode, colors]);
+
   return (
-    // contentStyle: the screen behind a transition is the app background, never a blank white frame.
+    <ThemeProvider value={navTheme}>
+    {/* contentStyle: the screen behind a transition is the app background, never a blank white frame. */}
     <Stack screenOptions={{ headerBackTitle: 'Back', headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       {/* Bottom-tab screens swap instantly (no cross-fade), so no half-faded ghost of the old screen shows. */}
       <Stack.Screen name="index" options={{ animation: 'none' }} />
@@ -103,6 +132,7 @@ function RootLayoutNav() {
       <Stack.Screen name="help" />
       <Stack.Screen name="safety" />
     </Stack>
+    </ThemeProvider>
   );
 }
 

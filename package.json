@@ -52,9 +52,9 @@
   },
   "dependencies": {
     "@react-native-community/datetimepicker": "8.4.4",
-    "expo-camera": "~15.0.0",
+    "expo-camera": "~17.0.10",
     "expo-clipboard": "~8.0.8",
-    "expo-notifications": "~0.28.1",
+    "expo-notifications": "~0.32.17",
     "expo-secure-store": "~15.0.8",
     "expo-updates": "~29.0.20",
     "react-dom": "19.1.0",

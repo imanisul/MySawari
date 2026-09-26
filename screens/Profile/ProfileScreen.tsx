@@ -41,22 +41,27 @@ export default function ProfileScreen() {
 
   // Animate the gift box when unlocked
   useEffect(() => {
-    if (giftUnlocked) {
-      // Pulsing scale
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(giftScaleAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
-          Animated.timing(giftScaleAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
-        ])
-      ).start();
-      // Glow opacity
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(giftGlowAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-          Animated.timing(giftGlowAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
-        ])
-      ).start();
-    }
+    if (!giftUnlocked) return;
+    // Pulsing scale
+    const scaleLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(giftScaleAnim, { toValue: 1.15, duration: 800, useNativeDriver: true }),
+        Animated.timing(giftScaleAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    // Glow opacity
+    const glowLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(giftGlowAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(giftGlowAnim, { toValue: 0.3, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    scaleLoop.start();
+    glowLoop.start();
+    return () => {
+      scaleLoop.stop();
+      glowLoop.stop();
+    };
   }, [giftUnlocked]);
 
   const handleGiftPress = async () => {

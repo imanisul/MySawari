@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Page, Header, CarListCard } from '@/components';
-import { cars } from '@/utils/sawari';
+import { useVehicles } from '@/hooks/useVehicles';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,23 +15,25 @@ export default function WishlistScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { favorites } = useSawari();
+  const { data: vehicles } = useVehicles();
 
   const favoriteCars = useMemo(() => {
-    return cars.filter(car => favorites.includes(car.id));
-  }, [favorites]);
+    return (vehicles || []).filter(car => favorites.includes(car.id));
+  }, [vehicles, favorites]);
 
   // Animation for empty state
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    if (favoriteCars.length === 0) {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        ])
-      ).start();
-    }
+    if (favoriteCars.length !== 0) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.1, duration: 1000, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
   }, [favoriteCars.length]);
 
   const renderEmpty = () => (

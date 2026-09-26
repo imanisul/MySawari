@@ -64,9 +64,17 @@ export function VehicleSummary({ car, isAvailable, availabilityNote }: { car: Ca
         <View style={[styles.availBanner, { backgroundColor: colors.tintLight, borderColor: colors.primary + '30' }]}>
           <Feather name="check-circle" size={15} color={colors.primaryText} />
           <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.primaryText, flex: 1 }}>
-            {car.availability?.freeUntil 
-              ? `Avail · ${car.availability?.startDate || 'Today'} – ${car.availability.freeUntil}`
-              : `Avail · ${car.availability?.startDate || 'Today'} – Onwards`}
+            {(() => {
+              const a = car.availability;
+              if (!a) return 'Available';
+              if (a.freeUntil) {
+                if (a.startDate === a.freeUntil || (a.startDate === 'Today' && a.freeUntil === dayNumToLabel(todayDayNum()))) {
+                  return a.startDate === 'Today' ? 'Avail only for today' : `Avail only for ${a.startDate}`;
+                }
+                return `Avail · ${a.startDate} – ${a.freeUntil}`;
+              }
+              return `Avail · ${a.startDate || 'Today'} – Onwards`;
+            })()}
           </Text>
         </View>
       )}

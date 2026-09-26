@@ -11,6 +11,28 @@ export const BOOKING_ADVANCE_AMOUNT = 500;
 
 export type Coordinates = { latitude: number; longitude: number };
 
+export type Coupon = {
+  code: string;
+  discountType: 'FLAT' | 'PERCENTAGE';
+  discountValue: number;
+  minimumBooking: number;
+  maximumDiscount?: number | null;
+  expiryDate: string;
+  active: boolean;
+};
+
+/**
+ * The one list of real coupons. There is no coupons backend yet, so this is the source of truth for
+ * both what the "available coupons" list shows (services/backend/api.ts) and what a typed-in code is
+ * checked against here — a typed code that isn't in this list, expired, active:false, or under its
+ * minimum booking amount gets no discount at all.
+ */
+export const COUPONS: Coupon[] = [
+  { code: 'FIRST100', discountType: 'FLAT', discountValue: 100, minimumBooking: 999, expiryDate: '2027-12-31', active: true },
+  { code: 'SAWARI200', discountType: 'FLAT', discountValue: 200, minimumBooking: 2500, expiryDate: '2027-12-31', active: true },
+  { code: 'FESTIVAL10', discountType: 'PERCENTAGE', discountValue: 10, minimumBooking: 2000, maximumDiscount: 500, expiryDate: '2027-12-31', active: true },
+];
+
 /** Single place for the ₹ + Indian-grouping formatting repeated across booking/payment screens. */
 export function formatCurrency(amount: number): string {
   const safeAmount = Number.isFinite(amount) ? amount : 0;
@@ -38,6 +60,8 @@ export type QuoteParams = {
   membership?: {
     plan: 'starter' | 'plus' | 'pro';
     totalSaved: number;
+    /** Discount only applies while this is in the future — a lapsed record must not keep discounting. */
+    expiresAt?: string;
   } | null;
 };
 
@@ -89,6 +113,9 @@ export type FuelEstimate = {
 
 export function calculateRentalDays(start: string, end: string, startTime?: string, endTime?: string): number {
   try {
+    // A placeholder like "Select Dates" is not a date. Some engines (Chrome) still parse it as 1 Jan,
+    // which priced an undated trip as hundreds of days.
+    if (!/\d/.test(start) || !/\d/.test(end)) return 1;
     const currentYear = new Date().getFullYear();
     const normStart = start.replace(/Sept/gi, 'Sep');
     const normEnd = end.replace(/Sept/gi, 'Sep');
@@ -187,9 +214,42 @@ export function calculateDropCharge(
   return { charge: distanceKm * PICKUP_DROP_RATE_PER_KM, distanceKm };
 }
 
-export function calculateCouponDiscount(rentalAmount: number, driverCharge: number, couponCode?: string): number {
-  if (!couponCode) return 0;
-  return Math.min((rentalAmount + driverCharge) * 0.1, 500);
+/**
+ * The coupons checkout prices against. The server is the source of truth (it re-checks every code
+ * when the booking is saved), so this is replaced by the server's list via setCouponCatalog() as soon
+ * as it loads; the built-in COUPONS list is only used while the server can't be reached.
+ */
+let couponCatalog: Coupon[] = COUPONS;
+export function setCouponCatalog(list: Coupon[]) {
+  couponCatalog = list;
+}
+
+/**
+ * Discount for a coupon code — the exact rule the server applies when the booking is saved:
+ * on the vehicle rent (not the driver or delivery charges), only for a real, active, in-date coupon
+ * whose minimum booking is met, capped at the rent, rounded to whole rupees. A typo or unknown code
+ * gives ₹0 off.
+ */
+export function calculateCouponDiscount(rentalAmount: number, _driverCharge: number, couponCode?: string): number {
+  if (!couponCode || !couponCode.trim()) return 0;
+  const base = Math.max(0, rentalAmount);
+  const coupon = couponCatalog.find(c => String(c.code).toUpperCase() === couponCode.trim().toUpperCase());
+  if (!coupon || coupon.active === false) return 0;
+  if (new Date(coupon.expiryDate) < new Date()) return 0;
+  if (base < (coupon.minimumBooking || 0)) return 0;
+  const value = Number(coupon.discountValue);
+  if (!Number.isFinite(value) || value < 0) return 0;
+
+  let discount: number;
+  if (coupon.discountType === 'FLAT') {
+    discount = Math.min(value, base);
+  } else if (coupon.discountType === 'PERCENTAGE') {
+    discount = base * (Math.min(value, 100) / 100);
+    if (coupon.maximumDiscount) discount = Math.min(discount, coupon.maximumDiscount);
+  } else {
+    return 0;
+  }
+  return Math.round(Math.max(0, Math.min(discount, base)));
 }
 
 /** Trip total = rental (after driver charge + coupon) plus any pickup/drop service charges. */
@@ -266,8 +326,9 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
     pro:     { discountRate: 0.125, annualCap: 20000 },
   };
   const PER_TRIP_CAP = 999;
+  const isMembershipActive = !!(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()));
   let subscriptionDiscount = 0;
-  if (membership?.plan && MEMBERSHIP_PLANS[membership.plan]) {
+  if (isMembershipActive && membership && MEMBERSHIP_PLANS[membership.plan]) {
     const { discountRate, annualCap } = MEMBERSHIP_PLANS[membership.plan];
     const remaining = Math.max(0, annualCap - (membership.totalSaved || 0));
     subscriptionDiscount = Math.min(
@@ -282,8 +343,9 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   // Everything else — rental, driver, pickup and drop services — is the remaining balance.
   const bookingAdvance = calculateAdvanceAmount(totalAfterSubscription);
 
-  // 45% of the base rental amount can be paid with SawariCash
-  const maxSawariCashAllowed = rentalAmount * 0.45;
+  // Prevent users from draining their entire signup bonus at once.
+  // Cap SawariCash usage to 10% of the base rental amount, up to an absolute maximum of ₹50 per trip.
+  const maxSawariCashAllowed = Math.min(rentalAmount * 0.10, 50);
   const verifiedCashToApply = Math.min(Math.max(0, sawariCashToApply || 0), Math.max(0, availableSawariCash || 0));
   const sawariCashUsed = Math.min(verifiedCashToApply, maxSawariCashAllowed);
 

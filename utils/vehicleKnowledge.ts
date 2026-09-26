@@ -260,7 +260,7 @@ const KNOWLEDGE_DB: Record<string, VehicleKnowledge> = {
  * Falls back to sensible defaults derived from the vehicle's basic info.
  */
 export function getVehicleKnowledge(vehicleName: string, vehicleType: 'Car' | 'Bike'): VehicleKnowledge {
-  const name = vehicleName.toLowerCase();
+  const name = String(vehicleName || '').toLowerCase();
 
   // Try to find a matching key in the knowledge DB
   for (const [key, knowledge] of Object.entries(KNOWLEDGE_DB)) {

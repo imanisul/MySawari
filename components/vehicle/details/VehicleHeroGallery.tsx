@@ -1,6 +1,5 @@
 import React, { useState, useRef } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, Dimensions, Modal, Text } from 'react-native';
-import { Image } from 'expo-image';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -69,7 +68,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
                 { backgroundColor: colors.surfaceSoft, borderColor: isActive ? colors.primary : 'transparent' }
               ]}
             >
-              <Image source={img} style={styles.thumbnailImage} contentFit="cover" transition={200} />
+              <LoadingImage source={img} style={styles.thumbnailImage} contentFit="cover" transition={200} />
               {isActive && <View style={[styles.thumbnailOverlay, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />}
             </Pressable>
           );
@@ -81,7 +80,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
             onPress={openFullScreen}
             style={[styles.thumbnailWrap, { backgroundColor: colors.surfaceSoft, borderColor: 'transparent' }]}
           >
-            <Image source={images[MAX_THUMBNAILS - 1]} style={styles.thumbnailImage} contentFit="cover" transition={200} />
+            <LoadingImage source={images[MAX_THUMBNAILS - 1]} style={styles.thumbnailImage} contentFit="cover" transition={200} />
             <View style={[styles.thumbnailOverlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
               <Text style={styles.plusText}>+{remainingCount}</Text>
             </View>
@@ -117,12 +116,15 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
           >
             {images.map((img, i) => (
               <View key={i} style={{ width, justifyContent: 'center', alignItems: 'center' }}>
-                <Image 
-                  source={img} 
-                  style={{ width: '100%', height: width * 0.75 }} 
-                  contentFit="contain" 
-                  transition={200}
-                />
+                <View style={{ width: '100%', height: width * 0.75 }}>
+                  {/* Same plate-processed URL as the card — never the original photo. */}
+                  <LoadingImage
+                    source={img}
+                    style={StyleSheet.absoluteFill}
+                    contentFit="contain"
+                    transition={200}
+                  />
+                </View>
               </View>
             ))}
           </ScrollView>

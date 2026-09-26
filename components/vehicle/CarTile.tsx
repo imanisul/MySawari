@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Car, getAvailability } from '@/utils/sawari';
+import { Car, getAvailability, dayNumToLabel, todayDayNum } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 
 export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }: { car: Car; onPress?: () => void; onIntercept?: () => void }) {
@@ -48,7 +48,17 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
         <View style={styles.availableRow}>
           <View style={[styles.availableDot, { backgroundColor: colors.primary }]} />
           <Text style={[styles.availableText, { color: colors.foreground }]}>
-            {(() => { const a = car.availability ?? getAvailability(car); return a.detail ? `${a.headline} · ${a.detail}` : a.headline; })()}
+            {(() => { 
+              const a = car.availability ?? getAvailability(car);
+              if (!a.available) return a.headline;
+              if (a.freeUntil) {
+                if (a.startDate === a.freeUntil || (a.startDate === 'Today' && a.freeUntil === dayNumToLabel(todayDayNum()))) {
+                  return a.startDate === 'Today' ? 'Avail only for today' : `Avail only for ${a.startDate}`;
+                }
+                return `Avail · ${a.startDate} – ${a.freeUntil}`;
+              }
+              return `Avail · ${a.startDate} – Onwards`;
+            })()}
           </Text>
         </View>
       </View>

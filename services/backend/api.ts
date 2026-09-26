@@ -100,22 +100,92 @@ function placeLabel(place: any): string | undefined {
   return undefined;
 }
 
-import { calculateBookingPrice, QuoteParams, PricingQuote } from './pricingEngine';
+import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog } from './pricingEngine';
 import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Local backend
-// The backend is a separate project. Point the app at it with EXPO_PUBLIC_API_BASE_URL
-// (e.g. https://api.example.com, or http://<your-computer's-LAN-IP>:5001 to test on a real phone).
-// Without it we fall back to a backend running on the same computer: localhost on the
-// iOS simulator, 10.0.2.2 on the Android emulator.
-const LOCAL_DEV_URL = Platform.OS === 'android' ? 'http://10.0.2.2:5001' : 'http://localhost:5001';
-const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || LOCAL_DEV_URL).replace(/\/+$/, '');
-if (!__DEV__ && !process.env.EXPO_PUBLIC_API_BASE_URL) {
-  console.warn('EXPO_PUBLIC_API_BASE_URL is not set — this build is talking to a local development server.');
+// The backend is a separate project, deployed on Render. EXPO_PUBLIC_API_BASE_URL overrides it
+// (e.g. http://<your-computer's-LAN-IP>:5001 to test against a local backend on a real phone).
+const DEFAULT_API_BASE_URL = 'http://192.168.29.131:5001';
+const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+export const BACKEND_URL = `${BASE_URL}/api`;
+
+
+/**
+ * A random id for this app install (not personal data, not a secret). Sent as X-Install-Id so the server
+ * can tell when two accounts are used from the same phone — used only for referral-fraud checks.
+ */
+let installIdPromise: Promise<string> | null = null;
+export function getInstallId(): Promise<string> {
+  if (!installIdPromise) {
+    installIdPromise = (async () => {
+      const { getItemAsync, setItemAsync } = require('../../utils/secureStore');
+      try {
+        const existing = await getItemAsync('install_id');
+        if (existing && /^[A-Za-z0-9-]{16,64}$/.test(existing)) return existing;
+      } catch {}
+      const rand = () => Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, '0');
+      const id = `${Date.now().toString(16)}-${rand()}${rand()}${rand()}`;
+      try { await setItemAsync('install_id', id); } catch {}
+      return id;
+    })();
+  }
+  return installIdPromise;
 }
-const BACKEND_URL = `${BASE_URL}/api`;
+
+async function withInstallId(headers: Record<string, string> = {}): Promise<Record<string, string>> {
+  try {
+    return { ...headers, 'X-Install-Id': await getInstallId() };
+  } catch {
+    return headers;
+  }
+}
+
+/**
+ * fetch() with a time limit. Without one, a stalled server or a dead mobile connection left requests
+ * (and their loading spinners) hanging forever. A caller's own AbortSignal still works as before.
+ */
+export async function timedFetch(url: string, options: RequestInit = {}, timeoutMs: number = 20000): Promise<Response> {
+  const controller = new AbortController();
+  const outer = options.signal;
+  const onOuterAbort = () => controller.abort();
+  if (outer) {
+    if (outer.aborted) controller.abort();
+    else outer.addEventListener('abort', onOuterAbort);
+  }
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error: any) {
+    if (timedOut) {
+      throw new Error('The server is taking too long to respond. Please check your connection and try again.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    if (outer) outer.removeEventListener('abort', onOuterAbort);
+  }
+}
+
+const PLATE_PROXY_PATH = '/images/blur?target=';
+// Bumped when plate processing changes: a new URL means the phone never reuses an image it cached
+// under the old one (including an unprocessed original from before the backend stopped falling back to it).
+const PLATE_PROXY_VERSION = 'pv=5';
+
+/**
+ * Every vehicle photo shown in the app must come through the backend's number-plate processing.
+ * Wraps a raw photo URL in that endpoint (or tags an already-wrapped one with the current version),
+ * so no card, gallery or full-screen viewer can ever load the original with a readable plate.
+ */
+export function plateSafeImageUrl(url: string): string {
+  if (!url) return '';
+  const absolute = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  if (absolute.includes(PLATE_PROXY_PATH)) {
+    return absolute.includes(PLATE_PROXY_VERSION) ? absolute : `${absolute}&${PLATE_PROXY_VERSION}`;
+  }
+  return `${BACKEND_URL}${PLATE_PROXY_PATH}${encodeURIComponent(absolute)}&${PLATE_PROXY_VERSION}`;
+}
 
 // The render backend does not currently expose /locations routes, so
 // location search/reverse-geocode call Photon's public API directly.
@@ -186,6 +256,10 @@ function dedupeLocations(list: any[]) {
   });
 }
 
+// Server coupon list (what bookings are validated against), refreshed every few minutes.
+let couponCache: { at: number; list: Coupon[] } | null = null;
+const COUPON_TTL_MS = 5 * 60 * 1000;
+
 // Wallet balance cache (cleared whenever the balance can change: booking, cancel, reward).
 let walletCache: { at: number; data: any } | null = null;
 const WALLET_TTL_MS = 20 * 1000;
@@ -205,22 +279,43 @@ const onRefreshed = (token: string) => {
   refreshSubscribers = [];
 };
 
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  const { getItemAsync, setItemAsync, deleteItemAsync } = require('expo-secure-store');
+/**
+ * The backend answers a missing or invalid login with a 500 "Authentication required" instead of a 401.
+ * Turn that into a real 401 so guests get the logged-out view and expired sessions go through the
+ * refresh below, instead of every screen showing a server error.
+ */
+async function normalizeAuthError(response: Response): Promise<Response> {
+  if (response.status !== 500) return response;
+  try {
+    const body = await response.clone().json();
+    if (body?.message === 'Authentication required' || body?.message === 'Invalid or expired token') {
+      return new Response(JSON.stringify({ success: false, message: body.message }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+  } catch {}
+  return response;
+}
+
+export async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  const { getItemAsync, setItemAsync, deleteItemAsync } = require('../../utils/secureStore');
   let token = await getItemAsync('auth_token');
 
   const headers = new Headers(options.headers || {});
   if (token) headers.set('Authorization', `Bearer ${token}`);
+  try { headers.set('X-Install-Id', await getInstallId()); } catch {}
   
   let response;
   try {
-    response = await fetch(url, { ...options, headers });
+    response = await timedFetch(url, { ...options, headers });
   } catch (error: any) {
     if (error.name === 'TypeError' && error.message === 'Network request failed') {
       throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
     }
     throw error;
   }
+  response = await normalizeAuthError(response);
 
   if (response.status === 401) {
     if (!token) {
@@ -229,21 +324,32 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
     if (!isRefreshing) {
       isRefreshing = true;
+      // Only a definite "no" from the server ends the session. A network drop, timeout, rate limit or
+      // server error used to wipe the tokens and log the customer out; now it just fails this request.
+      let sessionRejected = false;
       try {
         const refreshToken = await getItemAsync('refresh_token');
-        if (!refreshToken) throw new Error('No refresh token');
+        if (!refreshToken) {
+          sessionRejected = true;
+          throw new Error('No refresh token');
+        }
 
-        const refreshRes = await fetch(`${BACKEND_URL}/auth/refresh`, {
+        const refreshRes = await timedFetch(`${BACKEND_URL}/auth/refresh`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await withInstallId({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({ refreshToken })
         });
 
-        if (!refreshRes.ok) throw new Error('Session expired');
+        if (refreshRes.status === 401 || refreshRes.status === 403) {
+          sessionRejected = true;
+          throw new Error('Session expired');
+        }
+        if (!refreshRes.ok) throw new Error('Refresh temporarily unavailable');
 
         const data = await refreshRes.json();
-        const newToken = data.data.token;
-        const newRefreshToken = data.data.refreshToken;
+        const newToken = data?.data?.token;
+        const newRefreshToken = data?.data?.refreshToken;
+        if (!newToken) throw new Error('Refresh temporarily unavailable');
 
         await setItemAsync('auth_token', newToken);
         if (newRefreshToken) await setItemAsync('refresh_token', newRefreshToken);
@@ -251,10 +357,13 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
         token = newToken;
         onRefreshed(newToken);
       } catch (e) {
+        onRefreshed(''); // release anyone waiting on this refresh
+        if (!sessionRejected) {
+          throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
+        }
         // Force logout
         await deleteItemAsync('auth_token');
         await deleteItemAsync('refresh_token');
-        onRefreshed(''); // signal failure
         
         // Emit global event for Context to log the user out of the UI
         const { DeviceEventEmitter } = require('react-native');
@@ -269,19 +378,20 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
       token = await new Promise((resolve) => {
         subscribeTokenRefresh(resolve);
       });
-      if (!token) throw new Error('Session expired');
+      if (!token) throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
     }
 
     // Retry original request
     headers.set('Authorization', `Bearer ${token}`);
     try {
-      response = await fetch(url, { ...options, headers });
+      response = await timedFetch(url, { ...options, headers });
     } catch (error: any) {
       if (error.name === 'TypeError' && error.message === 'Network request failed') {
         throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
       }
       throw error;
     }
+    response = await normalizeAuthError(response);
   }
 
   return response;
@@ -332,17 +442,18 @@ export const API = {
   mapVehicles(dbVehicles: any[]): Car[] {
     const { getVehicleKnowledge } = require('../../utils/vehicleKnowledge');
 
-    return dbVehicles.map((v: any) => {
+    // One malformed record (missing name, id or price) must not blank the whole list: it is skipped.
+    const valid = (Array.isArray(dbVehicles) ? dbVehicles : []).filter(
+      (v: any) => v && v._id && typeof v.vehicleName === 'string' && v.vehicleName.trim() && Number.isFinite(Number(v.pricePerDay))
+    );
+    return valid.map((v: any) => {
       // Robust check for bikes: Seating capacity <= 2 guarantees it's a two-wheeler,
       // even if someone mistakenly saved it as 'SUV' or 'Luxury' in the DB.
       const isBike = v.seatingCapacity <= 2 || /^(bike|scooter|cruiser|sports|standard)$/i.test(v.vehicleType);
       const { getVehicleImage } = require('../../utils/vehicleImages');
       const fallbackImage = getVehicleImage(v.vehicleName, isBike);
-      const hasImages = v.images && v.images.length > 0 && v.images[0].url;
-      const getFullUrl = (url: string) => {
-        if (!url) return '';
-        return url.startsWith('http') ? url : `${BASE_URL}${url}`;
-      };
+      const hasImages = Array.isArray(v.images) && v.images.length > 0 && typeof v.images[0]?.url === 'string' && v.images[0].url;
+      const getFullUrl = plateSafeImageUrl;
 
       // Enrich with curated real-world specs from the knowledge base
       const vehicleType: 'Car' | 'Bike' = isBike ? 'Bike' : 'Car';
@@ -382,10 +493,12 @@ export const API = {
         type: vehicleType,
         name: v.vehicleName,
         category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : v.vehicleType),
-        price: `₹${v.pricePerDay}`,
-        perDay: v.pricePerDay,
+        price: `₹${Number(v.pricePerDay)}`,
+        perDay: Number(v.pricePerDay),
         image: hasImages ? { uri: getFullUrl(v.images[0].url) } : fallbackImage,
-        images: hasImages ? v.images.map((img: any) => ({ uri: getFullUrl(img.url) })) : [fallbackImage],
+        images: hasImages
+          ? v.images.filter((img: any) => typeof img?.url === 'string' && img.url).map((img: any) => ({ uri: getFullUrl(img.url) }))
+          : [fallbackImage],
         seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
         transmission: v.transmission || 'Manual',
         fuel: v.fuelType || 'Petrol',
@@ -425,14 +538,40 @@ export const API = {
   },
 
   /**
-   * GET /api/coupons
+   * GET /api/offers?type=coupon
+   * Fetches active coupon offers from the backend, falling back to the local
+   * COUPONS list if the API is unreachable.
    */
-  async getCoupons() {
-    return [
-      { code: 'FIRST100', discountType: 'FLAT', discountValue: 100, minimumBooking: 999, expiryDate: '2027-12-31', active: true },
-      { code: 'SAWARI200', discountType: 'FLAT', discountValue: 200, minimumBooking: 2500, expiryDate: '2027-12-31', active: true },
-      { code: 'FESTIVAL10', discountType: 'PERCENTAGE', discountValue: 10, minimumBooking: 2000, maximumDiscount: 500, expiryDate: '2027-12-31', active: true }
-    ];
+  async getCoupons(force: boolean = false): Promise<Coupon[]> {
+    if (!force && couponCache && Date.now() - couponCache.at < COUPON_TTL_MS) return couponCache.list;
+    try {
+      const res = await timedFetch(`${BACKEND_URL}/offers?type=coupon`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          // The server's list is what a booking is checked against, so it is used even when it is empty —
+          // falling back to the built-in list here would offer codes the server then rejects.
+          const list: Coupon[] = json.data
+            .filter((o: any) => typeof o?.code === 'string' && o.code.trim())
+            .map((o: any) => ({
+              code: o.code.trim().toUpperCase(),
+              discountType: o.discountType,
+              discountValue: Number(o.discountValue) || 0,
+              minimumBooking: Number(o.minimumBooking) || 0,
+              maximumDiscount: o.maximumDiscount ?? null,
+              expiryDate: o.expiryDate,
+              active: o.active !== false,
+            }));
+          couponCache = { at: Date.now(), list };
+          setCouponCatalog(list);
+          return list;
+        }
+      }
+    } catch {
+      // API unavailable — fall through
+    }
+    // Server unreachable: the built-in list keeps the checkout usable offline.
+    return COUPONS.filter(c => c.active && new Date(c.expiryDate) >= new Date());
   },
 
   /**
@@ -460,9 +599,15 @@ export const API = {
         membership = {
           plan: walletData.membership.plan,
           totalSaved: walletData.membership.totalSaved || 0,
+          expiresAt: walletData.membership.expiresAt,
         };
       }
     } catch(e) {}
+
+    // Price a coupon with the server's own list, so the discount shown is the one the booking gets.
+    if (params.couponCode) {
+      await this.getCoupons().catch(() => {});
+    }
     
     const quote = await calculateBookingPrice({
       ...params,
@@ -526,6 +671,11 @@ export const API = {
   /**
    * POST /api/bookings
    */
+  async getActiveHandover() {
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings/active-handover`);
+    return response.json();
+  },
+
   async createBooking(
     params: Omit<QuoteParams, 'availableSawariCash'>, 
     vehicleId: string,
@@ -587,22 +737,37 @@ export const API = {
     
     // 3. Save to backend DB. The server re-validates price, availability and the
     // Razorpay payment, so a failure here must surface — the user has already paid.
-    // Bookings store calendar days at UTC midnight. Sending the device's local
-    // midnight would land on the previous day for the ops team and availability.
-    const toUtcMidnight = (label: string) => {
+    const toExactLocalTime = (label: string, timeStr: string) => {
       const day = parseDayLabel(label);
       if (day === null) throw new Error('Invalid booking date');
-      return new Date(day * 24 * 60 * 60 * 1000);
+      
+      const match = (timeStr || '10:00 AM').match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (!match) return new Date(day * 86400000).toISOString();
+      
+      let hours = parseInt(match[1], 10);
+      const minutes = parseInt(match[2], 10);
+      const ampm = match[3]?.toUpperCase();
+      
+      if (ampm === 'PM' && hours < 12) hours += 12;
+      if (ampm === 'AM' && hours === 12) hours = 0;
+      
+      const utcMidnight = new Date(day * 86400000);
+      return new Date(
+        utcMidnight.getUTCFullYear(),
+        utcMidnight.getUTCMonth(),
+        utcMidnight.getUTCDate(),
+        hours, minutes, 0
+      ).toISOString();
     };
 
-    const response = await fetchWithAuth(`${BACKEND_URL}/bookings`, {
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings/hold`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         vehicleId: vehicleId,
         vehicleName: vehicleName,
-        fromDate: toUtcMidnight(params.pickupDateStr).toISOString(),
-        toDate: toUtcMidnight(params.returnDateStr).toISOString(),
+        fromDate: toExactLocalTime(params.pickupDateStr, params.pickupTime || '10:00 AM'),
+        toDate: toExactLocalTime(params.returnDateStr, params.returnTime || '10:00 AM'),
         pickupTime: params.pickupTime || '10:00 AM',
         dropTime: params.returnTime || '10:00 AM',
         totalDays: quote.rentalDays,
@@ -642,21 +807,49 @@ export const API = {
         },
         sawariCashUsed: quote.sawariCashUsed,
         subscriptionDiscount: quote.subscriptionDiscount,
-        razorpayOrderId: paymentDetails.razorpayOrderId,
-        razorpayPaymentId: paymentDetails.razorpayPaymentId,
+        // The server re-validates the code and recomputes the discount; without it the booking was
+        // priced at ₹0 off on the server and rejected as a mismatch.
+        couponCode: quote.couponDiscount > 0 ? quote.couponCode : undefined,
       })
     });
     const saved = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(saved.message || 'Failed to save booking');
+      throw new Error(saved.message || 'Failed to secure vehicle reservation');
     }
     snapshot.id = saved.data?._id || snapshot.id;
-    invalidateWalletCache(); // SawariCash may have been spent
+    invalidateWalletCache(); // SawariCash intent
 
-    // Referral Processing Logic is now handled entirely by the backend upon booking creation.
-
-    
     return snapshot;
+  },
+
+  /** Keeps the checkout soft-lock alive while the payment sheet is open (best effort). */
+  async keepHoldAlive(bookingId: string): Promise<void> {
+    try {
+      await fetchWithAuth(`${BACKEND_URL}/bookings/${encodeURIComponent(bookingId)}/hold/keep-alive`, { method: 'POST' });
+    } catch {
+      // A missed renewal only shortens the lock; the payment itself is still honoured if the car is free.
+    }
+  },
+
+  /** Frees the car for other customers as soon as this checkout is abandoned (best effort). */
+  async releaseHold(bookingId: string): Promise<void> {
+    try {
+      await fetchWithAuth(`${BACKEND_URL}/bookings/${encodeURIComponent(bookingId)}/hold/release`, { method: 'POST' });
+    } catch {
+      // The lock also frees itself after 2 minutes.
+    }
+  },
+
+  async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string): Promise<void> {
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/confirm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ razorpayOrderId, razorpayPaymentId })
+    });
+    const saved = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(saved.message || 'Failed to confirm booking payment');
+    }
   },
   
   async trackLead(data: {
@@ -738,7 +931,7 @@ export const API = {
     if (!force && walletCache && Date.now() - walletCache.at < WALLET_TTL_MS) return walletCache.data;
     try {
       // Guests have no wallet — don't hit a protected endpoint without a session.
-      const { getItemAsync } = require('expo-secure-store');
+      const { getItemAsync } = require('../../utils/secureStore');
       if (!(await getItemAsync('auth_token'))) return empty;
 
       const response = await fetchWithAuth(`${BACKEND_URL}/customers/wallet`);
@@ -924,13 +1117,29 @@ export const API = {
 
 
   /**
+   * POST /api/auth/logout — ends the session on the server as well (best effort, never blocks sign-out).
+   */
+  async logoutServer(refreshToken: string | null) {
+    if (!refreshToken) return;
+    try {
+      await timedFetch(`${BACKEND_URL}/auth/logout`, {
+        method: 'POST',
+        headers: await withInstallId({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ refreshToken }),
+      }, 8000);
+    } catch {
+      // Offline: the token still expires on its own; signing out locally must not fail because of this.
+    }
+  },
+
+  /**
    * POST /api/auth/send-otp
    */
   async sendOtp(mobile: string) {
     try {
-      const res = await fetch(`${BACKEND_URL}/auth/send-otp`, {
+      const res = await timedFetch(`${BACKEND_URL}/auth/send-otp`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await withInstallId({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ mobileNumber: mobile })
       });
       const data = await res.json();
@@ -946,9 +1155,9 @@ export const API = {
    */
   async verifyOtp(mobile: string, otp: string, name?: string, referredByCode?: string) {
     try {
-      const res = await fetch(`${BACKEND_URL}/auth/verify-otp`, {
+      const res = await timedFetch(`${BACKEND_URL}/auth/verify-otp`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await withInstallId({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ mobileNumber: mobile, otp, customerName: name, referredByCode })
       });
       const data = await res.json();
@@ -1083,7 +1292,7 @@ export const API = {
       url.searchParams.set('lon', String(SERVICE_CENTER.longitude));
       if (options.restrictToServiceArea) url.searchParams.set('bbox', SERVICE_AREA_BBOX.join(','));
 
-      const response = await fetch(url.toString(), {
+      const response = await timedFetch(url.toString(), {
         headers: { 'Accept-Language': 'en' },
         signal,
       });
@@ -1111,7 +1320,7 @@ export const API = {
           url.searchParams.set('bounded', '1');
         }
 
-        const response = await fetch(url.toString(), {
+        const response = await timedFetch(url.toString(), {
           headers: { 'User-Agent': 'MySawariApp/1.0' },
           signal,
         });
@@ -1163,7 +1372,7 @@ export const API = {
       url.searchParams.set('lat', latitude.toString());
       url.searchParams.set('lon', longitude.toString());
 
-      const response = await fetch(url.toString(), {
+      const response = await timedFetch(url.toString(), {
         headers: { 'Accept-Language': 'en' },
       });
       if (!response.ok) throw new Error(`Photon API responded with status ${response.status}`);
@@ -1183,7 +1392,7 @@ export const API = {
         url.searchParams.set('lon', longitude.toString());
         url.searchParams.set('format', 'json');
         
-        const response = await fetch(url.toString(), {
+        const response = await timedFetch(url.toString(), {
           headers: { 'User-Agent': 'MySawariApp/1.0' },
         });
         
@@ -1227,7 +1436,7 @@ export const API = {
   reviews: {
     async fetchByCarId(carId: string) {
       try {
-        const response = await fetch(`${BACKEND_URL}/reviews/${encodeURIComponent(carId)}`);
+        const response = await timedFetch(`${BACKEND_URL}/reviews/${encodeURIComponent(carId)}`);
         const data = await response.json();
         if (!response.ok) return [];
         // Only well-rated reviews (and their photos) are shown publicly.
@@ -1239,7 +1448,8 @@ export const API = {
           date: new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
           isVerified: r.isVerified,
           placeVisited: r.placeVisited || undefined,
-          images: (r.images || []) as string[],
+          // Guest trip photos often show the car too — they go through plate processing like fleet photos.
+          images: ((r.images || []) as string[]).map(plateSafeImageUrl),
         }));
       } catch (e) {
         return [];
@@ -1310,10 +1520,10 @@ export const API = {
       form.append('folder', folder);
       form.append('signature', signature);
 
-      const upload = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      const upload = await timedFetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',
         body: form,
-      });
+      }, 60000);
       const result = await upload.json();
       if (!upload.ok || !result.secure_url) {
         throw new Error(result?.error?.message || 'Photo upload failed');

@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Car, getAvailability } from '@/utils/sawari';
+import { Car, getAvailability, splitDateRange, dayNumToLabel, todayDayNum } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -39,16 +39,14 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
   let availableText = availability.headline.toUpperCase();
   
   if (availability.available) {
-    const todayStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    if (isDateSelected) {
-      const [start, end] = dateRange.split(' - ');
-      if (end) {
-        availableText = `AVAIL - ${start} - ${end}`.toUpperCase();
+    if (availability.freeUntil) {
+      if (availability.startDate === availability.freeUntil || (availability.startDate === 'Today' && availability.freeUntil === dayNumToLabel(todayDayNum()))) {
+        availableText = availability.startDate === 'Today' ? 'AVAIL ONLY FOR TODAY' : `AVAIL ONLY FOR ${availability.startDate}`.toUpperCase();
       } else {
-        availableText = `AVAIL - ${start} - ${availability.freeUntil ? availability.freeUntil : 'ONWARDS'}`.toUpperCase();
+        availableText = `AVAIL · ${availability.startDate} – ${availability.freeUntil}`.toUpperCase();
       }
     } else {
-      availableText = `AVAIL - ${todayStr} - ${availability.freeUntil ? availability.freeUntil : 'ONWARDS'}`.toUpperCase();
+      availableText = `AVAIL · ${availability.startDate} – ONWARDS`.toUpperCase();
     }
   }
 

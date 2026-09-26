@@ -22,6 +22,7 @@ export * from './common/Header';
 export * from './common/Page';
 export * from './booking/SearchCard';
 export * from './common/OfferCard';
+export * from './common/SpecialDealCard';
 export * from './vehicle/CarListCard';
 export * from './vehicle/LuxuryCarTile';
 export * from './vehicle/CarTile';

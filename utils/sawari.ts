@@ -487,11 +487,16 @@ function buildBlocks(car: Car, today: number): Block[] {
     blocks.push({ start, end, kind: 'booked' });
   }
 
-  if (car.dbStatus === 'service' || car.dbStatus === 'maintenance') {
+  const dbStatus = (car.dbStatus || '').toLowerCase();
+  
+  if (dbStatus === 'service' || dbStatus === 'maintenance') {
     const until = isoToDayNum(car.maintenanceUntil);
-    blocks.push({ start: today, end: isNaN(until) ? Infinity : until, kind: 'service' });
+    // If the maintenance date has passed but the status is STILL 'service', 
+    // it means the maintenance is taking longer than expected. Treat as indefinite until status changes.
+    const endService = isNaN(until) || until < today ? Infinity : until;
+    blocks.push({ start: today, end: endService, kind: 'service' });
   } else if (
-    (car.dbStatus === 'rent' || car.dbStatus === 'booked') &&
+    (dbStatus === 'rent' || dbStatus === 'booked') &&
     !blocks.some(b => b.start <= today && b.end >= today)
   ) {
     // Marked as out on rent but with no booking on record: unavailable today only.

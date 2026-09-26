@@ -18,23 +18,22 @@ import { shadows } from '@/constants/shadows';
  * Availability comes from `car.availability` (set by the list screen for the
  * dates being viewed) or the shared getAvailability() — nothing is invented here.
  */
-export const CarListCard = React.memo(function CarListCard({
-  car,
-  isExplore,
-  effectiveDateRange,
-  onIntercept,
-  style,
-}: {
+type CarListCardProps = {
   car: Car;
   isExplore?: boolean;
   effectiveDateRange?: string;
   onIntercept?: () => void;
   style?: any;
-}) {
+};
+
+const CarListCardUI = React.memo(function CarListCardUI({
+  car,
+  effectiveDateRange,
+  style,
+  globalDateRange,
+  onCarPress
+}: CarListCardProps & { globalDateRange: string; onCarPress: () => void }) {
   const colors = useColors();
-  const router = useRouter();
-  const { selectCar, dateRange: globalDateRange, setDateRange } = useSawari();
-  const dateRange = effectiveDateRange ?? globalDateRange;
   const { scaleAnim, opacityAnim, onPressIn, onPressOut } = usePressAnimation();
   const [isNavigating, setIsNavigating] = useState(false);
 
@@ -43,10 +42,11 @@ export const CarListCard = React.memo(function CarListCard({
   // Badge: "Avail · [start date] – [end date]" for available, or the unavailability headline.
   const badgeText = !unavailable
     ? (availability.freeUntil
-        ? `Avail · ${availability.startDate} – ${availability.freeUntil}`
+        ? (availability.startDate === availability.freeUntil || (availability.startDate === 'Today' && availability.freeUntil === dayNumToLabel(todayDayNum())))
+          ? (availability.startDate === 'Today' ? 'Avail only for today' : `Avail only for ${availability.startDate}`)
+          : `Avail · ${availability.startDate} – ${availability.freeUntil}`
         : `Avail · ${availability.startDate} – Onwards`)
     : availability.headline;
-  const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
 
   const image = (car as any).images?.[0] ?? car.image;
   const price = car.perDay ? formatCurrency(car.perDay) : car.price;
@@ -55,16 +55,7 @@ export const CarListCard = React.memo(function CarListCard({
     if (isNavigating) return;
     setIsNavigating(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    selectCar(car);
-
-    if (!isDateSelected && onIntercept) {
-      onIntercept();
-    } else {
-      if (effectiveDateRange && effectiveDateRange !== globalDateRange) {
-        setDateRange(effectiveDateRange);
-      }
-      router.push('/car-details');
-    }
+    onCarPress();
     setTimeout(() => setIsNavigating(false), 500);
   };
 
@@ -154,6 +145,34 @@ export const CarListCard = React.memo(function CarListCard({
     </Animated.View>
   );
 });
+
+export function CarListCard(props: CarListCardProps) {
+  const { selectCar, dateRange: globalDateRange, setDateRange } = useSawari();
+  const router = useRouter();
+  
+  const handleCarPress = React.useCallback(() => {
+    selectCar(props.car);
+    const dateRange = props.effectiveDateRange ?? globalDateRange;
+    const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
+
+    if (!isDateSelected && props.onIntercept) {
+      props.onIntercept();
+    } else {
+      if (props.effectiveDateRange && props.effectiveDateRange !== globalDateRange) {
+        setDateRange(props.effectiveDateRange);
+      }
+      router.push('/car-details');
+    }
+  }, [props.car, selectCar, props.onIntercept, props.effectiveDateRange, globalDateRange, setDateRange, router]);
+
+  return (
+    <CarListCardUI 
+      {...props} 
+      globalDateRange={globalDateRange} 
+      onCarPress={handleCarPress} 
+    />
+  );
+}
 
 function Spec({ icon, text, color }: { icon: React.ComponentProps<typeof Feather>['name']; text: string; color: string }) {
   return (

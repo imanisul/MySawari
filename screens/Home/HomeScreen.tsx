@@ -21,6 +21,7 @@ import {
   OfferCardSkeleton,
   DestinationCard,
   LoginBottomSheet,
+  SpecialDealCard,
 } from '@/components';
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
@@ -46,7 +47,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, pickup, dropoff, customer, bookingConfirmed, selectedCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading } = useSawari();
+  const { mode, setMode, vehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -57,9 +58,32 @@ export default function HomeScreen() {
     return 'Good evening';
   }, []);
 
+  const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useVehicles();
+
   const renderOffer = useCallback(({ item }: any) => (
     <OfferCard offer={item} />
   ), []);
+
+  const renderSpecialDeal = useCallback(({ item }: any) => {
+    return (
+      <SpecialDealCard 
+        deal={item} 
+        onPress={() => {
+          if (item.vehicleId) {
+            const car = fetchedVehicles.find(v => v.id === item.vehicleId);
+            if (car) {
+              selectCar(car);
+              setBookingSource('home');
+              router.push('/car-details');
+            } else {
+              // Fallback to explore if the car isn't currently loaded
+              router.push('/explore');
+            }
+          }
+        }}
+      />
+    );
+  }, [fetchedVehicles, selectCar, setBookingSource, router]);
   
   const renderLuxury = useCallback(({ item }: any) => (
     <CarListCard car={item} style={{ width: 280, marginHorizontal: 8, marginBottom: 0 }} />
@@ -69,18 +93,27 @@ export default function HomeScreen() {
     <DestinationCard image={item.image} title={item.title} subtitle={item.subtitle} places={item.places} />
   ), []);
 
-  const { data: offers = [], isLoading: isLoadingOffers } = useQuery({
+  const { data: allOffers = [], isLoading: isLoadingOffers } = useQuery({
     queryKey: ['offers'],
     queryFn: fetchOffers,
-    // There is no offers backend yet, so start from an empty list: no one-frame skeleton flash before
-    // the (instant) empty result. Real offers, when they exist, still replace this on the first fetch.
+    // fetchOffers may now be a network call, so start empty and show skeletons
     initialData: [] as Awaited<ReturnType<typeof fetchOffers>>,
     initialDataUpdatedAt: 0,
   });
 
-  const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useVehicles();
+  // Split offers into coupons (for the offers carousel) and special deals (for the deals section)
+  const offers = useMemo(() => allOffers.filter(o => o.type !== 'special_deal'), [allOffers]);
+  const specialDeals = useMemo(() => allOffers.filter(o => o.type === 'special_deal'), [allOffers]);
 
-  const { data: bookings = [], refetch: refetchBookings, isFetching: isFetchingBookings } = useQuery({
+
+  // Pull-to-refresh has its own state, deliberately not react-query's `isFetching`: `isFetching` is
+  // also true for the silent focus refetch below and the 60s background poll, and binding the spinner
+  // to it made the native refresh indicator pop up on its own every time the tab regained focus or the
+  // interval fired — a "continuous loading" look with no pull gesture behind it. This only turns on for
+  // an explicit pull.
+  const [manualRefreshing, setManualRefreshing] = useState(false);
+
+  const { data: bookings = [], refetch: refetchBookings } = useQuery({
     queryKey: ['bookings'],
     queryFn: async () => {
       const userBookings = await API.getAllBookings();
@@ -108,9 +141,13 @@ export default function HomeScreen() {
     useCallback(() => {
       setBookingSource('home');
       if (!isAuthLoading) {
-        if (isAuthenticated) refetchBookings();
+        if (isAuthenticated) {
+          refetchBookings();
+          // Picks up a just-activated membership (or SawariCash change) when coming back to Home.
+          fetchWallet();
+        }
       }
-    }, [isAuthLoading, isAuthenticated, refetchBookings, setBookingSource])
+    }, [isAuthLoading, isAuthenticated, refetchBookings, setBookingSource, fetchWallet])
   );
 
   // People's Choice: show curated favourites (even if unavailable) plus available
@@ -143,13 +180,13 @@ export default function HomeScreen() {
   const peopleChoiceCars = useMemo(() => ['curvv', 'venue', 'brezza', 'innova', 'creta'], []);
   const displayCars = useMemo(
     () => processVehicles(fetchedVehicles, 'Car', peopleChoiceCars),
-    [fetchedVehicles, peopleChoiceCars, selectedDate]
+    [fetchedVehicles, peopleChoiceCars, dateRange]
   );
 
   const peopleChoiceBikes = useMemo(() => ['xpulse', 'xpluse', 'ntorq', 'hunter', 'jawa'], []);
   const displayBikes = useMemo(
     () => processVehicles(fetchedVehicles, 'Bike', peopleChoiceBikes),
-    [fetchedVehicles, peopleChoiceBikes, selectedDate]
+    [fetchedVehicles, peopleChoiceBikes, dateRange]
   );
 
   // ── App Startup Permissions ──
@@ -214,12 +251,15 @@ export default function HomeScreen() {
     { type: 'header', key: 'header' },
     { type: 'nextTrip', key: 'nextTrip' },
     { type: 'membershipPromo', key: 'membershipPromo' },
+    { type: 'specialDeals', key: 'specialDeals' },
     { type: 'offers', key: 'offers' },
     { type: 'exploreVehicles', key: 'exploreVehicles' },
     { type: 'referEarn', key: 'referEarn' },
     { type: 'destinations', key: 'destinations' },
     { type: 'footer', key: 'footer' },
   ], []);
+
+  const sectionKeyExtractor = useCallback((item: { key: string }) => item.key, []);
 
   const renderSection = useCallback(({ item, index }: any) => {
     let content = null;
@@ -293,10 +333,10 @@ export default function HomeScreen() {
         );
         break;
       case 'membershipPromo': {
-        const mem = customer?.membership || {};
-        const isMemActive = mem.plan && mem.expiresAt && new Date(mem.expiresAt) > new Date();
-        
-        if (isMemActive) {
+        const mem = membership;
+        const isMemActive = !!(mem?.plan && mem.expiresAt && new Date(mem.expiresAt) > new Date());
+
+        if (isMemActive && mem) {
           const planDisplay = mem.plan.toUpperCase();
           const cap = mem.plan === 'pro' ? 20000 : mem.plan === 'plus' ? 15000 : 10000;
           const saved = mem.totalSaved || 0;
@@ -347,7 +387,12 @@ export default function HomeScreen() {
         } else {
           content = (
             <View style={[styles.sectionPad, { marginTop: 16, marginBottom: 8 }]}>
-              <Pressable onPress={() => router.push('/membership')}>
+              <Pressable onPress={() => {
+                // Guests would otherwise reach the paid-plan checkout and hit a confusing failure —
+                // ask them to log in first, same as Search and Refer & Earn already do.
+                if (isAuthenticated) router.push('/membership');
+                else setShowLogin(true);
+              }}>
                 <LinearGradient
                   colors={['#111827', '#1F2937']}
                   start={{ x: 0, y: 0 }}
@@ -386,10 +431,38 @@ export default function HomeScreen() {
         }
         break;
       }
-      case 'offers':
+      case 'specialDeals':
+        // Only show the Special Deals section when there are active deals — completely hidden otherwise.
+        if (!isLoadingOffers && specialDeals.length === 0) break;
+        if (isLoadingOffers) break; // Don't show skeleton for deals, only show when data arrives
         content = (
           <>
-            <SectionHeading title="Special Deals" kicker="EXCLUSIVE SPECIALS" />
+            <SectionHeading title="Special Deals" kicker="LIMITED TIME" />
+            <FlatList
+              data={specialDeals}
+              keyExtractor={(item, index) => item?._id || item?.id || String(index)}
+              renderItem={renderSpecialDeal}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.offerRow}
+              snapToInterval={304}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              removeClippedSubviews={false}
+              initialNumToRender={2}
+              maxToRenderPerBatch={3}
+              windowSize={3}
+            />
+          </>
+        );
+        break;
+      case 'offers':
+        // Guards against every coupon expiring/being deactivated at once — showing the heading with
+        // nothing under it would read as a broken section rather than an intentionally quiet one.
+        if (!isLoadingOffers && offers.length === 0) break;
+        content = (
+          <>
+            <SectionHeading title="Exclusive Offers" kicker="COUPONS & DISCOUNTS" />
             <FlatList
               data={isLoadingOffers ? [] : offers}
               keyExtractor={(item, index) => item?.id || String(index)}
@@ -400,7 +473,7 @@ export default function HomeScreen() {
               snapToInterval={304}
               snapToAlignment="start"
               decelerationRate="fast"
-              removeClippedSubviews
+              removeClippedSubviews={false} // Android can render a clipped card blank (white) when scrolled back into view
               initialNumToRender={2}
               maxToRenderPerBatch={3}
               windowSize={3}
@@ -434,7 +507,7 @@ export default function HomeScreen() {
                 snapToInterval={296}
                 snapToAlignment="start"
                 decelerationRate="fast"
-                removeClippedSubviews
+                removeClippedSubviews={false} // Android can render a clipped card blank (white) when scrolled back into view
                 initialNumToRender={3}
                 maxToRenderPerBatch={3}
                 windowSize={3}
@@ -470,7 +543,7 @@ export default function HomeScreen() {
                 snapToInterval={296}
                 snapToAlignment="start"
                 decelerationRate="fast"
-                removeClippedSubviews
+                removeClippedSubviews={false} // Android can render a clipped card blank (white) when scrolled back into view
                 initialNumToRender={3}
                 maxToRenderPerBatch={3}
                 windowSize={3}
@@ -508,7 +581,7 @@ export default function HomeScreen() {
               snapToInterval={296}
               snapToAlignment="start"
               decelerationRate="fast"
-              removeClippedSubviews
+              removeClippedSubviews={false} // Android can render a clipped card blank (white) when scrolled back into view
               initialNumToRender={2}
               maxToRenderPerBatch={3}
               windowSize={3}
@@ -538,25 +611,37 @@ export default function HomeScreen() {
     }
     
     if (!content) return null;
+    // The header is shown instantly so the screen doesn't start completely blank (which looks like a white flash).
+    if (item.type === 'header') return content;
+    
     // Each section eases in a beat after the one above it, so the page builds top to bottom.
-    return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [colors, greeting, customer?.name, isAuthenticated, pickup, dropoff, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, renderOffer, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, upcomingBooking, upcomingCar]);
+    return <Reveal delay={Math.min(Math.max(0, index - 1), 6) * 40}>{content}</Reveal>;
+  }, [colors, greeting, customer?.name, isAuthenticated, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, upcomingBooking, upcomingCar, membership]);
 
   return (
     <Page bottomNav scroll={false}>
       <FlatList
         data={sections}
-        keyExtractor={(item) => item.key}
+        keyExtractor={sectionKeyExtractor}
         renderItem={renderSection}
-        extraData={{ vehicleType, displayVehicle }}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-        removeClippedSubviews={false} // don't clip vertical sections
+        removeClippedSubviews={false}
+        initialNumToRender={4}
+        maxToRenderPerBatch={3}
+        windowSize={7}
+        updateCellsBatchingPeriod={100}
         refreshControl={
           <RefreshControl
-            refreshing={isFetchingBookings}
-            onRefresh={() => {
-              if (isAuthenticated) refetchBookings();
+            refreshing={manualRefreshing}
+            onRefresh={async () => {
+              if (!isAuthenticated) return;
+              setManualRefreshing(true);
+              try {
+                await refetchBookings();
+              } finally {
+                setManualRefreshing(false);
+              }
             }}
             tintColor={colors.primary}
           />
@@ -594,12 +679,14 @@ function AnimatedReferBanner({ router }: { router: any }) {
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    Animated.loop(
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.02, duration: 2000, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 2000, useNativeDriver: true })
       ])
-    ).start();
+    );
+    loop.start();
+    return () => loop.stop();
   }, [pulseAnim]);
 
   return (

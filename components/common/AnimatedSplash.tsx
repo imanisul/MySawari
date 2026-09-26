@@ -78,48 +78,52 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
     }
   }, [isReady]);
 
-  if (isAnimationComplete) {
-    return <>{children}</>;
-  }
-
   return (
-    <View style={styles.container}>
-      <Animated.View style={[
-        styles.splashScreen, 
-        { 
-          backgroundColor: colors.background,
-          opacity: opacityAnim,
-        }
-      ]}>
-        <View style={styles.content}>
-          <Animated.View style={{ 
-            opacity: logoOpacity,
-            transform: [{ scale: logoScale }] 
-          }}>
-            <Image 
-              source={require('@/assets/images/MySawari_nobg.png')} 
-              style={styles.logoImage} 
-              resizeMode="contain"
-            />
-          </Animated.View>
-          
-          <Animated.View style={{ 
-            opacity: titleOpacity,
-            transform: [{ translateY: titleTranslateY }],
-            marginTop: 4
-          }}>
-            <Text style={[styles.titleText, { color: colors.foreground }]}>MySawari</Text>
-          </Animated.View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* The real app is mounted underneath from the start (not swapped in after the fade), so the
+          splash fading away reveals the already-painted screen directly — no blank/white frame between
+          "splash gone" and "app appears". */}
+      {children}
+      {!isAnimationComplete && (
+        <Animated.View
+          pointerEvents="auto"
+          style={[
+            styles.splashScreen,
+            {
+              backgroundColor: colors.background,
+              opacity: opacityAnim,
+            }
+          ]}>
+          <View style={styles.content}>
+            <Animated.View style={{
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }]
+            }}>
+              <Image
+                source={require('@/assets/images/MySawari_nobg.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </Animated.View>
 
-          <Animated.View style={{ 
-            opacity: taglineOpacity,
-            transform: [{ translateY: taglineTranslateY }],
-            marginTop: 6
-          }}>
-            <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Your ride, your way.</Text>
-          </Animated.View>
-        </View>
-      </Animated.View>
+            <Animated.View style={{
+              opacity: titleOpacity,
+              transform: [{ translateY: titleTranslateY }],
+              marginTop: 4
+            }}>
+              <Text style={[styles.titleText, { color: colors.foreground }]}>MySawari</Text>
+            </Animated.View>
+
+            <Animated.View style={{
+              opacity: taglineOpacity,
+              transform: [{ translateY: taglineTranslateY }],
+              marginTop: 6
+            }}>
+              <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Your ride, your way.</Text>
+            </Animated.View>
+          </View>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -127,7 +131,6 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   splashScreen: {
     ...StyleSheet.absoluteFillObject,

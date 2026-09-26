@@ -21,12 +21,15 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
 
   const parseDate = (dateStr: string) => {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const parts = dateStr.split(' ');
+    const parts = dateStr.trim().split(' ');
     const monthPrefix = parts.length >= 2 ? parts[1].substring(0, 3) : '';
     if (parts.length >= 2 && months.includes(monthPrefix)) {
       const day = parseInt(parts[0], 10);
       const month = months.indexOf(monthPrefix);
-      const year = new Date().getFullYear();
+      // Booking dates already carry their real year (e.g. "5 Jan 2027" from getAllBookings) — only
+      // fall back to the current year when the string genuinely has none, otherwise a return date near
+      // a year boundary computes the wrong new return date.
+      const year = parts.length >= 3 && /^\d{4}$/.test(parts[2]) ? parseInt(parts[2], 10) : new Date().getFullYear();
       return new Date(year, month, day);
     }
     const d = new Date(dateStr);

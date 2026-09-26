@@ -1,21 +1,74 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, AppState, Linking } from 'react-native';
 import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as Location from 'expo-location';
+import Notifications from '@/utils/notifications';
 import { useRouter } from 'expo-router';
 
 export default function SettingsScreen() {
   const colors = useColors();
-  const { logout, isDarkMode, toggleDarkMode } = useSawari();
+  const { logout, isDarkMode, toggleDarkMode, isAuthenticated } = useSawari();
   const router = useRouter();
 
-  // Mock settings state
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [locationEnabled, setLocationEnabled] = useState(true);
+  // Reflects the real OS permission — not a preference the app can silently flip, so it starts
+  // false and is filled in as soon as the actual status is read (see refreshPermissions below).
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+
+  const refreshPermissions = useCallback(async () => {
+    try {
+      const notif = await Notifications.getPermissionsAsync();
+      setNotificationsEnabled(notif.status === 'granted');
+    } catch {}
+    try {
+      const loc = await Location.getForegroundPermissionsAsync();
+      setLocationEnabled(loc.status === 'granted');
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    refreshPermissions();
+    // Re-check on return from the system Settings app, so toggling there is reflected here too.
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshPermissions();
+    });
+    return () => sub.remove();
+  }, [refreshPermissions]);
+
+  const promptOpenSettings = (title: string, message: string) => {
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => Linking.openSettings() },
+    ]);
+  };
+
+  const handleNotificationsToggle = async (val: boolean) => {
+    Haptics.selectionAsync();
+    if (val) {
+      const res = await Notifications.requestPermissionsAsync();
+      if (res.status === 'granted') setNotificationsEnabled(true);
+      // Already denied once — the OS won't prompt again, only Settings can grant it now.
+      else promptOpenSettings('Enable Notifications', 'MySawari needs permission in Settings to send you ride updates.');
+    } else {
+      promptOpenSettings('Turn Off Notifications', 'This opens system Settings, where you can turn off notifications for MySawari.');
+    }
+  };
+
+  const handleLocationToggle = async (val: boolean) => {
+    Haptics.selectionAsync();
+    if (val) {
+      const res = await Location.requestForegroundPermissionsAsync();
+      if (res.status === 'granted') setLocationEnabled(true);
+      else promptOpenSettings('Enable Location', 'MySawari needs permission in Settings to detect your pickup location.');
+    } else {
+      promptOpenSettings('Turn Off Location', 'This opens system Settings, where you can turn off location access for MySawari.');
+    }
+  };
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -50,10 +103,7 @@ export default function SettingsScreen() {
               </View>
               <Switch
                 value={notificationsEnabled}
-                onValueChange={(val) => {
-                  Haptics.selectionAsync();
-                  setNotificationsEnabled(val);
-                }}
+                onValueChange={handleNotificationsToggle}
                 trackColor={{ false: colors.border, true: colors.primary }}
               />
             </View>
@@ -66,10 +116,7 @@ export default function SettingsScreen() {
               </View>
               <Switch
                 value={locationEnabled}
-                onValueChange={(val) => {
-                  Haptics.selectionAsync();
-                  setLocationEnabled(val);
-                }}
+                onValueChange={handleLocationToggle}
                 trackColor={{ false: colors.border, true: colors.primary }}
               />
             </View>
@@ -91,19 +138,23 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 24 }]}>Account</Text>
+          {isAuthenticated === true && (
+            <>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 24 }]}>Account</Text>
 
-          {/* Action Buttons */}
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity 
-              style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={handleLogout}
-            >
-              <Feather name="log-out" size={18} color={colors.foreground} style={styles.actionIcon} />
-              <Text style={[styles.actionText, { color: colors.foreground }]}>Log Out</Text>
-            </TouchableOpacity>
-          </View>
-          
+              {/* Action Buttons */}
+              <View style={styles.actionsContainer}>
+                <TouchableOpacity 
+                  style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={handleLogout}
+                >
+                  <Feather name="log-out" size={18} color={colors.foreground} style={styles.actionIcon} />
+                  <Text style={[styles.actionText, { color: colors.foreground }]}>Log Out</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
           {/* App Version */}
           <View style={styles.versionContainer}>
             <Text style={[styles.versionText, { color: colors.mutedForeground }]}>MySawari v1.0.0</Text>

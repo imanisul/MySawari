@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -167,6 +167,12 @@ export default function ExploreScreen() {
 
       // If the user is actively searching, only show cars that are actually available
       const matchSearchAvailability = debouncedQuery === '' || isAvailable;
+      
+      // Do not show vehicles that are in maintenance on the explore page
+      const isMaintenance = car.dbStatus?.toLowerCase() === 'service' || car.dbStatus?.toLowerCase() === 'maintenance';
+      if (isMaintenance) {
+        return acc;
+      }
 
       if (matchType && matchSearch && matchSearchAvailability && matchFilterCategory && matchFilterPrice && matchFilterTrans && matchFilterFuel) {
         acc.push({ ...car, isAvailable, availability });
@@ -206,9 +212,19 @@ export default function ExploreScreen() {
     setIsRefreshing(false);
   };
 
+  const keyExtractor = useCallback((item: Car) => item.id, []);
+
   const renderCar = useCallback(({ item }: { item: typeof cars[0] }) => (
     <CarListCard car={item} effectiveDateRange={exploreDate} />
   ), [exploreDate]);
+
+  // Stable item layout for fixed-height cards — avoids measuring every cell on scroll
+  const CARD_HEIGHT = 290; // image (16:9 on ~width-32) + body + margin
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: CARD_HEIGHT,
+    offset: CARD_HEIGHT * index,
+    index,
+  }), []);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -220,7 +236,7 @@ export default function ExploreScreen() {
   }, [filters]);
 
   /* ─── ListHeaderComponent: Search + Filters + Dates ─── */
-  const listHeaderElement = (
+  const listHeaderElement = useMemo(() => (
     <Reanimated.View entering={rise()}>
       {/* Search Bar */}
       <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -378,10 +394,13 @@ export default function ExploreScreen() {
         })}
       </ScrollView>
     </Reanimated.View>
-  );
+  ), [searchQuery, setSearchQuery, colors, vehicleType, setVehicleType, setFilters, setPage,
+      activeFilterCount, showFilterSheet, setShowFilterSheet, exploreDate, handleDateSelect,
+      availableDates, showDatePicker, setShowDatePicker, isDarkMode, currentSelectedDateObj,
+      onDateChange, defaultFilters]);
 
   /* ─── ListEmptyComponent ─── */
-  const listEmptyElement = (() => {
+  const listEmptyElement = useMemo(() => {
     if (isFetchingCars || isFiltering) {
       return (
         <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 16 }}>
@@ -437,7 +456,9 @@ export default function ExploreScreen() {
       )}
       </View>
     );
-  })();
+  }, [isFetchingCars, isFiltering, fetchError, colors, vehicleType, debouncedQuery,
+      exploreDate, activeFilterCount, defaultToday, setSearchQuery, setDebouncedQuery,
+      setExploreDate, setGlobalSelectedDate, setFilters, setPage, fetchVehicles]);
   return (
     <Page bottomNav scroll={false}>
       {/* ── FIXED: Explore Header ── */}
@@ -446,23 +467,24 @@ export default function ExploreScreen() {
       <FlatList
         style={{ flex: 1 }}
         data={paginatedCars}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         renderItem={renderCar}
         ListHeaderComponent={listHeaderElement}
         ListEmptyComponent={listEmptyElement}
-        extraData={`${vehicleType}-${exploreDate}-${debouncedQuery}-${activeFilterCount}`}
         showsVerticalScrollIndicator={false}
         // Last card must clear the fixed tab bar (+ safe area) and the floating support button.
         contentContainerStyle={[styles.listContent, { paddingBottom: bottomNavHeight + 88 }]}
         {...scrollHandlers}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        initialNumToRender={5}
-        maxToRenderPerBatch={5}
-        windowSize={5}
+        initialNumToRender={4}
+        maxToRenderPerBatch={3}
+        updateCellsBatchingPeriod={100}
+        windowSize={7}
         removeClippedSubviews={true}
         refreshing={isRefreshing}
         onRefresh={handleRefresh}
+        getItemLayout={getItemLayout}
         ListFooterComponent={
           isLoadingMore ? (
             <View style={styles.loadingFooter}>

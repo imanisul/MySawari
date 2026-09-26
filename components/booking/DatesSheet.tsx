@@ -52,8 +52,12 @@ export function DatesSheet() {
   const [start, setStart] = useState<Date | null>(initialStart && initialStart >= today ? initialStart : null);
   const [end, setEnd] = useState<Date | null>(initialEnd && initialStart && initialEnd >= initialStart ? initialEnd : null);
   
-  const [tempPickupTime, setTempPickupTime] = useState(pickupTime || '8:00 AM');
-  const [tempReturnTime, setTempReturnTime] = useState(returnTime || '8:00 AM');
+  const [tempPickupTime, setTempPickupTime] = useState(pickupTime ? pickupTime.replace(/^0/, '') : '8:00 AM');
+  
+  const initialIsSameDay = initialStart && (initialEnd || initialStart).getTime() === initialStart.getTime();
+  const [tempReturnTime, setTempReturnTime] = useState<string | null>(
+    (initialIsSameDay && (!returnTime || returnTime === '08:00 AM' || returnTime === '8:00 AM')) ? null : (returnTime ? returnTime.replace(/^0/, '') : '8:00 AM')
+  );
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
@@ -98,6 +102,7 @@ export function DatesSheet() {
     if (start && end) {
       setStart(date);
       setEnd(null);
+      setTempReturnTime(null);
       return;
     }
     
@@ -106,9 +111,15 @@ export function DatesSheet() {
       if (date < start) {
         // Picked a date before start, make it the new start
         setStart(date);
+        setEnd(null);
+        setTempReturnTime(null);
+      } else if (date.getTime() === start.getTime()) {
+        // Clicking same date again, keep it same-day
+        setTempReturnTime(null);
       } else {
         // Picked a date after start, make it the end
         setEnd(date);
+        setTempReturnTime('8:00 AM');
       }
       return;
     }
@@ -116,6 +127,7 @@ export function DatesSheet() {
     // Default fallback (should never hit if initialized properly)
     setStart(date);
     setEnd(null);
+    setTempReturnTime(null);
   };
 
   const formatDateStr = (date: Date | null) => {
@@ -124,8 +136,9 @@ export function DatesSheet() {
   };
 
   const effectiveEnd = end || start;
-  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime, tempReturnTime) : 0;
-  const canApply = start !== null;
+  const isSameDay = !!(start && effectiveEnd && start.getTime() === effectiveEnd.getTime());
+  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime, tempReturnTime || '8:00 AM') : 0;
+  const canApply = start !== null && (!isSameDay || tempReturnTime !== null);
 
   return (
     <SheetFrame height="95%">
@@ -242,6 +255,7 @@ export function DatesSheet() {
                     newEnd.setHours(0, 0, 0, 0);
                     setEnd(newEnd);
                     
+                    setTempPickupTime('8:00 AM');
                     setTempReturnTime('8:00 AM');
                     
                     if (newEnd.getMonth() !== currentMonth.getMonth()) {
@@ -301,7 +315,7 @@ export function DatesSheet() {
 
           <Text style={[styles.timeTitle, { color: colors.foreground, marginTop: 12 }]}>Return Time</Text>
           <ScrollView ref={returnScrollRef} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
-            {ALL_TIMES.map((time) => {
+            {(isSameDay ? ALL_TIMES.slice(17) : ALL_TIMES).map((time) => {
               const selected = time === tempReturnTime;
               const isAnchorTime = time === '8:00 AM';
               return (
@@ -338,8 +352,9 @@ export function DatesSheet() {
           disabled={!canApply}
           onPress={() => {
             if (start) {
+              const finalReturnTime = tempReturnTime || '8:00 AM';
               setDates(`${formatDateStr(start)} – ${formatDateStr(effectiveEnd)}`, `${rentalDays} Day${rentalDays !== 1 ? 's' : ''}`);
-              setTimes(tempPickupTime, tempReturnTime);
+              setTimes(tempPickupTime, finalReturnTime);
               
               if (returnBack === 'true') {
                 router.back();

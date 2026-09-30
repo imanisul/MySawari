@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "493361757272",
+    "project_id": "mysawari-9dec1",
+    "storage_bucket": "mysawari-9dec1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:493361757272:android:502f19f7af4b47effd5e2d",
+        "android_client_info": {
+          "package_name": "com.mysawari.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDP62rCUJTNl_6SGgYwR7GBZN7rMjFKAW8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

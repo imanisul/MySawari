@@ -84,7 +84,7 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style,
             colors={['rgba(255,255,255,0)', highlight, 'rgba(255,255,255,0)']}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
         </Reanimated.View>
       )}

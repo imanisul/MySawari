@@ -5,19 +5,22 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { NotificationsAPI, BackendNotification } from '@/services/api/notifications';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
+
+import { NotificationSkeleton } from '@/components/loading/ScreenSkeletons';
+
+import { useSawari } from '@/context/SawariContext';
 
 export default function NotificationsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [notifications, setNotifications] = useState<BackendNotification[]>([]);
+  const { notifications, syncNotifications, markNotificationRead } = useSawari();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const fetchNotifications = async () => {
-    const data = await NotificationsAPI.getNotifications();
-    setNotifications(data);
+    await syncNotifications();
     setLoading(false);
   };
 
@@ -33,12 +36,9 @@ export default function NotificationsScreen() {
     setRefreshing(false);
   };
 
-  const handlePressNotification = async (item: BackendNotification) => {
-    if (!item.isRead) {
-      const success = await NotificationsAPI.markAsRead(item.id);
-      if (success) {
-        setNotifications(prev => prev.map(n => n.id === item.id ? { ...n, isRead: true } : n));
-      }
+  const handlePressNotification = async (item: any) => {
+    if (!item.read) {
+      await markNotificationRead(item.id);
     }
   };
 
@@ -54,8 +54,15 @@ export default function NotificationsScreen() {
 
   if (loading && notifications.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}>
+            <Feather name="arrow-left" size={24} color={colors.foreground} />
+          </Pressable>
+          <Text style={[styles.title, { color: colors.foreground }]}>Notifications</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <NotificationSkeleton />
       </View>
     );
   }
@@ -77,7 +84,7 @@ export default function NotificationsScreen() {
         ListEmptyComponent={renderEmpty}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         renderItem={({ item }) => {
-          const date = new Date(item.createdAt);
+          const date = new Date(item.date);
           const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           const dateString = date.toLocaleDateString([], { day: 'numeric', month: 'short' });
 
@@ -86,7 +93,7 @@ export default function NotificationsScreen() {
               onPress={() => handlePressNotification(item)}
               style={({ pressed }) => [
                 styles.card, 
-                { backgroundColor: item.isRead ? colors.card : colors.tintLight, borderColor: colors.border },
+                { backgroundColor: item.read ? colors.card : colors.tintLight, borderColor: colors.border },
                 pressed && { opacity: 0.8 }
               ]}
             >
@@ -100,11 +107,11 @@ export default function NotificationsScreen() {
                     {dateString} • {timeString}
                   </Text>
                 </View>
-                {!item.isRead && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
+                {!item.read && <View style={[styles.unreadDot, { backgroundColor: colors.primary }]} />}
               </View>
 
-              {item.data?.image && (
-                <Image source={{ uri: item.data.image }} style={styles.attachedImage} resizeMode="cover" />
+              {item.image && (
+                <Image source={{ uri: item.image }} style={styles.attachedImage} resizeMode="cover" />
               )}
               
               {!!item.body && (

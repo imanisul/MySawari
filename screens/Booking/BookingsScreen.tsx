@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -26,6 +26,7 @@ export default function BookingsScreen() {
   const [showLogin, setShowLogin] = useState(false);
   
   const [tab, setTab] = useState<BookingTab>('Upcoming');
+  const [initialTabSet, setInitialTabSet] = useState(false);
   const tabs: BookingTab[] = ['Upcoming', 'Active', 'Completed', 'Cancelled'];
   
   const [actionBooking, setActionBooking] = useState<BookingSnapshot | null>(null);
@@ -54,6 +55,21 @@ export default function BookingsScreen() {
     refetchInterval: 30 * 1000, // status changes (e.g. trip completed by the ops team) appear on their own
     refetchOnWindowFocus: true,
   });
+
+  useEffect(() => {
+    if (!loading && !initialTabSet) {
+      if (bookings && bookings.length > 0) {
+        if (bookings.some(b => b.status === 'ONGOING')) {
+          setTab('Active');
+        } else if (bookings.some(b => b.status === 'CONFIRMED' || b.status === 'PENDING')) {
+          setTab('Upcoming');
+        } else if (bookings.some(b => b.status === 'COMPLETED')) {
+          setTab('Completed');
+        }
+      }
+      setInitialTabSet(true);
+    }
+  }, [loading, bookings, initialTabSet]);
 
   // A booking is Active only once the operations app has handed the vehicle to the customer
   // (status vehicle_handover, mapped to ONGOING). Reaching the start date never moves it: until the
@@ -95,14 +111,33 @@ export default function BookingsScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.content, { paddingTop: Math.max(insets.top + 16, 16) }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Your bookings</Text>
-        <View style={{ borderBottomColor: colors.border, borderBottomWidth: 1, marginTop: 24 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-            {tabs.map((item) => (
-              <Pressable key={item} onPress={() => setTab(item)} style={styles.tab}>
-                <Text style={[styles.tabText, { color: tab === item ? colors.foreground : colors.mutedForeground, fontFamily: tab === item ? 'Inter_500Medium' : 'Inter_400Regular' }]}>{item}</Text>
-                {tab === item && <View style={[styles.tabUnderline, { backgroundColor: colors.foreground }]} />}
-              </Pressable>
-            ))}
+        <View style={{ marginTop: 24, marginBottom: 12, marginHorizontal: -24 }}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 24 }}>
+            {tabs.map((item) => {
+              const isSelected = tab === item;
+              return (
+                <Pressable 
+                  key={item} 
+                  onPress={() => setTab(item)} 
+                  style={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderRadius: 99,
+                    backgroundColor: isSelected ? colors.primary : colors.card,
+                    borderWidth: 1,
+                    borderColor: isSelected ? colors.primary : colors.border,
+                  }}
+                >
+                  <Text style={{ 
+                    color: isSelected ? colors.primaryForeground : colors.foreground, 
+                    fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                    fontSize: 14 
+                  }}>
+                    {item}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </View>
         
@@ -148,60 +183,101 @@ export default function BookingsScreen() {
               >
                 <View style={styles.upcomingCopy}>
                   <View style={styles.upcomingTitleRow}>
-                    <Text style={[styles.upcomingName, { color: textColor }]}>{booking.vehicleName}</Text>
-                    <View style={styles.upcomingStatus}>
+                    <Text style={[styles.upcomingName, { color: textColor, fontSize: 18, fontFamily: 'Inter_700Bold' }]}>{booking.vehicleName}</Text>
+                    <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: 
+                            booking.status === 'ONGOING' ? colors.success + '15' :
+                            booking.status === 'CONFIRMED' ? '#04785715' : 
+                            booking.status === 'PENDING' ? '#3B82F615' : 
+                            (booking.status === 'CANCELLED' || booking.status === 'FAILED') ? colors.destructive + '15' : 
+                            colors.mutedForeground + '15',
+                        paddingHorizontal: 8,
+                        paddingVertical: 4,
+                        borderRadius: 6
+                    }}>
                       <View style={[
                         styles.statusDot, 
                         { backgroundColor: 
-                            booking.status === 'CONFIRMED' ? colors.primary : 
-                            booking.status === 'PENDING' ? colors.blue : 
+                            booking.status === 'ONGOING' ? colors.success :
+                            booking.status === 'CONFIRMED' ? '#047857' : 
+                            booking.status === 'PENDING' ? '#3B82F6' : 
                             (booking.status === 'CANCELLED' || booking.status === 'FAILED') ? colors.destructive : 
                             colors.mutedForeground 
                         }
                       ]} />
-                      <Text style={[styles.upcomingStatusText, { color: textColor }]}>{booking.status}</Text>
+                      <Text style={{ 
+                        fontFamily: 'Inter_600SemiBold', 
+                        fontSize: 11,
+                        color: 
+                            booking.status === 'ONGOING' ? (isActive ? textColor : colors.success) :
+                            booking.status === 'CONFIRMED' ? (isActive ? textColor : '#047857') : 
+                            booking.status === 'PENDING' ? (isActive ? textColor : '#3B82F6') : 
+                            (booking.status === 'CANCELLED' || booking.status === 'FAILED') ? (isActive ? textColor : colors.destructive) : 
+                            (isActive ? textColor : colors.mutedForeground)
+                      }}>{booking.status}</Text>
                     </View>
                   </View>
-                  <View style={styles.upcomingMetaRow}>
-                    <Feather name="calendar" size={13} color={subtextColor} />
-                    <Text style={[styles.upcomingMeta, { color: subtextColor }]}>
-                      {booking.pickupDate} {booking.pickupTime || '8:00 AM'} - {booking.returnDate} {booking.dropTime || '8:00 AM'} ({booking.rentalDays} Days)
-                    </Text>
-                  </View>
-                  {(!booking.pickupCharge && !booking.dropCharge) ? (
+                  <View style={{ marginTop: 12, gap: 6 }}>
                     <View style={styles.upcomingMetaRow}>
-                      <Feather name="map-pin" size={13} color={subtextColor} />
-                      <Text style={[styles.upcomingMeta, { color: subtextColor }]} numberOfLines={1}>
-                        {booking.dropoffLocationName || 'MySawari Office'}
-                      </Text>
+                      <View style={{ width: 24, alignItems: 'center' }}><Feather name="calendar" size={14} color={subtextColor} /></View>
+                      <View>
+                        <Text style={[styles.upcomingMeta, { color: subtextColor, fontSize: 12 }]}>Pickup Date & Time</Text>
+                        <Text style={[styles.upcomingMeta, { color: textColor, fontFamily: 'Inter_500Medium', marginTop: 2 }]}>{booking.pickupDate} at {booking.pickupTime || '10:00 AM'}</Text>
+                      </View>
                     </View>
-                  ) : (
-                    <>
-                      {!!booking.pickupCharge && booking.pickupCharge > 0 && (
-                        <View style={styles.upcomingMetaRow}>
-                          <Feather name="map-pin" size={13} color={subtextColor} />
-                          <Text style={[styles.upcomingMeta, { color: subtextColor }]} numberOfLines={1}>
-                            Pickup: {booking.pickupLocationName}
-                          </Text>
-                        </View>
-                      )}
-                      {!!booking.dropCharge && booking.dropCharge > 0 && (
-                        <View style={styles.upcomingMetaRow}>
-                          <Feather name="map-pin" size={13} color={subtextColor} />
-                          <Text style={[styles.upcomingMeta, { color: subtextColor }]} numberOfLines={1}>
-                            Drop: {booking.dropLocationName}
-                          </Text>
-                        </View>
-                      )}
-                    </>
-                  )}
+                    <View style={styles.upcomingMetaRow}>
+                      <View style={{ width: 24, alignItems: 'center' }}><Feather name="clock" size={14} color={subtextColor} /></View>
+                      <View>
+                        <Text style={[styles.upcomingMeta, { color: subtextColor, fontSize: 12 }]}>Drop Date & Time</Text>
+                        <Text style={[styles.upcomingMeta, { color: textColor, fontFamily: 'Inter_500Medium', marginTop: 2 }]}>{booking.returnDate} at {booking.dropTime || '10:00 AM'}</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: 6, gap: 6 }}>
+                    {(!booking.pickupCharge && !booking.dropCharge) ? (
+                      <View style={styles.upcomingMetaRow}>
+                        <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
+                        <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
+                          {booking.dropoffLocationName || 'MySawari Office'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <>
+                        {!!booking.pickupCharge && booking.pickupCharge > 0 && (
+                          <View style={styles.upcomingMetaRow}>
+                            <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
+                            <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
+                              Pickup: {booking.pickupLocationName}
+                            </Text>
+                          </View>
+                        )}
+                        {!!booking.dropCharge && booking.dropCharge > 0 && (
+                          <View style={styles.upcomingMetaRow}>
+                            <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
+                            <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
+                              Drop: {booking.dropLocationName}
+                            </Text>
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </View>
                   
-                  <View style={{ height: 1, backgroundColor: dividerColor, marginVertical: 12 }} />
+                  <View style={{ height: 1, backgroundColor: dividerColor, marginVertical: 16 }} />
                   
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ color: textColor, fontFamily: 'Inter_600SemiBold' }}>₹{booking.onlinePayableNow.toLocaleString('en-IN')} <Text style={{ color: subtextColor, fontFamily: 'Inter_400Regular', fontSize: 13 }}>booking amount paid</Text></Text>
+                    <View>
+                      <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Booking Amount</Text>
+                      <Text style={{ color: textColor, fontFamily: 'Inter_700Bold', fontSize: 16, marginTop: 2 }}>₹{booking.onlinePayableNow.toLocaleString('en-IN')}</Text>
+                    </View>
                     {booking.remainingRentalAmount > 0 && (
-                      <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Balance: ₹{booking.remainingRentalAmount.toLocaleString('en-IN')}</Text>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Balance Due</Text>
+                        <Text style={{ color: textColor, fontFamily: 'Inter_700Bold', fontSize: 16, marginTop: 2 }}>₹{booking.remainingRentalAmount.toLocaleString('en-IN')}</Text>
+                      </View>
                     )}
                   </View>
                   
@@ -256,14 +332,29 @@ export default function BookingsScreen() {
                         </Pressable>
                       )
                     )}
-                    {(tab === 'Active' || (tab === 'Upcoming' && booking.status === 'CONFIRMED')) && (
-                      <Pressable 
-                        onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('extend'); }}
-                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary, marginLeft: 12 }}
-                      >
-                        <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extend Trip</Text>
-                      </Pressable>
-                    )}
+                    {(() => {
+                      const hasPendingExt = booking.extensions?.some((e: any) => e.status === 'pending');
+                      const hasRejectedExt = booking.extensions?.some((e: any) => e.status === 'rejected');
+                      if (hasPendingExt) {
+                        return (
+                          <View style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#F59E0B20', marginLeft: 12 }}>
+                            <Text style={{ color: '#B45309', fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extension Pending</Text>
+                          </View>
+                        );
+                      }
+                      
+                      if (!hasRejectedExt && (tab === 'Active' || (tab === 'Upcoming' && booking.status === 'CONFIRMED'))) {
+                        return (
+                          <Pressable 
+                            onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('extend'); }}
+                            style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary, marginLeft: 12 }}
+                          >
+                            <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extend Trip</Text>
+                          </Pressable>
+                        );
+                      }
+                      return null;
+                    })()}
                   </View>
                 </View>
               </Pressable>

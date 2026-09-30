@@ -47,7 +47,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet } = useSawari();
+  const { mode, setMode, vehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet, syncNotifications } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
 
@@ -141,13 +141,14 @@ export default function HomeScreen() {
     useCallback(() => {
       setBookingSource('home');
       if (!isAuthLoading) {
+        syncNotifications(); // Now safe for unauthenticated users too
         if (isAuthenticated) {
           refetchBookings();
           // Picks up a just-activated membership (or SawariCash change) when coming back to Home.
           fetchWallet();
         }
       }
-    }, [isAuthLoading, isAuthenticated, refetchBookings, setBookingSource, fetchWallet])
+    }, [isAuthLoading, isAuthenticated, refetchBookings, setBookingSource, fetchWallet, syncNotifications])
   );
 
   // People's Choice: show curated favourites (even if unavailable) plus available
@@ -162,7 +163,11 @@ export default function HomeScreen() {
       });
 
     const isFavourite = (v: any) => favourites.some(name => v.name.toLowerCase().includes(name));
+    
+    // Favourites always show up (even if unavailable, they will show 'On a trip')
     const favs = typed.filter(isFavourite);
+    // Fill remaining slots with other vehicles that ARE available
+    const others = typed.filter(v => !isFavourite(v) && v.isAvailable);
 
     // Sort favourites by the curated order
     const rank = (v: any) => {
@@ -170,10 +175,13 @@ export default function HomeScreen() {
       return i === -1 ? favourites.length : i;
     };
     favs.sort((a, b) => rank(a) - rank(b));
+    
+    // Fill remaining slots with other available vehicles
+    const combined = [...favs, ...others];
 
     // Deduplicate by id
     const seen = new Set<string>();
-    const unique = favs.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
+    const unique = combined.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
     return unique.slice(0, 6);
   };
 
@@ -267,7 +275,6 @@ export default function HomeScreen() {
       case 'header':
         content = (
           <>
-            <Header />
             <View style={{ position: 'relative', overflow: 'visible', zIndex: -1 }}>
               <View>
                 <Text style={[styles.greeting, { color: colors.mutedForeground }]}>
@@ -370,7 +377,7 @@ export default function HomeScreen() {
                       </Text>
                     </View>
                     <View style={{ backgroundColor: 'rgba(255, 215, 0, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255, 215, 0, 0.3)' }}>
-                      <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: colors.primary }}>View Progress</Text>
+                      <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 12, color: '#FBBF24' }}>View Progress</Text>
                     </View>
                   </View>
                   
@@ -620,12 +627,13 @@ export default function HomeScreen() {
 
   return (
     <Page bottomNav scroll={false}>
+      <Header absolute={true} />
       <FlatList
         data={sections}
         keyExtractor={sectionKeyExtractor}
         renderItem={renderSection}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: insets.top + 52 }}
         removeClippedSubviews={false}
         initialNumToRender={4}
         maxToRenderPerBatch={3}
@@ -656,7 +664,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  greeting: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 22, paddingHorizontal: 20 },
+  greeting: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 8, paddingHorizontal: 20 },
   heading: { fontFamily: 'Inter_700Bold', fontSize: 26, letterSpacing: -0.8, lineHeight: 32, marginTop: 6, paddingHorizontal: 20 },
   sectionPad: { paddingHorizontal: 16 },
   emptyVehicles: { fontFamily: 'Inter_500Medium', fontSize: 13, paddingVertical: 24 },

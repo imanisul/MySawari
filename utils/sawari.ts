@@ -484,6 +484,15 @@ function buildBlocks(car: Car, today: number): Block[] {
     const start = isoToDayNum(r.start);
     const end = isoToDayNum(r.end);
     if (isNaN(start) || isNaN(end) || end < today) continue; // past bookings don't matter
+    
+    // If the backend includes the status, ignore cancelled/completed bookings
+    if (r.status) {
+      const st = r.status.toLowerCase();
+      if (['cancelled', 'canceled', 'failed', 'rejected', 'completed', 'complete', 'returned', 'closed'].includes(st)) {
+        continue;
+      }
+    }
+    
     blocks.push({ start, end, kind: 'booked' });
   }
 
@@ -538,7 +547,8 @@ export function getAvailability(car: Car | undefined | null, startLabel?: string
   const today = todayDayNum();
   const start = parseDayLabel(startLabel);
   const hasDates = start !== null;
-  const windowStart = hasDates ? start! : today;
+  const rawStart = hasDates ? start! : today;
+  const windowStart = Math.max(rawStart, today);
   const parsedEnd = hasDates ? parseDayLabel(endLabel, windowStart) : null;
   const windowEnd = parsedEnd !== null ? parsedEnd : windowStart;
   const stayDays = windowEnd - windowStart + 1;

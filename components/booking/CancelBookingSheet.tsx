@@ -6,10 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API } from '@/services/backend/api';
 import { BookingSnapshot } from '@/services/backend/api';
 import { MockRequests } from '@/utils/mockRequests';
+import { useSawari } from '@/context/SawariContext';
 
 export function CancelBookingSheet({ visible, onClose, booking, onSuccess }: { visible: boolean; onClose: () => void; booking: BookingSnapshot; onSuccess: (updatedSnapshot: BookingSnapshot) => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { customer } = useSawari();
   
   const [loading, setLoading] = useState(false);
   const slideAnim = useRef(new Animated.Value(400)).current;
@@ -28,10 +30,12 @@ export function CancelBookingSheet({ visible, onClose, booking, onSuccess }: { v
       const response = await API.cancelBooking(booking.id, 'Change of plans');
       if (response.success) {
         if (refund > 0) {
-          await MockRequests.requestRefund({
+          await API.requestRefund({
             bookingId: booking.id,
-            refundAmount: refund,
-            requestedAt: new Date().toISOString()
+            amount: refund,
+            reason: 'Booking Cancelled',
+            customerId: customer.id,
+            customerMobile: customer.mobile
           });
         }
         onSuccess(response.snapshot);

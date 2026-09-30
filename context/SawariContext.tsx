@@ -11,6 +11,17 @@ import Notifications from '@/utils/notifications';
 import { AppState } from 'react-native';
 import { getDevicePosition } from '@/utils/location';
 import { calculateDistanceKm } from '@/services/backend/pricingEngine';
+import { registerDeviceForPushNotifications } from '@/services/pushNotification';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+
+let messaging: any = null;
+if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
+  try {
+    messaging = require('@react-native-firebase/messaging').default;
+  } catch (e) {
+    console.warn("Firebase messaging not available");
+  }
+}
 
 export type PaymentMethod = string;
 export type BookingStatus = 'upcoming' | 'active' | 'completed' | 'cancelled';
@@ -120,6 +131,8 @@ type SawariContextValue = {
   clearBooking: () => void;
   addNotification: (notification: Omit<AppNotification, 'read'>) => void;
   markAllAsRead: () => void;
+  syncNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<boolean>;
   setPushToken: (token: string) => void;
   hasSeenPermissions: boolean | null;
   completeOnboarding: () => Promise<void>;
@@ -188,6 +201,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     setSawariCash(wallet.walletBalance || 0);
     setMembership(wallet.membership || null);
   }, []);
+
+  const fetchWallet = useCallback(async () => {
+    applyWallet(await API.getWallet(true));
+  }, [applyWallet]);
+
   const [totalBookings, setTotalBookings] = useState(0);
   const [expoPushToken, setPushToken] = useState<string | null>(null);
   const [hasSeenPermissions, setHasSeenPermissions] = useState<boolean | null>(null);
@@ -198,7 +216,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
 
   // --- Start Push Notification Listener ---
   useEffect(() => {
-    const sub = Notifications.addNotificationReceivedListener((notification) => {
+    const sub = Notifications.addNotificationReceivedListener((notification: any) => {
       const { title, body } = notification.request.content;
       const id = notification.request.identifier;
       
@@ -308,8 +326,26 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setHasSeenPermissions(permissionsVal === 'true');
           setIsDarkMode(themeVal === 'true');
           
-          if (storedDateRange) {
-             setDateRangeState(storedDateRange);
+          if (storedDateRange && storedDateRange !== 'Select Dates') {
+            const parts = storedDateRange.split(/[-–]/).map(d => d.trim());
+            const startLabel = parts[0];
+            if (startLabel) {
+              const dayParts = startLabel.split(' ');
+              if (dayParts.length >= 2) {
+                const day = parseInt(dayParts[0], 10);
+                const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+                let month = MONTHS.indexOf(dayParts[1]);
+                if (month === 12) month = 8;
+                if (month !== -1 && !isNaN(day)) {
+                  const currentYear = new Date().getFullYear();
+                  const parsedDate = new Date(currentYear, month, day);
+                  const today = new Date(new Date().setHours(0,0,0,0));
+                  if (parsedDate >= today) {
+                    setDateRangeState(storedDateRange);
+                  }
+                }
+              }
+            }
           }
           
           if (storedSelectedDate) {
@@ -400,6 +436,19 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Register push notifications (for both authenticated and anonymous users)
+  useEffect(() => {
+    if (!isAuthLoading) {
+      registerDeviceForPushNotifications();
+      // Subscribe to global topic for broadcasts
+      if (messaging) {
+        messaging().requestPermission().then(() => {
+          messaging().subscribeToTopic('all_customers');
+        }).catch((err: any) => console.warn('Global FCM subscription failed', err));
+      }
+    }
+  }, [isAuthLoading, isAuthenticated]);
+
   const quoteParams = useMemo(() => {
     // Split by either en-dash '–' or standard hyphen '-'
     const dates = dateRange.split(/[-–]/).map(d => d.trim());
@@ -442,6 +491,34 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       if (seq === quoteSeq.current) setIsQuoteLoading(false);
     }
   }, [quoteParams]);
+
+  const syncNotifications = useCallback(async () => {
+    // Allowed for guests too, they just get 'all' targeted broadcast notifications
+    try {
+      const { NotificationsAPI } = require('@/services/api/notifications');
+      const data = await NotificationsAPI.getNotifications();
+      const mapped = data.map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        date: n.createdAt,
+        image: n.data?.image,
+        read: n.isRead,
+      }));
+      setNotifications(mapped);
+    } catch (e) {
+      console.error('syncNotifications error:', e);
+    }
+  }, [isAuthenticated]);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    const { NotificationsAPI } = require('@/services/api/notifications');
+    const success = await NotificationsAPI.markAsRead(id);
+    if (success) {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    }
+    return success;
+  }, []);
 
   // Refresh quote whenever dependencies change
   useEffect(() => {
@@ -628,6 +705,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       markAllAsRead: () => {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       },
+      syncNotifications,
+      markNotificationRead,
       setPushToken,
       hasSeenPermissions,
       completeOnboarding: async () => {
@@ -671,6 +750,17 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           const rewards = user.rewards || [];
           setEarnedRewards(rewards);
           await AsyncStorage.setItem(`@earned_rewards_${user.id}`, JSON.stringify(rewards));
+
+          try {
+            const sanitizedMobile = newCustomer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');
+          if (messaging) {
+            await messaging().requestPermission();
+            await messaging().subscribeToTopic(`customer_${sanitizedMobile}`);
+          }
+            if (__DEV__) console.log(`Subscribed to topic: customer_${sanitizedMobile}`);
+          } catch (fcmError) {
+            console.warn('FCM Topic Subscription Failed:', fcmError);
+          }
           
           setIsAuthenticated(true);
         } catch (e) {
@@ -688,6 +778,18 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           await SecureStore.deleteItemAsync('auth_token');
           await SecureStore.deleteItemAsync('refresh_token');
           await SecureStore.deleteItemAsync('user_id');
+          if (customer?.mobile) {
+            try {
+              const sanitizedMobile = customer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');
+            if (messaging) {
+              await messaging().unsubscribeFromTopic(`customer_${sanitizedMobile}`);
+            }
+              if (__DEV__) console.log(`Unsubscribed from topic: customer_${sanitizedMobile}`);
+            } catch (fcmError) {
+              console.warn('FCM Topic Unsubscribe Failed:', fcmError);
+            }
+          }
+
           setCustomer({
             id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: ''
           });
@@ -713,9 +815,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         setIsDarkMode(value);
         AsyncStorage.setItem('@app_theme_dark', value ? 'true' : 'false').catch(() => {});
       },
-      fetchWallet: async () => {
-        applyWallet(await API.getWallet(true));
-      },
+      fetchWallet,
     }),
     [
       mode,

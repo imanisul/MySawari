@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,8 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(false);
   const [daysToAdd, setDaysToAdd] = useState(1);
+  const [reason, setReason] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   
   const [availability, setAvailability] = useState<{ available: boolean; message?: string; additionalAmount: number } | null>(null);
 
@@ -49,6 +51,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
     } else {
       Animated.timing(slideAnim, { toValue: 500, duration: 250, useNativeDriver: true }).start();
       setDaysToAdd(1);
+      setReason('');
       setAvailability(null);
     }
   }, [visible]);
@@ -78,19 +81,24 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
   };
 
   const handleRequestExtension = async () => {
+    if (!reason.trim()) {
+      Alert.alert('Reason Required', 'Please provide a reason for extending your trip.');
+      return;
+    }
     setLoading(true);
     try {
-      await MockRequests.requestExtension({
-        bookingId: booking.id,
+      await API.requestExtension(
+        booking.id, 
         daysToAdd,
-        additionalAmount: availability?.additionalAmount || estimatedTotal,
-        requestedAt: new Date().toISOString()
-      });
+        booking.driverMode === 'With Driver',
+        reason.trim()
+      );
+      
       // Notify parent that a request was made
-      onSuccess(booking); // We don't have the updated snapshot yet, but this triggers a refresh in the parent
+      onSuccess(booking); 
       onClose();
     } catch(e: any) {
-      Alert.alert('Request Failed', e.message);
+      Alert.alert('Request Failed', e.message || 'Failed to submit extension request');
     } finally {
       setLoading(false);
     }
@@ -173,6 +181,28 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
                       )}
                     </View>
                   )}
+                </View>
+                <View style={styles.divider} />
+
+                <View style={{ marginTop: 4, marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 14, color: colors.foreground }}>Reason for Extension <Text style={{color: colors.destructive}}>*</Text></Text>
+                    <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: reason.length > 130 ? colors.warning : colors.mutedForeground }}>{reason.length}/150</Text>
+                  </View>
+                  <View style={{ backgroundColor: isFocused ? colors.background : colors.card, borderRadius: 12, borderWidth: 1, borderColor: isFocused ? colors.primary : colors.border }}>
+                    <TextInput
+                      style={{ padding: 12, color: colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 15, minHeight: 80, textAlignVertical: 'top' }}
+                      placeholder="E.g., Need the car for an extra day for a family trip..."
+                      placeholderTextColor={colors.mutedForeground}
+                      value={reason}
+                      onChangeText={setReason}
+                      multiline
+                      maxLength={150}
+                      onFocus={() => setIsFocused(true)}
+                      onBlur={() => setIsFocused(false)}
+                      selectionColor={colors.primary}
+                    />
+                  </View>
                 </View>
               </View>
 

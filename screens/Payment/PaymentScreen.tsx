@@ -269,9 +269,9 @@ export default function PaymentScreen() {
               <View style={[styles.row, { marginTop: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Feather name="award" size={14} color={colors.primary} />
-                  <Text style={{ color: colors.primary, fontFamily: 'Inter_500Medium' }}>Membership Discount</Text>
+                  <Text style={{ color: colors.primaryText, fontFamily: 'Inter_500Medium' }}>Membership Discount</Text>
                 </View>
-                <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>- {formatCurrency(pricingQuote.subscriptionDiscount)}</Text>
+                <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold' }}>- {formatCurrency(pricingQuote.subscriptionDiscount)}</Text>
               </View>
             )}
 

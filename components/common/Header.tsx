@@ -4,16 +4,20 @@ import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
 import { useSawari } from '@/context/SawariContext';
 
 export function Header({
   title = 'My Sawari',
   back = false,
   hideLogo = false,
+  absolute = false,
 }: {
   title?: string;
   back?: boolean;
   hideLogo?: boolean;
+  absolute?: boolean;
 }) {
   const colors = useColors();
   const router = useRouter();
@@ -45,99 +49,115 @@ export function Header({
     outputRange: ['0deg', '90deg']
   });
 
-  return (
-    <View style={styles.header}>
-      <Pressable
-        accessibilityRole="button"
-        testID={back ? 'back-button' : 'brand-home'}
-        onPress={() => {
-          Haptics.selectionAsync();
-          if (back) router.back();
-          else router.replace('/');
-        }}
-        style={styles.headerTitleWrap}
-      >
-        {back ? (
-          <Feather name="arrow-left" size={21} color={colors.foreground} />
-        ) : !hideLogo ? (
-          <Image 
-            source={require('../../assets/images/MySawari_nobg.png')} 
-            style={[styles.logo, isDarkMode && { tintColor: '#FFFFFF' }]} 
-            resizeMode="contain" 
-          />
-        ) : null}
-        <Text style={[styles.appName, { color: colors.foreground }]}>{title}</Text>
-      </Pressable>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        
-        {/* Wishlist Badge - Only show if they have items */}
-        {!hideLogo && favorites?.length > 0 && (
+  const insets = useSafeAreaInsets();
+
+  const content = (
+    <SafeAreaView edges={['top']} style={!absolute ? { backgroundColor: colors.background } : undefined}>
+      <View style={[styles.header, { paddingBottom: 8 }]}>
+        <Pressable
+          accessibilityRole="button"
+          testID={back ? 'back-button' : 'brand-home'}
+          onPress={() => {
+            Haptics.selectionAsync();
+            if (back) router.back();
+            else router.replace('/');
+          }}
+          style={styles.headerTitleWrap}
+        >
+          {back ? (
+            <Feather name="arrow-left" size={21} color={colors.foreground} />
+          ) : !hideLogo ? (
+            <Image 
+              source={require('../../assets/images/MySawari_nobg.png')} 
+              style={[styles.logo, isDarkMode && { tintColor: '#FFFFFF' }]} 
+              resizeMode="contain" 
+            />
+          ) : null}
+          <Text style={[styles.appName, { color: colors.foreground }]}>{title}</Text>
+        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          
+          {/* Wishlist Badge - Only show if they have items */}
+          {!hideLogo && favorites?.length > 0 && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Wishlist"
+              onPress={() => {
+                Haptics.selectionAsync();
+                router.push('/wishlist');
+              }}
+              style={[
+                styles.notificationButton,
+                { backgroundColor: colors.card, borderColor: colors.border }
+              ]}
+            >
+              <Feather name="heart" size={17} color={colors.foreground} />
+            </Pressable>
+          )}
+
+          {/* SawariCash Badge */}
+          {!hideLogo && isAuthenticated && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="SawariCash Wallet"
+              onPress={() => {
+                Haptics.selectionAsync();
+                router.push('/rewards');
+              }}
+              style={[
+                styles.cashBadge,
+                { backgroundColor: colors.card, borderColor: colors.border }
+              ]}
+            >
+              <Animated.View style={{ transform: [{ rotateX }], width: 16, alignItems: 'center' }}>
+                {showRupee ? (
+                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 14, color: colors.success, marginTop: -1 }}>₹</Text>
+                ) : (
+                  <FontAwesome5 name="coins" size={14} color="#FFD700" />
+                )}
+              </Animated.View>
+              <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.foreground }}>
+                {sawariCash}
+              </Text>
+            </Pressable>
+          )}
+
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Wishlist"
+            accessibilityLabel="Notifications"
+            testID="notifications"
             onPress={() => {
               Haptics.selectionAsync();
-              router.push('/wishlist');
+              router.push('/notifications');
             }}
             style={[
               styles.notificationButton,
               { backgroundColor: colors.card, borderColor: colors.border }
             ]}
           >
-            <Feather name="heart" size={17} color={colors.foreground} />
+            <Feather name="bell" size={17} color={colors.foreground} />
+            {unreadCount > 0 && (
+              <View style={[styles.badge, { borderColor: colors.card }]}>
+                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+              </View>
+            )}
           </Pressable>
-        )}
-
-        {/* SawariCash Badge */}
-        {!hideLogo && isAuthenticated && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="SawariCash Wallet"
-            onPress={() => {
-              Haptics.selectionAsync();
-              router.push('/rewards');
-            }}
-            style={[
-              styles.cashBadge,
-              { backgroundColor: colors.card, borderColor: colors.border }
-            ]}
-          >
-            <Animated.View style={{ transform: [{ rotateX }], width: 16, alignItems: 'center' }}>
-              {showRupee ? (
-                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 14, color: colors.success, marginTop: -1 }}>₹</Text>
-              ) : (
-                <FontAwesome5 name="coins" size={14} color="#FFD700" />
-              )}
-            </Animated.View>
-            <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.foreground }}>
-              {sawariCash}
-            </Text>
-          </Pressable>
-        )}
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Notifications"
-          testID="notifications"
-          onPress={() => {
-            Haptics.selectionAsync();
-            router.push('/notifications');
-          }}
-          style={[
-            styles.notificationButton,
-            { backgroundColor: colors.card, borderColor: colors.border }
-          ]}
-        >
-          <Feather name="bell" size={17} color={colors.foreground} />
-          {unreadCount > 0 && (
-            <View style={[styles.badge, { borderColor: colors.card }]}>
-              <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-            </View>
-          )}
-        </Pressable>
+        </View>
       </View>
-    </View>
+    </SafeAreaView>
   );
+
+  if (absolute) {
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 100 }}>
+        <BlurView intensity={isDarkMode ? 30 : 80} tint={isDarkMode ? 'dark' : 'light'}>
+          {content}
+        </BlurView>
+      </View>
+    );
+  }
+
+  return content;
 }
 
 const styles = StyleSheet.create({
@@ -172,20 +192,25 @@ const styles = StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#DC2626',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    minWidth: 22,
+    height: 22,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
     borderWidth: 2,
+    shadowColor: '#FF3B30',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 3,
+    elevation: 4,
   },
   badgeText: {
-    color: '#fff',
-    fontSize: 10,
+    color: '#FFFFFF',
+    fontSize: 11,
     fontFamily: 'Inter_700Bold',
   },
   pressed: { opacity: 0.65 },

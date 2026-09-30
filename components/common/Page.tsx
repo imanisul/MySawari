@@ -22,7 +22,7 @@ export function Page({
       style={[
         styles.pageContent,
         {
-          paddingTop: insets.top + 9,
+          paddingTop: 0,
           // If bottomNav is true, we pad exact height of the tab bar (approx 56) + the safe area inset.
           // We add an extra 24px of breathing room either way.
           paddingBottom: scroll ? (bottomNav ? bottomNavHeight + 24 : insets.bottom + 24) : 0,

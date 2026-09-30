@@ -12,6 +12,7 @@ import { LoginBottomSheet } from '@/components';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { Reveal } from '@/components/common/Reveal';
+import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { LoyaltySkeleton } from '@/components/loading/ScreenSkeletons';
 
 export default function ProfileScreen() {
@@ -141,7 +142,7 @@ export default function ProfileScreen() {
     <Page bottomNav scroll={false}>
       <Header title="Profile" hideLogo={true} back={false} />
       
-      <ScrollView contentContainerStyle={styles.scrollContent} bounces={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: useBottomNavHeight() + 24 }]} bounces={false}>
         <Reveal delay={0}>
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

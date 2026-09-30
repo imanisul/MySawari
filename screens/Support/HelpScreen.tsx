@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 // Enable LayoutAnimation for Android on older architecture
-const isFabricEnabled = (global as any)?.nativeFabricUIManager != null;
+const isFabricEnabled = (globalThis as any)?.nativeFabricUIManager != null;
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental && !isFabricEnabled) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -52,7 +52,7 @@ export default function HelpScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Header title="Help & FAQ" back={true} />
         
         <ScrollView contentContainerStyle={styles.scrollContent}>

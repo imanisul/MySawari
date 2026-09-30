@@ -86,7 +86,7 @@ export default function BookingScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <KeyboardAwareScrollViewCompat
-        bottomOffset={72}
+        
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
       >
@@ -241,7 +241,6 @@ export default function BookingScreen() {
         </Pressable>
         </Reanimated.View>
       </KeyboardAwareScrollViewCompat>
-      <StatusBarScrim />
     </View>
   );
 }

@@ -7,18 +7,18 @@
 // light and dark. Keep colours as 6-digit hex: screens append alpha (e.g. `+ '20'`).
 const colors = {
   light: {
-    text: '#101B2E',
+    text: '#000000',
     tint: '#B7F52E',
     tintLight: '#F0FBCB', // Light lime for selected backgrounds
     background: '#F5F7FA',
-    foreground: '#101B2E',
+    foreground: '#000000',
     card: '#FFFFFF',
-    cardForeground: '#101B2E',
+    cardForeground: '#000000',
     primary: '#B7F52E',
-    primaryForeground: '#101B2E',
+    primaryForeground: '#000000',
     primaryText: '#3F6212', // Deep lime green — legible as text on white
     secondary: '#E7EBF2',
-    secondaryForeground: '#101B2E',
+    secondaryForeground: '#000000',
     muted: '#ECEFF4',
     mutedForeground: '#4A5568',
     accent: '#E6EBFF',
@@ -29,7 +29,7 @@ const colors = {
     input: '#E0E5EE',
     surfaceStrong: '#111A2B',
     surfaceSoft: '#FFFFFF',
-    darkText: '#101B2E',
+    darkText: '#000000',
     navy: '#111A2B',
     blue: '#3F58C4',
     lightBlue: '#EDF1FF',
@@ -63,7 +63,7 @@ const colors = {
     card: '#121D31', // A clear step above the background
     cardForeground: '#F3F6FB',
     primary: '#B7F52E',
-    primaryForeground: '#101B2E',
+    primaryForeground: '#000000',
     primaryText: '#B7F52E', // Bright lime on dark backgrounds
     secondary: '#1A2740',
     secondaryForeground: '#F3F6FB',

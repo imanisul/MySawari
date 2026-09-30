@@ -1,0 +1,12 @@
+appId: com.anisul17.mysawari
+---
+- launchApp
+- tapOn: "Profile"
+- assertVisible: "Login" # Assuming Profile tab shows Login button when unauthenticated
+- tapOn: "Login"
+- assertVisible: "Enter your phone number"
+- tapOn: "Phone Number"
+- inputText: "0000000000"
+- tapOn: "Get OTP"
+- assertVisible: "Invalid mobile number" # Or whatever validation error appears
+- tapOn: "Back" # Navigate back out to avoid getting stuck

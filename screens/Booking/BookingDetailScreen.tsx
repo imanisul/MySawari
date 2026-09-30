@@ -13,7 +13,7 @@ import { ReviewModal } from '@/components/booking/ReviewModal';
 import { StatusBarScrim } from '@/components/common/StatusBarScrim';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
 import Notifications from '@/utils/notifications';
-import { MockRequests, PendingExtension, PendingRefund } from '@/utils/mockRequests';
+import { MockRequests, PendingRefund } from '@/utils/mockRequests';
 import { useQuery } from '@tanstack/react-query';
 import { useVehicles } from '@/hooks/useVehicles';
 import { LoadingImage } from '@/components/common/LoadingImage';
@@ -30,13 +30,13 @@ export default function BookingDetailScreen() {
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);
   
-  const [pendingExtension, setPendingExtension] = useState<PendingExtension | null>(null);
   const [pendingRefund, setPendingRefund] = useState<PendingRefund | null>(null);
+
+  const hasPendingExtension = snapshot?.extensions?.some((e: any) => e.status === 'pending');
+  const hasRejectedExtension = snapshot?.extensions?.some((e: any) => e.status === 'rejected');
 
   const fetchMockRequests = React.useCallback(async () => {
     if (!id) return;
-    const ext = await MockRequests.getExtensionForBooking(id);
-    setPendingExtension(ext);
     
     const refund = await MockRequests.getRefundForBooking(id);
     setPendingRefund(refund);
@@ -48,54 +48,7 @@ export default function BookingDetailScreen() {
     }, [fetchMockRequests])
   );
 
-  const handleApproveExtension = async () => {
-    if (!__DEV__ || !pendingExtension || !snapshot) return;
-    setLoading(true);
-    try {
-      // Hit the real backend API with a mock payment detail
-      await API.extendBooking(snapshot.id, pendingExtension.daysToAdd, snapshot.driverMode === 'With Driver', {
-        razorpayOrderId: 'mock_order_123',
-        razorpayPaymentId: 'mock_payment_123'
-      });
-      await MockRequests.approveExtension(snapshot.id);
-      const res = await API.getBooking(snapshot.id);
-      setSnapshot(res);
-      await fetchMockRequests();
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const handleApproveRefund = async () => {
-    if (!__DEV__ || !pendingRefund || !snapshot) return;
-    setLoading(true);
-    try {
-      await MockRequests.approveRefund(snapshot.id);
-      await fetchMockRequests();
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDemoPush = async () => {
-    if (!__DEV__) return;
-    alert('Push Notification scheduled! Minimise or close the app now to see it arrive in 5 seconds.');
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Operations App Update',
-        body: 'This is a simulated notification from the operations app. Your vehicle is ready for pickup.',
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 5,
-      },
-    });
-  };
 
   // Whether this (completed) trip has already been reviewed.
   const { data: myReviews } = useQuery({
@@ -175,24 +128,7 @@ export default function BookingDetailScreen() {
           </View>
         </View>
 
-        {/* DEMO BUTTON — development builds only; never shipped to customers */}
-        {__DEV__ && <Pressable
-          onPress={handleDemoPush}
-          style={({ pressed }) => [
-            {
-              backgroundColor: colors.blue,
-              borderRadius: 12,
-              padding: 16,
-              alignItems: 'center',
-              marginTop: 16,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
-        >
-          <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 14 }}>
-            DEMO: Trigger Operation App Notification (5s delay)
-          </Text>
-        </Pressable>}
+
 
         <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>VEHICLE</Text>
         <View style={[styles.vehicleCard, { backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1 }]}>
@@ -262,9 +198,16 @@ export default function BookingDetailScreen() {
                 
                 return (
                   <View key={ext.id} style={{ marginBottom: idx < s.extensions!.length - 1 ? 16 : 0 }}>
-                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Extension #{idx + 1}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Extension #{idx + 1}</Text>
+                      <View style={{ backgroundColor: ext.status === 'approved' ? colors.success + '20' : ext.status === 'rejected' ? colors.destructive + '20' : colors.primary + '20', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+                        <Text style={{ color: ext.status === 'approved' ? colors.success : ext.status === 'rejected' ? colors.destructive : colors.primary, fontSize: 10, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase' }}>
+                          {ext.status || 'pending'}
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={{ color: colors.mutedForeground, marginTop: 4 }}>Extended until {formatDateSafe(ext.newEndDate)}</Text>
-                    <Text style={{ color: colors.mutedForeground }}>+{ext.additionalDays} Days | ₹{ext.additionalAmount.toLocaleString('en-IN')}</Text>
+                    <Text style={{ color: colors.mutedForeground }}>+{ext.daysToAdd || ext.additionalDays} Days | ₹{(ext.additionalAmount || 0).toLocaleString('en-IN')}</Text>
                     {idx < s.extensions!.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border, marginTop: 12, marginBottom: 0 }]} />}
                   </View>
                 );
@@ -353,14 +296,6 @@ export default function BookingDetailScreen() {
                     <Text style={{ color: '#B45309', fontFamily: 'Inter_600SemiBold', flex: 1 }}>Refund Requested</Text>
                     <Text style={{ color: '#B45309', fontFamily: 'Inter_700Bold' }}>₹{(s.refundAmount || 0).toLocaleString('en-IN')}</Text>
                   </View>
-                  {__DEV__ && (
-                    <Pressable
-                      style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center', marginTop: 8 }}
-                      onPress={handleApproveRefund}
-                    >
-                      <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Refund</Text>
-                    </Pressable>
-                  )}
                 </>
               ) : (
                 <View style={styles.paymentRow}>
@@ -424,24 +359,16 @@ export default function BookingDetailScreen() {
       {(s.status === 'CONFIRMED' || s.status === 'ONGOING' || s.status === 'PENDING') && (
         <Animated.View entering={FadeInDown.delay(300).springify()} style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
           
-          {/* Pending Extension Demo UI */}
-          {pendingExtension && (
+          {/* Pending Extension Notice */}
+          {hasPendingExtension && (
             <View style={{ width: '100%', marginBottom: 12, padding: 12, backgroundColor: '#F59E0B20', borderRadius: 12, borderWidth: 1, borderColor: '#F59E0B50' }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <Feather name="clock" size={16} color="#B45309" />
                 <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#B45309' }}>Extension Requested</Text>
               </View>
-              <Text style={{ fontFamily: 'Inter_400Regular', color: colors.foreground, fontSize: 13, marginBottom: 12 }}>
-                Request to add {pendingExtension.daysToAdd} days sent to Operations.
+              <Text style={{ fontFamily: 'Inter_400Regular', color: colors.foreground, fontSize: 13, marginBottom: 4 }}>
+                Request to extend trip sent to Operations.
               </Text>
-              {__DEV__ && (
-                <Pressable
-                  style={{ padding: 10, backgroundColor: '#B45309', borderRadius: 8, alignItems: 'center' }}
-                  onPress={handleApproveExtension}
-                >
-                  <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFF', fontSize: 13 }}>DEMO: Approve Request</Text>
-                </Pressable>
-              )}
             </View>
           )}
 
@@ -468,7 +395,7 @@ export default function BookingDetailScreen() {
               </Pressable>
             )}
 
-            {(s.status === 'CONFIRMED' || s.status === 'ONGOING') && !pendingExtension && (
+            {(s.status === 'CONFIRMED' || s.status === 'ONGOING') && !hasPendingExtension && !hasRejectedExtension && (
               <Pressable 
                 style={[styles.actionBtn, { backgroundColor: colors.primary, flex: 1 }]}
                 onPress={() => setShowExtend(true)}
@@ -479,7 +406,6 @@ export default function BookingDetailScreen() {
           </View>
         </Animated.View>
       )}
-      <StatusBarScrim />
     </View>
   );
 }

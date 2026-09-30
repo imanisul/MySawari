@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LogBox, View } from 'react-native';
+import { LogBox, View, Platform } from 'react-native';
 
 LogBox.ignoreLogs([
   'ProgressBarAndroid has been extracted from react-native core',
@@ -12,8 +12,7 @@ import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-
 import { AppState } from 'react-native';
 import { primeVehicles } from '@/hooks/useVehicles';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash } from '@/components';
 import {
   Inter_400Regular,
@@ -23,8 +22,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { Feather, FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import Notifications from '@/utils/notifications';
@@ -32,6 +30,8 @@ import { SawariProvider, useSawari } from '@/context/SawariContext';
 import { useAppUpdates } from '@/hooks/useAppUpdates';
 import { useColors } from '@/hooks/useColors';
 import { PostTripReviewPrompt } from '@/components/booking/PostTripReviewPrompt';
+import * as Location from 'expo-location';
+import { API } from '@/services/backend/api';
 
 // The native splash is the only splash. It stays up until the first usable screen is ready (see AppGate).
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -136,10 +136,9 @@ function RootLayoutNav() {
   );
 }
 
-/** Status-bar icons follow the app's own theme (not just the system's). */
 function ThemedStatusBar() {
   const { isDarkMode } = useSawari();
-  return <StatusBar style={isDarkMode ? 'light' : 'dark'} />;
+  return <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent={true} backgroundColor="transparent" />;
 }
 
 /**
@@ -214,21 +213,20 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView>
-            <KeyboardProvider>
-              <SawariProvider>
-                <AppGate fontError={!!fontError && !fontsLoaded} cacheReady={cacheReady}>
-                  <RootLayoutNav />
-                  <FloatingSupport />
-                  <OTAUpdateChecker />
-                  <PostTripReviewPrompt />
-                  <ThemedStatusBar />
-                </AppGate>
-              </SawariProvider>
-            </KeyboardProvider>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SawariProvider>
+              <AppGate fontError={!!fontError && !fontsLoaded} cacheReady={cacheReady}>
+                <RootLayoutNav />
+                <FloatingSupport />
+                <OTAUpdateChecker />
+                <PostTripReviewPrompt />
+                <LocationTracker />
+                <ThemedStatusBar />
+              </AppGate>
+            </SawariProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>
@@ -261,7 +259,11 @@ function AppGate({
     if (status === 'booting' || splashHidden.current) return;
     splashHidden.current = true;
     SplashScreen.hideAsync().catch(() => {});
-  }, [status]);
+    import('expo-system-ui').then(SystemUI => {
+      SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
+    });
+
+  }, [status, colors.background]);
 
   if (status === 'booting') return null;
 
@@ -272,4 +274,42 @@ function AppGate({
       </AnimatedSplash>
     </View>
   );
+}
+
+function LocationTracker() {
+  const { isAuthenticated } = useSawari();
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    
+    let isMounted = true;
+    
+    const sendLocation = async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+        
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        
+        if (isMounted) {
+          await API.updateLocation(location.coords.latitude, location.coords.longitude);
+        }
+      } catch (e) {
+        console.warn('Location Tracker Error:', e);
+      }
+    };
+
+    sendLocation();
+    
+    // Update every 5 minutes while app is in foreground
+    const interval = setInterval(sendLocation, 5 * 60 * 1000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [isAuthenticated]);
+  
+  return null;
 }

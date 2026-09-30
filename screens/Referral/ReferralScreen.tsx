@@ -120,7 +120,7 @@ export default function ReferScreen() {
     const rows = transactions.map(t => ({
       id: t.id || t._id,
       type: t.type as 'referral' | 'withdrawal',
-      label: t.label,
+      label: t.label || t.description,
       amount: t.amount,
       date: t.date,
       status: t.status,
@@ -299,7 +299,7 @@ export default function ReferScreen() {
 
   if (!isAuthenticated) {
     return (
-      <Page>
+      <Page scroll={false}>
         <Header title="Refer & Earn" back />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
           <Feather name="lock" size={64} color={colors.mutedForeground} style={{ marginBottom: 24 }} />
@@ -338,7 +338,7 @@ export default function ReferScreen() {
       <Header title="Refer & Earn" back />
 
       <Reanimated.View entering={rise()} style={{ flex: 1 }}>
-        <KeyboardAwareScrollViewCompat bottomOffset={72} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <KeyboardAwareScrollViewCompat  contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
           {/* ═══════════════════════════════════════════════════════════════
               MAIN TABS

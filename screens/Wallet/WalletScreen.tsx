@@ -12,7 +12,7 @@ export default function RewardsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Header title="My Rewards" back={true} />
         
         {earnedRewards.length === 0 ? (

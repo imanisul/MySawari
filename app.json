@@ -7,7 +7,6 @@
     "icon": "./assets/images/MySawari.png",
     "scheme": "car-rental-mobile",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -17,6 +16,7 @@
       "fallbackToCacheTimeout": 0
     },
     "ios": {
+      "bundleIdentifier": "com.mysawari.customer",
       "backgroundColor": "#FAFAF9",
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
@@ -28,7 +28,8 @@
     },
     "android": {
       "backgroundColor": "#FAFAF9",
-      "package": "com.anisul17.mysawari",
+      "package": "com.mysawari.customer",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
@@ -39,6 +40,10 @@
         "backgroundColor": "#F9F9F8"
       }
     },
+    "androidStatusBar": {
+      "translucent": true,
+      "backgroundColor": "#00000000"
+    },
     "web": {
       "favicon": "./assets/images/favicon.png"
     },
@@ -47,6 +52,15 @@
         "expo-router",
         {
           "origin": "https://mysawari.app/"
+        }
+      ],
+      [
+        "expo-navigation-bar",
+        {
+          "position": "absolute",
+          "visibility": "visible",
+          "behavior": "inset-swipe",
+          "backgroundColor": "#00000000"
         }
       ],
       [
@@ -62,11 +76,22 @@
       "expo-web-browser",
       "expo-updates",
       "expo-secure-store",
-      "@react-native-community/datetimepicker"
+      "expo-notifications",
+      "@react-native-community/datetimepicker",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "eas": {

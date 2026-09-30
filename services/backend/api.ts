@@ -1044,6 +1044,14 @@ export const API = {
           refundAmount: b.refundAmount,
           refundStatus: b.refundStatus,
           cancelledAt: b.cancelledAt,
+          extensions: (b.extensions || []).map((e: any) => ({
+            id: e._id,
+            daysToAdd: e.additionalDays,
+            newEndDate: e.newToDate,
+            additionalAmount: e.additionalAmount,
+            status: e.status, // 'pending', 'approved', 'rejected'
+            requestedAt: e.createdAt,
+          }))
         } as BookingSnapshot;
       });
     } catch (e: any) {
@@ -1075,6 +1083,17 @@ export const API = {
     return { success: true, snapshot };
   },
 
+  async requestRefund(data: { bookingId: string; amount: number; reason: string; customerId: string; customerMobile: string }): Promise<any> {
+    const response = await fetchWithAuth(`${BACKEND_URL}/refunds`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to request refund');
+    return result;
+  },
+
   async checkExtensionAvailability(bookingId: string, additionalDays: number, withDriver?: boolean): Promise<{ available: boolean; message?: string; additionalDays: number; additionalAmount: number }> {
     const qs = `days=${additionalDays}${withDriver ? '&withDriver=true' : ''}`;
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/extension-check?${qs}`);
@@ -1083,23 +1102,21 @@ export const API = {
     return data.data;
   },
 
-  async extendBooking(
+  async requestExtension(
     bookingId: string,
     additionalDays: number,
-    withDriver: boolean | undefined,
-    paymentDetails: { razorpayOrderId: string; razorpayPaymentId: string }
-  ): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
+    withDriver: boolean,
+    reason: string
+  ): Promise<{ success: boolean; data: any }> {
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/extend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ additionalDays, withDriver: !!withDriver, ...paymentDetails }),
+      body: JSON.stringify({ additionalDays, withDriver, reason }),
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Failed to extend booking');
+    if (!response.ok) throw new Error(data.message || 'Failed to request extension');
 
-    const snapshot = await this.getBooking(bookingId);
-    if (!snapshot) throw new Error('Booking not found');
-    return { success: true, snapshot };
+    return { success: true, data: data.data };
   },
 
   /**
@@ -1231,6 +1248,27 @@ export const API = {
   },
 
   /**
+   * PUT /api/customers/location
+   */
+  async updateLocation(lat: number, lng: number) {
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/customers/location`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Failed to update location');
+      }
+      return true;
+    } catch (e: any) {
+      console.warn('Failed to update location:', e.message);
+      return false;
+    }
+  },
+
+  /**
    * GET /api/auth/my-referrals
    */
   async getReferrals(userId: string) {
@@ -1304,8 +1342,9 @@ export const API = {
         throw e;
       }
       
-      console.warn(`Photon search failed: ${e.message}. Falling back to Nominatim...`);
-      
+      if (!e.message.includes('status 503') && !e.message.includes('status 502')) {
+        console.warn(`Photon search failed: ${e.message}. Falling back to Nominatim...`);
+      }
       try {
         // Fallback: Nominatim API
         const url = new URL(`${NOMINATIM_BASE_URL}/search`);
@@ -1321,7 +1360,7 @@ export const API = {
         }
 
         const response = await timedFetch(url.toString(), {
-          headers: { 'User-Agent': 'MySawariApp/1.0' },
+          headers: { 'User-Agent': 'MySawariApp/1.0 (contact@mysawari.com)' },
           signal,
         });
         
@@ -1367,7 +1406,7 @@ export const API = {
 
   async reverseGeocodeUncached(latitude: number, longitude: number, options: { areaOnly?: boolean } = {}) {
     try {
-      // Primary: Try Photon API
+      // Primary: Photon API (faster, less strict rate limits)
       const url = new URL(`${PHOTON_BASE_URL}/reverse`);
       url.searchParams.set('lat', latitude.toString());
       url.searchParams.set('lon', longitude.toString());
@@ -1377,14 +1416,12 @@ export const API = {
       });
       if (!response.ok) throw new Error(`Photon API responded with status ${response.status}`);
       const data = await response.json();
- const mapped = mapPhotonResponse(data);
+      const mapped = mapPhotonResponse(data);
       if (mapped.length === 0) return null;
-      // For an auto-detected position, describe the area — not the nearest business.
       if (options.areaOnly) return { ...mapped[0], ...photonAreaLocation(data.features[0].properties) };
       return mapped[0];
     } catch (e: any) {
-      console.warn(`Photon reverse geocode failed: ${e.message}. Falling back to Nominatim...`);
-      
+      if (__DEV__) console.log(`Photon reverse geocode failed: ${e.message}. Trying Nominatim...`);
       try {
         // Fallback: Nominatim API
         const url = new URL(`${NOMINATIM_BASE_URL}/reverse`);
@@ -1392,14 +1429,15 @@ export const API = {
         url.searchParams.set('lon', longitude.toString());
         url.searchParams.set('format', 'json');
         
+        // Ensure a valid user agent is passed, which Nominatim requires
         const response = await timedFetch(url.toString(), {
-          headers: { 'User-Agent': 'MySawariApp/1.0' },
+          headers: { 'User-Agent': 'MySawariApp/1.0 (contact@mysawari.com)' },
         });
         
         if (!response.ok) throw new Error(`Nominatim API responded with status ${response.status}`);
         const data = await response.json();
         
-        if (data.error) return null;
+        if (data.error) throw new Error(data.error);
         
         let name = data.name;
         let address = data.display_name;

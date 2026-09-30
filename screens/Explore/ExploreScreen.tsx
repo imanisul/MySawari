@@ -165,8 +165,8 @@ export default function ExploreScreen() {
                                (filters.transmission === 'Gear' && car.transmission === 'Manual');
       const matchFilterFuel = filters.fuel === 'All' || car.fuel === filters.fuel;
 
-      // If the user is actively searching, only show cars that are actually available
-      const matchSearchAvailability = debouncedQuery === '' || isAvailable;
+      // Allow all matching cars, even if unavailable/on rent, to show in the search results
+      const matchSearchAvailability = true;
       
       // Do not show vehicles that are in maintenance on the explore page
       const isMaintenance = car.dbStatus?.toLowerCase() === 'service' || car.dbStatus?.toLowerCase() === 'maintenance';

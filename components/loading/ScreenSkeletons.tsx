@@ -158,6 +158,53 @@ export function ReviewListSkeleton() {
   );
 }
 
+/** Notification list while it loads (shimmer cards instead of a bare spinner). */
+export function NotificationSkeleton() {
+  return (
+    <SkeletonGroup>
+      <View style={{ padding: 16, gap: 16 }}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <SkeletonCard key={i} style={{ gap: 12 }}>
+            <View style={styles.reviewHead}>
+              <Skeleton width={32} height={32} borderRadius={16} delay={i * 80} />
+              <View style={{ flex: 1, gap: 6 }}>
+                <Skeleton width="60%" height={14} borderRadius={5} delay={i * 80 + 30} />
+                <Skeleton width="30%" height={10} borderRadius={4} delay={i * 80 + 60} />
+              </View>
+            </View>
+            <Skeleton width="90%" height={12} borderRadius={5} delay={i * 80 + 90} />
+            <Skeleton width="65%" height={12} borderRadius={5} delay={i * 80 + 120} />
+          </SkeletonCard>
+        ))}
+      </View>
+    </SkeletonGroup>
+  );
+}
+
+/** Membership screen while plans load (hero + plan cards). */
+export function MembershipSkeleton() {
+  return (
+    <SkeletonGroup>
+      <View style={{ padding: 16 }}>
+        <SkeletonCard style={{ gap: 12, marginBottom: 24 }}>
+          <Skeleton width="50%" height={18} borderRadius={6} />
+          <Skeleton width="80%" height={13} borderRadius={5} delay={60} />
+          <Skeleton width="60%" height={13} borderRadius={5} delay={120} />
+        </SkeletonCard>
+        {[0, 1, 2].map((i) => (
+          <SkeletonCard key={i} style={{ gap: 14, marginBottom: 16 }}>
+            <Skeleton width="40%" height={18} borderRadius={6} delay={i * 100} />
+            <Skeleton width="25%" height={28} borderRadius={8} delay={i * 100 + 50} />
+            <Skeleton width="90%" height={12} borderRadius={5} delay={i * 100 + 100} />
+            <Skeleton width="70%" height={12} borderRadius={5} delay={i * 100 + 140} />
+            <Skeleton width="100%" height={44} borderRadius={12} delay={i * 100 + 180} />
+          </SkeletonCard>
+        ))}
+      </View>
+    </SkeletonGroup>
+  );
+}
+
 const styles = StyleSheet.create({
   card: { borderRadius: 16, borderWidth: 1, padding: 16 },
   rowCard: { flexDirection: 'row', alignItems: 'center', marginTop: 32 },

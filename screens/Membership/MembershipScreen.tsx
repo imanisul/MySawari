@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import Reanimated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { Page, Header } from '@/components';
+import { MembershipSkeleton } from '@/components/loading/ScreenSkeletons';
 import { useColors } from '@/hooks/useColors';
 import { API, invalidateWalletCache } from '@/services/backend/api';
 import { formatCurrency } from '@/services/backend/pricingEngine';
@@ -175,11 +176,9 @@ export default function MembershipScreen() {
 
   if (loading) {
     return (
-      <Page>
+      <Page scroll={false}>
         <Header title="Membership" back={true} />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+        <MembershipSkeleton />
       </Page>
     );
   }
@@ -207,7 +206,7 @@ export default function MembershipScreen() {
 
   if (checkoutStatus === 'VERIFYING') {
     return (
-      <Page>
+      <Page scroll={false}>
         <Header title="Verifying Payment" back={false} />
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={colors.primary} style={{ marginBottom: 16 }} />
@@ -218,7 +217,7 @@ export default function MembershipScreen() {
   }
 
   return (
-    <Page>
+    <Page scroll={false}>
       <Header title="Membership" back={true} />
       <ScrollView
         ref={scrollViewRef}
@@ -260,7 +259,7 @@ export default function MembershipScreen() {
                 </View>
 
                 <View style={styles.progressTrack}>
-                  <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 6 }} />
+                  <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 6 }} />
                   <Animated.View
                     style={[
                       styles.progressFill,

@@ -151,7 +151,7 @@ export default function PaymentsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Header title="Payment Methods" back={true} />
         
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   addButtonText: { fontFamily: 'Inter_700Bold', fontSize: 16, marginLeft: 10 },
   
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalOverlayBg: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalOverlayBg: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, borderTopWidth: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   modalTitle: { fontFamily: 'Inter_700Bold', fontSize: 20 },

@@ -106,7 +106,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // The backend is a separate project, deployed on Render. EXPO_PUBLIC_API_BASE_URL overrides it
 // (e.g. http://<your-computer's-LAN-IP>:5001 to test against a local backend on a real phone).
-const DEFAULT_API_BASE_URL = 'http://192.168.29.131:5001';
+const DEFAULT_API_BASE_URL = 'https://mysawari-customer-backend-1.onrender.com';
 const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
 export const BACKEND_URL = `${BASE_URL}/api`;
 

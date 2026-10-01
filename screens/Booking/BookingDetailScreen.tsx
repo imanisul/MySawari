@@ -204,6 +204,21 @@ export default function BookingDetailScreen() {
               </View>
             </View>
 
+            {s.destination ? (
+              <View style={[styles.timelineRow, { marginTop: 0 }]}>
+                <View style={styles.timelineLeft}>
+                  <View style={[styles.timelineDot, { backgroundColor: colors.primary, opacity: 0.5 }]} />
+                  <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
+                </View>
+                <View style={[styles.timelineContent, { marginBottom: 0 }]}>
+                  <Text style={[styles.timelineLabel, { color: colors.mutedForeground }]}>DESTINATION</Text>
+                  <Text style={[styles.timelineLoc, { color: colors.foreground }]} numberOfLines={2}>
+                    {s.destination}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
             {/* Drop-off */}
             <View style={[styles.timelineRow, { marginTop: 0 }]}>
               <View style={styles.timelineLeft}>

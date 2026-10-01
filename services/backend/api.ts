@@ -30,6 +30,7 @@ export type BookingSnapshot = {
   customerName?: string;
   customerMobile?: string;
   customerEmail?: string;
+  destination?: string;
   createdAt: string;
   // Cancellation fields
   cancellationReason?: string;
@@ -496,10 +497,8 @@ export const API = {
         category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : v.vehicleType),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
-        image: hasImages ? { uri: getFullUrl(v.images[0].url) } : fallbackImage,
-        images: hasImages
-          ? v.images.filter((img: any) => typeof img?.url === 'string' && img.url).map((img: any) => ({ uri: getFullUrl(img.url) }))
-          : [fallbackImage],
+        image: fallbackImage,
+        images: [fallbackImage],
         seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
         transmission: v.transmission || 'Manual',
         fuel: v.fuelType || 'Petrol',
@@ -1042,6 +1041,8 @@ export const API = {
             : Math.max(0, totalAmount - Math.max(collected, bookingPaid)),
           customerName: b.customerName,
           customerMobile: b.mobileNumber,
+          customerEmail: b.customerEmail,
+          destination: b.destination,
           createdAt: b.createdAt,
           cancellationReason: b.cancellationReason,
           cancellationFee: b.cancellationFee,

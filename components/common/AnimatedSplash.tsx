@@ -74,7 +74,7 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
         }).start(() => {
           setIsAnimationComplete(true);
         });
-      }, 1500); // Hold for 1.5s so they can admire it!
+      }, 300);
     }
   }, [isReady]);
 

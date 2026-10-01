@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, Alert, AppState, Linking } from 'react-native';
-import { Header } from '@/components';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, AppState, Linking } from 'react-native';
+import { Header, CustomAlert } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
@@ -41,7 +41,7 @@ export default function SettingsScreen() {
   }, [refreshPermissions]);
 
   const promptOpenSettings = (title: string, message: string) => {
-    Alert.alert(title, message, [
+    CustomAlert.alert(title, message, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Open Settings', onPress: () => Linking.openSettings() },
     ]);
@@ -72,7 +72,7 @@ export default function SettingsScreen() {
 
   const handleLogout = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Logout', 'Are you sure you want to log out?', [
+    CustomAlert.alert('Logout', 'Are you sure you want to log out?', [
       { text: 'Cancel', style: 'cancel' },
       { 
         text: 'Logout', 

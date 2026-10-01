@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform, Pressable, Animated, Modal } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Page, Header, PrimaryButton } from '@/components';
+import { Page, Header, PrimaryButton, CustomAlert } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
@@ -110,7 +110,7 @@ export default function ProfileScreen() {
     } else if (item.id === 'help') {
       router.push('/help');
     } else {
-      Alert.alert('Coming Soon', `${item.title} section is under development.`);
+      CustomAlert.alert('Coming Soon', `${item.title} section is under development.`);
     }
   };
 

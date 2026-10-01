@@ -13,7 +13,7 @@ import { AppState } from 'react-native';
 import { primeVehicles } from '@/hooks/useVehicles';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
-import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash } from '@/components';
+import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -272,6 +272,7 @@ function AppGate({
       <AnimatedSplash isReady={status === 'ready' || status === 'error'}>
         {children}
       </AnimatedSplash>
+      <CustomAlertProvider />
     </View>
   );
 }

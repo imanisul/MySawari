@@ -126,6 +126,13 @@ export default function HomeScreen() {
   });
 
   const upcomingBooking = useMemo(() => {
+    // 1. Show ongoing trips first
+    const ongoing = bookings.filter(b => b.status === 'ONGOING').sort((a, b) => {
+      return new Date(b.pickupDate).getTime() - new Date(a.pickupDate).getTime();
+    });
+    if (ongoing.length > 0) return ongoing[0];
+
+    // 2. Fallback to confirmed/pending trips
     const upcoming = bookings.filter(b => b.status === 'CONFIRMED' || b.status === 'PENDING').sort((a, b) => {
       return new Date(a.pickupDate).getTime() - new Date(b.pickupDate).getTime();
     });
@@ -134,7 +141,16 @@ export default function HomeScreen() {
 
   const upcomingCar = useMemo(() => {
     if (!upcomingBooking || fetchedVehicles.length === 0) return null;
-    return fetchedVehicles.find(v => v.id === upcomingBooking.vehicleId) || null;
+    // Try to match by MongoDB _id first
+    const byId = fetchedVehicles.find(v => v.id === upcomingBooking.vehicleId);
+    if (byId) return byId;
+    // Fallback: match by vehicle name (case-insensitive) in case ID formats differ
+    const byName = upcomingBooking.vehicleName
+      ? fetchedVehicles.find(v =>
+          v.name?.toLowerCase() === upcomingBooking.vehicleName?.toLowerCase()
+        )
+      : null;
+    return byName || null;
   }, [upcomingBooking, fetchedVehicles]);
 
   useFocusEffect(
@@ -322,23 +338,26 @@ export default function HomeScreen() {
       case 'referEarn':
         content = <AnimatedReferBanner router={router} />;
         break;
-      case 'nextTrip':
-        const carToDisplay = (bookingConfirmed && selectedCar) ? selectedCar : upcomingCar;
-        if (!carToDisplay) break;
+      case 'nextTrip': {
+        if (!upcomingBooking) break;
         
-        let dateRangeStr = undefined;
-        if (!bookingConfirmed && upcomingBooking) {
-          const pTime = upcomingBooking.pickupTime || '8:00 AM';
-          const rTime = upcomingBooking.dropTime || (upcomingBooking as any).returnTime || '8:00 AM';
-          dateRangeStr = `${upcomingBooking.pickupDate} ${pTime} – ${upcomingBooking.returnDate} ${rTime}`;
-        }
+        const tripPickupTime = upcomingBooking.pickupTime || '8:00 AM';
+        const tripDropTime = upcomingBooking.dropTime || (upcomingBooking as any).returnTime || '8:00 AM';
+        const tripDateRange = `${upcomingBooking.pickupDate} ${tripPickupTime} – ${upcomingBooking.returnDate} ${tripDropTime}`;
+        const tripLabel = upcomingBooking.status === 'ONGOING' ? 'Your current trip' : 'Your next trip';
         
         content = (
           <View style={styles.sectionPad}>
-            <NextTrip car={carToDisplay} dateRangeStr={dateRangeStr} />
+            <NextTrip 
+              car={upcomingCar || undefined}
+              vehicleName={!upcomingCar ? upcomingBooking.vehicleName : undefined}
+              dateRangeStr={tripDateRange} 
+              label={tripLabel}
+            />
           </View>
         );
         break;
+      }
       case 'membershipPromo': {
         const mem = membership;
         const isMemActive = !!(mem?.plan && mem.expiresAt && new Date(mem.expiresAt) > new Date());

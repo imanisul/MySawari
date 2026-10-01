@@ -9,6 +9,7 @@ export type PendingReview = {
 
 export type BookingSnapshot = {
   id: string;
+  bookingCode?: string;
   status: string;
   vehicleId: string;
   vehicleName: string;
@@ -403,7 +404,7 @@ export const API = {
    */
   async getPickupLocations() {
     return [
-      { id: 'office', name: 'MySawari Office', address: 'Guwahati, Assam', pickupCharge: 0, active: true },
+      { id: 'office', name: 'Office', address: 'Guwahati, Assam', pickupCharge: 0, active: true },
       { id: 'airport-t2', name: 'Guwahati Airport Terminal 2', address: 'Guwahati Airport', pickupCharge: 790, active: true },
       { id: 'railway', name: 'Guwahati Railway Station', address: 'Paltan Bazaar', pickupCharge: 500, active: true }
     ];
@@ -773,13 +774,15 @@ export const API = {
         totalDays: quote.rentalDays,
         destination: params.dropoffLocation?.name || '',
         pickup: {
-          location: params.pickupLocation?.name || '',
+          // Use the resolved name from the quote (already accounts for delivery mode)
+          location: quote.pickupLocationName,
           landmark: '',
           mapLink: '',
           charge: quote.pickupCharge || 0
         },
         drop: {
-          location: params.returnLocation?.name || '',
+          // Use the resolved name from the quote (already accounts for return mode)
+          location: quote.dropLocationName,
           landmark: '',
           mapLink: '',
           charge: quote.dropCharge || 0
@@ -1008,6 +1011,7 @@ export const API = {
         const hasBalance = p.balanceAmount !== undefined && p.balanceAmount !== null;
         return {
           id: b._id,
+          bookingCode: b.bookingCode,
           status: normalizeBookingStatus(b.status),
           vehicleId: b.vehicleId?._id || b.vehicleId,
           vehicleName: b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle',
@@ -1020,8 +1024,8 @@ export const API = {
           rentalAmount,
           distanceKm: 0,
           ratePerKm: 0,
-          pickupLocationName: pickupName || 'MySawari Office',
-          dropoffLocationName: dropName || 'MySawari Office',
+          pickupLocationName: pickupName || 'Office',
+          dropoffLocationName: dropName || 'Office',
           dropLocationName: dropName,
           pickupCharge: asAmount(p.pickupCharge) || undefined,
           dropCharge: asAmount(p.dropCharge) || undefined,

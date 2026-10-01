@@ -7,11 +7,12 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Car } from '@/utils/sawari';
 
-export function NextTrip({ car, dateRangeStr }: { car: Car, dateRangeStr?: string }) {
+export function NextTrip({ car, vehicleName, dateRangeStr, label = 'Your next trip' }: { car?: Car, vehicleName?: string, dateRangeStr?: string, label?: string }) {
   const colors = useColors();
   const router = useRouter();
   const { dateRange } = useSawari();
   const displayDate = dateRangeStr || dateRange || '';
+  const displayName = vehicleName || car?.name || 'Vehicle';
   return (
     <Pressable
       accessibilityRole="button"
@@ -26,10 +27,16 @@ export function NextTrip({ car, dateRangeStr }: { car: Car, dateRangeStr?: strin
         pressed && styles.cardPressed,
       ]}
     >
-      <Image source={car.image} resizeMode="cover" style={styles.tripImage} />
+      {car?.image ? (
+        <Image source={car.image} resizeMode="cover" style={styles.tripImage} />
+      ) : (
+        <View style={[styles.tripImage, { backgroundColor: colors.tintLight, alignItems: 'center', justifyContent: 'center' }]}>
+          <Feather name="truck" size={28} color={colors.primaryText} />
+        </View>
+      )}
       <View style={styles.nextTripCopy}>
-        <Text style={[styles.nextTripLabel, { color: colors.primary }]}>Your next trip</Text>
-        <Text style={[styles.nextTripName, { color: '#FFFFFF' }]}>{car.name}</Text>
+        <Text style={[styles.nextTripLabel, { color: colors.primary }]}>{label}</Text>
+        <Text style={[styles.nextTripName, { color: '#FFFFFF' }]}>{displayName}</Text>
         <Text style={[styles.nextTripDate, { color: colors.walletMuted }]}>{displayDate.replace('–', '→')}</Text>
       </View>
       <Feather name="arrow-right" size={20} color="#FFFFFF" />

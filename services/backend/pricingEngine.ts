@@ -358,14 +358,31 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   let remainingRentalAmount = calculateRemainingAmount(totalAfterSubscription, bookingAdvance);
   remainingRentalAmount = Math.max(0, remainingRentalAmount - appliedToRemaining);
 
+  // ── Resolve human-readable location names ──────────────────────────────────
+  // Rules:
+  //  - No delivery selected               → both pickup & drop = MySawari Office
+  //  - Delivery only ('delivery')         → pickup = customer's address, drop = MySawari Office
+  //  - Return/collect only ('return')     → pickup = MySawari Office, drop = customer's return address
+  //  - Both ('both')                      → pickup = customer's delivery address, drop = customer's return address
+  //
+  // If a delivery mode is enabled but the customer hasn't typed an address yet, we fall back to Office.
+
+  const OFFICE = 'Office';
+
+  const hasDelivery = !!isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
+  const hasReturn   = !!isDeliveryRequested && (deliveryMode === 'return'   || deliveryMode === 'both');
+
+  const resolvedPickupName = hasDelivery && pickupLocation?.name ? pickupLocation.name : OFFICE;
+  const resolvedDropName   = hasReturn && returnLocation?.name   ? returnLocation.name : OFFICE;
+
   return {
     rentalDays,
     dailyRate,
     rentalAmount,
     distanceKm: pickup.distanceKm,
     ratePerKm: PICKUP_DROP_RATE_PER_KM,
-    pickupLocationName: pickupLocation?.name || 'MySawari Office',
-    dropoffLocationName: dropoffLocation?.name || 'Dropoff',
+    pickupLocationName: resolvedPickupName,
+    dropoffLocationName: resolvedDropName,   // kept in sync — both fields must match
     driverMode,
     driverCharge,
     couponCode: couponDiscount > 0 ? couponCode : undefined,
@@ -380,7 +397,7 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
     pickupType: isDeliveryRequested ? 'DELIVERY' as const : 'OFFICE' as const,
     dropCharge: drop.charge,
     dropDistanceKm: drop.distanceKm,
-    dropLocationName: returnLocation?.name || 'MySawari Office',
+    dropLocationName: resolvedDropName,
     subscriptionDiscount,
   };
 }

@@ -85,8 +85,15 @@ export function InlineTripEditor({ onSave }: { onSave: () => void }) {
       return;
     }
     if (start && !end) {
-      if (date < start) setStart(date);
-      else setEnd(date);
+      if (date.getTime() === start.getTime()) {
+        // Tapping the start date again → deselect it entirely
+        setStart(null);
+        setEnd(null);
+      } else if (date < start) {
+        setStart(date);
+      } else {
+        setEnd(date);
+      }
       return;
     }
     setStart(date);

@@ -247,40 +247,27 @@ def find_plates(img):
     h, w = img.shape[:2]
     found = []
 
-    # 1. The whole photo, with test-time augmentation (flips / scales) for extra recall.
-    for box, conf in _detect_plates(img, 1280, augment=True):
+    # 1. Fast direct pass at standard 640px
+    for box, conf in _detect_plates(img, 640, augment=False, conf_threshold=MIN_CONF):
         found.append((*box, conf, 'full'))
 
-    # 2. Zoomed out: the photo placed in the middle of a larger canvas.
-    f = 2.5
-    ch, cw = int(h * f), int(w * f)
-    oy, ox = (ch - h) // 2, (cw - w) // 2
-    canvas = np.full((ch, cw, 3), 127, np.uint8)
-    canvas[oy:oy + h, ox:ox + w] = img
-    for (x1, y1, x2, y2), conf in _detect_plates(canvas, 1280):
-        found.append((x1 - ox, y1 - oy, x2 - ox, y2 - oy, conf, 'zoom_out'))
+    # If confident plate is already found, return immediately for instant response
+    if any(f[4] >= SURE_CONF for f in found):
+        return found
 
-    # 3. Zoomed in on every vehicle.
-    vr = vehicle_model.predict(img, conf=0.25, classes=VEHICLE_CLASSES, verbose=False)[0]
-    for b in vr.boxes:
-        cls = int(b.cls[0])
-        is_bike = (cls == 3)
-
-        x1, y1, x2, y2 = map(int, b.xyxy[0])
-        px, py = int((x2 - x1) * 0.1), int((y2 - y1) * 0.1)
-        x1, y1, x2, y2 = max(0, x1 - px), max(0, y1 - py), min(w, x2 + px), min(h, y2 + py)
-        crop = img[y1:y2, x1:x2]
-        if crop.size == 0 or min(crop.shape[:2]) < 32:
-            continue
-
-        if is_bike:
-            # Dedicated multi-strategy bike pipeline
-            found.extend(_find_bike_plates(crop, x1, y1))
-        else:
-            # Standard car/bus/truck detection
-            crop_found = _detect_plates(crop, 960, conf_threshold=MIN_CONF)
+    # 2. Focused vehicle sub-crop pass only if direct pass didn't find confident plates
+    try:
+        vr = vehicle_model.predict(img, conf=0.3, imgsz=640, classes=VEHICLE_CLASSES, verbose=False)[0]
+        for b in vr.boxes:
+            x1, y1, x2, y2 = map(int, b.xyxy[0])
+            crop = img[y1:y2, x1:x2]
+            if crop.size == 0 or min(crop.shape[:2]) < 32:
+                continue
+            crop_found = _detect_plates(crop, 640, augment=False, conf_threshold=MIN_CONF)
             for (a, b_, c, d), conf in crop_found:
                 found.append((a + x1, b_ + y1, c + x1, d + y1, conf, 'vehicle'))
+    except Exception as e:
+        print(f"Vehicle crop detection skipped: {e}")
 
     return found
 
@@ -339,19 +326,18 @@ def blur_plate(image_bytes):
     if img is None:
         raise ValueError("Invalid image")
 
+    # Downsample high-resolution images BEFORE inference to prevent Out Of Memory (OOM) on Render
+    max_dim = 1200
+    h, w = img.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / float(max(h, w))
+        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+
     with model_lock:
         plates = select_plates(find_plates(img))
 
     for x1, y1, x2, y2, _, _ in plates:
         hide_region(img, x1, y1, x2, y2)
-
-    # To guarantee fast loading on mobile, cap the maximum width to 1200px (Retina mobile quality)
-    # This prevents the app from struggling with raw 4K photos.
-    max_width = 1200
-    if img.shape[1] > max_width:
-        scale = max_width / img.shape[1]
-        new_dim = (max_width, int(img.shape[0] * scale))
-        img = cv2.resize(img, new_dim, interpolation=cv2.INTER_AREA)
 
     # Encode back to JPEG with 80% quality to ensure fast network loading
     success, buffer = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 80])
@@ -372,22 +358,34 @@ def _download_image(url):
     parsed = urlparse(url)
     if parsed.scheme not in ('http', 'https') or not parsed.hostname:
         raise HTTPException(status_code=400, detail="Invalid image URL")
-    with requests.get(url, headers={'User-Agent': 'MySawariImageService/1.0'}, timeout=10,
-                      stream=True, allow_redirects=False) as response:
-        if response.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to fetch input image")
-        content_type = response.headers.get('content-type', '')
-        if content_type and not content_type.lower().startswith('image/'):
-            raise HTTPException(status_code=400, detail="Input is not an image")
-        declared = int(response.headers.get('content-length') or 0)
-        if declared > MAX_DOWNLOAD_BYTES:
-            raise HTTPException(status_code=413, detail="Image too large")
-        data = bytearray()
-        for chunk in response.iter_content(64 * 1024):
-            data.extend(chunk)
-            if len(data) > MAX_DOWNLOAD_BYTES:
+    
+    # Cloud microservices cannot access localhost/loopback addresses
+    is_cloud = os.environ.get('RENDER') or os.environ.get('PORT')
+    if is_cloud and parsed.hostname in ('localhost', '127.0.0.1', '0.0.0.0', '10.0.2.2'):
+        print(f"Refusing to fetch loopback address in cloud environment: {url}")
+        raise HTTPException(status_code=400, detail=f"Cannot fetch from local/private host: {parsed.hostname}")
+
+    try:
+        with requests.get(url, headers={'User-Agent': 'MySawariImageService/1.0'}, timeout=15,
+                          stream=True, allow_redirects=True) as response:
+            if response.status_code != 200:
+                print(f"Image download HTTP error {response.status_code} for URL: {url}")
+                raise HTTPException(status_code=400, detail=f"Failed to fetch image: HTTP {response.status_code}")
+            content_type = response.headers.get('content-type', '')
+            if content_type and not content_type.lower().startswith('image/'):
+                raise HTTPException(status_code=400, detail="Input is not an image")
+            declared = int(response.headers.get('content-length') or 0)
+            if declared > MAX_DOWNLOAD_BYTES:
                 raise HTTPException(status_code=413, detail="Image too large")
-    return bytes(data)
+            data = bytearray()
+            for chunk in response.iter_content(64 * 1024):
+                data.extend(chunk)
+                if len(data) > MAX_DOWNLOAD_BYTES:
+                    raise HTTPException(status_code=413, detail="Image too large")
+        return bytes(data)
+    except requests.exceptions.RequestException as e:
+        print(f"Network error downloading image from {url}: {type(e).__name__} - {e}")
+        raise HTTPException(status_code=400, detail=f"Could not reach image host: {type(e).__name__}")
 
 
 @app.post("/process")
@@ -395,10 +393,17 @@ def process_image(request: ImageProcessRequest, x_service_token: Optional[str] =
     if SERVICE_TOKEN and not hmac.compare_digest(x_service_token or '', SERVICE_TOKEN):
         raise HTTPException(status_code=401, detail="Not authorized")
     try:
-        # The Android app sends URLs with 10.0.2.2 (Emulator's alias for host).
-        # Since this service runs on the host, we must translate it to 127.0.0.1.
-        image_url = request.input.replace("10.0.2.2", "127.0.0.1")
-        content = _download_image(image_url)
+        # If running locally (not in cloud), translate Android emulator 10.0.2.2 to 127.0.0.1
+        input_data = request.input
+        if input_data.startswith("data:image/"):
+            import base64
+            _, encoded = input_data.split(",", 1)
+            content = base64.b64decode(encoded)
+        else:
+            image_url = input_data
+            if not os.environ.get('RENDER') and '10.0.2.2' in image_url:
+                image_url = image_url.replace("10.0.2.2", "127.0.0.1")
+            content = _download_image(image_url)
 
         # Plates are always hidden: this service never hands back an unprocessed original.
         nparr = np.frombuffer(content, np.uint8)
@@ -411,7 +416,7 @@ def process_image(request: ImageProcessRequest, x_service_token: Optional[str] =
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error processing image: {type(e).__name__}")
+        print(f"Error processing image {request.input}: {type(e).__name__} - {e}")
         raise HTTPException(status_code=500, detail="Image processing failed")
 
 

@@ -28,7 +28,7 @@ export default function ConfirmationScreen() {
         <View style={[styles.confirmationCard, { backgroundColor: colors.card }]}>
           <View style={styles.referenceRow}>
             <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>Booking reference</Text>
-            <Text style={[styles.reference, { color: colors.foreground }]}>{lastBooking?.id ? `MS-${lastBooking.id.slice(-6).toUpperCase()}` : '—'}</Text>
+            <Text style={[styles.reference, { color: colors.foreground }]}>{lastBooking?.bookingCode || (lastBooking?.id ? `MS-${lastBooking.id.slice(-6).toUpperCase()}` : '—')}</Text>
           </View>
           <View style={[styles.carRow, { borderTopColor: colors.border }]}>
             <Image source={selectedCar.image} resizeMode="cover" style={styles.carImage} />
@@ -38,7 +38,7 @@ export default function ConfirmationScreen() {
             </View>
           </View>
           {!isDeliveryRequested ? (
-            <InfoRow icon="map-pin" value={dropoff?.name || 'MySawari Office'} />
+            <InfoRow icon="map-pin" value={dropoff?.name || 'Office'} />
           ) : (
             <>
               {(deliveryMode === 'both' || deliveryMode === 'delivery') && (

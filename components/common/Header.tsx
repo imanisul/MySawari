@@ -52,7 +52,7 @@ export function Header({
   const insets = useSafeAreaInsets();
 
   const content = (
-    <SafeAreaView edges={['top']} style={!absolute ? { backgroundColor: colors.background } : undefined}>
+    <View style={[{ paddingTop: insets.top }, !absolute ? { backgroundColor: colors.background } : undefined]}>
       <View style={[styles.header, { paddingBottom: 8 }]}>
         <Pressable
           accessibilityRole="button"
@@ -144,7 +144,7 @@ export function Header({
           </Pressable>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 
   if (absolute) {

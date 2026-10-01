@@ -138,7 +138,7 @@ function RootLayoutNav() {
 
 function ThemedStatusBar() {
   const { isDarkMode } = useSawari();
-  return <StatusBar style={isDarkMode ? 'light' : 'dark'} translucent={true} backgroundColor="transparent" />;
+  return <StatusBar style={isDarkMode ? 'light' : 'dark'} />;
 }
 
 /**

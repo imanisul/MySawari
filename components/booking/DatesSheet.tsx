@@ -114,7 +114,9 @@ export function DatesSheet() {
         setEnd(null);
         setTempReturnTime(null);
       } else if (date.getTime() === start.getTime()) {
-        // Clicking same date again, keep it same-day
+        // Tapping the same start date again → deselect it entirely
+        setStart(null);
+        setEnd(null);
         setTempReturnTime(null);
       } else {
         // Picked a date after start, make it the end

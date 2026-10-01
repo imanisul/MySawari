@@ -241,7 +241,7 @@ export default function BookingsScreen() {
                       <View style={styles.upcomingMetaRow}>
                         <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
                         <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
-                          {booking.dropoffLocationName || 'MySawari Office'}
+                          {booking.dropoffLocationName || 'Office'}
                         </Text>
                       </View>
                     ) : (

@@ -313,8 +313,15 @@ function ReviewsTab({ car }: { car: Car }) {
       alert('Please login to write a review');
       return;
     }
+    if (!tripForCar) {
+      alert('You can only write a review after completing a trip on this vehicle.');
+      return;
+    }
     setIsWriteModalVisible(true);
   };
+
+  // Whether the current user can write a review (must have a completed trip on this car)
+  const canReview = isAuthenticated && !!tripForCar;
 
   // Wait for the reviews before deciding there are none (car.reviews are the built-in ones and are instant).
   if (isLoadingReviews && reviews.length === 0) {
@@ -330,15 +337,24 @@ function ReviewsTab({ car }: { car: Car }) {
       <View style={[styles.tabSection, { alignItems: 'center', paddingVertical: 40 }]}>
         <Feather name="message-square" size={40} color={colors.muted} />
         <Text style={[styles.emptyReviewText, { color: colors.mutedForeground, marginTop: 16, marginBottom: 24 }]}>
-          No reviews yet.{"\n"}Be the first to review this vehicle after completing your trip.
+          No reviews yet.{'\n'}Reviews are only visible after completing a trip.
         </Text>
-        <Pressable 
-          style={[styles.writeReviewBtn, { borderColor: colors.border }]}
-          onPress={handleWriteReview}
-        >
-          <Feather name="edit-2" size={16} color={colors.foreground} />
-          <Text style={[styles.writeReviewBtnText, { color: colors.foreground }]}>Write a Review</Text>
-        </Pressable>
+
+        {/* Only show Write Review button if they have a completed trip on this car */}
+        {canReview ? (
+          <Pressable 
+            style={[styles.writeReviewBtn, { borderColor: colors.primary, backgroundColor: colors.tintLight }]}
+            onPress={handleWriteReview}
+          >
+            <Feather name="edit-2" size={16} color={colors.primaryText} />
+            <Text style={[styles.writeReviewBtnText, { color: colors.primaryText }]}>Write a Review</Text>
+          </Pressable>
+        ) : (
+          <View style={[styles.writeReviewBtn, { borderColor: colors.border, opacity: 0.5 }]}>
+            <Feather name="lock" size={16} color={colors.mutedForeground} />
+            <Text style={[styles.writeReviewBtnText, { color: colors.mutedForeground }]}>Complete a trip to review</Text>
+          </View>
+        )}
 
         <Modal visible={isWriteModalVisible} animationType="slide" transparent={true}>
           <View style={styles.modalOverlay}>
@@ -360,10 +376,13 @@ function ReviewsTab({ car }: { car: Car }) {
     <View style={styles.tabSection}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
         <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Customer Reviews</Text>
-        <Pressable onPress={handleWriteReview} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Feather name="edit-2" size={14} color={colors.primaryText} />
-          <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 14, color: colors.primaryText }}>Write</Text>
-        </Pressable>
+        {/* Write button only shown to users who completed a trip on this car */}
+        {canReview && (
+          <Pressable onPress={handleWriteReview} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Feather name="edit-2" size={14} color={colors.primaryText} />
+            <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 14, color: colors.primaryText }}>Write</Text>
+          </Pressable>
+        )}
       </View>
       
       <View style={styles.reviewHeader}>

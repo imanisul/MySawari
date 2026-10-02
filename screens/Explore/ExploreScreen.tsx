@@ -453,17 +453,6 @@ export default function ExploreScreen() {
   }, [isFetchingCars, isFiltering, fetchError, colors, vehicleType, debouncedQuery,
       exploreDate, activeFilterCount, defaultToday, setSearchQuery, setDebouncedQuery,
       setExploreDate, setGlobalSelectedDate, setFilters, setPage, fetchVehicles]);
-  // Accurate layout measurement for perfectly smooth fast-scrolling
-  const screenWidth = Dimensions.get('window').width;
-  const imageHeight = (screenWidth - 32) * (9 / 16);
-  // Image height + Body height (120) + Margins/Borders (marginBottom: 16, borderWidth: 1)
-  const CARD_HEIGHT = imageHeight + 120 + 17; 
-  const getItemLayout = useCallback((_: any, index: number) => ({
-    length: CARD_HEIGHT,
-    offset: CARD_HEIGHT * index,
-    index,
-  }), [CARD_HEIGHT]);
-
   return (
     <Page bottomNav scroll={false}>
       {/* ── FIXED: Explore Header ── */}
@@ -482,13 +471,12 @@ export default function ExploreScreen() {
         {...scrollHandlers}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={7}
-        removeClippedSubviews={true}
+        initialNumToRender={6}
+        maxToRenderPerBatch={6}
+        windowSize={11}
+        removeClippedSubviews={false}
         refreshing={isRefreshing}
         onRefresh={handleRefresh}
-        getItemLayout={getItemLayout}
         ListFooterComponent={
           isLoadingMore ? (
             <View style={styles.loadingFooter}>

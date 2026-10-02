@@ -99,12 +99,28 @@ export default function PaymentProcessingScreen() {
       }, 1500);
     } catch (e: any) {
       const reason = e.message || 'Failed to confirm booking';
-      setErrorMsg(
-        paymentDetails?.razorpayPaymentId
-          ? `Your payment (${paymentDetails.razorpayPaymentId}) was received, but the booking could not be saved: ${reason}. Please contact support with this payment ID.`
-          : reason
-      );
-      setStatus('ERROR');
+      
+      if (paymentDetails?.razorpayPaymentId) {
+        // Payment was successful but booking confirmation failed (e.g. car taken by someone else or network error)
+        // Automatically formally cancel the hold so the system processes the refund.
+        try {
+          if (holdId.current) {
+            await API.cancelBooking(holdId.current, 'Payment successful but booking confirmation failed');
+          }
+        } catch (cancelErr) {
+          // Backend might have already cancelled it
+        }
+        
+        setErrorMsg(`Your payment (${paymentDetails.razorpayPaymentId}) was received, but the booking could not be saved: ${reason}. It has been cancelled and a refund will be processed.`);
+        setStatus('ERROR');
+        
+        setTimeout(() => {
+          router.replace('/bookings');
+        }, 3500);
+      } else {
+        setErrorMsg(reason);
+        setStatus('ERROR');
+      }
     }
   }
 

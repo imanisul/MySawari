@@ -118,38 +118,9 @@ export default function BookingsScreen() {
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.content, { paddingTop: Math.max(insets.top + 16, 16) }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Your bookings</Text>
-        <View style={{ marginTop: 24, marginBottom: 12, marginHorizontal: -24 }}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 24 }}>
-            {tabs.map((item) => {
-              const isSelected = tab === item;
-              return (
-                <Pressable 
-                  key={item} 
-                  onPress={() => setTab(item)} 
-                  style={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    borderRadius: 99,
-                    backgroundColor: isSelected ? colors.primary : colors.card,
-                    borderWidth: 1,
-                    borderColor: isSelected ? colors.primary : colors.border,
-                  }}
-                >
-                  <Text style={{ 
-                    color: isSelected ? colors.primaryForeground : colors.foreground, 
-                    fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
-                    fontSize: 14 
-                  }}>
-                    {item}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
         
         {loading ? (
-          <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 8, paddingBottom: insets.bottom + 100 }}>
+          <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 32, paddingBottom: insets.bottom + 100 }}>
             <BookingSkeleton index={0} />
             <BookingSkeleton index={1} />
             <BookingSkeleton index={2} />
@@ -165,7 +136,39 @@ export default function BookingsScreen() {
               <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium' }}>Retry</Text>
             </Pressable>
           </View>
-        ) : filteredBookings.length > 0 ? (
+        ) : (
+          <>
+            <View style={{ marginTop: 24, marginBottom: 12, marginHorizontal: -24 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 24 }}>
+                {tabs.map((item) => {
+                  const isSelected = tab === item;
+                  return (
+                    <Pressable 
+                      key={item} 
+                      onPress={() => setTab(item)} 
+                      style={{
+                        paddingHorizontal: 16,
+                        paddingVertical: 8,
+                        borderRadius: 99,
+                        backgroundColor: isSelected ? colors.primary : colors.card,
+                        borderWidth: 1,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                      }}
+                    >
+                      <Text style={{ 
+                        color: isSelected ? colors.primaryForeground : colors.foreground, 
+                        fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
+                        fontSize: 14 
+                      }}>
+                        {item}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            
+            {filteredBookings.length > 0 ? (
           <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 8 }} showsVerticalScrollIndicator={false}>
             {filteredBookings.map((booking) => {
               const isActive = tab === 'Active';
@@ -377,6 +380,8 @@ export default function BookingsScreen() {
           </ScrollView>
         ) : (
           <EmptyState title={`No ${tab.toLowerCase()} trips`} copy={`Your ${tab.toLowerCase()} rentals will appear here.`} colors={colors} />
+        )}
+        </>
         )}
       </View>
       <BottomNavigation />

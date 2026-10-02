@@ -39,15 +39,22 @@ function optimizeCloudinaryUrl(source: any): any {
   return { ...source, uri };
 }
 
-export function LoadingImage({ onLoad, onError, ...props }: ImageProps) {
+export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageProps) {
   const colors = useColors();
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const optimizedSource = optimizeCloudinaryUrl(props.source);
-  // A different photo starts fresh.
+  let optimizedSource = optimizeCloudinaryUrl(props.source);
+  
+  // Cache busting: append a retry query string so expo-image refetches the file without destroying the view.
+  if (attempt > 0 && typeof optimizedSource === 'string') {
+    optimizedSource = `${optimizedSource}${optimizedSource.includes('?') ? '&' : '?'}retry=${attempt}`;
+  } else if (attempt > 0 && typeof optimizedSource === 'object' && optimizedSource.uri) {
+    optimizedSource = { ...optimizedSource, uri: `${optimizedSource.uri}${optimizedSource.uri.includes('?') ? '&' : '?'}retry=${attempt}` };
+  }
+
   const sourceKey = JSON.stringify(optimizedSource ?? null);
   useEffect(() => {
     setReady(false);
@@ -62,13 +69,9 @@ export function LoadingImage({ onLoad, onError, ...props }: ImageProps) {
   return (
     <>
       <Image
-        // Changing the key remounts the image, which makes expo-image request it again.
-        key={`${sourceKey}#${attempt}`}
         {...props}
+        recyclingKey={recyclingKey} // Let expo-image optimize recycling natively
         source={optimizedSource}
-        // Once downloaded, the image stays on the phone's disk — scrolling back
-        // never re-downloads it, and the next app launch paints it instantly from
-        // cache instead of showing a shimmer.
         cachePolicy="memory-disk"
         onLoad={(e) => {
           setReady(true);
@@ -79,9 +82,9 @@ export function LoadingImage({ onLoad, onError, ...props }: ImageProps) {
           if (attempt < RETRY_DELAYS_MS.length) {
             if (retryTimer.current) clearTimeout(retryTimer.current);
             retryTimer.current = setTimeout(() => setAttempt((a) => a + 1), RETRY_DELAYS_MS[attempt]);
-            return; // keep the shimmer up while we try again
+            return;
           }
-          setReady(true); // never leave a shimmer running over a photo that failed
+          setReady(true);
           setFailed(true);
           onError?.(e);
         }}
@@ -91,8 +94,8 @@ export function LoadingImage({ onLoad, onError, ...props }: ImageProps) {
           <Feather name="image" size={28} color={colors.mutedForeground} />
         </View>
       )}
-      {!ready && (
-        <Reanimated.View exiting={FadeOut.duration(150)} style={StyleSheet.absoluteFill} pointerEvents="none">
+      {!ready && !failed && (
+        <Reanimated.View exiting={FadeOut.duration(200)} style={StyleSheet.absoluteFill} pointerEvents="none">
           <SkeletonGroup style={StyleSheet.absoluteFill}>
             <Skeleton width="100%" height="100%" borderRadius={0} />
           </SkeletonGroup>

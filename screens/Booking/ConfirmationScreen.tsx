@@ -33,24 +33,24 @@ export default function ConfirmationScreen() {
           <View style={[styles.carRow, { borderTopColor: colors.border }]}>
             <Image source={selectedCar.image} resizeMode="cover" style={styles.carImage} />
             <View>
-              <Text style={[styles.carName, { color: colors.foreground }]}>{selectedCar.name}</Text>
-              <Text style={[styles.carMode, { color: colors.mutedForeground }]}>{mode}</Text>
+              <Text style={[styles.carName, { color: colors.foreground }]}>{lastBooking?.vehicleName || selectedCar.name}</Text>
+              <Text style={[styles.carMode, { color: colors.mutedForeground }]}>{lastBooking?.driverMode === 'with-driver' ? 'With Driver' : 'Self Drive'}</Text>
             </View>
           </View>
           {!isDeliveryRequested ? (
-            <InfoRow icon="map-pin" value={dropoff?.name || 'Office'} />
+            <InfoRow icon="map-pin" value={lastBooking?.dropoffLocationName || 'Office'} />
           ) : (
             <>
               {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
-                <InfoRow icon="map-pin" value={`Pickup: ${pricingQuote && pricingQuote.pickupCharge > 0 ? pricingQuote.pickupLocationName : (pickup?.name || 'Self Pickup')}`} />
+                <InfoRow icon="map-pin" value={`Pickup: ${lastBooking?.pickupLocationName || 'Self Pickup'}`} />
               )}
               {(deliveryMode === 'both' || deliveryMode === 'return') && (
-                <InfoRow icon="map-pin" value={`Drop: ${pricingQuote && pricingQuote.dropCharge > 0 ? pricingQuote.dropLocationName : 'Self Drop'}`} />
+                <InfoRow icon="map-pin" value={`Drop: ${lastBooking?.dropLocationName || 'Self Drop'}`} />
               )}
             </>
           )}
-          <InfoRow icon="calendar" value={`${dateRange} · ${duration}`} />
-          <InfoRow icon="clock" value={`${pickupTime} – ${returnTime}`} />
+          <InfoRow icon="calendar" value={`${dateRange} · ${lastBooking?.rentalDays || duration} Days`} />
+          <InfoRow icon="clock" value={`${lastBooking?.pickupTime || pickupTime} – ${lastBooking?.returnTime || returnTime}`} />
           <View style={[styles.paidRow, { borderTopColor: colors.border }]}>
             <Text style={[styles.paidLabel, { color: colors.foreground }]}>Paid today</Text>
             <Text style={[styles.paidValue, { color: colors.foreground }]}>₹{payToday.toLocaleString('en-IN')}</Text>

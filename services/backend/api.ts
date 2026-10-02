@@ -843,6 +843,7 @@ export const API = {
       throw new Error(saved.message || 'Failed to secure vehicle reservation');
     }
     snapshot.id = saved.data?._id || snapshot.id;
+    snapshot.bookingCode = saved.data?.bookingCode || snapshot.bookingCode;
     invalidateWalletCache(); // SawariCash intent
 
     return snapshot;

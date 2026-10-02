@@ -344,10 +344,6 @@ export default function SearchResultsScreen() {
         // Last card must clear the fixed tab bar (+ safe area) and the floating support button.
         contentContainerStyle={{ paddingTop: 8, paddingBottom: bottomNavHeight + SUPPORT_BUTTON_CLEARANCE }}
         refreshControl={<RefreshControl refreshing={isPullRefreshing} onRefresh={handlePullRefresh} tintColor={navy} />}
-        initialNumToRender={4}
-        maxToRenderPerBatch={4}
-        windowSize={7}
-        removeClippedSubviews
         {...scrollHandlers}
       />
 

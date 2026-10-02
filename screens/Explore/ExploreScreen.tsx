@@ -477,14 +477,9 @@ export default function ExploreScreen() {
         {...scrollHandlers}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        initialNumToRender={3}
-        maxToRenderPerBatch={3}
-        updateCellsBatchingPeriod={50}
-        windowSize={7}
-        removeClippedSubviews={true}
+        onEndReachedThreshold={0.5}
         refreshing={isRefreshing}
         onRefresh={handleRefresh}
-        getItemLayout={getItemLayout}
         ListFooterComponent={
           isLoadingMore ? (
             <View style={styles.loadingFooter}>

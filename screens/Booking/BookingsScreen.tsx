@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
 import { BottomNavigation, PrimaryButton } from '@/components';
@@ -55,6 +55,12 @@ export default function BookingsScreen() {
     refetchInterval: 30 * 1000, // status changes (e.g. trip completed by the ops team) appear on their own
     refetchOnWindowFocus: true,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) refetch();
+    }, [isAuthenticated, refetch])
+  );
 
   useEffect(() => {
     if (!loading && !initialTabSet) {
@@ -241,7 +247,7 @@ export default function BookingsScreen() {
                       <View style={styles.upcomingMetaRow}>
                         <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
                         <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
-                          {booking.dropoffLocationName || 'Office'}
+                          {booking.destination || booking.dropoffLocationName || 'Office'}
                         </Text>
                       </View>
                     ) : (

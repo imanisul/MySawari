@@ -596,7 +596,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         // state (it is set moments earlier in the same flow), which failed with "No active booking hold".
         const id = bookingId || lastBooking?.id;
         if (!id) throw new Error('No active booking hold found');
-        await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId);
+        const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId);
+        
+        // Update the lastBooking state with the confirmed booking info so the ConfirmationScreen can read the real bookingCode
+        if (lastBooking) {
+          setLastBooking({ ...lastBooking, bookingCode: confirmedBooking.bookingCode });
+        }
+        
         // Refresh cash to reflect deduction
         applyWallet(await API.getWallet(true));
       },

@@ -28,7 +28,7 @@ export default function ConfirmationScreen() {
         <View style={[styles.confirmationCard, { backgroundColor: colors.card }]}>
           <View style={styles.referenceRow}>
             <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>Booking reference</Text>
-            <Text style={[styles.reference, { color: colors.foreground }]}>{lastBooking?.bookingCode || (lastBooking?.id ? `MS-${lastBooking.id.slice(-6).toUpperCase()}` : '—')}</Text>
+            <Text style={[styles.reference, { color: colors.foreground }]}>{lastBooking?.bookingCode || '—'}</Text>
           </View>
           <View style={[styles.carRow, { borderTopColor: colors.border }]}>
             <Image source={selectedCar.image} resizeMode="cover" style={styles.carImage} />

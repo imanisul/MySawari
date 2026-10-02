@@ -77,6 +77,7 @@ const CarListCardUI = React.memo(function CarListCardUI({
             source={image}
             contentFit="cover"
             transition={200}
+            recyclingKey={car.id}
             style={styles.image}
           />
           {/* Soft top gradient so the badges stay readable on any photo */}

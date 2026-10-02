@@ -49,6 +49,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { mode, setMode, vehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet, syncNotifications } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const insets = useSafeAreaInsets();
 
   const greeting = useMemo(() => {
@@ -328,6 +329,7 @@ export default function HomeScreen() {
                 if (isAuthenticated) {
                   router.push('/search');
                 } else {
+                  setPendingAction(() => () => router.push('/search'));
                   setShowLogin(true);
                 }
               }}
@@ -417,7 +419,10 @@ export default function HomeScreen() {
                 // Guests would otherwise reach the paid-plan checkout and hit a confusing failure —
                 // ask them to log in first, same as Search and Refer & Earn already do.
                 if (isAuthenticated) router.push('/membership');
-                else setShowLogin(true);
+                else {
+                  setPendingAction(() => () => router.push('/membership'));
+                  setShowLogin(true);
+                }
               }}>
                 <LinearGradient
                   colors={['#111827', '#1F2937']}
@@ -534,8 +539,8 @@ export default function HomeScreen() {
                 snapToAlignment="start"
                 decelerationRate="fast"
                 removeClippedSubviews={false} // Android can render a clipped card blank (white) when scrolled back into view
-                initialNumToRender={3}
-                maxToRenderPerBatch={3}
+                initialNumToRender={2}
+                maxToRenderPerBatch={2}
                 windowSize={3}
                 ListEmptyComponent={
                   isLoadingVehicles ? (
@@ -570,8 +575,8 @@ export default function HomeScreen() {
                 snapToAlignment="start"
                 decelerationRate="fast"
                 removeClippedSubviews={false} // Android can render a clipped card blank (white) when scrolled back into view
-                initialNumToRender={3}
-                maxToRenderPerBatch={3}
+                initialNumToRender={2}
+                maxToRenderPerBatch={2}
                 windowSize={3}
                 ListEmptyComponent={
                   isLoadingVehicles ? (
@@ -677,7 +682,16 @@ export default function HomeScreen() {
 
 
 
-      <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
+      <LoginBottomSheet 
+        visible={showLogin} 
+        onClose={() => setShowLogin(false)} 
+        onLoginSuccess={() => {
+          if (pendingAction) {
+            pendingAction();
+            setPendingAction(null);
+          }
+        }} 
+      />
     </Page>
   );
 }

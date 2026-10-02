@@ -455,7 +455,31 @@ export const API = {
       const { getVehicleImage } = require('../../utils/vehicleImages');
       const fallbackImage = getVehicleImage(v.vehicleName, isBike);
       const hasImages = Array.isArray(v.images) && v.images.length > 0 && typeof v.images[0]?.url === 'string' && v.images[0].url;
-      const getFullUrl = plateSafeImageUrl;
+      const getFullUrl = (url: string) => {
+        if (!url) return '';
+        let finalUrl = url;
+        // If the backend already wrapped it, extract the target to optimize it
+        if (finalUrl.includes('/images/blur?target=')) {
+          const match = finalUrl.match(/target=([^&]+)/);
+          if (match) {
+            let target = decodeURIComponent(match[1]);
+            if (target.includes('res.cloudinary.com') && target.includes('/upload/')) {
+              if (!target.includes('q_auto') && !target.includes('w_')) {
+                target = target.replace('/upload/', '/upload/q_auto,f_auto,w_800,c_limit/');
+                finalUrl = finalUrl.replace(match[1], encodeURIComponent(target));
+              }
+            }
+          }
+        } else {
+          // Unwrapped Cloudinary URL
+          if (finalUrl.includes('res.cloudinary.com') && finalUrl.includes('/upload/')) {
+            if (!finalUrl.includes('q_auto') && !finalUrl.includes('w_')) {
+              finalUrl = finalUrl.replace('/upload/', '/upload/q_auto,f_auto,w_800,c_limit/');
+            }
+          }
+        }
+        return plateSafeImageUrl(finalUrl);
+      };
 
       // Enrich with curated real-world specs from the knowledge base
       const vehicleType: 'Car' | 'Bike' = isBike ? 'Bike' : 'Car';
@@ -497,8 +521,8 @@ export const API = {
         category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : v.vehicleType),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
-        image: fallbackImage,
-        images: [fallbackImage],
+        image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,
+        images: hasImages ? v.images.map((img: any) => getFullUrl(img.url)) : [fallbackImage],
         seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
         transmission: v.transmission || 'Manual',
         fuel: v.fuelType || 'Petrol',

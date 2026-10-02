@@ -7,7 +7,7 @@ import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import Notifications from '@/utils/notifications';
 
-export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible: boolean; onClose: () => void; onLoginSuccess?: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { login } = useSawari();
@@ -73,6 +73,11 @@ export function LoginBottomSheet({ visible, onClose }: { visible: boolean; onClo
       }
       
       onClose();
+      // After the modal is closed, continue the interrupted flow
+      // (e.g. navigate to search, booking, membership, etc.)
+      if (onLoginSuccess) {
+        setTimeout(() => onLoginSuccess(), 300);
+      }
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Invalid OTP');
     } finally {

@@ -721,7 +721,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       isAuthLoading,
       login: async (token: string, refreshToken: string, user: any) => {
         try {
-          setIsAuthLoading(true);
+          // Do NOT set isAuthLoading here — it would unmount the entire navigation
+          // tree (AppGate returns null while booting), losing the user's position
+          // (e.g. car-details → booking). Auth loading is only for the initial
+          // cold boot session restore.
           await SecureStore.setItemAsync('auth_token', String(token));
           if (refreshToken) await SecureStore.setItemAsync('refresh_token', String(refreshToken));
           await SecureStore.setItemAsync('user_id', String(user.id));
@@ -765,8 +768,6 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(true);
         } catch (e) {
           console.error(e);
-        } finally {
-          setIsAuthLoading(false);
         }
       },
       logout: async () => {

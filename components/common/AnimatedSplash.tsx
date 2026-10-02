@@ -2,11 +2,18 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, Image } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
+// Module-level flag: the splash only shows on the very first cold app launch.
+// After login or any navigation within the same session, it is skipped entirely.
+let hasShownSplash = false;
+
 export function AnimatedSplash({ isReady, children }: { isReady: boolean, children: React.ReactNode }) {
   const colors = useColors();
   
+  // If splash was already shown this session, skip it entirely
+  const skipSplash = useRef(hasShownSplash).current;
+
   // State to track if the splash screen should still be mounted
-  const [isAnimationComplete, setIsAnimationComplete] = useState(false);
+  const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash);
   
   // Animation values
   const opacityAnim = useRef(new Animated.Value(1)).current;
@@ -64,18 +71,19 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
 
   // Exit Animation triggered when app is ready
   useEffect(() => {
-    if (isReady) {
-      // Small delay so the user can see the text if it loaded too fast
-      setTimeout(() => {
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }).start(() => {
-          setIsAnimationComplete(true);
-        });
-      }, 300);
-    }
+    if (!isReady || skipSplash) return;
+    // Keep the splash visible for 3 full seconds so the user sees
+    // "MySawari — Your ride, your way" before the app content appears.
+    setTimeout(() => {
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        hasShownSplash = true; // Never show splash again this session
+        setIsAnimationComplete(true);
+      });
+    }, 3000);
   }, [isReady]);
 
   return (

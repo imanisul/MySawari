@@ -50,7 +50,7 @@ export default function ExploreScreen() {
   const [page, setPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 3;
 
   // Debounce effect
   useEffect(() => {
@@ -198,11 +198,11 @@ export default function ExploreScreen() {
   const handleLoadMore = () => {
     if (paginatedCars.length < filteredCars.length && !isLoadingMore) {
       setIsLoadingMore(true);
-      // Simulate network latency for loading more
+      // Brief delay so the "Loading more..." indicator is visible, then load next batch
       setTimeout(() => {
         setPage(prev => prev + 1);
         setIsLoadingMore(false);
-      }, 500);
+      }, 300);
     }
   };
 
@@ -477,9 +477,9 @@ export default function ExploreScreen() {
         {...scrollHandlers}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        initialNumToRender={4}
+        initialNumToRender={3}
         maxToRenderPerBatch={3}
-        updateCellsBatchingPeriod={100}
+        updateCellsBatchingPeriod={50}
         windowSize={7}
         removeClippedSubviews={true}
         refreshing={isRefreshing}

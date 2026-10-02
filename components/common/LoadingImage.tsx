@@ -15,6 +15,30 @@ const RETRY_DELAYS_MS = [2000, 5000, 12000];
  * The placeholder only appears if the photo takes a moment, so cached/local images never flash it.
  * Sizing and layout come from `style`, exactly like a normal Image.
  */
+function optimizeCloudinaryUrl(source: any): any {
+  if (!source) return source;
+  
+  let uri = '';
+  if (typeof source === 'string') {
+    uri = source;
+  } else if (typeof source === 'object' && source.uri) {
+    uri = source.uri;
+  } else {
+    return source;
+  }
+
+  if (uri.includes('res.cloudinary.com') && uri.includes('/upload/')) {
+    if (!uri.includes('q_auto') && !uri.includes('w_')) {
+      uri = uri.replace('/upload/', '/upload/q_auto,f_auto,w_800,c_limit/');
+    }
+  }
+
+  if (typeof source === 'string') {
+    return uri;
+  }
+  return { ...source, uri };
+}
+
 export function LoadingImage({ onLoad, onError, ...props }: ImageProps) {
   const colors = useColors();
   const [ready, setReady] = useState(false);
@@ -22,8 +46,9 @@ export function LoadingImage({ onLoad, onError, ...props }: ImageProps) {
   const [attempt, setAttempt] = useState(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const optimizedSource = optimizeCloudinaryUrl(props.source);
   // A different photo starts fresh.
-  const sourceKey = JSON.stringify(props.source ?? null);
+  const sourceKey = JSON.stringify(optimizedSource ?? null);
   useEffect(() => {
     setReady(false);
     setFailed(false);
@@ -40,6 +65,11 @@ export function LoadingImage({ onLoad, onError, ...props }: ImageProps) {
         // Changing the key remounts the image, which makes expo-image request it again.
         key={`${sourceKey}#${attempt}`}
         {...props}
+        source={optimizedSource}
+        // Once downloaded, the image stays on the phone's disk — scrolling back
+        // never re-downloads it, and the next app launch paints it instantly from
+        // cache instead of showing a shimmer.
+        cachePolicy="memory-disk"
         onLoad={(e) => {
           setReady(true);
           setFailed(false);

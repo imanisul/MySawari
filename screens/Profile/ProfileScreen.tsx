@@ -21,6 +21,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
   const insets = useSafeAreaInsets();
+  const bottomNavHeight = useBottomNavHeight();
   const queryClient = useQueryClient();
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardAmount, setRewardAmount] = useState<number | null>(null);
@@ -142,7 +143,7 @@ export default function ProfileScreen() {
     <Page bottomNav scroll={false}>
       <Header title="Profile" hideLogo={true} back={false} />
       
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: useBottomNavHeight() + 24 }]} bounces={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavHeight + 24 }]} bounces={false}>
         <Reveal delay={0}>
         {/* Profile Card */}
         <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

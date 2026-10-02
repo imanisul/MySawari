@@ -39,8 +39,18 @@ export default function CarDetailsScreen() {
 
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
   const [showSearchSheet, setShowSearchSheet] = useState(false);
+
+  const handleBookingProceed = () => {
+    const isMissingEnd = !endStr || endStr.includes('Select');
+    if (bookingSource === 'explore' || !dropoff?.name || isMissingEnd) {
+      setShowSearchSheet(true);
+    } else {
+      router.push('/booking');
+    }
+  };
 
 
   useEffect(() => {
@@ -151,15 +161,11 @@ export default function CarDetailsScreen() {
       <StickyBookingBar 
         isAvailable={isAvailable} 
         onViewBreakdown={() => setShowBreakdown(true)} 
-        onNeedLogin={() => setShowLogin(true)} 
-        onBookNow={() => {
-          const isMissingEnd = !endStr || endStr.includes('Select');
-          if (bookingSource === 'explore' || !dropoff?.name || isMissingEnd) {
-            setShowSearchSheet(true);
-          } else {
-            router.push('/booking');
-          }
-        }}
+        onNeedLogin={() => {
+          setPendingAction(() => handleBookingProceed);
+          setShowLogin(true);
+        }} 
+        onBookNow={handleBookingProceed}
       />
       <PriceBreakdownSheet
         visible={showBreakdown}
@@ -174,7 +180,15 @@ export default function CarDetailsScreen() {
         }}
       />
       <LoginBottomSheet 
-        visible={showLogin} onClose={() => setShowLogin(false)} />
+        visible={showLogin} 
+        onClose={() => setShowLogin(false)}
+        onLoginSuccess={() => {
+          if (pendingAction) {
+            pendingAction();
+            setPendingAction(null);
+          }
+        }} 
+      />
       <TripEditorModal
         visible={isEditingTrip}
         onClose={() => setIsEditingTrip(false)}

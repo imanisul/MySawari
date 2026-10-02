@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator } from 'react-native';
+import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -459,6 +459,17 @@ export default function ExploreScreen() {
   }, [isFetchingCars, isFiltering, fetchError, colors, vehicleType, debouncedQuery,
       exploreDate, activeFilterCount, defaultToday, setSearchQuery, setDebouncedQuery,
       setExploreDate, setGlobalSelectedDate, setFilters, setPage, fetchVehicles]);
+  // Accurate layout measurement for perfectly smooth fast-scrolling
+  const screenWidth = Dimensions.get('window').width;
+  const imageHeight = (screenWidth - 32) * (9 / 16);
+  // Image height + Body height (120) + Margins/Borders (marginBottom: 16, borderWidth: 1)
+  const CARD_HEIGHT = imageHeight + 120 + 17; 
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: CARD_HEIGHT,
+    offset: CARD_HEIGHT * index,
+    index,
+  }), [CARD_HEIGHT]);
+
   return (
     <Page bottomNav scroll={false}>
       {/* ── FIXED: Explore Header ── */}
@@ -477,9 +488,13 @@ export default function ExploreScreen() {
         {...scrollHandlers}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
-        onEndReachedThreshold={0.5}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={7}
+        removeClippedSubviews={true}
         refreshing={isRefreshing}
         onRefresh={handleRefresh}
+        getItemLayout={getItemLayout}
         ListFooterComponent={
           isLoadingMore ? (
             <View style={styles.loadingFooter}>

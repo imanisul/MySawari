@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, TextInput } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, TextInput, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -331,6 +331,15 @@ export default function SearchResultsScreen() {
     />
   );
 
+  const screenWidth = Dimensions.get('window').width;
+  const imageHeight = (screenWidth - 32) * (9 / 16);
+  const CARD_HEIGHT = imageHeight + 120 + 17; 
+  const getItemLayout = useCallback((_: any, index: number) => ({
+    length: CARD_HEIGHT,
+    offset: CARD_HEIGHT * index,
+    index,
+  }), [CARD_HEIGHT]);
+
   return (
     <Page bottomNav scroll={false}>
       <Header title={vehicleType === 'bike' ? 'Available Bikes' : 'Available Cars'} back />
@@ -344,6 +353,11 @@ export default function SearchResultsScreen() {
         // Last card must clear the fixed tab bar (+ safe area) and the floating support button.
         contentContainerStyle={{ paddingTop: 8, paddingBottom: bottomNavHeight + SUPPORT_BUTTON_CLEARANCE }}
         refreshControl={<RefreshControl refreshing={isPullRefreshing} onRefresh={handlePullRefresh} tintColor={navy} />}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={7}
+        removeClippedSubviews={true}
+        getItemLayout={getItemLayout}
         {...scrollHandlers}
       />
 

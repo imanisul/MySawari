@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(17,26,43,0.88)',
   },
   typeBadgeText: { fontFamily: 'Inter_600SemiBold', fontSize: 12, color: '#FFFFFF' },
-  body: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14 },
+  body: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 14, height: 120 },
   titleRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
   name: { flex: 1, fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.2 },
   priceWrap: { flexDirection: 'row', alignItems: 'baseline', flexShrink: 0 },

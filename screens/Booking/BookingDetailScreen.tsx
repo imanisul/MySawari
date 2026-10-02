@@ -268,7 +268,7 @@ export default function BookingDetailScreen() {
                         color: ext.status === 'approved' ? colors.success : ext.status === 'rejected' ? colors.destructive : '#D97706',
                         fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase'
                       }}>
-                        {ext.status || 'pending'}
+                        {ext.status === 'pending' && ['COMPLETED', 'CANCELLED', 'FAILED'].includes(s.status) ? 'expired' : (ext.status || 'pending')}
                       </Text>
                     </View>
                   </View>

@@ -351,7 +351,7 @@ export default function BookingsScreen() {
                     {(() => {
                       const hasPendingExt = booking.extensions?.some((e: any) => e.status === 'pending');
                       const hasRejectedExt = booking.extensions?.some((e: any) => e.status === 'rejected');
-                      if (hasPendingExt) {
+                      if (hasPendingExt && booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED') {
                         return (
                           <View style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#F59E0B20', marginLeft: 12 }}>
                             <Text style={{ color: '#B45309', fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extension Pending</Text>

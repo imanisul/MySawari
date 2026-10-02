@@ -94,12 +94,14 @@ export default function HomeScreen() {
     <DestinationCard image={item.image} title={item.title} subtitle={item.subtitle} places={item.places} />
   ), []);
 
-  const { data: allOffers = [], isLoading: isLoadingOffers } = useQuery({
+  const { data: allOffers = [], isLoading: isLoadingOffers, isFetching: isFetchingOffers, refetch: refetchOffers } = useQuery({
     queryKey: ['offers'],
-    queryFn: fetchOffers,
-    // fetchOffers may now be a network call, so start empty and show skeletons
-    initialData: [] as Awaited<ReturnType<typeof fetchOffers>>,
-    initialDataUpdatedAt: 0,
+    queryFn: async () => {
+      await new Promise(r => setTimeout(r, 800)); // Smooth out the initial skeleton loading animation
+      return fetchOffers();
+    },
+    staleTime: 15 * 1000,
+    refetchOnWindowFocus: true,
   });
 
   // Split offers into coupons (for the offers carousel) and special deals (for the deals section)
@@ -667,10 +669,11 @@ export default function HomeScreen() {
           <RefreshControl
             refreshing={manualRefreshing}
             onRefresh={async () => {
-              if (!isAuthenticated) return;
               setManualRefreshing(true);
               try {
-                await refetchBookings();
+                const promises = [refetchOffers()];
+                if (isAuthenticated) promises.push(refetchBookings());
+                await Promise.all(promises);
               } finally {
                 setManualRefreshing(false);
               }

@@ -671,7 +671,7 @@ export default function HomeScreen() {
             onRefresh={async () => {
               setManualRefreshing(true);
               try {
-                const promises = [refetchOffers()];
+                const promises: Promise<any>[] = [refetchOffers()];
                 if (isAuthenticated) promises.push(refetchBookings());
                 await Promise.all(promises);
               } finally {

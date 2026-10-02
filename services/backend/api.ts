@@ -870,7 +870,7 @@ export const API = {
     }
   },
 
-  async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string): Promise<void> {
+  async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string): Promise<any> {
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -880,6 +880,7 @@ export const API = {
     if (!response.ok) {
       throw new Error(saved.message || 'Failed to confirm booking payment');
     }
+    return saved.data;
   },
   
   async trackLead(data: {

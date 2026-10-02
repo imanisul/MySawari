@@ -13,6 +13,7 @@ export const vehiclesQueryOptions = {
   queryKey: VEHICLES_KEY,
   queryFn: async () => {
     const raw = await API.getVehiclesRaw();
+    await new Promise(r => setTimeout(r, 800)); // Smooth out the initial skeleton loading animation
     // Keep a copy on the device so the next app launch has vehicles on screen instantly.
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ at: Date.now(), raw })).catch(() => {});
     return API.mapVehicles(raw);

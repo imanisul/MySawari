@@ -48,6 +48,7 @@ export default function BookingsScreen() {
     queryFn: async () => {
       if (!isAuthenticated) return [];
       const userBookings = await API.getAllBookings();
+      await new Promise(r => setTimeout(r, 800)); // Smooth out skeleton
       return userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     },
     enabled: isAuthenticated === true,

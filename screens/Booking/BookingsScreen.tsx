@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -63,18 +63,34 @@ export default function BookingsScreen() {
     }, [isAuthenticated, refetch])
   );
 
+  const prevBookings = useRef<BookingSnapshot[]>([]);
+
   useEffect(() => {
-    if (!loading && !initialTabSet) {
-      if (bookings && bookings.length > 0) {
-        if (bookings.some(b => b.status === 'ONGOING')) {
+    if (!loading && bookings) {
+      const currentOngoing = bookings.filter(b => b.status === 'ONGOING');
+      const prevOngoing = prevBookings.current.filter(b => b.status === 'ONGOING');
+      
+      const currentCompleted = bookings.filter(b => b.status === 'COMPLETED');
+      const prevCompleted = prevBookings.current.filter(b => b.status === 'COMPLETED');
+
+      if (!initialTabSet) {
+        if (bookings.length > 0) {
+          if (currentOngoing.length > 0) setTab('Active');
+          else if (bookings.some(b => b.status === 'CONFIRMED' || b.status === 'PENDING')) setTab('Upcoming');
+          else if (currentCompleted.length > 0) setTab('Completed');
+        }
+        setInitialTabSet(true);
+      } else {
+        // Automatically switch to Active if a vehicle was just handed over
+        if (currentOngoing.length > prevOngoing.length) {
           setTab('Active');
-        } else if (bookings.some(b => b.status === 'CONFIRMED' || b.status === 'PENDING')) {
-          setTab('Upcoming');
-        } else if (bookings.some(b => b.status === 'COMPLETED')) {
+        } 
+        // Automatically switch to Completed if an active trip was just completed
+        else if (currentCompleted.length > prevCompleted.length && currentOngoing.length === 0) {
           setTab('Completed');
         }
       }
-      setInitialTabSet(true);
+      prevBookings.current = bookings;
     }
   }, [loading, bookings, initialTabSet]);
 

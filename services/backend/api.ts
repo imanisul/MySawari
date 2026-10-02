@@ -15,6 +15,9 @@ export type BookingSnapshot = {
   vehicleName: string;
   pickupDate: string;
   returnDate: string;
+  rawEndDate?: string;
+  pickupTime?: string;
+  dropTime?: string;
   rentalDays: number;
   dailyRate: number;
   rentalAmount: number;
@@ -1041,6 +1044,7 @@ export const API = {
           vehicleName: b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle',
           pickupDate: fmt(b.fromDate),
           returnDate: fmt(b.toDate),
+          rawEndDate: b.toDate,
           pickupTime: b.pickupTime || undefined,
           dropTime: b.dropTime || undefined,
           rentalDays: days,

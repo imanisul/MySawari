@@ -174,6 +174,9 @@ export default function BookingsScreen() {
               const subtextColor = isActive ? '#A0AABF' : colors.mutedForeground;
               const dividerColor = isActive ? '#2A364C' : colors.border;
 
+              const isOverdue = booking.status === 'ONGOING' && booking.rawEndDate && new Date() > new Date(booking.rawEndDate);
+              const displayStatus = isOverdue ? 'OVERDUE' : booking.status;
+              
               return (
               <Reanimated.View key={booking.id} entering={rise()}>
                 <Pressable
@@ -182,7 +185,7 @@ export default function BookingsScreen() {
                     styles.upcomingCard, 
                     { 
                       backgroundColor: cardBg, 
-                      borderColor: cardBorder, 
+                      borderColor: isOverdue ? colors.destructive : cardBorder, 
                     borderWidth: 1 
                   }
                 ]}
@@ -195,6 +198,7 @@ export default function BookingsScreen() {
                         alignItems: 'center',
                         gap: 6,
                         backgroundColor: 
+                            isOverdue ? colors.destructive + '15' :
                             booking.status === 'ONGOING' ? colors.success + '15' :
                             booking.status === 'CONFIRMED' ? '#04785715' : 
                             booking.status === 'PENDING' ? '#3B82F615' : 
@@ -207,6 +211,7 @@ export default function BookingsScreen() {
                       <View style={[
                         styles.statusDot, 
                         { backgroundColor: 
+                            isOverdue ? colors.destructive :
                             booking.status === 'ONGOING' ? colors.success :
                             booking.status === 'CONFIRMED' ? '#047857' : 
                             booking.status === 'PENDING' ? '#3B82F6' : 
@@ -218,12 +223,13 @@ export default function BookingsScreen() {
                         fontFamily: 'Inter_600SemiBold', 
                         fontSize: 11,
                         color: 
+                            isOverdue ? (isActive ? '#FFF' : colors.destructive) :
                             booking.status === 'ONGOING' ? (isActive ? textColor : colors.success) :
                             booking.status === 'CONFIRMED' ? (isActive ? textColor : '#047857') : 
                             booking.status === 'PENDING' ? (isActive ? textColor : '#3B82F6') : 
                             (booking.status === 'CANCELLED' || booking.status === 'FAILED') ? (isActive ? textColor : colors.destructive) : 
                             (isActive ? textColor : colors.mutedForeground)
-                      }}>{booking.status}</Text>
+                      }}>{displayStatus}</Text>
                     </View>
                   </View>
                   <View style={{ marginTop: 12, gap: 6 }}>

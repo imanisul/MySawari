@@ -51,6 +51,11 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style,
   const [w, setW] = useState(0);
 
   const sweep = useSharedValue(0);
+  const opacity = useSharedValue(0);
+
+  useEffect(() => {
+    opacity.value = withDelay(delay, withTiming(1, { duration: 400 }));
+  }, [delay, opacity]);
 
   useEffect(() => {
     if (reduceMotion || w === 0) return;
@@ -71,12 +76,16 @@ export function Skeleton({ width = '100%', height = 20, borderRadius = 8, style,
     transform: [{ translateX: -w + sweep.value * w * 2 }],
   }));
 
-  const highlight = isDarkMode ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.75)';
+  const rOpacity = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  const highlight = isDarkMode ? 'rgba(255,255,255,0.09)' : 'rgba(255,255,255,0.4)';
 
   return (
     <Reanimated.View
       onLayout={(e: LayoutChangeEvent) => setW(Math.round(e.nativeEvent.layout.width))}
-      style={[styles.flat, { width, height, borderRadius, backgroundColor: colors.muted }, style]}
+      style={[styles.flat, { width, height, borderRadius, backgroundColor: colors.muted }, style, rOpacity]}
     >
       {!reduceMotion && w > 0 && (
         <Reanimated.View style={[{ width: w, height: '100%' }, rBand]} pointerEvents="none">

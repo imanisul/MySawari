@@ -218,13 +218,7 @@ export default function ExploreScreen() {
     <CarListCard car={item} effectiveDateRange={exploreDate} />
   ), [exploreDate]);
 
-  // Stable item layout for fixed-height cards — avoids measuring every cell on scroll
-  const CARD_HEIGHT = 290; // image (16:9 on ~width-32) + body + margin
-  const getItemLayout = useCallback((_: any, index: number) => ({
-    length: CARD_HEIGHT,
-    offset: CARD_HEIGHT * index,
-    index,
-  }), []);
+
 
   const activeFilterCount = useMemo(() => {
     let count = 0;

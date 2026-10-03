@@ -243,8 +243,7 @@ export function DatesSheet() {
           <Text style={[styles.timeTitle, { color: colors.foreground }]}>Select Duration (Days)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeScroll}>
             {[1, 2, 3, 4, 5, 7, 10, 15, 30].map(numDays => {
-              const diffDays = start ? Math.round((effectiveEnd!.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-              const isSelected = diffDays === numDays;
+              const isSelected = rentalDays === numDays;
               return (
                 <Pressable
                   key={`quick_day_${numDays}`}

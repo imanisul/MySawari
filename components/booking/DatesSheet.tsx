@@ -331,7 +331,20 @@ export function DatesSheet() {
                   key={'return_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    setTempReturnTime(time);
+                    const timeIndex = ALL_TIMES.indexOf(time);
+                    if (timeIndex >= 18) {
+                      const currentEnd = effectiveEnd || start || new Date(today);
+                      const nextDay = new Date(currentEnd);
+                      nextDay.setDate(nextDay.getDate() + 1);
+                      setEnd(nextDay);
+                      setTempReturnTime('8:00 AM');
+                      Alert.alert(
+                        'Extra Day Applied',
+                        'Returning at 9:00 AM or later incurs an extra day charge. We have automatically extended your booking to 8:00 AM the following day at no additional cost!'
+                      );
+                    } else {
+                      setTempReturnTime(time);
+                    }
                   }}
                   style={[
                     styles.timeChip,

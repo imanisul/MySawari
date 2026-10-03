@@ -65,7 +65,6 @@ export function DatesSheet() {
 
   const pickupScrollRef = useRef<ScrollView>(null);
   const returnScrollRef = useRef<ScrollView>(null);
-  const hasAutoBumped = useRef(false);
   
   useEffect(() => {
     setTimeout(() => {
@@ -106,7 +105,6 @@ export function DatesSheet() {
       setStart(date);
       setEnd(null);
       setTempReturnTime(null);
-      hasAutoBumped.current = false;
       return;
     }
     
@@ -117,18 +115,15 @@ export function DatesSheet() {
         setStart(date);
         setEnd(null);
         setTempReturnTime(null);
-        hasAutoBumped.current = false;
       } else if (date.getTime() === start.getTime()) {
         // Tapping the same start date again → deselect it entirely
         setStart(null);
         setEnd(null);
         setTempReturnTime(null);
-        hasAutoBumped.current = false;
       } else {
         // Picked a date after start, make it the end
         setEnd(date);
         setTempReturnTime('8:00 AM');
-        hasAutoBumped.current = false;
       }
       return;
     }
@@ -137,7 +132,6 @@ export function DatesSheet() {
     setStart(date);
     setEnd(null);
     setTempReturnTime(null);
-    hasAutoBumped.current = false;
   };
 
   const formatDateStr = (date: Date | null) => {
@@ -147,7 +141,14 @@ export function DatesSheet() {
 
   const effectiveEnd = end || start;
   const isSameDay = !!(start && effectiveEnd && start.getTime() === effectiveEnd.getTime());
-  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime, tempReturnTime || '8:00 AM') : 0;
+  // When return time >= 9 AM, the end date was already bumped +1 day to account for the extra time.
+  // So for rental days calculation, use '8:00 AM' to avoid double-counting.
+  const effectiveReturnTimeForCalc = (() => {
+    if (!tempReturnTime) return '8:00 AM';
+    const idx = ALL_TIMES.indexOf(tempReturnTime);
+    return idx >= 18 ? '8:00 AM' : tempReturnTime;
+  })();
+  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime, effectiveReturnTimeForCalc) : 0;
   const canApply = start !== null && (!isSameDay || tempReturnTime !== null);
 
   return (
@@ -338,20 +339,16 @@ export function DatesSheet() {
                   onPress={() => {
                     Haptics.selectionAsync();
                     const timeIndex = ALL_TIMES.indexOf(time);
-                    // 9:00 AM is index 18. If user picks >= 9 AM and we haven't bumped yet, auto-bump end date +1
-                    if (timeIndex >= 18 && !hasAutoBumped.current) {
+                    if (timeIndex >= 18) {
+                      // >= 9:00 AM: bump end date +1 and keep this time highlighted
                       const currentEnd = end || start || new Date(today);
                       const nextDay = new Date(currentEnd);
                       nextDay.setDate(nextDay.getDate() + 1);
                       setEnd(nextDay);
-                      setTempReturnTime('8:00 AM');
-                      hasAutoBumped.current = true;
-                    } else if (timeIndex < 18) {
-                      // User picked a time before 9 AM — allow normal selection and reset the bump flag
+                      setTempReturnTime(time); // Keep 9 AM (or whichever time) green-highlighted
+                    } else {
                       setTempReturnTime(time);
-                      hasAutoBumped.current = false;
                     }
-                    // If timeIndex >= 18 && hasAutoBumped is true → do nothing (already bumped)
                   }}
                   style={[
                     styles.timeChip,

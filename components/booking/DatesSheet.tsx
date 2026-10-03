@@ -65,6 +65,7 @@ export function DatesSheet() {
 
   const pickupScrollRef = useRef<ScrollView>(null);
   const returnScrollRef = useRef<ScrollView>(null);
+  const hasAutoBumped = useRef(false);
   
   useEffect(() => {
     setTimeout(() => {
@@ -105,6 +106,7 @@ export function DatesSheet() {
       setStart(date);
       setEnd(null);
       setTempReturnTime(null);
+      hasAutoBumped.current = false;
       return;
     }
     
@@ -115,15 +117,18 @@ export function DatesSheet() {
         setStart(date);
         setEnd(null);
         setTempReturnTime(null);
+        hasAutoBumped.current = false;
       } else if (date.getTime() === start.getTime()) {
         // Tapping the same start date again → deselect it entirely
         setStart(null);
         setEnd(null);
         setTempReturnTime(null);
+        hasAutoBumped.current = false;
       } else {
         // Picked a date after start, make it the end
         setEnd(date);
         setTempReturnTime('8:00 AM');
+        hasAutoBumped.current = false;
       }
       return;
     }
@@ -132,6 +137,7 @@ export function DatesSheet() {
     setStart(date);
     setEnd(null);
     setTempReturnTime(null);
+    hasAutoBumped.current = false;
   };
 
   const formatDateStr = (date: Date | null) => {
@@ -331,7 +337,21 @@ export function DatesSheet() {
                   key={'return_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    setTempReturnTime(time);
+                    const timeIndex = ALL_TIMES.indexOf(time);
+                    // 9:00 AM is index 18. If user picks >= 9 AM and we haven't bumped yet, auto-bump end date +1
+                    if (timeIndex >= 18 && !hasAutoBumped.current) {
+                      const currentEnd = end || start || new Date(today);
+                      const nextDay = new Date(currentEnd);
+                      nextDay.setDate(nextDay.getDate() + 1);
+                      setEnd(nextDay);
+                      setTempReturnTime('8:00 AM');
+                      hasAutoBumped.current = true;
+                    } else if (timeIndex < 18) {
+                      // User picked a time before 9 AM — allow normal selection and reset the bump flag
+                      setTempReturnTime(time);
+                      hasAutoBumped.current = false;
+                    }
+                    // If timeIndex >= 18 && hasAutoBumped is true → do nothing (already bumped)
                   }}
                   style={[
                     styles.timeChip,

@@ -10,6 +10,7 @@ import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { Car, getAvailability, dayNumToLabel, todayDayNum } from '@/utils/sawari';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useSawari } from '@/context/SawariContext';
+import { ActivityAPI } from '@/services/api/activity';
 import { shadows } from '@/constants/shadows';
 
 /**
@@ -152,6 +153,7 @@ export function CarListCard(props: CarListCardProps) {
   const router = useRouter();
   
   const handleCarPress = React.useCallback(() => {
+    ActivityAPI.logActivity('click_car', 'CarListCard', { carId: props.car.id, carName: props.car.name });
     selectCar(props.car);
     const dateRange = props.effectiveDateRange ?? globalDateRange;
     const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';

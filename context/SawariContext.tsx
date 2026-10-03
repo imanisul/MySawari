@@ -214,6 +214,12 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
+  useEffect(() => {
+    import('@/services/api/activity').then(({ ActivityAPI }) => {
+      ActivityAPI.logActivity('APP_OPENED', 'System');
+    });
+  }, []);
+
   // --- Start Push Notification Listener ---
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener((notification: any) => {
@@ -497,14 +503,39 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     try {
       const { NotificationsAPI } = require('@/services/api/notifications');
       const data = await NotificationsAPI.getNotifications();
-      const mapped = data.map((n: any) => ({
-        id: n.id,
-        title: n.title,
-        body: n.body,
-        date: n.createdAt,
-        image: n.data?.image,
-        read: n.isRead,
-      }));
+      
+      let installDateStr = null;
+      try {
+        installDateStr = await AsyncStorage.getItem('app_install_date');
+        if (!installDateStr) {
+          installDateStr = new Date().toISOString();
+          await AsyncStorage.setItem('app_install_date', installDateStr);
+        }
+      } catch {}
+
+      const installDate = installDateStr ? new Date(installDateStr).getTime() : 0;
+
+      let guestReadIds: string[] = [];
+      if (!isAuthenticated) {
+        try {
+          const stored = await AsyncStorage.getItem('guest_read_notifications');
+          if (stored) guestReadIds = JSON.parse(stored);
+        } catch {}
+      }
+
+      const mapped = data
+        .filter((n: any) => {
+          if (!n.createdAt) return true;
+          return new Date(n.createdAt).getTime() >= installDate;
+        })
+        .map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          body: n.body,
+          date: n.createdAt,
+          image: n.data?.image,
+          read: isAuthenticated ? n.isRead : guestReadIds.includes(n.id),
+        }));
       setNotifications(mapped);
     } catch (e) {
       console.error('syncNotifications error:', e);
@@ -512,13 +543,26 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated]);
 
   const markNotificationRead = useCallback(async (id: string) => {
+    if (!isAuthenticated) {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      try {
+        const stored = await AsyncStorage.getItem('guest_read_notifications');
+        const guestReadIds = stored ? JSON.parse(stored) : [];
+        if (!guestReadIds.includes(id)) {
+          guestReadIds.push(id);
+          await AsyncStorage.setItem('guest_read_notifications', JSON.stringify(guestReadIds));
+        }
+      } catch {}
+      return true;
+    }
+
     const { NotificationsAPI } = require('@/services/api/notifications');
     const success = await NotificationsAPI.markAsRead(id);
     if (success) {
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     }
     return success;
-  }, []);
+  }, [isAuthenticated]);
 
   // Refresh quote whenever dependencies change
   useEffect(() => {
@@ -771,6 +815,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             console.warn('FCM Topic Subscription Failed:', fcmError);
           }
           
+          import('@/services/api/activity').then(({ ActivityAPI }) => {
+            ActivityAPI.logActivity('AUTH_LOGIN', 'System', { userId: user.id });
+          });
+
           setIsAuthenticated(true);
         } catch (e) {
           console.error(e);
@@ -785,6 +833,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           await SecureStore.deleteItemAsync('auth_token');
           await SecureStore.deleteItemAsync('refresh_token');
           await SecureStore.deleteItemAsync('user_id');
+
+          import('@/services/api/activity').then(({ ActivityAPI }) => {
+            ActivityAPI.logActivity('AUTH_LOGOUT', 'System');
+          });
+
           if (customer?.mobile) {
             try {
               const sanitizedMobile = customer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');

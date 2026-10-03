@@ -10,15 +10,20 @@ export function DestinationCard({
   title,
   subtitle,
   places,
+  onPress,
 }: {
   image: any;
   title: string;
   subtitle: string;
   places: string[];
+  onPress?: () => void;
 }) {
   return (
     <Pressable
-      onPress={() => Haptics.selectionAsync()}
+      onPress={() => {
+        Haptics.selectionAsync();
+        onPress?.();
+      }}
       accessibilityRole="button"
       accessibilityLabel={`Explore ${title}, ${subtitle}`}
       style={({ pressed }) => [

@@ -23,7 +23,7 @@ import { calculateRentalDays } from '@/services/backend/pricingEngine';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
 import { rise } from '@/components/common/motion';
-
+import { ActivityAPI } from '@/services/api/activity';
 type SortOption = 'low-to-high' | 'high-to-low';
 type PriceRange = number;
 type TransmissionFilter = 'all' | 'Automatic' | 'Manual';
@@ -137,7 +137,23 @@ export default function SearchResultsScreen() {
     [vehicleType, priceRange, transmission, fuel]
   );
 
+  useEffect(() => {
+    ActivityAPI.logActivity('view_screen', 'SearchScreen', { vehicleType });
+  }, [vehicleType]);
+
+  useEffect(() => {
+    if (debouncedQuery) {
+      ActivityAPI.logActivity('search_query', 'SearchScreen', { query: debouncedQuery, vehicleType });
+    }
+  }, [debouncedQuery]);
+
   const activeFilterCount = [priceRange !== 10000, transmission !== 'all', fuel !== 'all'].filter(Boolean).length;
+
+  useEffect(() => {
+    if (activeFilterCount > 0) {
+      ActivityAPI.logActivity('apply_filter', 'SearchScreen', { priceRange, transmission, fuel });
+    }
+  }, [priceRange, transmission, fuel, activeFilterCount]);
 
   const filteredCars = useMemo(() => {
     // Only vehicles free for the chosen dates (or today, if none chosen).

@@ -62,8 +62,6 @@ export type BookingSnapshot = {
   vehicleMileageUsed?: number;
   fuelPriceUsed?: number;
   // Filled in for bookings created in the operations app
-  pickupTime?: string;
-  dropTime?: string;
   fastagAmount?: number;
   securityDeposit?: number;
   totalCollected?: number;

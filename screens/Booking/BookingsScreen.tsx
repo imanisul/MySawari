@@ -375,7 +375,7 @@ export default function BookingsScreen() {
                         );
                       }
                       
-                      if (!hasRejectedExt && (tab === 'Active' || (tab === 'Upcoming' && booking.status === 'CONFIRMED'))) {
+                      if (tab === 'Active' || (tab === 'Upcoming' && booking.status === 'CONFIRMED')) {
                         return (
                           <Pressable 
                             onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('extend'); }}

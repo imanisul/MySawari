@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { CarTile, LoginBottomSheet } from '@/components';
 import { TripEditorModal } from '@/components/home/TripEditorModal';
@@ -19,6 +19,8 @@ import { PriceBreakdownSheet } from '@/components/vehicle/details/PriceBreakdown
 import { SearchSheet } from '@/components/booking/SearchSheet';
 import Reanimated from 'react-native-reanimated';
 import { rise } from '@/components/common/motion';
+
+import { ActivityAPI } from '@/services/api/activity';
 
 export default function CarDetailsScreen() {
   const colors = useColors();
@@ -56,6 +58,14 @@ export default function CarDetailsScreen() {
   useEffect(() => {
     setFuelEstimate(null);
   }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      if (selectedCar) {
+        ActivityAPI.logActivity('view_car', 'CarDetailsScreen', { carId: selectedCar.id, carName: selectedCar.name });
+      }
+    }, [selectedCar])
+  );
 
   const mainScrollRef = useRef<ScrollView>(null);
 

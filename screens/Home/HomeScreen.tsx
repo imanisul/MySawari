@@ -52,6 +52,14 @@ export default function HomeScreen() {
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const insets = useSafeAreaInsets();
 
+  useFocusEffect(
+    useCallback(() => {
+      import('@/services/api/activity').then(({ ActivityAPI }) => {
+        ActivityAPI.logActivity('view_screen', 'HomeScreen');
+      });
+    }, [])
+  );
+
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     if (hour < 12) return 'Good morning';
@@ -62,7 +70,14 @@ export default function HomeScreen() {
   const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useVehicles();
 
   const renderOffer = useCallback(({ item }: any) => (
-    <OfferCard offer={item} />
+    <OfferCard 
+      offer={item} 
+      onPress={() => {
+        import('@/services/api/activity').then(({ ActivityAPI }) => {
+          ActivityAPI.logActivity('view_offer', 'HomeScreen', { offerCode: item.code, offerTitle: item.title });
+        });
+      }} 
+    />
   ), []);
 
   const renderSpecialDeal = useCallback(({ item }: any) => {
@@ -70,6 +85,9 @@ export default function HomeScreen() {
       <SpecialDealCard 
         deal={item} 
         onPress={() => {
+          import('@/services/api/activity').then(({ ActivityAPI }) => {
+            ActivityAPI.logActivity('view_special_deal', 'HomeScreen', { dealTitle: item.title, vehicleId: item.vehicleId });
+          });
           if (item.vehicleId) {
             const car = fetchedVehicles.find(v => v.id === item.vehicleId);
             if (car) {
@@ -91,8 +109,22 @@ export default function HomeScreen() {
   ), []);
   
   const renderDest = useCallback(({ item }: any) => (
-    <DestinationCard image={item.image} title={item.title} subtitle={item.subtitle} places={item.places} />
-  ), []);
+    <DestinationCard 
+      image={item.image} 
+      title={item.title} 
+      subtitle={item.subtitle} 
+      places={item.places} 
+      onPress={() => {
+        import('@/services/api/activity').then(({ ActivityAPI }) => {
+          ActivityAPI.logActivity('view_destination', 'HomeScreen', { destination: item.title });
+        });
+        // Scroll to top and switch to explore
+        mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+        setBookingSource('explore');
+        router.push('/explore');
+      }}
+    />
+  ), [router, setBookingSource]);
 
   const { data: allOffers = [], isLoading: isLoadingOffers, isFetching: isFetchingOffers, refetch: refetchOffers } = useQuery({
     queryKey: ['offers'],

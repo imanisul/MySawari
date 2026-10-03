@@ -50,7 +50,7 @@ export default function ConfirmationScreen() {
             </>
           )}
           <InfoRow icon="calendar" value={`${dateRange} · ${lastBooking?.rentalDays || duration} Days`} />
-          <InfoRow icon="clock" value={`${lastBooking?.pickupTime || pickupTime} – ${lastBooking?.returnTime || returnTime}`} />
+          <InfoRow icon="clock" value={`${lastBooking?.pickupTime || pickupTime} – ${lastBooking?.dropTime || returnTime}`} />
           <View style={[styles.paidRow, { borderTopColor: colors.border }]}>
             <Text style={[styles.paidLabel, { color: colors.foreground }]}>Paid today</Text>
             <Text style={[styles.paidValue, { color: colors.foreground }]}>₹{payToday.toLocaleString('en-IN')}</Text>

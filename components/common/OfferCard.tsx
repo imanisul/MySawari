@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { Offer } from '@/services/api/offers';
 
-export const OfferCard = React.memo(function OfferCard({ offer }: { offer: Offer }) {
+export const OfferCard = React.memo(function OfferCard({ offer, onPress }: { offer: Offer; onPress?: () => void }) {
   const { scaleAnim, opacityAnim, onPressIn, onPressOut } = usePressAnimation(1, 0.98, 1, 1);
 
   return (
@@ -15,9 +15,7 @@ export const OfferCard = React.memo(function OfferCard({ offer }: { offer: Offer
       accessibilityRole="button"
       accessibilityLabel={`${offer.discount} discount on ${offer.title}, ${offer.subtitle}. Expires ${offer.expiry}. Code ${offer.code}`}
       testID={`offer-${offer.id}`}
-      onPress={() => {
-        // Optional: Trigger action
-      }}
+      onPress={onPress}
       onPressIn={onPressIn}
       onPressOut={onPressOut}
     >

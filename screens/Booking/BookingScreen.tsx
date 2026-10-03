@@ -13,6 +13,7 @@ import { LoadingImage } from '@/components/common/LoadingImage';
 import { StatusBarScrim } from '@/components/common/StatusBarScrim';
 import { rise } from '@/components/common/motion';
 import { API } from '@/services/backend/api';
+import { ActivityAPI } from '@/services/api/activity';
 
 export default function BookingScreen() {
   const colors = useColors();
@@ -26,6 +27,10 @@ export default function BookingScreen() {
 
   const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    ActivityAPI.logActivity('initiate_checkout', 'BookingScreen', { carId: selectedCar?.id });
+  }, []);
 
   useEffect(() => {
     // Wait for a plausible full number (not every keystroke) and settle briefly before tracking,

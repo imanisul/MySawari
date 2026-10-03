@@ -439,8 +439,8 @@ export default function ExploreScreen() {
           onPress={() => {
             setSearchQuery('');
             setDebouncedQuery('');
-            setExploreDate(defaultToday);
-            setGlobalSelectedDate(defaultToday);
+            setExploreDate('');
+            setGlobalSelectedDate('');
             setFilters(defaultFilters);
             setPage(1);
           }}
@@ -451,7 +451,7 @@ export default function ExploreScreen() {
       </View>
     );
   }, [isFetchingCars, isFiltering, fetchError, colors, vehicleType, debouncedQuery,
-      exploreDate, activeFilterCount, defaultToday, setSearchQuery, setDebouncedQuery,
+      exploreDate, activeFilterCount, setSearchQuery, setDebouncedQuery,
       setExploreDate, setGlobalSelectedDate, setFilters, setPage, fetchVehicles]);
   return (
     <Page bottomNav scroll={false}>

@@ -332,7 +332,7 @@ export function DatesSheet() {
                   onPress={() => {
                     Haptics.selectionAsync();
                     const timeIndex = ALL_TIMES.indexOf(time);
-                    if (timeIndex > 18) {
+                    if (timeIndex >= 18) {
                       const currentEnd = effectiveEnd || start || new Date(today);
                       const nextDay = new Date(currentEnd);
                       nextDay.setDate(nextDay.getDate() + 1);

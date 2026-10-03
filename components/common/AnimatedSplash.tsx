@@ -1,0 +1,168 @@
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Animated, Image } from 'react-native';
+import { useColors } from '@/hooks/useColors';
+
+// Module-level flag: the splash only shows on the very first cold app launch.
+// After login or any navigation within the same session, it is skipped entirely.
+let hasShownSplash = false;
+
+export function AnimatedSplash({ isReady, children }: { isReady: boolean, children: React.ReactNode }) {
+  const colors = useColors();
+  
+  // If splash was already shown this session, skip it entirely
+  const skipSplash = useRef(hasShownSplash).current;
+
+  // State to track if the splash screen should still be mounted
+  const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash);
+  
+  // Animation values
+  const opacityAnim = useRef(new Animated.Value(1)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  
+  const titleTranslateY = useRef(new Animated.Value(20)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+
+  const taglineTranslateY = useRef(new Animated.Value(20)).current;
+  const taglineOpacity = useRef(new Animated.Value(0)).current;
+
+  // Entry Animation
+  useEffect(() => {
+    Animated.stagger(150, [
+      Animated.parallel([
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.spring(logoScale, {
+          toValue: 1,
+          tension: 12,
+          friction: 5,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(titleOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(titleTranslateY, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(taglineOpacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(taglineTranslateY, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        })
+      ])
+    ]).start();
+  }, []);
+
+  // Exit Animation triggered when app is ready
+  useEffect(() => {
+    if (!isReady || skipSplash) return;
+    // Keep the splash visible for 3 full seconds so the user sees
+    // "MySawari — Your ride, your way" before the app content appears.
+    setTimeout(() => {
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        hasShownSplash = true; // Never show splash again this session
+        setIsAnimationComplete(true);
+      });
+    }, 3000);
+  }, [isReady]);
+
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* The real app is mounted underneath from the start (not swapped in after the fade), so the
+          splash fading away reveals the already-painted screen directly — no blank/white frame between
+          "splash gone" and "app appears". */}
+      {children}
+      {!isAnimationComplete && (
+        <Animated.View
+          pointerEvents="auto"
+          style={[
+            styles.splashScreen,
+            {
+              backgroundColor: colors.background,
+              opacity: opacityAnim,
+            }
+          ]}>
+          <View style={styles.content}>
+            <Animated.View style={{
+              opacity: logoOpacity,
+              transform: [{ scale: logoScale }]
+            }}>
+              <Image
+                source={require('@/assets/images/MySawari_nobg.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </Animated.View>
+
+            <Animated.View style={{
+              opacity: titleOpacity,
+              transform: [{ translateY: titleTranslateY }],
+              marginTop: 4
+            }}>
+              <Text style={[styles.titleText, { color: colors.foreground }]}>MySawari</Text>
+            </Animated.View>
+
+            <Animated.View style={{
+              opacity: taglineOpacity,
+              transform: [{ translateY: taglineTranslateY }],
+              marginTop: 6
+            }}>
+              <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Your ride, your way.</Text>
+            </Animated.View>
+          </View>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  splashScreen: {
+    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 9999,
+  },
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoImage: {
+    width: 220,
+    height: 110,
+    marginBottom: 0,
+  },
+  titleText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 32,
+    letterSpacing: -0.5,
+  },
+  tagline: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 15,
+    letterSpacing: 0.3,
+  }
+});

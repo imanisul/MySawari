@@ -65,6 +65,7 @@ export function DatesSheet() {
 
   const pickupScrollRef = useRef<ScrollView>(null);
   const returnScrollRef = useRef<ScrollView>(null);
+  const hasAutoBumped = useRef(false);
   
   useEffect(() => {
     setTimeout(() => {
@@ -105,6 +106,7 @@ export function DatesSheet() {
       setStart(date);
       setEnd(null);
       setTempReturnTime(null);
+      hasAutoBumped.current = false;
       return;
     }
     
@@ -115,15 +117,18 @@ export function DatesSheet() {
         setStart(date);
         setEnd(null);
         setTempReturnTime(null);
+        hasAutoBumped.current = false;
       } else if (date.getTime() === start.getTime()) {
         // Tapping the same start date again → deselect it entirely
         setStart(null);
         setEnd(null);
         setTempReturnTime(null);
+        hasAutoBumped.current = false;
       } else {
         // Picked a date after start, make it the end
         setEnd(date);
         setTempReturnTime('8:00 AM');
+        hasAutoBumped.current = false;
       }
       return;
     }
@@ -132,6 +137,7 @@ export function DatesSheet() {
     setStart(date);
     setEnd(null);
     setTempReturnTime(null);
+    hasAutoBumped.current = false;
   };
 
   const formatDateStr = (date: Date | null) => {
@@ -340,13 +346,26 @@ export function DatesSheet() {
                     Haptics.selectionAsync();
                     const timeIndex = ALL_TIMES.indexOf(time);
                     if (timeIndex >= 18) {
-                      // >= 9:00 AM: bump end date +1 and keep this time highlighted
-                      const currentEnd = end || start || new Date(today);
-                      const nextDay = new Date(currentEnd);
-                      nextDay.setDate(nextDay.getDate() + 1);
-                      setEnd(nextDay);
-                      setTempReturnTime(time); // Keep 9 AM (or whichever time) green-highlighted
+                      // >= 9:00 AM
+                      if (!hasAutoBumped.current) {
+                        // First time selecting >= 9 AM: bump end date by exactly 1 day
+                        const currentEnd = end || start || new Date(today);
+                        const nextDay = new Date(currentEnd);
+                        nextDay.setDate(nextDay.getDate() + 1);
+                        setEnd(nextDay);
+                        hasAutoBumped.current = true;
+                      }
+                      // Always update the green highlight to whichever >= 9 AM time was tapped
+                      setTempReturnTime(time);
                     } else {
+                      // < 9:00 AM selected
+                      if (hasAutoBumped.current && end) {
+                        // Was previously bumped, reverse it (decrease date by 1)
+                        const prevDay = new Date(end);
+                        prevDay.setDate(prevDay.getDate() - 1);
+                        setEnd(prevDay);
+                        hasAutoBumped.current = false;
+                      }
                       setTempReturnTime(time);
                     }
                   }}

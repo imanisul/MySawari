@@ -60,6 +60,8 @@ export function DatesSheet() {
   );
   
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
+  const [showStandardTimeNote, setShowStandardTimeNote] = useState(false);
+  const noteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
@@ -355,6 +357,10 @@ export function DatesSheet() {
                         setEnd(nextDay);
                         hasAutoBumped.current = true;
                       }
+                      // Show the standard time note and auto-hide after 4 seconds
+                      setShowStandardTimeNote(true);
+                      if (noteTimerRef.current) clearTimeout(noteTimerRef.current);
+                      noteTimerRef.current = setTimeout(() => setShowStandardTimeNote(false), 4000);
                       // Always update the green highlight to whichever >= 9 AM time was tapped
                       setTempReturnTime(time);
                     } else {
@@ -387,6 +393,15 @@ export function DatesSheet() {
               );
             })}
           </ScrollView>
+
+          {showStandardTimeNote && (
+            <View style={{ marginTop: 8, marginHorizontal: 4, backgroundColor: colors.gold + '18', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Feather name="info" size={13} color={colors.goldDark} />
+              <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11.5, color: colors.goldDark, flex: 1 }}>
+                Our standard rental time is 8:00 AM to 8:00 AM. An extra day has been added.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 

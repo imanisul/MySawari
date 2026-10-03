@@ -150,9 +150,10 @@ export function calculateRentalDays(start: string, end: string, startTime?: stri
 
     const diffTime = endDate.getTime() - startDate.getTime();
     if (diffTime <= 0) return 1;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    // 1-hour grace period: subtract 1 hour before ceiling, ensure minimum 1 day.
+    const diffDays = Math.max(1, Math.ceil((diffTime - (60 * 60 * 1000)) / (1000 * 60 * 60 * 24)));
 
-    return diffDays > 0 ? diffDays : 1;
+    return diffDays;
   } catch (e) {
     return 1;
   }

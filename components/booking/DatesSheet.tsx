@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation, Alert, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -294,6 +294,20 @@ export function DatesSheet() {
                   onPress={() => {
                     Haptics.selectionAsync();
                     setTempPickupTime(time);
+                    
+                    const timeIndex = ALL_TIMES.indexOf(time);
+                    // ALL_TIMES index 16 is 8:00 AM. Indices 0 to 15 are before 8:00 AM.
+                    if (timeIndex !== -1 && timeIndex < 16) {
+                      Alert.alert(
+                        'Early Pickup Requested',
+                        'For vehicle pickup before 8:00 AM, please connect with our Customer Care team.',
+                        [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Call Now', onPress: () => Linking.openURL('tel:+919876543210') },
+                          { text: 'WhatsApp', onPress: () => Linking.openURL('https://wa.me/919876543210') }
+                        ]
+                      );
+                    }
                   }}
                   style={[
                     styles.timeChip,

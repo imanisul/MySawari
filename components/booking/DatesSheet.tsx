@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation, Alert, Linking } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation, Alert, Linking, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -58,6 +58,8 @@ export function DatesSheet() {
   const [tempReturnTime, setTempReturnTime] = useState<string | null>(
     (initialIsSameDay && (!returnTime || returnTime === '08:00 AM' || returnTime === '8:00 AM')) ? null : (returnTime ? returnTime.replace(/^0/, '') : '8:00 AM')
   );
+  
+  const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
@@ -293,21 +295,12 @@ export function DatesSheet() {
                   key={'pickup_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    setTempPickupTime(time);
-                    
                     const timeIndex = ALL_TIMES.indexOf(time);
-                    // ALL_TIMES index 16 is 8:00 AM. Indices 0 to 15 are before 8:00 AM.
                     if (timeIndex !== -1 && timeIndex < 16) {
-                      Alert.alert(
-                        'Early Pickup Requested',
-                        'For vehicle pickup before 8:00 AM, please connect with our Customer Care team.',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Call Now', onPress: () => Linking.openURL('tel:+919876543210') },
-                          { text: 'WhatsApp', onPress: () => Linking.openURL('https://wa.me/919876543210') }
-                        ]
-                      );
+                      setShowEarlyPickupModal(true);
+                      return;
                     }
+                    setTempPickupTime(time);
                   }}
                   style={[
                     styles.timeChip,
@@ -338,7 +331,16 @@ export function DatesSheet() {
                   key={'return_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    setTempReturnTime(time);
+                    const timeIndex = ALL_TIMES.indexOf(time);
+                    if (timeIndex > 18) {
+                      const currentEnd = effectiveEnd || start || new Date(today);
+                      const nextDay = new Date(currentEnd);
+                      nextDay.setDate(nextDay.getDate() + 1);
+                      setEnd(nextDay);
+                      setTempReturnTime('8:00 AM');
+                    } else {
+                      setTempReturnTime(time);
+                    }
                   }}
                   style={[
                     styles.timeChip,
@@ -381,6 +383,45 @@ export function DatesSheet() {
           }}
         />
       </View>
+
+      <Modal visible={showEarlyPickupModal} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.destructive + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <Feather name="clock" size={32} color={colors.destructive} />
+            </View>
+            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Early Pickup</Text>
+            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
+              For vehicle pickup before 8:00 AM, please connect with our Customer Care team to confirm availability.
+            </Text>
+            
+            <View style={{ width: '100%', gap: 12 }}>
+              <Pressable 
+                onPress={() => Linking.openURL('tel:+919876543210')}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8 }}
+              >
+                <Feather name="phone-call" size={18} color={colors.primaryForeground} />
+                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.primaryForeground }}>Call Customer Care</Text>
+              </Pressable>
+              
+              <Pressable 
+                onPress={() => Linking.openURL('https://wa.me/919876543210')}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', paddingVertical: 14, borderRadius: 14, gap: 8 }}
+              >
+                <Feather name="message-circle" size={18} color="#fff" />
+                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: "#fff" }}>WhatsApp Us</Text>
+              </Pressable>
+              
+              <Pressable 
+                onPress={() => setShowEarlyPickupModal(false)}
+                style={{ paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
+              >
+                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.mutedForeground }}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SheetFrame>
   );
 }

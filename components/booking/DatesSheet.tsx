@@ -331,16 +331,7 @@ export function DatesSheet() {
                   key={'return_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    const timeIndex = ALL_TIMES.indexOf(time);
-                    if (timeIndex >= 18) {
-                      const currentEnd = effectiveEnd || start || new Date(today);
-                      const nextDay = new Date(currentEnd);
-                      nextDay.setDate(nextDay.getDate() + 1);
-                      setEnd(nextDay);
-                      setTempReturnTime('8:00 AM');
-                    } else {
-                      setTempReturnTime(time);
-                    }
+                    setTempReturnTime(time);
                   }}
                   style={[
                     styles.timeChip,

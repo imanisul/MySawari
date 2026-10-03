@@ -419,12 +419,12 @@ export function DatesSheet() {
             </View>
             <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Early Pickup</Text>
             <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
-              For vehicle pickup before 8:00 AM, please connect with our Customer Care team to confirm availability.
+              For vehicle pickup before 8:00 AM, please connect with our Customer Care to confirm availability.
             </Text>
             
             <View style={{ width: '100%', gap: 12 }}>
               <Pressable 
-                onPress={() => Linking.openURL('tel:+919876543210')}
+                onPress={() => Linking.openURL('tel:+919365557500')}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8 }}
               >
                 <Feather name="phone-call" size={18} color={colors.primaryForeground} />
@@ -432,7 +432,7 @@ export function DatesSheet() {
               </Pressable>
               
               <Pressable 
-                onPress={() => Linking.openURL('https://wa.me/919876543210')}
+                onPress={() => Linking.openURL('https://wa.me/919365557500')}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', paddingVertical: 14, borderRadius: 14, gap: 8 }}
               >
                 <Feather name="message-circle" size={18} color="#fff" />

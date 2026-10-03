@@ -29,8 +29,7 @@ export default function ExploreScreen() {
   const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>(globalVehicleType === 'car' ? 'Cars' : 'Bikes');
 
   // Fully local date state — completely independent from the Home/Index page
-  const defaultToday = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const [exploreDate, setExploreDate] = useState(defaultToday);
+  const [exploreDate, setExploreDate] = useState<string>('');
 
   useFocusEffect(
     useCallback(() => {
@@ -66,16 +65,17 @@ export default function ExploreScreen() {
 
   const handleDateSelect = useCallback((date: string) => {
     Haptics.selectionAsync();
-    if (date === exploreDate) return;
     
-    // 1. Immediately show skeleton and visually select the date chip
+    // 1. Immediately show skeleton and visually update the date chip
     setIsFiltering(true);
-    setExploreDate(date);
+    
+    const newDate = date === exploreDate ? '' : date;
+    setExploreDate(newDate);
     
     // 2. Defer the heavy list filtering to the next JS tick
     // This allows the skeleton to render immediately without dropping frames
     setTimeout(() => {
-      setGlobalSelectedDate(date);
+      setGlobalSelectedDate(newDate);
       setPage(1);
 
       // Keep skeleton up slightly longer so the list layout doesn't flash jarringly

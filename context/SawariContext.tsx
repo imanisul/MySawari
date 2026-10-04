@@ -404,6 +404,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             
             // Only consider them authenticated if the profile successfully fetched
             setIsAuthenticated(true);
+
+            // Booking pushes (confirmed / trip started / cancelled) go to the customer_<mobile> topic. It was
+            // only joined at login, so a reinstall or a new Firebase token on a saved session lost them.
+            if (messaging && userProfile.mobile) {
+              const topicMobile = String(userProfile.mobile).replace(/[^a-zA-Z0-9-_.~%]/g, '');
+              messaging().subscribeToTopic(`customer_${topicMobile}`).catch(() => {});
+            }
             
             // Load other data concurrently
             const [storedRewards, storedBookings] = await Promise.all([
@@ -839,6 +846,12 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         try {
           invalidateWalletCache();
+          // Logged while the session still exists, so the entry carries the customer's id and number.
+          try {
+            const { ActivityAPI } = await import('@/services/api/activity');
+            // Never holds the logout up for more than 2 s on a slow network.
+            await Promise.race([ActivityAPI.logActivity('AUTH_LOGOUT', 'System'), new Promise((r) => setTimeout(r, 2000))]);
+          } catch {}
           // Revoke the session server-side too (a copied refresh token stops working right away).
           const refreshToken = await SecureStore.getItemAsync('refresh_token').catch(() => null);
           API.logoutServer(refreshToken);
@@ -846,9 +859,6 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           await SecureStore.deleteItemAsync('refresh_token');
           await SecureStore.deleteItemAsync('user_id');
 
-          import('@/services/api/activity').then(({ ActivityAPI }) => {
-            ActivityAPI.logActivity('AUTH_LOGOUT', 'System');
-          });
 
           if (customer?.mobile) {
             try {

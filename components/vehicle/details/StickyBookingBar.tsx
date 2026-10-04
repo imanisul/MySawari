@@ -31,7 +31,7 @@ export function StickyBookingBar({
       <Pressable
         style={styles.priceContainer}
         onPress={onViewBreakdown}
-        disabled={!onViewBreakdown}
+        disabled={!onViewBreakdown || !isAvailable}
         accessibilityRole={onViewBreakdown ? 'button' : undefined}
         accessibilityLabel="View price breakdown"
       >

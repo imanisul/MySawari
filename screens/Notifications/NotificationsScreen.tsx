@@ -40,6 +40,9 @@ export default function NotificationsScreen() {
     if (!item.read) {
       await markNotificationRead(item.id);
     }
+    if (item.bookingId) {
+      router.push({ pathname: '/booking-detail', params: { id: item.bookingId } });
+    }
   };
 
   const renderEmpty = () => (

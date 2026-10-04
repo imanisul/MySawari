@@ -30,6 +30,7 @@ import { SawariProvider, useSawari } from '@/context/SawariContext';
 import { useAppUpdates } from '@/hooks/useAppUpdates';
 import { useColors } from '@/hooks/useColors';
 import { PostTripReviewPrompt } from '@/components/booking/PostTripReviewPrompt';
+import { PushNotificationHandler } from '@/components/notifications/PushNotificationHandler';
 import * as Location from 'expo-location';
 import { API } from '@/services/backend/api';
 
@@ -237,6 +238,7 @@ export default function RootLayout() {
                 <OTAUpdateChecker />
                 <PostTripReviewPrompt />
                 <LocationTracker />
+                <PushNotificationHandler />
                 <ThemedStatusBar />
               </AppGate>
             </SawariProvider>

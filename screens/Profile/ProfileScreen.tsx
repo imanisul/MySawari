@@ -5,7 +5,7 @@ import { Page, Header, PrimaryButton, CustomAlert } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoginBottomSheet } from '@/components';
@@ -65,6 +65,14 @@ export default function ProfileScreen() {
       glowLoop.stop();
     };
   }, [giftUnlocked]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      import('@/services/api/activity').then(({ ActivityAPI }) => {
+        ActivityAPI.logActivity('view_profile', 'ProfileScreen');
+      });
+    }, [])
+  );
 
   const handleGiftPress = async () => {
     if (!giftUnlocked) return;

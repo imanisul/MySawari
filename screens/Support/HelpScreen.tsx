@@ -101,7 +101,10 @@ export default function HelpScreen() {
             </Text>
             <TouchableOpacity 
               style={[styles.chatButton, { backgroundColor: colors.primary }]}
-              onPress={() => Linking.openURL('https://wa.me/919876543210')}
+              onPress={() => {
+                import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('contact_support', 'HelpScreen', { method: 'whatsapp' }));
+                Linking.openURL('https://wa.me/919876543210');
+              }}
             >
               <Text style={styles.chatButtonText}>Chat on WhatsApp</Text>
             </TouchableOpacity>

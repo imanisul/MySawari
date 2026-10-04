@@ -174,7 +174,8 @@ export async function timedFetch(url: string, options: RequestInit = {}, timeout
 const PLATE_PROXY_PATH = '/images/blur?target=';
 // Bumped when plate processing changes: a new URL means the phone never reuses an image it cached
 // under the old one (including an unprocessed original from before the backend stopped falling back to it).
-const PLATE_PROXY_VERSION = 'pv=5';
+// pv=6: plates are now hidden by the backend itself (tilted bike plates included).
+const PLATE_PROXY_VERSION = 'pv=6';
 
 /**
  * Every vehicle photo shown in the app must come through the backend's number-plate processing.

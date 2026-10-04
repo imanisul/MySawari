@@ -340,7 +340,10 @@ export default function PaymentScreen() {
           </View>
           <Pressable
             disabled={isQuoteLoading || !pricingQuote || isTripIncomplete}
-            onPress={() => router.push('/payment-processing')}
+            onPress={() => {
+              import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_started', 'PaymentScreen', { amount: pricingQuote?.onlinePayableNow }));
+              router.push('/payment-processing');
+            }}
             style={[styles.payButton, { backgroundColor: isQuoteLoading || isTripIncomplete ? colors.muted : colors.primary }]}
           >
             {isQuoteLoading ? (

@@ -33,6 +33,8 @@ export type AppNotification = {
   date: string;
   image?: string;
   read: boolean;
+  /** Set when the notification is about a booking — tapping it opens that booking. */
+  bookingId?: string;
 };
 
 export type AppCustomer = {
@@ -223,8 +225,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   // --- Start Push Notification Listener ---
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener((notification: any) => {
-      const { title, body } = notification.request.content;
-      const id = notification.request.identifier;
+      const { title, body, data } = notification.request.content;
+      // The server's id when there is one, so the next sync from the server doesn't add it a second time.
+      const id = (typeof data?.notificationId === 'string' && data.notificationId) || notification.request.identifier;
+      const bookingId = typeof data?.bookingId === 'string' && data.bookingId ? data.bookingId : undefined;
       
       setNotifications((prev) => {
         // Prevent duplicates
@@ -236,6 +240,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             body: body || '',
             date: new Date().toISOString(),
             read: false,
+            bookingId,
           },
           ...prev,
         ];
@@ -534,6 +539,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           body: n.body,
           date: n.createdAt,
           image: n.data?.image,
+          bookingId: n.data?.bookingId ? String(n.data.bookingId) : undefined,
           read: isAuthenticated ? n.isRead : guestReadIds.includes(n.id),
         }));
       setNotifications(mapped);
@@ -573,8 +579,15 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
 
   const contextValue = useMemo<SawariContextValue>(() => ({
     vehicleType,
-    setVehicleType,
+    setVehicleType: (val: 'car' | 'bike') => {
+      import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('change_vehicle_type', 'SawariContext', { vehicleType: val }));
+      setVehicleType(val);
+    },
     mode,
+    setMode: (val: DriverMode) => {
+      import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('change_driver_mode', 'SawariContext', { mode: val }));
+      setMode(val);
+    },
       selectedCar,
       bookingConfirmed,
       pickup,
@@ -650,7 +663,6 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         // Refresh cash to reflect deduction
         applyWallet(await API.getWallet(true));
       },
-      setMode,
       selectCar: setSelectedCar,
       setPickup,
       setDropoff,
@@ -866,9 +878,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       },
       favorites,
       toggleFavorite: (carId: string) => {
-        setFavorites(prev => 
-          prev.includes(carId) ? prev.filter(id => id !== carId) : [...prev, carId]
-        );
+        setFavorites(prev => {
+          const isRemoving = prev.includes(carId);
+          import('@/services/api/activity').then(({ ActivityAPI }) => {
+            ActivityAPI.logActivity(isRemoving ? 'remove_favorite' : 'add_favorite', 'SawariContext', { carId });
+          });
+          return isRemoving ? prev.filter(id => id !== carId) : [...prev, carId];
+        });
       },
       isDarkMode,
       toggleDarkMode: (value: boolean) => {

@@ -51,6 +51,7 @@ export default function HomeScreen() {
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const insets = useSafeAreaInsets();
+  const mainScrollRef = useRef<FlatList<any>>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -119,7 +120,7 @@ export default function HomeScreen() {
           ActivityAPI.logActivity('view_destination', 'HomeScreen', { destination: item.title });
         });
         // Scroll to top and switch to explore
-        mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+        mainScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
         setBookingSource('explore');
         router.push('/explore');
       }}
@@ -687,6 +688,7 @@ export default function HomeScreen() {
     <Page bottomNav scroll={false}>
       <Header absolute={true} />
       <FlatList
+        ref={mainScrollRef}
         data={sections}
         keyExtractor={sectionKeyExtractor}
         renderItem={renderSection}

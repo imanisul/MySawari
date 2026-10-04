@@ -46,6 +46,12 @@ export function DatesSheet() {
     return d;
   };
 
+  useEffect(() => {
+    import('@/services/api/activity').then(({ ActivityAPI }) => {
+      ActivityAPI.logActivity('open_dates_sheet', 'DatesSheet');
+    });
+  }, []);
+
   const initialStart = parseDateStr(dateRange.split(' – ')[0]);
   const initialEnd = parseDateStr(dateRange.split(' – ')[1]);
 
@@ -415,6 +421,16 @@ export function DatesSheet() {
               setDates(`${formatDateStr(start)} – ${formatDateStr(effectiveEnd)}`, `${rentalDays} Day${rentalDays !== 1 ? 's' : ''}`);
               setTimes(tempPickupTime, finalReturnTime);
               
+              import('@/services/api/activity').then(({ ActivityAPI }) => {
+                ActivityAPI.logActivity('select_dates', 'DatesSheet', { 
+                  startDate: formatDateStr(start), 
+                  endDate: formatDateStr(effectiveEnd),
+                  pickupTime: tempPickupTime,
+                  returnTime: finalReturnTime,
+                  rentalDays
+                });
+              });
+
               if (returnBack === 'true') {
                 router.back();
               } else {

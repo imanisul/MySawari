@@ -39,6 +39,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
   }, [searchQuery, mode]);
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => listRef.current?.scrollTo({ y: 0, animated: false }));
+    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('open_location_sheet', 'LocationSheet', { mode }));
     return () => sub.remove();
   }, []);
 
@@ -167,6 +168,8 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
         source: 'gps'
       };
 
+      import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('select_location', 'LocationSheet', { locationName: 'Current Location', mode }));
+
       if (mode === 'destination') {
         setDropoff(loc);
         router.back();
@@ -208,6 +211,8 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
       name: place.name || place.structured_formatting?.main_text || 'Selected Location',
       source: 'osm'
     };
+
+    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('select_location', 'LocationSheet', { locationName: loc.name, mode }));
 
     if (mode === 'destination') {
       setDropoff(loc);

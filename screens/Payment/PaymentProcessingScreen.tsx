@@ -94,6 +94,9 @@ export default function PaymentProcessingScreen() {
       
       confirmBooking();
       setStatus('SUCCESS');
+      
+      import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_success', 'PaymentProcessingScreen', { paymentId: paymentDetails?.razorpayPaymentId }));
+
       setTimeout(() => {
         router.replace('/confirmation');
       }, 1500);
@@ -111,6 +114,8 @@ export default function PaymentProcessingScreen() {
           // Backend might have already cancelled it
         }
         
+        import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_failed', 'PaymentProcessingScreen', { reason, paymentId: paymentDetails?.razorpayPaymentId }));
+
         setErrorMsg(`Your payment (${paymentDetails.razorpayPaymentId}) was received, but the booking could not be saved: ${reason}. It has been cancelled and a refund will be processed.`);
         setStatus('ERROR');
         
@@ -118,6 +123,7 @@ export default function PaymentProcessingScreen() {
           router.replace('/bookings');
         }, 3500);
       } else {
+        import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_failed', 'PaymentProcessingScreen', { reason }));
         setErrorMsg(reason);
         setStatus('ERROR');
       }

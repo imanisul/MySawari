@@ -8,7 +8,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { CarTile, LoginBottomSheet } from '@/components';
 import { TripEditorModal } from '@/components/home/TripEditorModal';
-import { cars, getAvailability, splitDateRange } from '@/utils/sawari';
+import { cars, getAvailability, splitDateRange, parseDayLabel, dayNumToLabel, todayDayNum } from '@/utils/sawari';
 
 import { VehicleHeader } from '@/components/vehicle/details/VehicleHeader';
 import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGallery';
@@ -26,7 +26,7 @@ export default function CarDetailsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate } = useSawari();
+  const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate, setDates } = useSawari();
   
   // CarListCard already syncs the Explore page's date to dateRange before navigation.
   const effectiveDateRange = dateRange;
@@ -38,6 +38,30 @@ export default function CarDetailsScreen() {
 
   // Enrich the car with the computed availability so child components can access nextAvailableFrom etc.
   const enrichedCar = selectedCar ? { ...selectedCar, availability, isAvailable } : selectedCar;
+
+  // When the car is taken for the chosen dates, offer the next window of the same length.
+  const requestedStart = parseDayLabel(startStr);
+  const requestedEnd = requestedStart !== null ? parseDayLabel(endStr, requestedStart) : null;
+  const stayDays = requestedStart !== null && requestedEnd !== null ? requestedEnd - requestedStart + 1 : 1;
+  const requestedLabel = requestedStart !== null
+    ? `${dayNumToLabel(requestedStart)}${requestedEnd !== null && requestedEnd > requestedStart ? ` – ${dayNumToLabel(requestedEnd)}` : ''}`
+    : 'Today';
+  const nextStart = parseDayLabel(availability.nextAvailableFrom, todayDayNum());
+  const nextEnd = nextStart !== null ? nextStart + stayDays - 1 : null;
+  const nextWindowLabel = nextStart !== null && nextEnd !== null
+    ? (nextEnd > nextStart ? `${dayNumToLabel(nextStart)} – ${dayNumToLabel(nextEnd)}` : dayNumToLabel(nextStart))
+    : null;
+
+  const openDatePicker = () => {
+    Haptics.selectionAsync();
+    router.push({ pathname: '/dates', params: { returnBack: 'true' } });
+  };
+
+  const applyNextWindow = () => {
+    if (nextStart === null || nextEnd === null) return;
+    Haptics.selectionAsync();
+    setDates(`${dayNumToLabel(nextStart)} – ${dayNumToLabel(nextEnd)}`, `${stayDays} Day${stayDays !== 1 ? 's' : ''}`);
+  };
 
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -107,6 +131,51 @@ export default function CarDetailsScreen() {
           <DetailsTabs car={enrichedCar} />
         </Reanimated.View>
 
+        {/* Not available for the chosen dates: check other dates instead of showing the pickup location */}
+        {!isAvailable && (
+          <Reanimated.View entering={rise(300)} style={styles.fuelSection}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Check Availability</Text>
+            <View style={[styles.locationCard, { backgroundColor: colors.card, borderColor: colors.border, padding: 16 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={[styles.availIcon, { backgroundColor: colors.destructive + '12' }]}>
+                  <Feather name={availability.reason === 'service' ? 'tool' : 'calendar'} size={20} color={colors.destructive} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.locationTitle, { color: colors.foreground, fontSize: 14 }]}>
+                    Not available for {requestedLabel}
+                  </Text>
+                  <Text style={[styles.locationDesc, { color: colors.mutedForeground, fontSize: 12 }]}>
+                    {availability.reason === 'service' ? 'This vehicle is under maintenance.' : 'This vehicle is booked on these dates.'}
+                    {availability.nextAvailableFrom ? ` Next available from ${availability.nextAvailableFrom}.` : ' Try different dates.'}
+                  </Text>
+                </View>
+              </View>
+
+              {!!nextWindowLabel && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={applyNextWindow}
+                  style={({ pressed }) => [styles.availPrimaryBtn, { backgroundColor: colors.primary }, pressed && styles.pressed]}
+                >
+                  <Feather name="check-circle" size={16} color={colors.primaryForeground} />
+                  <Text style={[styles.mapBtnText, { color: colors.primaryForeground }]}>
+                    Book for {nextWindowLabel}
+                  </Text>
+                </Pressable>
+              )}
+
+              <Pressable
+                accessibilityRole="button"
+                onPress={openDatePicker}
+                style={({ pressed }) => [styles.availSecondaryBtn, { borderColor: colors.border }, pressed && styles.pressed]}
+              >
+                <Feather name="calendar" size={16} color={colors.foreground} />
+                <Text style={[styles.mapBtnText, { color: colors.foreground }]}>Change Dates</Text>
+              </Pressable>
+            </View>
+          </Reanimated.View>
+        )}
+
         {/* Location Card */}
         {isAvailable && (
           <Reanimated.View entering={rise(300)} style={styles.fuelSection}>
@@ -170,6 +239,7 @@ export default function CarDetailsScreen() {
       
       <StickyBookingBar 
         isAvailable={isAvailable} 
+        onCheckAvailability={openDatePicker}
         onViewBreakdown={() => setShowBreakdown(true)} 
         onNeedLogin={() => {
           setPendingAction(() => handleBookingProceed);
@@ -212,6 +282,9 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: {},
   pressed: { opacity: 0.7 },
+  availIcon: { height: 48, width: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  availPrimaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 12, marginTop: 16 },
+  availSecondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 12, marginTop: 10, borderWidth: 1 },
   notAvailableBox: { margin: 16, padding: 24, borderRadius: 16, borderWidth: 1, alignItems: 'center' },
   notAvailableTitle: { fontFamily: 'Inter_700Bold', fontSize: 18, textAlign: 'center' },
   notAvailableDesc: { fontFamily: 'Inter_500Medium', fontSize: 13, textAlign: 'center', marginTop: 8 },

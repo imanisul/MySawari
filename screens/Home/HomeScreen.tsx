@@ -68,7 +68,7 @@ export default function HomeScreen() {
     return 'Good evening';
   }, []);
 
-  const { data: fetchedVehicles = [], isLoading: isLoadingVehicles } = useVehicles();
+  const { data: fetchedVehicles = [], isLoading: isLoadingVehicles, isError: vehiclesFailed, refetch: refetchVehicles } = useVehicles();
 
   const renderOffer = useCallback(({ item }: any) => (
     <OfferCard 
@@ -129,10 +129,7 @@ export default function HomeScreen() {
 
   const { data: allOffers = [], isLoading: isLoadingOffers, isFetching: isFetchingOffers, refetch: refetchOffers } = useQuery({
     queryKey: ['offers'],
-    queryFn: async () => {
-      await new Promise(r => setTimeout(r, 800)); // Smooth out the initial skeleton loading animation
-      return fetchOffers();
-    },
+    queryFn: fetchOffers,
     staleTime: 15 * 1000,
     refetchOnWindowFocus: true,
   });
@@ -586,6 +583,12 @@ export default function HomeScreen() {
                         </View>
                       ))}
                     </View>
+                  ) : vehiclesFailed && fetchedVehicles.length === 0 ? (
+                    <Pressable onPress={() => refetchVehicles()} style={{ paddingVertical: 24 }}>
+                      <Text style={[styles.emptyVehicles, { color: colors.mutedForeground, paddingVertical: 0 }]}>
+                        Couldn't load vehicles. <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold' }}>Tap to retry</Text>
+                      </Text>
+                    </Pressable>
                   ) : (
                     <Text style={[styles.emptyVehicles, { color: colors.mutedForeground }]}>
                       {selectedDate === 'All Dates' ? 'None available right now.' : `None available on ${selectedDate}.`} Try another date.
@@ -622,6 +625,12 @@ export default function HomeScreen() {
                         </View>
                       ))}
                     </View>
+                  ) : vehiclesFailed && fetchedVehicles.length === 0 ? (
+                    <Pressable onPress={() => refetchVehicles()} style={{ paddingVertical: 24 }}>
+                      <Text style={[styles.emptyVehicles, { color: colors.mutedForeground, paddingVertical: 0 }]}>
+                        Couldn't load vehicles. <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold' }}>Tap to retry</Text>
+                      </Text>
+                    </Pressable>
                   ) : (
                     <Text style={[styles.emptyVehicles, { color: colors.mutedForeground }]}>
                       {selectedDate === 'All Dates' ? 'None available right now.' : `None available on ${selectedDate}.`} Try another date.
@@ -682,7 +691,7 @@ export default function HomeScreen() {
     
     // Each section eases in a beat after the one above it, so the page builds top to bottom.
     return <Reveal delay={Math.min(Math.max(0, index - 1), 6) * 40}>{content}</Reveal>;
-  }, [colors, greeting, customer?.name, isAuthenticated, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, upcomingBooking, upcomingCar, membership]);
+  }, [colors, greeting, customer?.name, isAuthenticated, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, vehiclesFailed, refetchVehicles, upcomingBooking, upcomingCar, membership]);
 
   return (
     <Page bottomNav scroll={false}>
@@ -705,7 +714,7 @@ export default function HomeScreen() {
             onRefresh={async () => {
               setManualRefreshing(true);
               try {
-                const promises: Promise<any>[] = [refetchOffers()];
+                const promises: Promise<any>[] = [refetchOffers(), refetchVehicles()];
                 if (isAuthenticated) promises.push(refetchBookings());
                 await Promise.all(promises);
               } finally {

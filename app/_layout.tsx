@@ -10,7 +10,7 @@ LogBox.ignoreLogs([
 
 import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
 import { AppState } from 'react-native';
-import { primeVehicles } from '@/hooks/useVehicles';
+import { primeVehicles, useVehicles } from '@/hooks/useVehicles';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
@@ -205,11 +205,9 @@ function OTAUpdateChecker() {
 }
 
 export default function RootLayout() {
-  // Restore the saved vehicles before the splash lifts, so Home/Explore open with content instead of
-  // a flash of placeholders. The network refresh starts in the background and is not waited for.
-  const [cacheReady, setCacheReady] = useState(false);
+  // Start loading the live vehicles from the database right away; the loading screen waits for them.
   useEffect(() => {
-    primeVehicles(queryClient).finally(() => setCacheReady(true));
+    primeVehicles(queryClient);
   }, []);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -232,7 +230,7 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <SawariProvider>
-              <AppGate fontError={!!fontError && !fontsLoaded} cacheReady={cacheReady}>
+              <AppGate fontError={!!fontError && !fontsLoaded}>
                 <RootLayoutNav />
                 <FloatingSupport />
                 <OTAUpdateChecker />
@@ -250,23 +248,24 @@ export default function RootLayout() {
 }
 
 /**
- * The single readiness gate. Nothing is rendered while booting (fonts, saved session and settings,
- * saved vehicles), and the native splash is hidden exactly once, after the first ready frame is laid out.
+ * The single readiness gate. Nothing is rendered while booting (fonts, saved session and settings),
+ * and the native splash is hidden exactly once, after the first ready frame is laid out. The branded
+ * loading screen then stays over the app until the live vehicles have loaded from the server.
  */
 function AppGate({
   children,
   fontError,
-  cacheReady,
 }: {
   children: React.ReactNode;
   fontError: boolean;
-  cacheReady: boolean;
 }) {
   const { isAuthLoading } = useSawari();
+  const vehicles = useVehicles();
+  const vehiclesLoaded = vehicles.data !== undefined;
   const colors = useColors();
   const splashHidden = useRef(false);
 
-  const status: AppStatus = isAuthLoading || !cacheReady ? 'booting' : fontError ? 'error' : 'ready';
+  const status: AppStatus = isAuthLoading ? 'booting' : fontError ? 'error' : 'ready';
 
   const onLayout = useCallback(() => {
     // AnimatedSplash handles its own visual lifecycle, so we only need to hide the native splash
@@ -284,7 +283,12 @@ function AppGate({
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayout}>
-      <AnimatedSplash isReady={status === 'ready' || status === 'error'}>
+      <AnimatedSplash
+        isReady={status === 'ready' || status === 'error'}
+        isDataReady={vehiclesLoaded}
+        loadFailed={vehicles.isError && !vehiclesLoaded && !vehicles.isFetching}
+        onRetry={() => vehicles.refetch()}
+      >
         {children}
       </AnimatedSplash>
       <CustomAlertProvider />

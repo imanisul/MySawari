@@ -1,13 +1,36 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image, ActivityIndicator, Pressable } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 // Module-level flag: the splash only shows on the very first cold app launch.
 // After login or any navigation within the same session, it is skipped entirely.
 let hasShownSplash = false;
 
-export function AnimatedSplash({ isReady, children }: { isReady: boolean, children: React.ReactNode }) {
+// Shortest time the brand screen stays up, counted from when it first appears (data loads meanwhile).
+const MIN_SPLASH_MS = 2000;
+// After this long without data, say so instead of leaving the customer looking at a spinner.
+const SLOW_LOAD_MS = 12000;
+
+export function AnimatedSplash({
+  isReady,
+  isDataReady = true,
+  loadFailed = false,
+  onRetry,
+  children,
+}: {
+  isReady: boolean;
+  /** The live data the first screen needs (vehicles) has arrived from the server. */
+  isDataReady?: boolean;
+  /** Loading that data failed after retries. */
+  loadFailed?: boolean;
+  onRetry?: () => void;
+  children: React.ReactNode;
+}) {
   const colors = useColors();
+  const mountedAt = useRef(Date.now()).current;
+  const [isSlow, setIsSlow] = useState(false);
+  // The customer chose to go in without waiting for the data (the screens show their own loading/error states).
+  const [skipWaiting, setSkipWaiting] = useState(false);
   
   // If splash was already shown this session, skip it entirely
   const skipSplash = useRef(hasShownSplash).current;
@@ -69,12 +92,19 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
     ]).start();
   }, []);
 
-  // Exit Animation triggered when app is ready
   useEffect(() => {
-    if (!isReady || skipSplash) return;
-    // Keep the splash visible for 3 full seconds so the user sees
-    // "MySawari — Your ride, your way" before the app content appears.
-    setTimeout(() => {
+    if (skipSplash || isDataReady) return;
+    setIsSlow(false);
+    const t = setTimeout(() => setIsSlow(true), SLOW_LOAD_MS);
+    return () => clearTimeout(t);
+  }, [isDataReady, skipSplash, loadFailed]);
+
+  // Exit animation: once the app is ready and its live data has loaded (or the customer chose to continue).
+  const canExit = isReady && (isDataReady || skipWaiting);
+  useEffect(() => {
+    if (!canExit || skipSplash) return;
+    const wait = Math.max(0, MIN_SPLASH_MS - (Date.now() - mountedAt));
+    const t = setTimeout(() => {
       Animated.timing(opacityAnim, {
         toValue: 0,
         duration: 400,
@@ -83,8 +113,11 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
         hasShownSplash = true; // Never show splash again this session
         setIsAnimationComplete(true);
       });
-    }, 3000);
-  }, [isReady]);
+    }, wait);
+    return () => clearTimeout(t);
+  }, [canExit]);
+
+  const showProblem = !isDataReady && (loadFailed || isSlow);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -129,6 +162,39 @@ export function AnimatedSplash({ isReady, children }: { isReady: boolean, childr
             }}>
               <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Your ride, your way.</Text>
             </Animated.View>
+
+            <View style={styles.status}>
+              {showProblem ? (
+                <>
+                  <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
+                    {loadFailed ? "Couldn't load vehicles. Check your internet connection." : 'This is taking longer than usual…'}
+                  </Text>
+                  <View style={styles.actions}>
+                    {loadFailed && !!onRetry && (
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={onRetry}
+                        style={({ pressed }) => [styles.btn, { backgroundColor: colors.primary }, pressed && { opacity: 0.7 }]}
+                      >
+                        <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Retry</Text>
+                      </Pressable>
+                    )}
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setSkipWaiting(true)}
+                      style={({ pressed }) => [styles.btn, { borderColor: colors.border, borderWidth: 1 }, pressed && { opacity: 0.7 }]}
+                    >
+                      <Text style={[styles.btnText, { color: colors.foreground }]}>Continue</Text>
+                    </Pressable>
+                  </View>
+                </>
+              ) : !isDataReady ? (
+                <>
+                  <ActivityIndicator color={colors.primary} />
+                  <Text style={[styles.statusText, { color: colors.mutedForeground }]}>Loading available vehicles…</Text>
+                </>
+              ) : null}
+            </View>
           </View>
         </Animated.View>
       )}
@@ -164,5 +230,30 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     fontSize: 15,
     letterSpacing: 0.3,
-  }
+  },
+  status: {
+    marginTop: 40,
+    minHeight: 72,
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 32,
+  },
+  statusText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  btn: {
+    paddingHorizontal: 22,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  btnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
+  },
 });

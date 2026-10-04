@@ -425,10 +425,11 @@ export const API = {
   /** The vehicles exactly as the backend sends them (this is what is saved on the device). */
   async getVehiclesRaw(): Promise<any[]> {
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/vehicles`);
-      
+      let response = await fetchWithAuth(`${BACKEND_URL}/vehicles`);
+
+      // The vehicle list is public. An expired session must not turn into an empty fleet, so ask again without it.
       if (response.status === 401) {
-        return [];
+        response = await timedFetch(`${BACKEND_URL}/vehicles`);
       }
       
       const data = await response.json();

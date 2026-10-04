@@ -12,8 +12,10 @@ export function StickyBookingBar({
   onViewBreakdown,
   onNeedLogin,
   onBookNow,
+  onCheckAvailability,
 }: {
   isAvailable?: boolean;
+  onCheckAvailability?: () => void;
   onViewBreakdown?: () => void;
   onNeedLogin?: () => void;
   onBookNow?: () => void;
@@ -59,27 +61,28 @@ export function StickyBookingBar({
       <Pressable
         accessibilityRole="button"
         onPress={() => {
+          if (!isAvailable) {
+            onCheckAvailability?.();
+            return;
+          }
           if (isAuthenticated) {
             onBookNow ? onBookNow() : router.push('/booking');
           } else {
             onNeedLogin?.();
           }
         }}
-        disabled={!isAvailable || isQuoteLoading}
+        disabled={isAvailable ? isQuoteLoading : !onCheckAvailability}
         style={({ pressed }) => [
           styles.bottomButtonPremium, 
-          { backgroundColor: !isAvailable ? colors.muted : colors.primary }, 
-          pressed && isAvailable && styles.pressed,
-          (!isAvailable || isQuoteLoading) && { opacity: 0.5 }
+          { backgroundColor: colors.primary }, 
+          pressed && styles.pressed,
+          (isAvailable ? isQuoteLoading : !onCheckAvailability) && { opacity: 0.5 }
         ]}
       >
-        <Text style={[
-          styles.bottomButtonText,
-          { color: !isAvailable ? colors.mutedForeground : colors.primaryForeground }
-        ]}>
-          Book Now
+        <Text style={[styles.bottomButtonText, { color: colors.primaryForeground }]}>
+          {isAvailable ? 'Book Now' : 'Change Dates'}
         </Text>
-        <Feather name="arrow-right" size={18} color={!isAvailable ? colors.mutedForeground : colors.primaryForeground} />
+        <Feather name={isAvailable ? 'arrow-right' : 'calendar'} size={18} color={colors.primaryForeground} />
       </Pressable>
     </View>
   );

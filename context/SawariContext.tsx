@@ -463,6 +463,14 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         messaging().requestPermission().then(() => {
           messaging().subscribeToTopic('all_customers');
         }).catch((err: any) => console.warn('Global FCM subscription failed', err));
+
+        // Someone who hasn't logged in still gets pushes picked from what they browse, on this install's
+        // own topic. Once logged in they get them on their account's topic instead.
+        import('@/services/api/activity').then(({ getSessionId }) => getSessionId()).then((sessionId) => {
+          if (!sessionId) return;
+          const topic = `customer_guest_${sessionId.replace(/[^a-zA-Z0-9-_.~%]/g, '')}`;
+          return isAuthenticated ? messaging().unsubscribeFromTopic(topic) : messaging().subscribeToTopic(topic);
+        }).catch(() => {});
       }
     }
   }, [isAuthLoading, isAuthenticated]);

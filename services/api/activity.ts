@@ -3,7 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 let guestSessionId: string | null = null;
 
-const getSessionId = async () => {
+/** This install's anonymous id (created on first launch). Guests are tracked and notified by it. */
+export const getSessionId = async () => {
   if (guestSessionId) return guestSessionId;
   guestSessionId = await AsyncStorage.getItem('guest_session_id');
   if (!guestSessionId) {

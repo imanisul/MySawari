@@ -1,4 +1,5 @@
 import { fetchWithAuth, BACKEND_URL } from '../backend/api';
+import { getSessionId } from './activity';
 
 export interface BackendNotification {
   id: string;
@@ -13,7 +14,10 @@ export interface BackendNotification {
 export const NotificationsAPI = {
   getNotifications: async (): Promise<BackendNotification[]> => {
     try {
-      const res = await fetchWithAuth(`${BACKEND_URL}/notifications`);
+      // A guest's own notifications are found by this install's session id (ignored once logged in).
+      let guestSession = '';
+      try { guestSession = await getSessionId(); } catch {}
+      const res = await fetchWithAuth(`${BACKEND_URL}/notifications`, guestSession ? { headers: { 'X-Guest-Session': guestSession } } : {});
       const data = await res.json();
       if (res.ok && data.success) {
         return data.data.map((n: any) => ({

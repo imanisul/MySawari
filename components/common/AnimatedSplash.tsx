@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Image, ActivityIndicator, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image, Pressable, Easing } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 // Module-level flag: the splash only shows on the very first cold app launch.
@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/useColors';
 let hasShownSplash = false;
 
 // Shortest time the brand screen stays up, counted from when it first appears (data loads meanwhile).
-const MIN_SPLASH_MS = 2000;
+const MIN_SPLASH_MS = 1200;
 // After this long without data, say so instead of leaving the customer looking at a spinner.
 const SLOW_LOAD_MS = 12000;
 
@@ -49,6 +49,11 @@ export function AnimatedSplash({
   const taglineTranslateY = useRef(new Animated.Value(20)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
 
+  // Loading bar shown under the tagline: creeps towards 90% while waiting, fills to 100% when data arrives.
+  const loaderOpacity = useRef(new Animated.Value(0)).current;
+  const progress = useRef(new Animated.Value(0)).current;
+  const [barDone, setBarDone] = useState(false);
+
   // Entry Animation
   useEffect(() => {
     Animated.stagger(150, [
@@ -88,9 +93,30 @@ export function AnimatedSplash({
           duration: 400,
           useNativeDriver: true,
         })
-      ])
+      ]),
+      Animated.timing(loaderOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
     ]).start();
+    Animated.timing(progress, {
+      toValue: 0.9,
+      duration: 6000,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
   }, []);
+
+  useEffect(() => {
+    if (!isDataReady && !skipWaiting) return;
+    progress.stopAnimation();
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: 250,
+      useNativeDriver: false,
+    }).start(() => setBarDone(true));
+  }, [isDataReady, skipWaiting]);
 
   useEffect(() => {
     if (skipSplash || isDataReady) return;
@@ -100,7 +126,7 @@ export function AnimatedSplash({
   }, [isDataReady, skipSplash, loadFailed]);
 
   // Exit animation: once the app is ready and its live data has loaded (or the customer chose to continue).
-  const canExit = isReady && (isDataReady || skipWaiting);
+  const canExit = isReady && (isDataReady || skipWaiting) && barDone;
   useEffect(() => {
     if (!canExit || skipSplash) return;
     const wait = Math.max(0, MIN_SPLASH_MS - (Date.now() - mountedAt));
@@ -188,12 +214,24 @@ export function AnimatedSplash({
                     </Pressable>
                   </View>
                 </>
-              ) : !isDataReady ? (
-                <>
-                  <ActivityIndicator color={colors.primary} />
-                  <Text style={[styles.statusText, { color: colors.mutedForeground }]}>Loading available vehicles…</Text>
-                </>
-              ) : null}
+              ) : (
+                <Animated.View style={{ opacity: loaderOpacity, alignItems: 'center', gap: 12 }}>
+                  <View style={[styles.track, { backgroundColor: colors.border }]}>
+                    <Animated.View
+                      style={[
+                        styles.bar,
+                        {
+                          backgroundColor: colors.primary,
+                          width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
+                    {isDataReady ? 'Ready' : 'Loading available vehicles…'}
+                  </Text>
+                </Animated.View>
+              )}
             </View>
           </View>
         </Animated.View>
@@ -237,6 +275,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 32,
+  },
+  track: {
+    width: 180,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  bar: {
+    height: 4,
+    borderRadius: 2,
   },
   statusText: {
     fontFamily: 'Inter_500Medium',

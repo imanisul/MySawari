@@ -75,6 +75,10 @@ const queryClient = new QueryClient({
   },
 });
 
+// Start loading the live vehicles from the database as the app starts (in parallel with fonts and the
+// saved session), so they are usually ready by the time the loading screen has played.
+primeVehicles(queryClient);
+
 // Tell React Query when the app is in the foreground: it re-checks stale data when you come back
 // and pauses background polling while the app is not in use.
 focusManager.setEventListener((handleFocus) => {
@@ -205,10 +209,6 @@ function OTAUpdateChecker() {
 }
 
 export default function RootLayout() {
-  // Start loading the live vehicles from the database right away; the loading screen waits for them.
-  useEffect(() => {
-    primeVehicles(queryClient);
-  }, []);
 
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,

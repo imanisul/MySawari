@@ -25,6 +25,29 @@ export function StickyBookingBar({
   const insets = useSafeAreaInsets();
   const { pricingQuote, isQuoteLoading, isAuthenticated } = useSawari();
 
+  // Not free for the chosen dates: one full-width action to pick a destination and dates and check again.
+  if (!isAvailable) {
+    return (
+      <View style={[styles.bottomBarPremium, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onCheckAvailability}
+          disabled={!onCheckAvailability}
+          style={({ pressed }) => [
+            styles.bottomButtonPremium,
+            styles.fullButton,
+            { backgroundColor: colors.primary },
+            pressed && styles.pressed,
+            !onCheckAvailability && { opacity: 0.5 },
+          ]}
+        >
+          <Feather name="calendar" size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />
+          <Text style={[styles.bottomButtonText, { color: colors.primaryForeground, marginRight: 0 }]}>Check Availability</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={[styles.bottomBarPremium, { 
       backgroundColor: colors.card, 
@@ -61,28 +84,22 @@ export function StickyBookingBar({
       <Pressable
         accessibilityRole="button"
         onPress={() => {
-          if (!isAvailable) {
-            onCheckAvailability?.();
-            return;
-          }
           if (isAuthenticated) {
             onBookNow ? onBookNow() : router.push('/booking');
           } else {
             onNeedLogin?.();
           }
         }}
-        disabled={isAvailable ? isQuoteLoading : !onCheckAvailability}
+        disabled={isQuoteLoading}
         style={({ pressed }) => [
           styles.bottomButtonPremium, 
           { backgroundColor: colors.primary }, 
           pressed && styles.pressed,
-          (isAvailable ? isQuoteLoading : !onCheckAvailability) && { opacity: 0.5 }
+          isQuoteLoading && { opacity: 0.5 }
         ]}
       >
-        <Text style={[styles.bottomButtonText, { color: colors.primaryForeground }]}>
-          {isAvailable ? 'Book Now' : 'Change Dates'}
-        </Text>
-        <Feather name={isAvailable ? 'arrow-right' : 'calendar'} size={18} color={colors.primaryForeground} />
+        <Text style={[styles.bottomButtonText, { color: colors.primaryForeground }]}>Book Now</Text>
+        <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
       </Pressable>
     </View>
   );
@@ -133,6 +150,9 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     fontSize: 16,
     marginRight: 8,
+  },
+  fullButton: {
+    flex: 1,
   },
   pressed: {
     opacity: 0.7,

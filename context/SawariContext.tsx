@@ -120,7 +120,7 @@ type SawariContextValue = {
   setDates: (dateRange: string, duration: string) => void;
   setTimes: (pickupTime: string, returnTime: string) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
-  updateCustomer: (field: 'name' | 'mobile' | 'email' | 'license' | 'dob' | 'gender', value: string) => void;
+  updateCustomer: (field: 'name' | 'mobile' | 'email' | 'license' | 'dob' | 'gender' | 'referralCode', value: string) => void;
   saveProfile: (data: Partial<AppCustomer>) => Promise<void>;
   earnReward: (reward: Offer) => void;
   earnSawariCash: (amount: number) => void;
@@ -392,14 +392,14 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             const userProfile = JSON.parse(storedProfile);
             setCustomer({
               id: userProfile.id || userId,
-              name: userProfile.name || 'Demo User',
-              mobile: userProfile.mobile || '+91 9999999999',
+              name: userProfile.name || '',
+              mobile: userProfile.mobile || '',
               email: userProfile.email || '',
               license: userProfile.license || '',
               dob: userProfile.dob || '',
               gender: userProfile.gender || '',
               joinedOn: userProfile.joinedOn || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
-              referralCode: userProfile.referralCode || 'DEMO123',
+              referralCode: userProfile.referralCode || '',
             });
             
             // Only consider them authenticated if the profile successfully fetched

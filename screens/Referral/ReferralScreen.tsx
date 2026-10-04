@@ -55,7 +55,7 @@ const formatCurrency = (amount: number) => `₹${amount.toLocaleString('en-IN')}
 export default function ReferScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { customer, isAuthenticated, isAuthLoading, sawariCash } = useSawari();
+  const { customer, isAuthenticated, isAuthLoading, sawariCash, updateCustomer } = useSawari();
   const insets = useSafeAreaInsets();
 
   // ── State ────────────────────────────────────────────────────────────────
@@ -96,7 +96,9 @@ export default function ReferScreen() {
   const [showQrPopup, setShowQrPopup] = useState(false);
 
   // ── Derived ──────────────────────────────────────────────────────────────
-  const referralCode = customer.referralCode || 'SIGNUP-TO-REFER';
+  // The code always comes from the account on the server; nothing is shared until it has loaded.
+  const referralCode = customer.referralCode || '';
+  const hasCode = referralCode.length > 0;
   const referralLink = `${REFERRAL_BASE_URL}?code=${referralCode}`;
 
   const totalEarned = useMemo(
@@ -170,11 +172,17 @@ export default function ReferScreen() {
     loadData();
     if (isAuthenticated && customer.id) {
       loadWallet();
+      // The saved profile can be from an older app version without a code: take the code from the server.
+      API.getUserProfile(customer.id).then((profile) => {
+        const code = typeof profile?.referralCode === 'string' ? profile.referralCode : '';
+        if (code && code !== customer.referralCode) updateCustomer('referralCode', code);
+      }).catch(() => {});
     }
   }, [isAuthenticated, customer.id, loadWallet]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handleCopy = async () => {
+    if (!hasCode) return;
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await Clipboard.setStringAsync(referralCode);
     setCopySuccess(true);
@@ -182,10 +190,11 @@ export default function ReferScreen() {
   };
 
   const handleShare = async () => {
+    if (!hasCode) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await Share.share({
-        message: `🚗 Hey! Use my MySawari referral code *${referralCode}* to get ₹100 off on your first ride!\n\nDownload now: ${referralLink}`,
+        message: `🚗 Hey! Use my MySawari referral code *${referralCode}* to sign up and get ₹100 SawariCash for your first ride!\n\nDownload now: ${referralLink}`,
         title: 'Share MySawari Referral',
       });
     } catch {}
@@ -401,7 +410,7 @@ export default function ReferScreen() {
             <View style={[styles.codeBox, { backgroundColor: '#1F2937', borderColor: '#4B5563' }]}>
               <Text style={styles.codeLabel}>YOUR REFERRAL CODE</Text>
               <Pressable style={styles.codeRow} onPress={handleCopy}>
-                <Text style={styles.codeText}>{referralCode}</Text>
+                <Text style={styles.codeText}>{hasCode ? referralCode : 'Loading…'}</Text>
                 <View style={styles.copyBtn}>
                   {copySuccess ? (
                     <Feather name="check" size={18} color={colors.emerald} />
@@ -417,7 +426,8 @@ export default function ReferScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Generate QR code"
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowQrPopup(true); }}
+                onPress={() => { if (!hasCode) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowQrPopup(true); }}
+                disabled={!hasCode}
                 style={({ pressed }) => [
                   styles.actionBtn,
                   { backgroundColor: '#1F2937', borderColor: '#4B5563', borderWidth: 1, opacity: pressed ? 0.85 : 1 },
@@ -431,6 +441,7 @@ export default function ReferScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Share referral link"
                 onPress={handleShare}
+                disabled={!hasCode}
                 style={({ pressed }) => [
                   styles.actionBtn,
                   { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
@@ -529,7 +540,7 @@ export default function ReferScreen() {
                   Earn {rewardAmountText} on every friend's first ride. Withdraw anytime directly to your UPI.
                 </Text>
 
-                {totalEarned > 0 && (
+                {availableToWithdraw > 0 && (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Withdraw earnings"

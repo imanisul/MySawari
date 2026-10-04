@@ -39,6 +39,7 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
       setMobile('');
       setOtp('');
       setName('');
+      setReferralCode('');
       setIsExistingUser(false);
       
       Animated.spring(slideAnim, {
@@ -59,7 +60,7 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
   const performLogin = async (finalName: string) => {
     try {
       setLoading(true);
-      const { token, refreshToken, user } = await API.verifyOtp(mobile, otp, finalName, referralCode);
+      const { token, refreshToken, user } = await API.verifyOtp(mobile, otp, finalName, isExistingUser ? '' : referralCode);
       await login(token, refreshToken, user);
       
       // Request Notifications Permission Just-In-Time
@@ -192,9 +193,12 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
                     placeholder="99999 99999"
                     placeholderTextColor={colors.mutedForeground}
                     keyboardType="number-pad"
-                    maxLength={10}
                     value={mobile}
-                    onChangeText={setMobile}
+                    // Digits only; a pasted "+91 98765 43210" or "098765 43210" drops the prefix.
+                    onChangeText={(t) => {
+                      const d = t.replace(/\D/g, '');
+                      setMobile(d.length > 10 && /^(91|0)/.test(d) ? d.slice(-10) : d.slice(0, 10));
+                    }}
                     autoFocus
                   />
                 </View>
@@ -248,8 +252,11 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
                       placeholder="Referral Code (Optional)"
                       placeholderTextColor={colors.mutedForeground}
                       value={referralCode}
-                      onChangeText={setReferralCode}
+                      // Codes are letters and digits only; a pasted space, dash or emoji would make signup fail.
+                      onChangeText={(t) => setReferralCode(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20))}
                       autoCapitalize="characters"
+                      autoCorrect={false}
+                      maxLength={20}
                     />
                   </View>
                 </>

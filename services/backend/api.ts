@@ -185,7 +185,8 @@ const PLATE_PROXY_VERSION = 'pv=6';
 export function plateSafeImageUrl(url: string): string {
   if (!url) return '';
   const absolute = url.startsWith('http') ? url : `${BASE_URL}${url}`;
-  if (absolute.includes(PLATE_PROXY_PATH)) {
+  // Already a processed-photo URL from the backend (an encrypted token, or the older ?target= form).
+  if (absolute.includes('/images/blur?')) {
     return absolute.includes(PLATE_PROXY_VERSION) ? absolute : `${absolute}&${PLATE_PROXY_VERSION}`;
   }
   return `${BACKEND_URL}${PLATE_PROXY_PATH}${encodeURIComponent(absolute)}&${PLATE_PROXY_VERSION}`;

@@ -26,7 +26,7 @@ export default function CarDetailsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer } = useSawari();
+  const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime } = useSawari();
   
   // CarListCard already syncs the Explore page's date to dateRange before navigation.
   const effectiveDateRange = dateRange;
@@ -69,7 +69,14 @@ export default function CarDetailsScreen() {
       if (selectedCar && selectedCar !== cars[0]) {
         ActivityAPI.logActivity('view_car', 'CarDetailsScreen', { carId: selectedCar.id, carName: selectedCar.name });
         // Shown again on Home under "Recently viewed".
-        addRecentlyViewed(isAuthenticated ? customer?.id : null, String(selectedCar.id)).catch(() => {});
+        addRecentlyViewed(isAuthenticated ? customer?.id : null, {
+          vehicleId: String(selectedCar.id),
+          dropoff: dropoff || undefined,
+          dateRange,
+          pickupTime,
+          returnTime,
+          duration,
+        }).catch(() => {});
       }
     }, [selectedCar, isAuthenticated, customer?.id])
   );

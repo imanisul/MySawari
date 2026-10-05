@@ -86,14 +86,19 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['recentlyViewed', recentKey || 'guest'] });
   }, [queryClient, recentKey]));
-  const recentlyViewedCars = useMemo(() => {
+  const recentlyViewedAll = useMemo(() => {
     const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
     return viewedIds
-      .map((id) => fetchedVehicles.find((v) => String(v.id) === id))
+      .map((item: any) => {
+        const v = fetchedVehicles.find((v) => String(v.id) === item.vehicleId);
+        return v ? { ...v, viewedContext: item } : null;
+      })
       .filter(Boolean)
       .map((v: any) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; })
-      .slice(0, 8);
+      .slice(0, 10);
   }, [viewedIds, fetchedVehicles, dateRange]);
+  const recentlyViewedCarsList = useMemo(() => recentlyViewedAll.filter((v: any) => v.type === 'Car'), [recentlyViewedAll]);
+  const recentlyViewedBikesList = useMemo(() => recentlyViewedAll.filter((v: any) => v.type === 'Bike'), [recentlyViewedAll]);
 
   /** Runs `go` now when signed in, or after logging in (search results need an account). */
   const requireLogin = useCallback((go: () => void) => {
@@ -160,6 +165,25 @@ export default function HomeScreen() {
   const renderLuxury = useCallback(({ item }: any) => (
     <CarListCard car={item} style={{ width: 280, marginHorizontal: 8, marginBottom: 0 }} />
   ), []);
+
+  /** Tapping a recently viewed vehicle reopens its detail page with full context. */
+  const renderRecentlyViewed = useCallback(({ item }: any) => (
+    <CarListCard
+      car={item}
+      style={{ width: 280, marginHorizontal: 8, marginBottom: 0 }}
+      onPressOverride={() => {
+        selectCar(item);
+        setVehicleType(item.type === 'Bike' ? 'bike' : 'car');
+        if (item.viewedContext) {
+          const ctx = item.viewedContext;
+          if (ctx.dropoff) setDropoff(ctx.dropoff);
+          if (ctx.dateRange && ctx.duration) setDates(ctx.dateRange, ctx.duration);
+          if (ctx.pickupTime && ctx.returnTime) setTimes(ctx.pickupTime, ctx.returnTime);
+        }
+        router.push('/car-details');
+      }}
+    />
+  ), [selectCar, setVehicleType, setDropoff, setDates, setTimes, router]);
   
   const renderDest = useCallback(({ item }: any) => (
     <DestinationCard 
@@ -349,7 +373,8 @@ export default function HomeScreen() {
   const sections = useMemo(() => [
     { type: 'header', key: 'header' },
     { type: 'recentSearches', key: 'recentSearches' },
-    { type: 'recentlyViewed', key: 'recentlyViewed' },
+    { type: 'recentlyViewedCars', key: 'recentlyViewedCars' },
+    { type: 'recentlyViewedBikes', key: 'recentlyViewedBikes' },
     { type: 'nextTrip', key: 'nextTrip' },
     { type: 'membershipPromo', key: 'memberTop', placement: 'top' },
     { type: 'specialDeals', key: 'specialDeals' },
@@ -464,15 +489,38 @@ export default function HomeScreen() {
         );
         break;
       }
-      case 'recentlyViewed':
-        if (!recentlyViewedCars.length) break;
+      case 'recentlyViewedCars':
+        if (!recentlyViewedCarsList.length) break;
         content = (
           <>
-            <SectionHeading title="Recently viewed" kicker="CARS & BIKES YOU CHECKED OUT" />
+            <SectionHeading title="Recently viewed cars" kicker="CARS YOU CHECKED OUT" />
             <FlatList
-              data={recentlyViewedCars}
-              keyExtractor={(item) => `viewed-${item.id}`}
-              renderItem={renderLuxury}
+              data={recentlyViewedCarsList}
+              keyExtractor={(item) => `viewed-car-${item.id}`}
+              renderItem={renderRecentlyViewed}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 4 }}
+              snapToInterval={296}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              removeClippedSubviews={false}
+              initialNumToRender={2}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+            />
+          </>
+        );
+        break;
+      case 'recentlyViewedBikes':
+        if (!recentlyViewedBikesList.length) break;
+        content = (
+          <>
+            <SectionHeading title="Recently viewed bikes" kicker="BIKES YOU CHECKED OUT" />
+            <FlatList
+              data={recentlyViewedBikesList}
+              keyExtractor={(item) => `viewed-bike-${item.id}`}
+              renderItem={renderRecentlyViewed}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 4 }}
@@ -814,7 +862,7 @@ export default function HomeScreen() {
     
     // Each section eases in a beat after the one above it, so the page builds top to bottom.
     return <Reveal delay={Math.min(Math.max(0, index - 1), 6) * 40}>{content}</Reveal>;
-  }, [colors, greeting, customer?.name, isAuthenticated, recentSearches, openRecentSearch, forgetRecentSearch, recentlyViewedCars, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, vehiclesFailed, refetchVehicles, upcomingBooking, upcomingCar, membership]);
+  }, [colors, greeting, customer?.name, isAuthenticated, recentSearches, openRecentSearch, forgetRecentSearch, recentlyViewedCarsList, recentlyViewedBikesList, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderRecentlyViewed, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, vehiclesFailed, refetchVehicles, upcomingBooking, upcomingCar, membership]);
 
   return (
     <Page bottomNav scroll={false}>

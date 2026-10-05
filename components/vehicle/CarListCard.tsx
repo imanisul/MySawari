@@ -24,6 +24,7 @@ type CarListCardProps = {
   isExplore?: boolean;
   effectiveDateRange?: string;
   onIntercept?: () => void;
+  onPressOverride?: () => void;
   style?: any;
 };
 
@@ -154,6 +155,10 @@ export function CarListCard(props: CarListCardProps) {
   
   const handleCarPress = React.useCallback(() => {
     ActivityAPI.logActivity('click_car', 'CarListCard', { carId: props.car.id, carName: props.car.name });
+    if (props.onPressOverride) {
+      props.onPressOverride();
+      return;
+    }
     selectCar(props.car);
     const dateRange = props.effectiveDateRange ?? globalDateRange;
     const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';

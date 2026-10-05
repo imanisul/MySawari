@@ -42,12 +42,30 @@ function formatExpiry(dateStr: string): string {
  * built-in coupons that may not match what the server accepts.
  */
 
+/**
+ * Still usable right now: switched on and not past its expiry date. The server lists expired offers too,
+ * but checkout only accepts an in-date coupon, so an expired one would be a card the customer can't use.
+ */
+export function isOfferLive(offer: { active?: boolean; expiryDate?: string | Date }, now = Date.now()): boolean {
+  if (offer.active === false) return false;
+  const expires = offer.expiryDate ? new Date(offer.expiryDate).getTime() : NaN;
+  return Number.isFinite(expires) && expires >= now;
+}
+
+/** One shared query, so the home screen and the app-start prefetch use the same cached offers. */
+export const offersQueryOptions = {
+  queryKey: ['offers'] as const,
+  queryFn: () => fetchOffers(),
+  staleTime: 15 * 1000,
+  refetchOnWindowFocus: true,
+};
+
 export async function fetchOffers(): Promise<Offer[]> {
   const res = await timedFetch(`${BACKEND_URL}/offers`);
   if (res.ok) {
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
-      return json.data.map((offer: any) => {
+      return json.data.filter((offer: any) => offer && isOfferLive(offer)).map((offer: any) => {
         if (offer.type === 'coupon') {
           const isFlat = offer.discountType === 'FLAT';
           const discount = isFlat ? `${formatCurrency(offer.discountValue)} OFF` : `${offer.discountValue}% OFF`;

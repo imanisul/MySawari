@@ -25,7 +25,7 @@ import {
 } from '@/components';
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { fetchOffers } from '@/services/api/offers';
+import { offersQueryOptions } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
 import { Reveal } from '@/components/common/Reveal';
@@ -127,12 +127,7 @@ export default function HomeScreen() {
     />
   ), [router, setBookingSource]);
 
-  const { data: allOffers = [], isLoading: isLoadingOffers, isFetching: isFetchingOffers, refetch: refetchOffers } = useQuery({
-    queryKey: ['offers'],
-    queryFn: fetchOffers,
-    staleTime: 15 * 1000,
-    refetchOnWindowFocus: true,
-  });
+  const { data: allOffers = [], isLoading: isLoadingOffers, isFetching: isFetchingOffers, refetch: refetchOffers } = useQuery(offersQueryOptions);
 
   // Split offers into coupons (for the offers carousel) and special deals (for the deals section)
   const offers = useMemo(() => allOffers.filter(o => o.type !== 'special_deal'), [allOffers]);

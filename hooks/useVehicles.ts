@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, useQuery } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
+import { offersQueryOptions } from '@/services/api/offers';
 
 /** The one place vehicles are fetched: Home, Explore and Search all share this query (and its cache). */
 export const VEHICLES_KEY = ['vehicles'] as const;
@@ -34,6 +35,9 @@ export function useVehicles() {
  */
 export function primeVehicles(queryClient: QueryClient) {
   AsyncStorage.removeItem(LEGACY_STORAGE_KEY).catch(() => {});
+  // Offers start loading now too, so Exclusive Offers / Special Deals are already there when Home
+  // appears instead of popping in (and pushing the page down) a moment later.
+  queryClient.prefetchQuery(offersQueryOptions).catch(() => {});
   
   AsyncStorage.getItem(STORAGE_KEY).then((cached) => {
     if (cached) {

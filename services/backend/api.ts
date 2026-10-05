@@ -579,8 +579,11 @@ export const API = {
         if (json.success && Array.isArray(json.data)) {
           // The server's list is what a booking is checked against, so it is used even when it is empty —
           // falling back to the built-in list here would offer codes the server then rejects.
+          const now = Date.now();
           const list: Coupon[] = json.data
-            .filter((o: any) => typeof o?.code === 'string' && o.code.trim())
+            // Expired or switched-off codes are refused at checkout, so they are not offered either.
+            .filter((o: any) => typeof o?.code === 'string' && o.code.trim() && o.active !== false
+              && Number.isFinite(new Date(o.expiryDate).getTime()) && new Date(o.expiryDate).getTime() >= now)
             .map((o: any) => ({
               code: o.code.trim().toUpperCase(),
               discountType: o.discountType,

@@ -28,7 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 import { offersQueryOptions } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
-import { bookingsQueryOptions, recentSearchesQueryOptions } from '@/hooks/useHomeData';
+import { bookingsQueryOptions, recentSearchesQueryOptions, recentlyViewedQueryOptions } from '@/hooks/useHomeData';
 import { RecentSearch, isPastSearch, removeRecentSearch } from '@/utils/recentSearches';
 import { useQueryClient } from '@tanstack/react-query';
 import { Reveal } from '@/components/common/Reveal';
@@ -74,22 +74,26 @@ export default function HomeScreen() {
   const { data: fetchedVehicles = [], isLoading: isLoadingVehicles, isError: vehiclesFailed, refetch: refetchVehicles } = useVehicles();
   const queryClient = useQueryClient();
 
-  // Live fleet line under the heading ("18 cars · 9 bikes available today"), from the database.
-  const availableToday = useMemo(() => {
-    let carsFree = 0, bikesFree = 0;
-    for (const v of fetchedVehicles) {
-      if (!getAvailability(v).available) continue;
-      if (v.type === 'Bike') bikesFree++; else carsFree++;
-    }
-    return { carsFree, bikesFree };
-  }, [fetchedVehicles]);
-
   // Recent trip searches: one tap fills destination + dates again. Loaded before Home appears.
   const recentKey = isAuthenticated ? customer?.id : null;
   const { data: recentSearches = [] } = useQuery(recentSearchesQueryOptions(recentKey));
   useFocusEffect(useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['recentSearches', recentKey || 'guest'] });
   }, [queryClient, recentKey]));
+
+  // Recently viewed cars / bikes: ids saved on the phone, shown with live price + availability from the server.
+  const { data: viewedIds = [] } = useQuery(recentlyViewedQueryOptions(recentKey));
+  useFocusEffect(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['recentlyViewed', recentKey || 'guest'] });
+  }, [queryClient, recentKey]));
+  const recentlyViewedCars = useMemo(() => {
+    const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
+    return viewedIds
+      .map((id) => fetchedVehicles.find((v) => String(v.id) === id))
+      .filter(Boolean)
+      .map((v: any) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; })
+      .slice(0, 8);
+  }, [viewedIds, fetchedVehicles, dateRange]);
 
   /** Runs `go` now when signed in, or after logging in (search results need an account). */
   const requireLogin = useCallback((go: () => void) => {
@@ -105,7 +109,7 @@ export default function HomeScreen() {
     import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('reuse_recent_search', 'HomeScreen', { destination: s.dropoff.name, dateRange: s.dateRange }));
     if (isPastSearch(s)) {
       // Those dates have gone by: keep the destination, pick new dates (then on to the results).
-      router.push({ pathname: '/dates', params: { returnBack: 'false' } });
+      router.push({ pathname: '/dates', params: { returnBack: 'false', fresh: 'true' } });
       return;
     }
     setDates(s.dateRange, s.duration);
@@ -345,6 +349,7 @@ export default function HomeScreen() {
   const sections = useMemo(() => [
     { type: 'header', key: 'header' },
     { type: 'recentSearches', key: 'recentSearches' },
+    { type: 'recentlyViewed', key: 'recentlyViewed' },
     { type: 'nextTrip', key: 'nextTrip' },
     { type: 'membershipPromo', key: 'memberTop', placement: 'top' },
     { type: 'specialDeals', key: 'specialDeals' },
@@ -364,19 +369,28 @@ export default function HomeScreen() {
       case 'header':
         content = (
           <>
+            {/* The top bar scrolls away with the page (nothing on Home is pinned). */}
+            <Header
+              leading={
+                <View>
+                  <Text style={[styles.topGreeting, { color: colors.mutedForeground }]}>{greeting}</Text>
+                  {isAuthenticated && customer?.name ? (
+                    <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>{customer.name.split(' ')[0]} 👋</Text>
+                  ) : (
+                    <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}>
+                      <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>
+                        Log in <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>· get ₹100 SawariCash</Text>
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+              }
+            />
             <View style={{ position: 'relative', overflow: 'visible', zIndex: -1 }}>
               <View>
                 <Text style={[styles.heading, { color: colors.foreground }]}>
                   Where are you{'\n'}going?
                 </Text>
-                {fetchedVehicles.length > 0 && (
-                  <View style={styles.liveRow}>
-                    <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
-                    <Text style={[styles.liveText, { color: colors.mutedForeground }]}>
-                      {availableToday.carsFree} {availableToday.carsFree === 1 ? 'car' : 'cars'} · {availableToday.bikesFree} {availableToday.bikesFree === 1 ? 'bike' : 'bikes'} available today
-                    </Text>
-                  </View>
-                )}
               </View>
               <Animated.Image 
                 source={displayVehicle === 'car' ? require('../../assets/images/header_car_final.png') : require('../../assets/images/footer_bike.png')}
@@ -450,6 +464,29 @@ export default function HomeScreen() {
         );
         break;
       }
+      case 'recentlyViewed':
+        if (!recentlyViewedCars.length) break;
+        content = (
+          <>
+            <SectionHeading title="Recently viewed" kicker="CARS & BIKES YOU CHECKED OUT" />
+            <FlatList
+              data={recentlyViewedCars}
+              keyExtractor={(item) => `viewed-${item.id}`}
+              renderItem={renderLuxury}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 8, paddingTop: 4 }}
+              snapToInterval={296}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              removeClippedSubviews={false}
+              initialNumToRender={2}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+            />
+          </>
+        );
+        break;
       case 'referEarn':
         // Refer & Earn needs an account; a guest is shown the sign-up bonus instead.
         content = isAuthenticated
@@ -777,34 +814,18 @@ export default function HomeScreen() {
     
     // Each section eases in a beat after the one above it, so the page builds top to bottom.
     return <Reveal delay={Math.min(Math.max(0, index - 1), 6) * 40}>{content}</Reveal>;
-  }, [colors, greeting, customer?.name, isAuthenticated, recentSearches, openRecentSearch, forgetRecentSearch, availableToday, fetchedVehicles.length, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, vehiclesFailed, refetchVehicles, upcomingBooking, upcomingCar, membership]);
+  }, [colors, greeting, customer?.name, isAuthenticated, recentSearches, openRecentSearch, forgetRecentSearch, recentlyViewedCars, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, vehiclesFailed, refetchVehicles, upcomingBooking, upcomingCar, membership]);
 
   return (
     <Page bottomNav scroll={false}>
-      <Header
-        absolute={true}
-        leading={
-          <View>
-            <Text style={[styles.topGreeting, { color: colors.mutedForeground }]}>{greeting}</Text>
-            {isAuthenticated && customer?.name ? (
-              <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>{customer.name.split(' ')[0]} 👋</Text>
-            ) : (
-              <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}>
-                <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>
-                  Log in <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>· get ₹100 SawariCash</Text>
-                </Text>
-              </Pressable>
-            )}
-          </View>
-        }
-      />
+
       <FlatList
         ref={mainScrollRef}
         data={sections}
         keyExtractor={sectionKeyExtractor}
         renderItem={renderSection}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: insets.top + 52 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         removeClippedSubviews={false}
         initialNumToRender={4}
         maxToRenderPerBatch={3}
@@ -849,9 +870,6 @@ const styles = StyleSheet.create({
   heading: { fontFamily: 'Inter_700Bold', fontSize: 26, letterSpacing: -0.8, lineHeight: 32, marginTop: 12, paddingHorizontal: 20 },
   topGreeting: { fontFamily: 'Inter_500Medium', fontSize: 12 },
   topName: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.3, marginTop: 1 },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 20 },
-  liveDot: { width: 7, height: 7, borderRadius: 4 },
-  liveText: { fontFamily: 'Inter_500Medium', fontSize: 12.5 },
   recentRow: { gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
   recentCard: { width: 236, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12 },
   recentIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

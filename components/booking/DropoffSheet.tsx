@@ -66,7 +66,7 @@ export function DropoffSheet() {
     setDropoff({ id: location.id, name: location.name, address: location.desc, latitude: 0, longitude: 0, source: 'database' });
     import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: location.name }));
     // Straight on to the dates — the next thing a trip needs — instead of back to the form.
-    router.replace({ pathname: '/dates', params: { returnBack: params.returnBack === 'true' ? 'true' : 'false' } });
+    router.replace({ pathname: '/dates', params: { returnBack: params.returnBack === 'true' ? 'true' : 'false', fresh: 'true' } });
   };
 
   const getIcon = (type: string) => {

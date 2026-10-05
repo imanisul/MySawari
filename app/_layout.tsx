@@ -310,7 +310,6 @@ function AppGate({
         loadFailed={homeDataReady && vehicles.data === undefined && vehicles.isError && !vehicles.isFetching}
         onRetry={() => { setHomeDataReady(false); setLoadRun((n) => n + 1); }}
         steps={loadSteps}
-        guest={!isAuthenticated}
       >
         {children}
       </AnimatedSplash>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Image, Pressable, Easing, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image, Pressable, Easing } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 
@@ -12,22 +12,15 @@ const BRAND_MS = 1400;
 // After this long without data, say so instead of leaving the customer looking at a spinner.
 const SLOW_LOAD_MS = 12000;
 
-const ROAD_WIDTH = Math.min(Dimensions.get('window').width - 64, 320);
-// Only things the app really offers (delivery toggle, sign-up bonus, referral commission).
-const TIPS = [
-  'Self-drive cars and bikes across the Northeast',
-  'Get your vehicle delivered to your doorstep',
-  'New here? Get ₹100 SawariCash when you sign up',
-  'Refer a friend and earn 10% of their first trip',
-];
+const BAR_WIDTH = 120;
 
 export type SplashStep = { key: string; label: string; done: boolean };
 
 /**
  * Launch sequence, shown over the app while it gets ready underneath:
  *  1. Brand  — logo, "MySawari", "Your ride, your way."
- *  2. Loading — a MySawari loading page that ticks off this person's data as it actually arrives
- *               (vehicles, offers, and for a signed-in customer their trips and wallet).
+ *  2. Loading — a minimal MySawari page (no text): the mark breathing gently over a thin line that
+ *               fills as this person's data actually arrives (vehicles, offers, trips, wallet).
  * Skipped straight to the app when everything is already there by the end of the brand phase.
  */
 export function AnimatedSplash({
@@ -36,7 +29,6 @@ export function AnimatedSplash({
   loadFailed = false,
   onRetry,
   steps = [],
-  guest = true,
   children,
 }: {
   isReady: boolean;
@@ -47,7 +39,6 @@ export function AnimatedSplash({
   onRetry?: () => void;
   /** What is being loaded, ticked off as each part arrives. */
   steps?: SplashStep[];
-  guest?: boolean;
   children: React.ReactNode;
 }) {
   const colors = useColors();
@@ -58,7 +49,6 @@ export function AnimatedSplash({
   const [isSlow, setIsSlow] = useState(false);
   // The customer chose to go in without waiting (the screens show their own loading / error states).
   const [skipWaiting, setSkipWaiting] = useState(false);
-  const [tip, setTip] = useState(0);
 
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const brandOpacity = useRef(new Animated.Value(1)).current;
@@ -69,7 +59,7 @@ export function AnimatedSplash({
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const taglineY = useRef(new Animated.Value(20)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const carX = useRef(new Animated.Value(0)).current;
+  const breathe = useRef(new Animated.Value(0)).current;
   const progress = useRef(new Animated.Value(0)).current;
 
   // Phase 1: brand entrance.
@@ -105,15 +95,15 @@ export function AnimatedSplash({
     ]).start();
   }, [brandDone, canExit, phase]);
 
-  // Loading page: the car drives along the road, tips rotate.
+  // Loading page: the mark breathes gently while waiting.
   useEffect(() => {
     if (phase !== 'loading') return;
-    const drive = Animated.loop(
-      Animated.timing(carX, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-    );
-    drive.start();
-    const tipTimer = setInterval(() => setTip((n) => (n + 1) % TIPS.length), 2600);
-    return () => { drive.stop(); clearInterval(tipTimer); };
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breathe, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      Animated.timing(breathe, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
   }, [phase]);
 
   // Progress bar follows the real steps (never quite full until everything is in).
@@ -143,7 +133,8 @@ export function AnimatedSplash({
   }, [brandDone, canExit]);
 
   const showProblem = !isDataReady && (loadFailed || isSlow);
-  const carTranslate = carX.interpolate({ inputRange: [0, 1], outputRange: [-40, ROAD_WIDTH - 40] });
+  const markScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.04] });
+  const markOpacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1] });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -165,64 +156,37 @@ export function AnimatedSplash({
             </Animated.View>
           </Animated.View>
 
-          {/* Phase 2 — MySawari loading page */}
+          {/* Phase 2 — minimal MySawari loading page */}
           {phase === 'loading' && (
-            <Animated.View style={[styles.center, { opacity: loadingOpacity, paddingHorizontal: 32 }]}>
-              <Text style={[styles.loadingKicker, { color: colors.primaryText }]}>MYSAWARI</Text>
-              <Text style={[styles.loadingTitle, { color: colors.foreground }]}>
-                {guest ? 'Getting your ride ready' : 'Welcome back! Getting things ready'}
-              </Text>
-
-              {/* The road */}
-              <View style={[styles.road, { width: ROAD_WIDTH }]}>
-                <Animated.Image
-                  source={require('@/assets/images/header_car_final.png')}
-                  style={[styles.roadCar, { transform: [{ translateX: carTranslate }] }]}
-                  resizeMode="contain"
+            <Animated.View style={[styles.center, { opacity: loadingOpacity }]}>
+              <Animated.Image
+                source={require('@/assets/images/MySawari_nobg.png')}
+                style={[styles.mark, { opacity: markOpacity, transform: [{ scale: markScale }] }]}
+                resizeMode="contain"
+                accessibilityLabel="Loading MySawari"
+              />
+              <View style={[styles.bar, { backgroundColor: colors.border }]}>
+                <Animated.View
+                  style={[styles.barFill, { backgroundColor: colors.primary, width: progress.interpolate({ inputRange: [0, 1], outputRange: [0, BAR_WIDTH] }) }]}
                 />
-                <View style={[styles.roadLine, { backgroundColor: colors.border }]}>
-                  <Animated.View
-                    style={[styles.roadFill, { backgroundColor: colors.primary, width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]}
-                  />
-                </View>
               </View>
 
-              {/* What is loading, ticked off as it arrives */}
-              <View style={[styles.steps, { width: ROAD_WIDTH }]}>
-                {steps.map((s) => (
-                  <View key={s.key} style={styles.stepRow}>
-                    {s.done || isDataReady ? (
-                      <View style={[styles.stepDone, { backgroundColor: colors.success }]}>
-                        <Feather name="check" size={11} color="#FFF" />
-                      </View>
-                    ) : (
-                      <ActivityIndicator size="small" color={colors.primary} style={styles.stepSpinner} />
-                    )}
-                    <Text style={[styles.stepText, { color: s.done || isDataReady ? colors.foreground : colors.mutedForeground }]}>{s.label}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {showProblem ? (
-                <View style={{ alignItems: 'center', gap: 12, marginTop: 20 }}>
-                  <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
-                    {loadFailed ? "Couldn't load everything. Check your internet connection." : 'This is taking longer than usual…'}
-                  </Text>
-                  <View style={styles.actions}>
-                    {loadFailed && !!onRetry && (
-                      <Pressable accessibilityRole="button" onPress={onRetry}
-                        style={({ pressed }) => [styles.btn, { backgroundColor: colors.primary }, pressed && { opacity: 0.7 }]}>
-                        <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Retry</Text>
-                      </Pressable>
-                    )}
-                    <Pressable accessibilityRole="button" onPress={() => setSkipWaiting(true)}
-                      style={({ pressed }) => [styles.btn, { borderColor: colors.border, borderWidth: 1 }, pressed && { opacity: 0.7 }]}>
-                      <Text style={[styles.btnText, { color: colors.foreground }]}>Continue</Text>
+              {/* Only when something is wrong: icon actions, no paragraphs. */}
+              {showProblem && (
+                <View style={styles.actions}>
+                  {loadFailed && !!onRetry && (
+                    <Pressable accessibilityRole="button" accessibilityLabel="Retry" onPress={onRetry}
+                      style={({ pressed }) => [styles.btn, { backgroundColor: colors.primary }, pressed && { opacity: 0.7 }]}>
+                      <Feather name="refresh-cw" size={15} color={colors.primaryForeground} />
+                      <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Retry</Text>
                     </Pressable>
-                  </View>
+                  )}
+                  <Pressable accessibilityRole="button" accessibilityLabel="Continue" onPress={() => setSkipWaiting(true)}
+                    style={({ pressed }) => [styles.btn, { borderColor: colors.border, borderWidth: 1 }, pressed && { opacity: 0.7 }]}>
+                    <Text style={[styles.btnText, { color: colors.foreground }]}>Continue</Text>
+                    <Feather name="arrow-right" size={15} color={colors.foreground} />
+                  </Pressable>
                 </View>
-              ) : (
-                <Text style={[styles.tip, { color: colors.mutedForeground }]}>{TIPS[tip]}</Text>
               )}
             </Animated.View>
           )}
@@ -239,20 +203,10 @@ const styles = StyleSheet.create({
   logoImage: { width: 220, height: 110 },
   titleText: { fontFamily: 'Inter_700Bold', fontSize: 32, letterSpacing: -0.5 },
   tagline: { fontFamily: 'Inter_500Medium', fontSize: 15, letterSpacing: 0.3 },
-  loadingKicker: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 2 },
-  loadingTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.4, marginTop: 6, textAlign: 'center' },
-  road: { marginTop: 28, height: 56, justifyContent: 'flex-end' },
-  roadCar: { position: 'absolute', bottom: 6, left: 0, width: 80, height: 40 },
-  roadLine: { height: 4, borderRadius: 2, overflow: 'hidden' },
-  roadFill: { height: 4, borderRadius: 2 },
-  steps: { marginTop: 24, gap: 12 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  stepDone: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  stepSpinner: { width: 18, height: 18, transform: [{ scale: 0.75 }] },
-  stepText: { fontFamily: 'Inter_500Medium', fontSize: 13.5, flexShrink: 1 },
-  tip: { fontFamily: 'Inter_400Regular', fontSize: 12.5, marginTop: 28, textAlign: 'center' },
-  statusText: { fontFamily: 'Inter_500Medium', fontSize: 13, textAlign: 'center' },
-  actions: { flexDirection: 'row', gap: 12 },
-  btn: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: 10 },
+  mark: { width: 140, height: 70 },
+  bar: { width: BAR_WIDTH, height: 3, borderRadius: 2, overflow: 'hidden', marginTop: 22 },
+  barFill: { height: 3, borderRadius: 2 },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 28 },
+  btn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
   btnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
 });

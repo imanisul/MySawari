@@ -30,7 +30,10 @@ const ALL_TIMES = generateTimes();
 export function DatesSheet() {
   const colors = useColors();
   const router = useRouter();
-  const { returnBack } = useLocalSearchParams();
+  // fresh: opened right after choosing a destination (or for a trip whose dates have passed) — the
+  // customer picks the dates themselves, nothing is pre-filled from an earlier search.
+  const { returnBack, fresh } = useLocalSearchParams();
+  const freshPick = fresh === 'true';
   const { setDates, setTimes, dateRange, pickupTime, returnTime } = useSawari();
 
   const today = new Date();
@@ -52,17 +55,17 @@ export function DatesSheet() {
     });
   }, []);
 
-  const initialStart = parseDateStr(dateRange.split(' – ')[0]);
-  const initialEnd = parseDateStr(dateRange.split(' – ')[1]);
+  const initialStart = freshPick ? null : parseDateStr(dateRange.split(' – ')[0]);
+  const initialEnd = freshPick ? null : parseDateStr(dateRange.split(' – ')[1]);
 
   const [start, setStart] = useState<Date | null>(initialStart && initialStart >= today ? initialStart : null);
   const [end, setEnd] = useState<Date | null>(initialEnd && initialStart && initialEnd >= initialStart ? initialEnd : null);
   
-  const [tempPickupTime, setTempPickupTime] = useState(pickupTime ? pickupTime.replace(/^0/, '') : '8:00 AM');
+  const [tempPickupTime, setTempPickupTime] = useState(!freshPick && pickupTime ? pickupTime.replace(/^0/, '') : '8:00 AM');
   
   const initialIsSameDay = initialStart && (initialEnd || initialStart).getTime() === initialStart.getTime();
   const [tempReturnTime, setTempReturnTime] = useState<string | null>(
-    (initialIsSameDay && (!returnTime || returnTime === '08:00 AM' || returnTime === '8:00 AM')) ? null : (returnTime ? returnTime.replace(/^0/, '') : '8:00 AM')
+    (initialIsSameDay && (!returnTime || returnTime === '08:00 AM' || returnTime === '8:00 AM')) ? null : (!freshPick && returnTime ? returnTime.replace(/^0/, '') : '8:00 AM')
   );
   
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);

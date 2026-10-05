@@ -20,12 +20,13 @@ import Reanimated from 'react-native-reanimated';
 import { rise } from '@/components/common/motion';
 
 import { ActivityAPI } from '@/services/api/activity';
+import { addRecentlyViewed } from '@/utils/recentlyViewed';
 
 export default function CarDetailsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate, isAuthenticated } = useSawari();
+  const { selectedCar, pickup, dropoff, dateRange, selectedDate, bookingSource, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer } = useSawari();
   
   // CarListCard already syncs the Explore page's date to dateRange before navigation.
   const effectiveDateRange = dateRange;
@@ -65,10 +66,12 @@ export default function CarDetailsScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      if (selectedCar) {
+      if (selectedCar && selectedCar !== cars[0]) {
         ActivityAPI.logActivity('view_car', 'CarDetailsScreen', { carId: selectedCar.id, carName: selectedCar.name });
+        // Shown again on Home under "Recently viewed".
+        addRecentlyViewed(isAuthenticated ? customer?.id : null, String(selectedCar.id)).catch(() => {});
       }
-    }, [selectedCar])
+    }, [selectedCar, isAuthenticated, customer?.id])
   );
 
   const mainScrollRef = useRef<ScrollView>(null);

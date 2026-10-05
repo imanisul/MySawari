@@ -3,8 +3,16 @@ import { API } from '@/services/backend/api';
 import { offersQueryOptions } from '@/services/api/offers';
 import { vehiclesQueryOptions, hasLiveVehicles } from '@/hooks/useVehicles';
 import { getRecentSearches } from '@/utils/recentSearches';
+import { getRecentlyViewed } from '@/utils/recentlyViewed';
 
 /** This person's recent trip searches (Home's one-tap "Recent searches"). */
+/** Ids of the cars / bikes this person opened recently (Home's "Recently viewed"). */
+export const recentlyViewedQueryOptions = (userId?: string | null) => ({
+  queryKey: ['recentlyViewed', userId || 'guest'] as const,
+  queryFn: () => getRecentlyViewed(userId),
+  staleTime: 0,
+});
+
 export const recentSearchesQueryOptions = (userId?: string | null) => ({
   queryKey: ['recentSearches', userId || 'guest'] as const,
   queryFn: () => getRecentSearches(userId),
@@ -60,6 +68,7 @@ export async function loadHomeData(
     step('vehicles', queryClient.fetchQuery({ ...vehiclesQueryOptions, staleTime: hasLiveVehicles() ? vehiclesQueryOptions.staleTime : 0 })),
     step('offers', queryClient.fetchQuery(offersQueryOptions)),
     queryClient.fetchQuery(recentSearchesQueryOptions(isAuthenticated ? userId : null)),
+    queryClient.fetchQuery(recentlyViewedQueryOptions(isAuthenticated ? userId : null)),
   ];
   if (isAuthenticated) {
     tasks.push(step('trips', queryClient.fetchQuery(bookingsQueryOptions)));

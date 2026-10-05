@@ -847,6 +847,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           });
           // Trips searched as a guest on this phone stay in their recent searches.
           import('@/utils/recentSearches').then(({ adoptGuestSearches }) => adoptGuestSearches(String(user.id))).catch(() => {});
+          import('@/utils/recentlyViewed').then(({ adoptGuestViewed }) => adoptGuestViewed(String(user.id))).catch(() => {});
 
           setIsAuthenticated(true);
         } catch (e) {

@@ -28,8 +28,8 @@ import { addRecentlyViewed } from '@/utils/recentlyViewed';
 
 type SectionKey = 'gallery' | 'about' | 'specifications' | 'features' | 'location' | 'reviews';
 const SECTIONS: { key: SectionKey; label: string }[] = [
-  { key: 'gallery', label: 'Gallery' },
   { key: 'about', label: 'About' },
+  { key: 'gallery', label: 'Gallery' },
   { key: 'specifications', label: 'Specs' },
   { key: 'features', label: 'Features' },
   { key: 'location', label: 'Location' },
@@ -253,14 +253,14 @@ export default function CarDetailsScreen() {
           </ScrollView>
         </View>
 
-        {/* Gallery: photos from hosts and guests */}
-        <View onLayout={onSectionLayout('gallery')}>
-          <GallerySection car={enrichedCar} />
-        </View>
-
         {/* About */}
         <View onLayout={onSectionLayout('about')}>
           <AboutSection car={enrichedCar} />
+        </View>
+
+        {/* Gallery: photos from hosts and guests */}
+        <View onLayout={onSectionLayout('gallery')}>
+          <GallerySection car={enrichedCar} />
         </View>
 
         {/* Specifications */}

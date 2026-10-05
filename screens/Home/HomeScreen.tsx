@@ -213,16 +213,33 @@ export default function HomeScreen() {
         // Opened from Home: "Book Now" goes straight on when the trip details are already there.
         setBookingSource('home');
         setVehicleType(item.type === 'Bike' ? 'bike' : 'car');
+        let targetRoute = '/car-details';
         if (item.viewedContext) {
           const ctx = item.viewedContext;
           if (ctx.dropoff) setDropoff(ctx.dropoff);
           if (ctx.dateRange && ctx.duration) setDates(ctx.dateRange, ctx.duration);
           if (ctx.pickupTime && ctx.returnTime) setTimes(ctx.pickupTime, ctx.returnTime);
+          
+          if (ctx.trip) {
+            if (ctx.trip.mode) setMode(ctx.trip.mode);
+            setIsDeliveryRequested(!!ctx.trip.isDeliveryRequested);
+            if (ctx.trip.deliveryMode) setDeliveryMode(ctx.trip.deliveryMode);
+            setPickup(ctx.trip.pickup || null);
+            setReturnAddress(ctx.trip.returnAddress || null);
+          }
+          
+          if (ctx.stage === 'payment') targetRoute = '/payment';
+          else if (ctx.stage === 'booking') targetRoute = '/booking';
         }
-        router.push('/car-details');
+        
+        if (targetRoute !== '/car-details') {
+          requireLogin(() => router.push(targetRoute as any));
+        } else {
+          router.push('/car-details');
+        }
       }}
     />
-  ), [selectCar, setVehicleType, setDropoff, setDates, setTimes, setBookingSource, router]);
+  ), [selectCar, setVehicleType, setDropoff, setDates, setTimes, setBookingSource, router, requireLogin, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress]);
   
   const renderDest = useCallback(({ item }: any) => (
     <DestinationCard 

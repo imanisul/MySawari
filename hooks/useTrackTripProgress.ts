@@ -26,6 +26,21 @@ export function useTrackTripProgress(stage: SearchStage) {
         trip: { mode, isDeliveryRequested, deliveryMode, pickup, returnAddress },
       },
     ).catch(() => {});
+
+    if (withCar) {
+      import('@/utils/recentlyViewed').then(({ addRecentlyViewed }) => {
+        addRecentlyViewed(isAuthenticated ? customer?.id : null, {
+          vehicleId: String(selectedCar.id),
+          dropoff: dropoff || undefined,
+          dateRange,
+          pickupTime,
+          returnTime,
+          duration,
+          stage: stage as any,
+          trip: { mode, isDeliveryRequested, deliveryMode, pickup, returnAddress }
+        });
+      }).catch(() => {});
+    }
   }, [stage, isAuthenticated, customer?.id, dropoff, dateRange, duration, pickupTime, returnTime, vehicleType,
       selectedCar?.id, mode, isDeliveryRequested, deliveryMode, pickup, returnAddress]));
 }

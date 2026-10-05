@@ -207,19 +207,44 @@ export function GallerySection({ car }: { car: Car }) {
   return (
     <View style={styles.tabSection}>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Gallery</Text>
-      <View style={styles.galleryGrid}>
-        {images.map((img, i) => (
+      <View style={styles.mosaicGrid}>
+        {images.length > 0 && (
           <Pressable 
-            key={i} 
-            style={styles.galleryImageWrap}
+            style={styles.mosaicMain}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setViewerSource(img);
+              setViewerSource(images[0]);
             }}
           >
-            <LoadingImage source={img} style={styles.galleryImage} contentFit="cover" transition={200} />
+            <LoadingImage source={images[0]} style={styles.galleryImage} contentFit="cover" transition={200} />
           </Pressable>
-        ))}
+        )}
+        
+        {images.length > 1 && (
+          <View style={styles.mosaicSubRow}>
+            {images.slice(1, 4).map((img, i) => {
+              const isLast = i === 2;
+              const hasMore = images.length > 4;
+              return (
+                <Pressable 
+                  key={i} 
+                  style={styles.mosaicSubImageWrap}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setViewerSource(img);
+                  }}
+                >
+                  <LoadingImage source={img} style={styles.galleryImage} contentFit="cover" transition={200} />
+                  {isLast && hasMore && (
+                    <View style={styles.mosaicOverlay}>
+                      <Text style={styles.mosaicOverlayText}>+{images.length - 4}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </View>
 
       {guestPhotos.length > 0 && (
@@ -660,6 +685,37 @@ const styles = StyleSheet.create({
     height: 220,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  mosaicGrid: {
+    gap: 8,
+  },
+  mosaicMain: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  mosaicSubRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  mosaicSubImageWrap: {
+    flex: 1,
+    height: 90,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  mosaicOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mosaicOverlayText: {
+    color: '#FFF',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 18,
   },
   galleryImage: {
     width: '100%',

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Car, cars, DriverMode, LocationResult } from '@/utils/sawari';
 import { Offer } from '@/services/api/offers';
@@ -160,6 +161,7 @@ const SawariContext = createContext<SawariContextValue | null>(null);
 
 
 export function SawariProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [vehicleType, setVehicleType] = useState<'car' | 'bike'>('car');
   const [mode, setMode] = useState<DriverMode>('Self Drive');
   const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
@@ -562,7 +564,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           data: n.data,
           read: isAuthenticated ? n.isRead : guestReadIds.includes(n.id),
         }));
-      setNotifications(mapped);
+      setNotifications((prev) => {
+        const locallyRead = new Set(prev.filter(n => n.read).map(n => n.id));
+        return mapped.map((n: any) => ({ ...n, read: n.read || locallyRead.has(n.id) }));
+      });
     } catch (e) {
       console.error('syncNotifications error:', e);
     }
@@ -897,6 +902,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setTotalBookings(0);
           setNotifications([]);
           setFavorites([]);
+          queryClient.clear();
           setIsAuthenticated(false);
         } catch (e) {
           if (__DEV__) console.warn('Logout failed', e);

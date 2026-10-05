@@ -61,12 +61,9 @@ export function DatesSheet() {
   const [start, setStart] = useState<Date | null>(initialStart && initialStart >= today ? initialStart : null);
   const [end, setEnd] = useState<Date | null>(initialEnd && initialStart && initialEnd >= initialStart ? initialEnd : null);
   
-  const [tempPickupTime, setTempPickupTime] = useState(!freshPick && pickupTime ? pickupTime.replace(/^0/, '') : '8:00 AM');
+  const [tempPickupTime, setTempPickupTime] = useState<string | null>(!freshPick && pickupTime && pickupTime !== '--:--' ? pickupTime.replace(/^0/, '') : null);
   
-  const initialIsSameDay = initialStart && (initialEnd || initialStart).getTime() === initialStart.getTime();
-  const [tempReturnTime, setTempReturnTime] = useState<string | null>(
-    (initialIsSameDay && (!returnTime || returnTime === '08:00 AM' || returnTime === '8:00 AM')) ? null : (!freshPick && returnTime ? returnTime.replace(/^0/, '') : '8:00 AM')
-  );
+  const [tempReturnTime, setTempReturnTime] = useState<string | null>(!freshPick && returnTime && returnTime !== '--:--' ? returnTime.replace(/^0/, '') : null);
   
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
   const [showStandardTimeNote, setShowStandardTimeNote] = useState(false);
@@ -165,8 +162,8 @@ export function DatesSheet() {
     const idx = ALL_TIMES.indexOf(tempReturnTime);
     return idx >= 18 ? '8:00 AM' : tempReturnTime;
   })();
-  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime, effectiveReturnTimeForCalc) : 0;
-  const canApply = start !== null && (!isSameDay || tempReturnTime !== null);
+  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', effectiveReturnTimeForCalc) : 0;
+  const canApply = start !== null && effectiveEnd !== null && tempPickupTime !== null && tempReturnTime !== null;
 
   return (
     <SheetFrame height="95%">

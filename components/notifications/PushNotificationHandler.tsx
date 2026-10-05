@@ -41,11 +41,15 @@ export function PushNotificationHandler() {
     const notificationId = asString(data?.notificationId);
     const bookingId = asString(data?.bookingId);
 
+    const link = asString(data?.link);
+
     if (notificationId) markRead(notificationId).catch(() => {});
     sync().catch(() => {});
 
     if (bookingId && authed) {
       router.push({ pathname: '/booking-detail', params: { id: bookingId } });
+    } else if (link) {
+      router.push(link as any);
     } else {
       router.push('/notifications');
     }

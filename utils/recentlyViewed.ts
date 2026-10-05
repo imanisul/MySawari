@@ -8,6 +8,14 @@ export type RecentlyViewedItem = {
   pickupTime?: string;
   returnTime?: string;
   duration?: string;
+  stage?: 'car' | 'booking' | 'payment';
+  trip?: {
+    mode: any;
+    isDeliveryRequested: boolean;
+    deliveryMode: any;
+    pickup: any;
+    returnAddress: any;
+  };
 };
 
 /**

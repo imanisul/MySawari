@@ -32,7 +32,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
     const interval = setInterval(() => {
       setActiveIndex((current) => {
         const nextIndex = (current + 1) % images.length;
-        scrollRef.current?.scrollTo({ x: nextIndex * width, animated: true });
+        scrollRef.current?.scrollTo({ x: nextIndex * (width - 32), animated: true });
         return nextIndex;
       });
     }, 3500); // Auto slide every 3.5 seconds
@@ -42,7 +42,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
 
   const onScroll = (e: any) => {
     const x = e.nativeEvent.contentOffset.x;
-    const index = Math.round(x / width);
+    const index = Math.round(x / (width - 32));
     if (index !== activeIndex && index >= 0 && index < images.length) {
       setActiveIndex(index);
     }
@@ -65,7 +65,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
           scrollEventThrottle={16}
         >
           {images.map((img, i) => (
-            <Pressable key={i} onPress={openFullScreen} style={{ width, height: HEIGHT }}>
+            <Pressable key={i} onPress={openFullScreen} style={{ width: width - 32, height: HEIGHT }}>
               <LoadingImage 
                 source={img} 
                 style={styles.heroImage} 
@@ -150,14 +150,16 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
 
 const styles = StyleSheet.create({
   container: {
-    // Edge-to-edge design
     width: '100%',
     paddingBottom: 16,
+    paddingHorizontal: 16,
   },
   heroWrap: {
     width: '100%',
     height: HEIGHT,
     position: 'relative',
+    borderRadius: 24,
+    overflow: 'hidden',
   },
   heroImage: {
     width: '100%',

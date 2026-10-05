@@ -228,6 +228,9 @@ export default function ExploreScreen() {
   /* ─── ListHeaderComponent: Search + Filters + Dates ─── */
   const listHeaderElement = useMemo(() => (
     <Reanimated.View entering={rise()}>
+      {/* ── SCROLLABLE: Explore Header ── */}
+      <Header title="Explore" hideLogo={true} />
+
       {/* Search Bar */}
       <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <TextInput 
@@ -451,9 +454,6 @@ export default function ExploreScreen() {
       setExploreDate, setGlobalSelectedDate, setFilters, setPage, fetchVehicles]);
   return (
     <Page bottomNav scroll={false}>
-      {/* ── FIXED: Explore Header ── */}
-      <Header title="Explore" hideLogo={false} />
-
       <FlatList
         style={{ flex: 1 }}
         data={paginatedCars}

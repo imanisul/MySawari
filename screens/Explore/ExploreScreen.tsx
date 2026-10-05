@@ -197,12 +197,8 @@ export default function ExploreScreen() {
 
   const handleLoadMore = () => {
     if (paginatedCars.length < filteredCars.length && !isLoadingMore) {
-      setIsLoadingMore(true);
-      // Brief delay so the "Loading more..." indicator is visible, then load next batch
-      setTimeout(() => {
-        setPage(prev => prev + 1);
-        setIsLoadingMore(false);
-      }, 300);
+      // The next batch is already on the phone: show it immediately (no artificial wait).
+      setPage(prev => prev + 1);
     }
   };
 

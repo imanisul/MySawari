@@ -62,6 +62,8 @@ export default function ReferScreen() {
   const [config, setConfig] = useState<any>(null);
   const [referrals, setReferrals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Referrals or earnings couldn't be loaded: shown as a retry bar, not as "no referrals" / ₹0.
+  const [dataFailed, setDataFailed] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [friendName, setFriendName] = useState('');
   const [friendMobile, setFriendMobile] = useState('');
@@ -137,7 +139,9 @@ export default function ReferScreen() {
   const loadWallet = useCallback(async () => {
     if (!isAuthenticated || !customer.id) return;
     try {
-      const w = await API.getWallet(true);
+      const w: any = await API.getWallet(true);
+      // A failed request keeps the earnings already on screen and offers a retry (never shows ₹0).
+      if (w?.failed) { setDataFailed(true); return; }
       setWalletBalance(w.walletBalance || 0);
       setWithdrawableBalance(w.withdrawableBalance || 0);
       setTransactions(w.transactions || []);
@@ -146,8 +150,12 @@ export default function ReferScreen() {
 
   const refreshReferrals = useCallback(async () => {
     if (!isAuthenticated || !customer.id) return;
-    const list = await API.getReferrals(customer.id);
-    setReferrals(list);
+    setDataFailed(false);
+    try {
+      setReferrals(await API.getReferrals(customer.id));
+    } catch {
+      setDataFailed(true); // the list on screen stays as it was
+    }
     await loadWallet();
   }, [isAuthenticated, customer.id, loadWallet]);
 
@@ -162,6 +170,8 @@ export default function ReferScreen() {
         if (userReferrals.status === 'fulfilled' && userReferrals.value) {
           setReferrals(userReferrals.value);
           if (userReferrals.value.some((r: any) => r.commissionAmount > 0)) invalidateWalletCache();
+        } else if (userReferrals.status === 'rejected') {
+          setDataFailed(true);
         }
       } catch (e) {
         console.error(e);
@@ -509,6 +519,17 @@ export default function ReferScreen() {
             </Reanimated.View>
           ) : (
             <Reanimated.View entering={FadeIn.duration(250)}>
+              {dataFailed && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => { Haptics.selectionAsync(); refreshReferrals(); }}
+                  style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, marginBottom: 12, backgroundColor: colors.destructive + '12' }, pressed && { opacity: 0.8 }]}
+                >
+                  <Feather name="wifi-off" size={16} color={colors.destructive} />
+                  <Text style={{ flex: 1, fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.destructive }}>Couldn't load your latest referrals and earnings.</Text>
+                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 13, color: colors.destructive }}>Retry</Text>
+                </Pressable>
+              )}
               {/* ═══════════════════════════════════════════════════════════════
                   EARNINGS DASHBOARD
                  ═══════════════════════════════════════════════════════════════ */}

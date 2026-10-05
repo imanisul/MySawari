@@ -34,7 +34,7 @@ export default function PaymentsScreen() {
   const [isSaving, setIsSaving] = useState(false);
 
   // Fetch Wallet Transactions
-  const { data: walletData, isLoading: isLoadingWallet } = useQuery({
+  const { data: walletData, isLoading: isLoadingWallet, refetch: refetchWallet, isFetching: isFetchingWallet } = useQuery({
     queryKey: ['wallet'],
     queryFn: () => API.getWallet(true), // always fresh when the customer opens their wallet history
     enabled: !!customer?.id
@@ -224,6 +224,16 @@ export default function PaymentsScreen() {
 
           {isLoadingWallet ? (
             <PaymentsSkeleton />
+          ) : (walletData as any)?.failed ? (
+            // A failed request is not "no transactions": say so and offer a retry.
+            <View style={[styles.emptyCard, { borderColor: colors.border }]}>
+              <Feather name="wifi-off" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Couldn't load your history</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>Check your internet connection and try again.</Text>
+              <TouchableOpacity onPress={() => refetchWallet()} disabled={isFetchingWallet} style={{ marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary, opacity: isFetchingWallet ? 0.6 : 1 }}>
+                <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>{isFetchingWallet ? 'Loading…' : 'Retry'}</Text>
+              </TouchableOpacity>
+            </View>
           ) : transactions.length === 0 ? (
             <View style={[styles.emptyCard, { borderColor: colors.border }]}>
               <Feather name="clock" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />

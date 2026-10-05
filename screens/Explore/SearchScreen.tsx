@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, TextInput, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -78,6 +79,7 @@ const SORT_OPTIONS: Array<{ label: string; value: SortOption; icon: React.Compon
 const SUPPORT_BUTTON_CLEARANCE = 88;
 
 export default function SearchResultsScreen() {
+  useTrackTripProgress('results'); // Recent searches resume this trip on this page
   const { colors, navy, onNavy } = useBrandColors();
   const router = useRouter();
   const bottomNavHeight = useBottomNavHeight();

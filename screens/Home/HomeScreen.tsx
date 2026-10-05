@@ -50,7 +50,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, setVehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet, syncNotifications, setDropoff, setDates, setTimes } = useSawari();
+  const { mode, setMode, vehicleType, setVehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet, syncNotifications, setDropoff, setDates, setTimes, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const insets = useSafeAreaInsets();
@@ -97,8 +97,9 @@ export default function HomeScreen() {
       .map((v: any) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; })
       .slice(0, 10);
   }, [viewedIds, fetchedVehicles, dateRange]);
-  const recentlyViewedCarsList = useMemo(() => recentlyViewedAll.filter((v: any) => v.type === 'Car'), [recentlyViewedAll]);
-  const recentlyViewedBikesList = useMemo(() => recentlyViewedAll.filter((v: any) => v.type === 'Bike'), [recentlyViewedAll]);
+  // The two most recent of each — a quick way back, not a second catalogue.
+  const recentlyViewedCarsList = useMemo(() => recentlyViewedAll.filter((v: any) => v.type === 'Car').slice(0, 2), [recentlyViewedAll]);
+  const recentlyViewedBikesList = useMemo(() => recentlyViewedAll.filter((v: any) => v.type === 'Bike').slice(0, 2), [recentlyViewedAll]);
 
   /** Runs `go` now when signed in, or after logging in (search results need an account). */
   const requireLogin = useCallback((go: () => void) => {
@@ -106,12 +107,16 @@ export default function HomeScreen() {
     else { setPendingAction(() => go); setShowLogin(true); }
   }, [isAuthenticated]);
 
+  /**
+   * Resumes a recent trip exactly where it was left: the results, the chosen car, the checkout or the
+   * payment page — with destination, dates, times, delivery and driver choices filled back in.
+   */
   const openRecentSearch = useCallback((s: RecentSearch) => {
     Haptics.selectionAsync();
     setBookingSource('home');
     setVehicleType(s.vehicleType);
     setDropoff(s.dropoff);
-    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('reuse_recent_search', 'HomeScreen', { destination: s.dropoff.name, dateRange: s.dateRange }));
+    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('reuse_recent_search', 'HomeScreen', { destination: s.dropoff.name, dateRange: s.dateRange, stage: s.stage }));
     if (isPastSearch(s)) {
       // Those dates have gone by: keep the destination, pick new dates (then on to the results).
       router.push({ pathname: '/dates', params: { returnBack: 'false', fresh: 'true' } });
@@ -119,8 +124,36 @@ export default function HomeScreen() {
     }
     setDates(s.dateRange, s.duration);
     setTimes(s.pickupTime, s.returnTime);
-    requireLogin(() => router.push('/search'));
-  }, [router, setBookingSource, setVehicleType, setDropoff, setDates, setTimes, requireLogin]);
+    if (s.trip) {
+      if (s.trip.mode) setMode(s.trip.mode);
+      setIsDeliveryRequested(!!s.trip.isDeliveryRequested);
+      if (s.trip.deliveryMode) setDeliveryMode(s.trip.deliveryMode);
+      setPickup(s.trip.pickup || null);
+      setReturnAddress(s.trip.returnAddress || null);
+    }
+
+    // The car they had chosen, as it is now on the server (price / availability may have changed).
+    const car = s.carId ? fetchedVehicles.find((v) => String(v.id) === s.carId) : undefined;
+    let stage = car ? s.stage || 'results' : 'results';
+    if (car && stage !== 'car') {
+      const [from, to] = splitDateRange(s.dateRange);
+      // Taken since: back to the car page, which offers "Check Availability" instead of a dead checkout.
+      if (!getAvailability(car, from, to).available) stage = 'car';
+    }
+
+    if (stage === 'results') {
+      requireLogin(() => router.push('/search'));
+      return;
+    }
+    selectCar(car!);
+    const resume = () => {
+      router.push('/car-details');
+      if (stage === 'booking' || stage === 'payment') router.push('/booking');
+      if (stage === 'payment') router.push('/payment');
+    };
+    // The car page is open to everyone; checkout and payment need an account.
+    if (stage === 'car') resume(); else requireLogin(resume);
+  }, [router, setBookingSource, setVehicleType, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress, selectCar, fetchedVehicles, requireLogin]);
 
   const forgetRecentSearch = useCallback(async (s: RecentSearch) => {
     Haptics.selectionAsync();
@@ -173,6 +206,8 @@ export default function HomeScreen() {
       style={{ width: 280, marginHorizontal: 8, marginBottom: 0 }}
       onPressOverride={() => {
         selectCar(item);
+        // Opened from Home: "Book Now" goes straight on when the trip details are already there.
+        setBookingSource('home');
         setVehicleType(item.type === 'Bike' ? 'bike' : 'car');
         if (item.viewedContext) {
           const ctx = item.viewedContext;
@@ -183,7 +218,7 @@ export default function HomeScreen() {
         router.push('/car-details');
       }}
     />
-  ), [selectCar, setVehicleType, setDropoff, setDates, setTimes, router]);
+  ), [selectCar, setVehicleType, setDropoff, setDates, setTimes, setBookingSource, router]);
   
   const renderDest = useCallback(({ item }: any) => (
     <DestinationCard 
@@ -459,8 +494,13 @@ export default function HomeScreen() {
           <>
             <SectionHeading title="Recent searches" kicker="PICK UP WHERE YOU LEFT OFF" />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentRow}>
-              {recentSearches.map((s) => {
+              {recentSearches.slice(0, 2).map((s) => {
                 const past = isPastSearch(s);
+                // Where the trip was left, so the customer knows the tap resumes it.
+                const where = s.carName && s.stage === 'payment' ? `Continue to payment · ${s.carName}`
+                  : s.carName && s.stage === 'booking' ? `Continue checkout · ${s.carName}`
+                  : s.carName && s.stage === 'car' ? s.carName
+                  : s.vehicleType === 'bike' ? 'Bikes' : 'Cars';
                 return (
                   <Pressable
                     key={s.id}
@@ -470,12 +510,12 @@ export default function HomeScreen() {
                     style={({ pressed }) => [styles.recentCard, { backgroundColor: colors.card, borderColor: colors.border }, pressed && { opacity: 0.8 }]}
                   >
                     <View style={[styles.recentIcon, { backgroundColor: colors.tintLight }]}>
-                      <Feather name={s.vehicleType === 'bike' ? 'wind' : 'clock'} size={15} color={colors.primaryText} />
+                      <Feather name={s.stage === 'booking' || s.stage === 'payment' ? 'arrow-right-circle' : 'clock'} size={15} color={colors.primaryText} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text numberOfLines={1} style={[styles.recentTitle, { color: colors.foreground }]}>{s.dropoff.name}</Text>
                       <Text numberOfLines={1} style={[styles.recentSub, { color: past ? colors.primaryText : colors.mutedForeground }]}>
-                        {past ? 'Dates passed · pick new dates' : `${s.dateRange} · ${s.vehicleType === 'bike' ? 'Bike' : 'Car'}`}
+                        {past ? 'Dates passed · pick new dates' : `${s.dateRange} · ${where}`}
                       </Text>
                     </View>
                     <Pressable hitSlop={10} accessibilityLabel="Remove from recent searches" onPress={() => forgetRecentSearch(s)} style={{ padding: 2 }}>
@@ -919,7 +959,7 @@ const styles = StyleSheet.create({
   topGreeting: { fontFamily: 'Inter_500Medium', fontSize: 12 },
   topName: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.3, marginTop: 1 },
   recentRow: { gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
-  recentCard: { width: 236, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12 },
+  recentCard: { width: 268, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12 },
   recentIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   recentTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   recentSub: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 2 },

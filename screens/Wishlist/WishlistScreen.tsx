@@ -5,6 +5,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Page, Header, CarListCard } from '@/components';
 import { useVehicles } from '@/hooks/useVehicles';
+import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +16,9 @@ export default function WishlistScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { favorites } = useSawari();
-  const { data: vehicles } = useVehicles();
+  const { data: vehicles, isLoading: vehiclesLoading } = useVehicles();
+  // Saved cars are matched against the live fleet: until it has loaded, show placeholders, not "empty".
+  const waitingForFleet = favorites.length > 0 && vehiclesLoading;
 
   const favoriteCars = useMemo(() => {
     return (vehicles || []).filter(car => favorites.includes(car.id));
@@ -89,7 +92,9 @@ export default function WishlistScreen() {
         data={favoriteCars}
         keyExtractor={item => item.id}
         renderItem={({ item }) => <CarListCard car={item} />}
-        ListEmptyComponent={renderEmpty}
+        ListEmptyComponent={waitingForFleet ? (
+          <View style={{ paddingHorizontal: 16 }}>{[0, 1].map((i) => <CarCardSkeleton key={i} index={i} />)}</View>
+        ) : renderEmpty}
         ListHeaderComponent={renderHeader}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100, flexGrow: 1 }}
         showsVerticalScrollIndicator={false}

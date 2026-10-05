@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { ScrollView, StyleSheet, View, Text, Pressable, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -23,6 +24,7 @@ import { ActivityAPI } from '@/services/api/activity';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 
 export default function CarDetailsScreen() {
+  useTrackTripProgress('car'); // Recent searches resume this trip on this page
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();

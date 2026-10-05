@@ -15,6 +15,7 @@ import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
 import { MockRequests, PendingRefund } from '@/utils/mockRequests';
 import { useQuery } from '@tanstack/react-query';
 import { useVehicles } from '@/hooks/useVehicles';
+import { bookingsQueryOptions } from '@/hooks/useHomeData';
 import { LoadingImage } from '@/components/common/LoadingImage';
 
 // Status config — colour + icon for each state
@@ -33,8 +34,17 @@ export default function BookingDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id?: string }>();
 
-  const [snapshot, setSnapshot] = useState<BookingSnapshot | null>(null);
-  const [loading, setLoading] = useState(!!id);
+  // From the shared bookings list (usually already loaded, so it opens instantly); refreshed on focus.
+  const { data: allBookings, isLoading: listLoading, isError: listFailed, refetch: refetchBookings } = useQuery({
+    ...bookingsQueryOptions,
+    enabled: !!id,
+  });
+  // A cancel / extend answer from the sheets shows straight away, before the list catches up.
+  const [updated, setUpdated] = useState<BookingSnapshot | null>(null);
+  const snapshot: BookingSnapshot | null = updated && updated.id === id ? updated : (allBookings || []).find((b) => b.id === id) || null;
+  const loading = !!id && listLoading && !snapshot;
+  const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); };
+  useFocusEffect(React.useCallback(() => { if (id) refetchBookings(); }, [id, refetchBookings]));
   const [showCancel, setShowCancel] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);
@@ -59,16 +69,6 @@ export default function BookingDetailScreen() {
 
   const { data: vehicles = [] } = useVehicles();
 
-  useEffect(() => {
-    if (id) {
-      API.getBooking(id)
-        .then(res => setSnapshot(res))
-        .catch(() => setSnapshot(null))
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, [id]);
 
   if (loading) {
     return (
@@ -82,6 +82,20 @@ export default function BookingDetailScreen() {
           </View>
           <BookingDetailSkeleton />
         </View>
+      </View>
+    );
+  }
+
+  if (!snapshot && listFailed) {
+    // A network problem is not "booking not found": offer a retry.
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
+        <Feather name="wifi-off" size={40} color={colors.mutedForeground} />
+        <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginTop: 16 }}>Couldn't load this trip</Text>
+        <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginTop: 6, textAlign: 'center' }}>Check your internet connection and try again.</Text>
+        <Pressable onPress={() => refetchBookings()} style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 12 }}>
+          <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>Retry</Text>
+        </Pressable>
       </View>
     );
   }

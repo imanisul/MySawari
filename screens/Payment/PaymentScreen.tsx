@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { Pressable, StyleSheet, Text, View, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -11,6 +12,7 @@ import { Reveal } from '@/components/common/Reveal';
 import { PriceSummarySkeleton } from '@/components/loading/ScreenSkeletons';
 
 export default function PaymentScreen() {
+  useTrackTripProgress('payment'); // Recent searches resume this trip on this page
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();

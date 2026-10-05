@@ -198,8 +198,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [sawariCash, setSawariCash] = useState(0);
   const [membership, setMembership] = useState<Membership>(null);
   // Wallet balance and membership status arrive together from the same endpoint — keep them in sync.
-  const applyWallet = useCallback((wallet: { walletBalance?: number; membership?: Membership } | null | undefined) => {
-    if (!wallet) return;
+  const applyWallet = useCallback((wallet: { walletBalance?: number; membership?: Membership; failed?: boolean } | null | undefined) => {
+    // A failed request keeps the last known balance and membership (never resets a member to "none").
+    if (!wallet || wallet.failed) return;
     setSawariCash(wallet.walletBalance || 0);
     setMembership(wallet.membership || null);
   }, []);

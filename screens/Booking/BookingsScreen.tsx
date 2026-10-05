@@ -14,6 +14,7 @@ import { API } from '@/services/backend/api';
 import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
+import { bookingsQueryOptions } from '@/hooks/useHomeData';
 import { ReviewModal, ReviewTrip } from '@/components/booking/ReviewModal';
 import { rise } from '@/components/common/motion';
 type BookingTab = 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
@@ -43,18 +44,11 @@ export default function BookingsScreen() {
   const hasReviewed = (b: BookingSnapshot) =>
     !!myReviews && (myReviews.bookingIds.includes(b.id) || myReviews.legacyCarIds.includes(String(b.vehicleId)));
   
+  // The same bookings query as Home (already loaded at app start), so this list opens instantly.
   const { data: bookings = [], isLoading: loading, isError: fetchError, refetch } = useQuery({
-    queryKey: ['bookings'],
-    queryFn: async () => {
-      if (!isAuthenticated) return [];
-      const userBookings = await API.getAllBookings();
-      await new Promise(r => setTimeout(r, 800)); // Smooth out skeleton
-      return userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    },
+    ...bookingsQueryOptions,
     enabled: isAuthenticated === true,
-    staleTime: 15 * 1000,
     refetchInterval: 30 * 1000, // status changes (e.g. trip completed by the ops team) appear on their own
-    refetchOnWindowFocus: true,
   });
 
   useFocusEffect(

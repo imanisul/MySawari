@@ -31,7 +31,7 @@ export default function ProfileScreen() {
   const giftGlowAnim = useRef(new Animated.Value(0)).current;
 
   // Fetch ride journey data from backend
-  const { data: journey, isLoading: isJourneyLoading } = useQuery({
+  const { data: journey, isLoading: isJourneyLoading, isError: journeyFailed, refetch: refetchJourney } = useQuery({
     queryKey: ['ride-journey'],
     queryFn: () => API.getRideJourney(),
     enabled: !!isAuthenticated,
@@ -241,6 +241,13 @@ export default function ProfileScreen() {
           <Text style={[styles.loyaltyTitle, { color: colors.foreground }]}>Your Ride Journey</Text>
           {isJourneyLoading ? (
             <LoyaltySkeleton />
+          ) : journeyFailed && !journey ? (
+            // Not "complete 4 more rides" for someone whose rides just didn't load.
+            <Pressable onPress={() => refetchJourney()} style={{ paddingVertical: 16 }}>
+              <Text style={[styles.loyaltySubtitle, { color: colors.mutedForeground }]}>
+                Couldn't load your ride journey. <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold' }}>Tap to retry</Text>
+              </Text>
+            </Pressable>
           ) : (
           <>
           <Text style={[styles.loyaltySubtitle, { color: colors.mutedForeground }]}>

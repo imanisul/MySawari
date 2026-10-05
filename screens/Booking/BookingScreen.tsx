@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { Pressable, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -16,6 +17,7 @@ import { API } from '@/services/backend/api';
 import { ActivityAPI } from '@/services/api/activity';
 
 export default function BookingScreen() {
+  useTrackTripProgress('booking'); // Recent searches resume this trip on this page
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();

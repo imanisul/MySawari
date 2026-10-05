@@ -979,7 +979,9 @@ export const API = {
       if (!/session expired|not authorized/i.test(e.message)) {
         console.error('getWallet error:', e.message);
       }
-      return empty;
+      // `failed` tells screens this is NOT a real empty wallet: they keep what they had (balance,
+      // membership) or offer a retry, instead of showing ₹0 / "not a member" to a paying member.
+      return { ...empty, failed: true };
     }
   },
 
@@ -1318,7 +1320,7 @@ export const API = {
       return data.data || [];
     } catch (e: any) {
       console.error('getReferrals error:', e);
-      return [];
+      throw e; // the screen shows a retry; an empty list would look like "you referred nobody"
     }
   },
 

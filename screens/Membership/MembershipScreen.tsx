@@ -16,6 +16,7 @@ import { useColors } from '@/hooks/useColors';
 import { API, invalidateWalletCache } from '@/services/backend/api';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWebView';
+import { useSawari } from '@/context/SawariContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -62,13 +63,19 @@ export default function MembershipScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const { membership: knownMembership, fetchWallet } = useSawari();
+  const isKnownActive = !!(knownMembership?.plan && knownMembership.expiresAt && new Date(knownMembership.expiresAt) > new Date());
+
+  // A member's plan (already loaded at app start) shows instantly and is refreshed in the background.
+  // Without one, the screen waits for the server: plans must never be offered to a member by mistake.
   const [membership, setMembership] = useState<{
     plan: PlanKey;
     activatedAt: string;
     expiresAt: string;
     totalSaved: number;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
+  } | null>(isKnownActive ? (knownMembership as any) : null);
+  const [loading, setLoading] = useState(!isKnownActive);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [activating, setActivating] = useState<PlanKey | null>(null);
   
   // Payment states
@@ -88,10 +95,14 @@ export default function MembershipScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const fetchMembership = useCallback(async () => {
-    try {
-      const wallet = await API.getWallet(true);
+    setLoadFailed(false);
+    const wallet: any = await API.getWallet(true).catch(() => ({ failed: true }));
+    if (wallet?.failed) {
+      // Keep a membership we already know about; otherwise say so instead of showing the plans.
+      setLoadFailed(true);
+    } else {
       setMembership(wallet?.membership || null);
-    } catch {}
+    }
     setLoading(false);
   }, []);
 
@@ -144,6 +155,7 @@ export default function MembershipScreen() {
       });
       invalidateWalletCache();
       setMembership(result.membership);
+      fetchWallet().catch(() => {}); // Home's membership card and SawariCash update too
       progressAnim.setValue(0);
       
       
@@ -179,6 +191,31 @@ export default function MembershipScreen() {
       <Page scroll={false}>
         <Header title="Membership" back={true} />
         <MembershipSkeleton />
+      </Page>
+    );
+  }
+
+  // Couldn't check the membership and none is known: retry rather than risk selling a second plan.
+  if (loadFailed && !membership) {
+    return (
+      <Page scroll={false}>
+        <Header title="Membership" back={true} />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <Feather name="wifi-off" size={36} color={colors.mutedForeground} />
+          <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 16, color: colors.foreground, marginTop: 16, textAlign: 'center' }}>
+            Couldn't load your membership
+          </Text>
+          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 13, color: colors.mutedForeground, marginTop: 6, textAlign: 'center' }}>
+            Check your internet connection and try again.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { setLoading(true); fetchMembership(); }}
+            style={({ pressed }) => [{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
+          >
+            <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>Retry</Text>
+          </Pressable>
+        </View>
       </Page>
     );
   }

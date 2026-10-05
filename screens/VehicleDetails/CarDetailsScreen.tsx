@@ -236,7 +236,7 @@ export default function CarDetailsScreen() {
                       <Text style={[styles.sectionTabText, { color: active ? colors.foreground : colors.mutedForeground }, active && { fontFamily: 'Inter_700Bold' }]}>
                         {label}
                       </Text>
-                      {count !== null && (
+                      {count != null && (
                         <View style={[styles.tabCount, { backgroundColor: active ? colors.primary : colors.surfaceSoft }]}>
                           <Text style={[styles.tabCountText, { color: active ? colors.primaryForeground : colors.mutedForeground }]}>{count}</Text>
                         </View>

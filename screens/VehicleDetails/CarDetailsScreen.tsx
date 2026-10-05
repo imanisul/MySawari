@@ -108,7 +108,7 @@ export default function CarDetailsScreen() {
   // ── One scrolling page with a sticky section bar (About · Gallery · Reviews) ──
   // The bar highlights the section being read as the page scrolls; tapping a tab scrolls to it.
   const [activeSection, setActiveSection] = useState<SectionKey>('gallery');
-  const sectionTops = useRef<Record<SectionKey, number>>({ about: 0, gallery: 0, reviews: 0 });
+  const sectionTops = useRef<Record<SectionKey, number>>({ gallery: 0, about: 0, specifications: 0, features: 0, location: 0, reviews: 0 });
   const tabBarHeight = useRef(48);
   const jumpingUntil = useRef(0); // ignore scroll updates while a tap-scroll animation is running
 
@@ -148,7 +148,7 @@ export default function CarDetailsScreen() {
   });
   const reviewCount = [...(selectedCar?.reviews || []), ...(dbReviews as any[])].filter((r: any) => r.rating >= MIN_PUBLIC_REVIEW_RATING).length;
   const photoCount = (selectedCar?.images || (selectedCar?.image ? [selectedCar.image] : [])).length;
-  const tabCount: Record<SectionKey, number | null> = { about: null, gallery: photoCount || null, reviews: reviewCount || null };
+  const tabCount: Record<SectionKey, number | null> = { gallery: photoCount || null, about: null, specifications: null, features: null, location: null, reviews: reviewCount || null };
 
   const scrollToSection = (key: SectionKey) => {
     Haptics.selectionAsync();

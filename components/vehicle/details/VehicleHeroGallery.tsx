@@ -177,7 +177,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
     padding: 8,
     borderRadius: 20,
-    backdropFilter: 'blur(10px)', // web only, but safe
   },
   paginationContainer: {
     position: 'absolute',

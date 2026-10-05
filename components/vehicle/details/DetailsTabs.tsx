@@ -217,7 +217,7 @@ export function GallerySection({ car }: { car: Car }) {
               setViewerSource(img);
             }}
           >
-            <Image source={img} style={styles.galleryImage} resizeMode="cover" />
+            <LoadingImage source={img} style={styles.galleryImage} contentFit="cover" transition={200} />
           </Pressable>
         ))}
       </View>

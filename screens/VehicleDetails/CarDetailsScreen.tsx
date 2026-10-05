@@ -15,7 +15,6 @@ import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGall
 import { VehicleSummary } from '@/components/vehicle/details/VehicleSummary';
 import { DetailsTabs } from '@/components/vehicle/details/DetailsTabs';
 import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
-import { PriceBreakdownSheet } from '@/components/vehicle/details/PriceBreakdownSheet';
 import { SearchSheet } from '@/components/booking/SearchSheet';
 import Reanimated from 'react-native-reanimated';
 import { rise } from '@/components/common/motion';
@@ -48,7 +47,6 @@ export default function CarDetailsScreen() {
   const [isEditingTrip, setIsEditingTrip] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  const [showBreakdown, setShowBreakdown] = useState(false);
   const [showSearchSheet, setShowSearchSheet] = useState(false);
 
   const handleBookingProceed = () => {
@@ -201,16 +199,11 @@ export default function CarDetailsScreen() {
       <StickyBookingBar 
         isAvailable={isAvailable} 
         onCheckAvailability={() => { Haptics.selectionAsync(); setShowSearchSheet(true); }}
-        onViewBreakdown={() => setShowBreakdown(true)} 
         onNeedLogin={() => {
           setPendingAction(() => handleBookingProceed);
           setShowLogin(true);
         }} 
         onBookNow={handleBookingProceed}
-      />
-      <PriceBreakdownSheet
-        visible={showBreakdown}
-        onClose={() => setShowBreakdown(false)}
       />
       <SearchSheet
         visible={showSearchSheet}

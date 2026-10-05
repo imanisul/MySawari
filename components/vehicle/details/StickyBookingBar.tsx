@@ -5,101 +5,59 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
-import { formatCurrency } from '@/services/backend/pricingEngine';
 
+/**
+ * The car details page's bottom bar: ONE full-width call to action and no price. The price breakdown is
+ * only shown on the payment page, once the customer has chosen their destination and trip details.
+ *  - available     → "Book Now" (asks to log in first when needed)
+ *  - not available → "Check Availability" (opens destination + dates to check other dates)
+ */
 export function StickyBookingBar({
   isAvailable = true,
-  onViewBreakdown,
   onNeedLogin,
   onBookNow,
   onCheckAvailability,
 }: {
   isAvailable?: boolean;
   onCheckAvailability?: () => void;
-  onViewBreakdown?: () => void;
   onNeedLogin?: () => void;
   onBookNow?: () => void;
 }) {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { pricingQuote, isQuoteLoading, isAuthenticated } = useSawari();
+  const { isAuthenticated } = useSawari();
 
-  // Not free for the chosen dates: one full-width action to pick a destination and dates and check again.
-  if (!isAvailable) {
-    return (
-      <View style={[styles.bottomBarPremium, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16) }]}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onCheckAvailability}
-          disabled={!onCheckAvailability}
-          style={({ pressed }) => [
-            styles.bottomButtonPremium,
-            styles.fullButton,
-            { backgroundColor: colors.primary },
-            pressed && styles.pressed,
-            !onCheckAvailability && { opacity: 0.5 },
-          ]}
-        >
-          <Feather name="calendar" size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />
-          <Text style={[styles.bottomButtonText, { color: colors.primaryForeground, marginRight: 0 }]}>Check Availability</Text>
-        </Pressable>
-      </View>
-    );
-  }
+  const label = isAvailable ? 'Book Now' : 'Check Availability';
+  const onPress = isAvailable
+    ? () => {
+        if (isAuthenticated) {
+          onBookNow ? onBookNow() : router.push('/booking');
+        } else {
+          onNeedLogin?.();
+        }
+      }
+    : onCheckAvailability;
+  const disabled = !onPress;
 
   return (
-    <View style={[styles.bottomBarPremium, { 
-      backgroundColor: colors.card, 
-      paddingBottom: Math.max(insets.bottom, 16) 
-    }]}>
-      <Pressable
-        style={styles.priceContainer}
-        onPress={onViewBreakdown}
-        disabled={!onViewBreakdown || !isAvailable}
-        accessibilityRole={onViewBreakdown ? 'button' : undefined}
-        accessibilityLabel="View price breakdown"
-      >
-        {!isAvailable ? (
-          <View>
-            <Text style={[styles.bottomLabel, { color: colors.destructive, fontFamily: 'Inter_600SemiBold', fontSize: 16 }]}>Not Available</Text>
-          </View>
-        ) : (
-          <>
-            <Text style={[styles.bottomLabel, { color: colors.mutedForeground }]}>Payable Now</Text>
-
-            {isQuoteLoading ? (
-              <Text style={[styles.bottomPrice, { color: colors.foreground, fontSize: 16 }]}>Calculating...</Text>
-            ) : (
-              <Text style={[styles.bottomPrice, { color: colors.foreground }]}>
-                {formatCurrency(pricingQuote?.onlinePayableNow || 0)}
-              </Text>
-            )}
-
-            <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11, color: colors.primaryText, marginTop: 2 }}>View breakdown</Text>
-          </>
-        )}
-      </Pressable>
-      
+    <View style={[styles.bottomBarPremium, { backgroundColor: colors.card, paddingBottom: Math.max(insets.bottom, 16) }]}>
       <Pressable
         accessibilityRole="button"
-        onPress={() => {
-          if (isAuthenticated) {
-            onBookNow ? onBookNow() : router.push('/booking');
-          } else {
-            onNeedLogin?.();
-          }
-        }}
-        disabled={isQuoteLoading}
+        accessibilityLabel={label}
+        onPress={onPress}
+        disabled={disabled}
         style={({ pressed }) => [
-          styles.bottomButtonPremium, 
-          { backgroundColor: colors.primary }, 
+          styles.bottomButtonPremium,
+          styles.fullButton,
+          { backgroundColor: colors.primary },
           pressed && styles.pressed,
-          isQuoteLoading && { opacity: 0.5 }
+          disabled && { opacity: 0.5 },
         ]}
       >
-        <Text style={[styles.bottomButtonText, { color: colors.primaryForeground }]}>Book Now</Text>
-        <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
+        {!isAvailable && <Feather name="calendar" size={18} color={colors.primaryForeground} style={{ marginRight: 8 }} />}
+        <Text style={[styles.bottomButtonText, { color: colors.primaryForeground, marginRight: isAvailable ? 8 : 0 }]}>{label}</Text>
+        {isAvailable && <Feather name="arrow-right" size={18} color={colors.primaryForeground} />}
       </Pressable>
     </View>
   );
@@ -119,19 +77,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
-  },
-  priceContainer: {
-    flex: 1,
-  },
-  bottomLabel: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-  },
-  bottomPrice: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 22,
-    marginTop: 2,
-    letterSpacing: -0.5,
   },
   bottomButtonPremium: {
     alignItems: 'center',

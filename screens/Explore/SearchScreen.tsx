@@ -15,6 +15,7 @@ import {
 } from '@/utils/sawari';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useSawari } from '@/context/SawariContext';
+import { saveRecentSearch } from '@/utils/recentSearches';
 import { Header, Page, CarListCard } from '@/components';
 import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
 import { SearchEmptyState, EmptyKind } from '@/components/search/SearchEmptyState';
@@ -81,7 +82,7 @@ export default function SearchResultsScreen() {
   const router = useRouter();
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
-  const { dateRange, vehicleType, pickupTime, returnTime, setDates } = useSawari();
+  const { dateRange, vehicleType, pickupTime, returnTime, setDates, dropoff, duration, customer } = useSawari();
 
   const vehicleWord = vehicleType === 'bike' ? 'bike' : 'car';
 
@@ -113,6 +114,14 @@ export default function SearchResultsScreen() {
   const endDay = startDay !== null ? parseDayLabel(endLabel, startDay) : null;
   const hasRange = startDay !== null && endDay !== null && endDay > startDay;
   const datesText = hasRange ? `${startLabel} – ${endLabel}` : startDay !== null ? startLabel! : null;
+
+  // Remember this trip search (destination + dates) so Home can offer it again with one tap.
+  useEffect(() => {
+    if (!dropoff?.name || startDay === null || endDay === null) return;
+    saveRecentSearch(customer?.id, { dropoff, dateRange, duration, pickupTime, returnTime, vehicleType }).catch(() => {});
+    ActivityAPI.logActivity('trip_search', 'SearchScreen', { destination: dropoff.name, dateRange, vehicleType });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dropoff?.name, dateRange, vehicleType]);
 
   // Refresh vehicles from the API whenever the customer moves to different dates.
   const lastDates = useRef<string | undefined>(undefined);

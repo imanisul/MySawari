@@ -119,7 +119,7 @@ export default function BookingScreen() {
             label="Destination"
             value={dropoff?.name || 'Select Destination'}
             isMissing={!dropoff?.name}
-            onPress={() => router.push('/dropoff')}
+            onPress={() => router.push({ pathname: '/dropoff', params: { returnBack: 'true' } })}
           />
           {isDeliveryRequested && (
             <>

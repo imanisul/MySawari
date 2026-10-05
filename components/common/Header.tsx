@@ -13,11 +13,14 @@ export function Header({
   back = false,
   hideLogo = false,
   absolute = false,
+  leading,
 }: {
   title?: string;
   back?: boolean;
   hideLogo?: boolean;
   absolute?: boolean;
+  /** Replaces the logo + app name on the left (Home shows a personal greeting there instead). */
+  leading?: React.ReactNode;
 }) {
   const colors = useColors();
   const router = useRouter();
@@ -54,6 +57,7 @@ export function Header({
   const content = (
     <View style={[{ paddingTop: insets.top }, !absolute ? { backgroundColor: colors.background } : undefined]}>
       <View style={[styles.header, { paddingBottom: 8 }]}>
+        {leading && !back ? <View style={{ flex: 1, marginRight: 12 }}>{leading}</View> : (
         <Pressable
           accessibilityRole="button"
           testID={back ? 'back-button' : 'brand-home'}
@@ -75,6 +79,7 @@ export function Header({
           ) : null}
           <Text style={[styles.appName, { color: colors.foreground }]}>{title}</Text>
         </Pressable>
+        )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           
           {/* Wishlist Badge - Only show if they have items */}

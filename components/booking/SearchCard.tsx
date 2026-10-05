@@ -70,7 +70,7 @@ export function SearchCard({
           accessibilityRole="button"
           onPress={() => {
             Haptics.selectionAsync();
-            router.push('/dropoff');
+            router.push({ pathname: '/dropoff', params: { returnBack: isModal ? 'true' : 'false' } });
           }}
           style={({ pressed }) => [
             styles.field,

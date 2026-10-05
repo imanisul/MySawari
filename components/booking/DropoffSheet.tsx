@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { StyleSheet, Text, View, Pressable, TextInput, ScrollView } from 'react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
@@ -20,13 +20,23 @@ const MAJOR_DESTINATIONS = [
   { id: 'dzukou', name: 'Dzukou Valley, Nagaland', desc: 'Lush Green Trekking Paradise', type: 'nature' },
   { id: 'dawki', name: 'Dawki, Meghalaya', desc: 'Crystal Clear Umngot River', type: 'nature' },
   { id: 'guwahati-local', name: 'Guwahati Local', desc: 'City Tour, Kamakhya Temple, Cruises', type: 'city' },
+  { id: 'kamakhya', name: 'Kamakhya Temple, Assam', desc: 'Guwahati · Nilachal Hill', type: 'city' },
+  { id: 'manas', name: 'Manas National Park, Assam', desc: 'Tigers, Elephants & Golden Langurs', type: 'nature' },
+  { id: 'ziro', name: 'Ziro Valley, Arunachal Pradesh', desc: 'Apatani Villages & Rice Fields', type: 'nature' },
+  { id: 'imphal', name: 'Imphal, Manipur', desc: 'Loktak Lake & Kangla Fort', type: 'city' },
+  { id: 'aizawl', name: 'Aizawl, Mizoram', desc: 'Hilltop City & Reiek Views', type: 'hill' },
+  { id: 'agartala', name: 'Agartala, Tripura', desc: 'Ujjayanta & Neermahal Palaces', type: 'city' },
+  { id: 'gangtok', name: 'Gangtok, Sikkim', desc: 'Tsomgo Lake & Nathula Pass', type: 'hill' },
 ];
 
 export function DropoffSheet() {
   const colors = useColors();
   const router = useRouter();
   const { setDropoff } = useSawari();
-  const [searchQuery, setSearchQuery] = useState('');
+  // returnBack: opened from a screen that wants the customer back afterwards (booking page, trip sheet).
+  // q: opened from a state on Home's "Explore Northeast", pre-filtered to it.
+  const params = useLocalSearchParams<{ returnBack?: string; q?: string }>();
+  const [searchQuery, setSearchQuery] = useState(typeof params.q === 'string' ? params.q : '');
 
   // Combine static pickup locations and Major Destinations
   const ALL_DESTINATIONS = useMemo(() => {
@@ -54,7 +64,9 @@ export function DropoffSheet() {
   const handleSelect = (location: any) => {
     Haptics.selectionAsync();
     setDropoff({ id: location.id, name: location.name, address: location.desc, latitude: 0, longitude: 0, source: 'database' });
-    router.back();
+    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: location.name }));
+    // Straight on to the dates — the next thing a trip needs — instead of back to the form.
+    router.replace({ pathname: '/dates', params: { returnBack: params.returnBack === 'true' ? 'true' : 'false' } });
   };
 
   const getIcon = (type: string) => {
@@ -104,10 +116,20 @@ export function DropoffSheet() {
             </View>
           </Pressable>
         ))}
-        {filteredDestinations.length === 0 && (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <Text style={{ fontFamily: 'Inter_500Medium', color: colors.mutedForeground }}>No destinations found.</Text>
-          </View>
+        {/* A place that isn't listed can still be the destination — never a dead end. */}
+        {searchQuery.trim().length >= 3 && !filteredDestinations.some((l) => l.name.toLowerCase() === searchQuery.trim().toLowerCase()) && (
+          <Pressable
+            style={({ pressed }) => [styles.locationItem, { borderBottomColor: colors.border }, pressed && { backgroundColor: colors.tintLight }]}
+            onPress={() => handleSelect({ id: `custom-${searchQuery.trim().toLowerCase()}`, name: searchQuery.trim(), desc: 'Your destination', type: 'map' })}
+          >
+            <View style={[styles.iconWrap, { backgroundColor: colors.primary + '20' }]}>
+              <Feather name="plus" size={16} color={colors.primaryText} />
+            </View>
+            <View style={styles.locTextWrap}>
+              <Text style={[styles.locTitle, { color: colors.foreground }]}>Use “{searchQuery.trim()}”</Text>
+              <Text style={[styles.locDesc, { color: colors.mutedForeground }]}>Set as your destination</Text>
+            </View>
+          </Pressable>
         )}
         <View style={{ height: 40 }} />
       </ScrollView>

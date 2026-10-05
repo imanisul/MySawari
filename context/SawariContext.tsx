@@ -845,6 +845,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           import('@/services/api/activity').then(({ ActivityAPI }) => {
             ActivityAPI.logActivity('AUTH_LOGIN', 'System', { userId: user.id });
           });
+          // Trips searched as a guest on this phone stay in their recent searches.
+          import('@/utils/recentSearches').then(({ adoptGuestSearches }) => adoptGuestSearches(String(user.id))).catch(() => {});
 
           setIsAuthenticated(true);
         } catch (e) {

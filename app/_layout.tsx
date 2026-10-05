@@ -11,7 +11,7 @@ LogBox.ignoreLogs([
 import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { primeVehicles, useVehicles } from '@/hooks/useVehicles';
-import { loadHomeData } from '@/hooks/useHomeData';
+import { loadHomeData, homeLoadSteps, HomeLoadStep } from '@/hooks/useHomeData';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
@@ -260,7 +260,7 @@ function AppGate({
   children: React.ReactNode;
   fontError: boolean;
 }) {
-  const { isAuthLoading, isAuthenticated, fetchWallet } = useSawari();
+  const { isAuthLoading, isAuthenticated, fetchWallet, customer } = useSawari();
   const vehicles = useVehicles();
   const client = useQueryClient();
 
@@ -268,10 +268,15 @@ function AppGate({
   // the loading screen lifts, so they land on a fully filled Home screen.
   const [homeDataReady, setHomeDataReady] = useState(false);
   const [loadRun, setLoadRun] = useState(0);
+  const [loadSteps, setLoadSteps] = useState<HomeLoadStep[]>([]);
   useEffect(() => {
     if (isAuthLoading || homeDataReady) return;
     let cancelled = false;
-    loadHomeData(client, { isAuthenticated: !!isAuthenticated, fetchWallet })
+    setLoadSteps(homeLoadSteps(!!isAuthenticated));
+    loadHomeData(client, {
+      isAuthenticated: !!isAuthenticated, fetchWallet, userId: customer?.id,
+      onStep: (key) => { if (!cancelled) setLoadSteps((prev) => prev.map((s) => (s.key === key ? { ...s, done: true } : s))); },
+    })
       .finally(() => { if (!cancelled) setHomeDataReady(true); });
     return () => { cancelled = true; };
     // Runs once per launch (and again on Retry); later sign-ins / refreshes are handled by the screens.
@@ -304,6 +309,8 @@ function AppGate({
         isDataReady={vehiclesLoaded}
         loadFailed={homeDataReady && vehicles.data === undefined && vehicles.isError && !vehicles.isFetching}
         onRetry={() => { setHomeDataReady(false); setLoadRun((n) => n + 1); }}
+        steps={loadSteps}
+        guest={!isAuthenticated}
       >
         {children}
       </AnimatedSplash>

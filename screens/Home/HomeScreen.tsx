@@ -28,7 +28,9 @@ import { useQuery } from '@tanstack/react-query';
 import { offersQueryOptions } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
-import { bookingsQueryOptions } from '@/hooks/useHomeData';
+import { bookingsQueryOptions, recentSearchesQueryOptions } from '@/hooks/useHomeData';
+import { RecentSearch, isPastSearch, removeRecentSearch } from '@/utils/recentSearches';
+import { useQueryClient } from '@tanstack/react-query';
 import { Reveal } from '@/components/common/Reveal';
 import { SocialLinks } from '@/components/common/SocialLinks';
 import * as Location from 'expo-location';
@@ -48,7 +50,7 @@ const DESTINATIONS = [
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { mode, setMode, vehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet, syncNotifications } = useSawari();
+  const { mode, setMode, vehicleType, setVehicleType, customer, bookingConfirmed, selectedCar, selectCar, isAuthenticated, setBookingSource, dateRange, selectedDate, isAuthLoading, membership, fetchWallet, syncNotifications, setDropoff, setDates, setTimes } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const insets = useSafeAreaInsets();
@@ -70,6 +72,51 @@ export default function HomeScreen() {
   }, []);
 
   const { data: fetchedVehicles = [], isLoading: isLoadingVehicles, isError: vehiclesFailed, refetch: refetchVehicles } = useVehicles();
+  const queryClient = useQueryClient();
+
+  // Live fleet line under the heading ("18 cars · 9 bikes available today"), from the database.
+  const availableToday = useMemo(() => {
+    let carsFree = 0, bikesFree = 0;
+    for (const v of fetchedVehicles) {
+      if (!getAvailability(v).available) continue;
+      if (v.type === 'Bike') bikesFree++; else carsFree++;
+    }
+    return { carsFree, bikesFree };
+  }, [fetchedVehicles]);
+
+  // Recent trip searches: one tap fills destination + dates again. Loaded before Home appears.
+  const recentKey = isAuthenticated ? customer?.id : null;
+  const { data: recentSearches = [] } = useQuery(recentSearchesQueryOptions(recentKey));
+  useFocusEffect(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['recentSearches', recentKey || 'guest'] });
+  }, [queryClient, recentKey]));
+
+  /** Runs `go` now when signed in, or after logging in (search results need an account). */
+  const requireLogin = useCallback((go: () => void) => {
+    if (isAuthenticated) go();
+    else { setPendingAction(() => go); setShowLogin(true); }
+  }, [isAuthenticated]);
+
+  const openRecentSearch = useCallback((s: RecentSearch) => {
+    Haptics.selectionAsync();
+    setBookingSource('home');
+    setVehicleType(s.vehicleType);
+    setDropoff(s.dropoff);
+    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('reuse_recent_search', 'HomeScreen', { destination: s.dropoff.name, dateRange: s.dateRange }));
+    if (isPastSearch(s)) {
+      // Those dates have gone by: keep the destination, pick new dates (then on to the results).
+      router.push({ pathname: '/dates', params: { returnBack: 'false' } });
+      return;
+    }
+    setDates(s.dateRange, s.duration);
+    setTimes(s.pickupTime, s.returnTime);
+    requireLogin(() => router.push('/search'));
+  }, [router, setBookingSource, setVehicleType, setDropoff, setDates, setTimes, requireLogin]);
+
+  const forgetRecentSearch = useCallback(async (s: RecentSearch) => {
+    Haptics.selectionAsync();
+    queryClient.setQueryData(['recentSearches', recentKey || 'guest'], await removeRecentSearch(recentKey, s.id));
+  }, [queryClient, recentKey]);
 
   const renderOffer = useCallback(({ item }: any) => (
     <OfferCard 
@@ -120,10 +167,9 @@ export default function HomeScreen() {
         import('@/services/api/activity').then(({ ActivityAPI }) => {
           ActivityAPI.logActivity('view_destination', 'HomeScreen', { destination: item.title });
         });
-        // Scroll to top and switch to explore
-        mainScrollRef.current?.scrollToOffset({ offset: 0, animated: true });
-        setBookingSource('explore');
-        router.push('/explore');
+        // Pick a place in that state, then straight on to the dates.
+        setBookingSource('home');
+        router.push({ pathname: '/dropoff', params: { q: item.title, returnBack: 'false' } });
       }}
     />
   ), [router, setBookingSource]);
@@ -293,13 +339,18 @@ export default function HomeScreen() {
     }
   }, [vehicleType, displayVehicle, vehicleFadeAnim, vehicleSlideAnim]);
 
+  // Order: plan a trip first (search + recent searches), then what is personal (current trip, membership
+  // savings), then what can be booked now (deals, offers, vehicles), then growth (membership, sign-up /
+  // refer) and inspiration (destinations).
   const sections = useMemo(() => [
     { type: 'header', key: 'header' },
+    { type: 'recentSearches', key: 'recentSearches' },
     { type: 'nextTrip', key: 'nextTrip' },
-    { type: 'membershipPromo', key: 'membershipPromo' },
+    { type: 'membershipPromo', key: 'memberTop', placement: 'top' },
     { type: 'specialDeals', key: 'specialDeals' },
     { type: 'offers', key: 'offers' },
     { type: 'exploreVehicles', key: 'exploreVehicles' },
+    { type: 'membershipPromo', key: 'memberBottom', placement: 'bottom' },
     { type: 'referEarn', key: 'referEarn' },
     { type: 'destinations', key: 'destinations' },
     { type: 'footer', key: 'footer' },
@@ -315,12 +366,17 @@ export default function HomeScreen() {
           <>
             <View style={{ position: 'relative', overflow: 'visible', zIndex: -1 }}>
               <View>
-                <Text style={[styles.greeting, { color: colors.mutedForeground }]}>
-                  {greeting}{isAuthenticated && customer?.name ? `, ${customer.name.split(' ')[0]}` : ''}
-                </Text>
                 <Text style={[styles.heading, { color: colors.foreground }]}>
                   Where are you{'\n'}going?
                 </Text>
+                {fetchedVehicles.length > 0 && (
+                  <View style={styles.liveRow}>
+                    <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
+                    <Text style={[styles.liveText, { color: colors.mutedForeground }]}>
+                      {availableToday.carsFree} {availableToday.carsFree === 1 ? 'car' : 'cars'} · {availableToday.bikesFree} {availableToday.bikesFree === 1 ? 'bike' : 'bikes'} available today
+                    </Text>
+                  </View>
+                )}
               </View>
               <Animated.Image 
                 source={displayVehicle === 'car' ? require('../../assets/images/header_car_final.png') : require('../../assets/images/footer_bike.png')}
@@ -358,8 +414,47 @@ export default function HomeScreen() {
           </>
         );
         break;
+      case 'recentSearches': {
+        if (!recentSearches.length) break;
+        content = (
+          <>
+            <SectionHeading title="Recent searches" kicker="PICK UP WHERE YOU LEFT OFF" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentRow}>
+              {recentSearches.map((s) => {
+                const past = isPastSearch(s);
+                return (
+                  <Pressable
+                    key={s.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Search ${s.dropoff.name}, ${past ? 'pick new dates' : s.dateRange}`}
+                    onPress={() => openRecentSearch(s)}
+                    style={({ pressed }) => [styles.recentCard, { backgroundColor: colors.card, borderColor: colors.border }, pressed && { opacity: 0.8 }]}
+                  >
+                    <View style={[styles.recentIcon, { backgroundColor: colors.tintLight }]}>
+                      <Feather name={s.vehicleType === 'bike' ? 'wind' : 'clock'} size={15} color={colors.primaryText} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text numberOfLines={1} style={[styles.recentTitle, { color: colors.foreground }]}>{s.dropoff.name}</Text>
+                      <Text numberOfLines={1} style={[styles.recentSub, { color: past ? colors.primaryText : colors.mutedForeground }]}>
+                        {past ? 'Dates passed · pick new dates' : `${s.dateRange} · ${s.vehicleType === 'bike' ? 'Bike' : 'Car'}`}
+                      </Text>
+                    </View>
+                    <Pressable hitSlop={10} accessibilityLabel="Remove from recent searches" onPress={() => forgetRecentSearch(s)} style={{ padding: 2 }}>
+                      <Feather name="x" size={14} color={colors.mutedForeground} />
+                    </Pressable>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        );
+        break;
+      }
       case 'referEarn':
-        content = <AnimatedReferBanner router={router} />;
+        // Refer & Earn needs an account; a guest is shown the sign-up bonus instead.
+        content = isAuthenticated
+          ? <AnimatedReferBanner router={router} />
+          : <SignupBonusBanner onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }} />;
         break;
       case 'nextTrip': {
         if (!upcomingBooking) break;
@@ -384,6 +479,8 @@ export default function HomeScreen() {
       case 'membershipPromo': {
         const mem = membership;
         const isMemActive = !!(mem?.plan && mem.expiresAt && new Date(mem.expiresAt) > new Date());
+        // A member's savings are personal (shown near the top); the promo for everyone else sits lower.
+        if ((item.placement === 'top') !== isMemActive) break;
 
         if (isMemActive && mem) {
           const planDisplay = mem.plan.toUpperCase();
@@ -680,11 +777,27 @@ export default function HomeScreen() {
     
     // Each section eases in a beat after the one above it, so the page builds top to bottom.
     return <Reveal delay={Math.min(Math.max(0, index - 1), 6) * 40}>{content}</Reveal>;
-  }, [colors, greeting, customer?.name, isAuthenticated, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, vehiclesFailed, refetchVehicles, upcomingBooking, upcomingCar, membership]);
+  }, [colors, greeting, customer?.name, isAuthenticated, recentSearches, openRecentSearch, forgetRecentSearch, availableToday, fetchedVehicles.length, mode, setMode, bookingConfirmed, selectedCar, isLoadingOffers, offers, specialDeals, renderOffer, renderSpecialDeal, renderLuxury, renderDest, router, vehicleType, displayVehicle, vehicleSlideAnim, vehicleFadeAnim, displayCars, displayBikes, isLoadingVehicles, vehiclesFailed, refetchVehicles, upcomingBooking, upcomingCar, membership]);
 
   return (
     <Page bottomNav scroll={false}>
-      <Header absolute={true} />
+      <Header
+        absolute={true}
+        leading={
+          <View>
+            <Text style={[styles.topGreeting, { color: colors.mutedForeground }]}>{greeting}</Text>
+            {isAuthenticated && customer?.name ? (
+              <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>{customer.name.split(' ')[0]} 👋</Text>
+            ) : (
+              <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}>
+                <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>
+                  Log in <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>· get ₹100 SawariCash</Text>
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        }
+      />
       <FlatList
         ref={mainScrollRef}
         data={sections}
@@ -733,7 +846,17 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   greeting: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 8, paddingHorizontal: 20 },
-  heading: { fontFamily: 'Inter_700Bold', fontSize: 26, letterSpacing: -0.8, lineHeight: 32, marginTop: 6, paddingHorizontal: 20 },
+  heading: { fontFamily: 'Inter_700Bold', fontSize: 26, letterSpacing: -0.8, lineHeight: 32, marginTop: 12, paddingHorizontal: 20 },
+  topGreeting: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  topName: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: -0.3, marginTop: 1 },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 20 },
+  liveDot: { width: 7, height: 7, borderRadius: 4 },
+  liveText: { fontFamily: 'Inter_500Medium', fontSize: 12.5 },
+  recentRow: { gap: 10, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 4 },
+  recentCard: { width: 236, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, paddingVertical: 10, paddingHorizontal: 12 },
+  recentIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  recentTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  recentSub: { fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 2 },
   sectionPad: { paddingHorizontal: 16 },
   emptyVehicles: { fontFamily: 'Inter_500Medium', fontSize: 13, paddingVertical: 24 },
   offerRow: { gap: 14, paddingBottom: 6, paddingTop: 12, paddingHorizontal: 20 },
@@ -780,7 +903,7 @@ function AnimatedReferBanner({ router }: { router: any }) {
                 <Text style={{ color: '#FFD700', fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1 }}>LIFETIME REWARDS</Text>
               </View>
               <Text style={{ fontFamily: 'Inter_700Bold', color: '#FFF', fontSize: 18, marginBottom: 6 }}>Unlock 10% Commission</Text>
-              <Text style={{ fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 18 }}>Invite friends. They get 100 SawariCash, you earn on every ride.</Text>
+              <Text style={{ fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 18 }}>Invite friends. They get ₹100 SawariCash, you earn 10% of their first trip.</Text>
             </View>
             <View style={{ width: 72, height: 72, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(212, 175, 55, 0.1)', borderRadius: 36, marginLeft: 12, borderWidth: 1, borderColor: 'rgba(212, 175, 55, 0.2)' }}>
               <Feather name="gift" size={32} color="#FFD700" />
@@ -792,3 +915,23 @@ function AnimatedReferBanner({ router }: { router: any }) {
   );
 }
 
+
+function SignupBonusBanner({ onPress }: { onPress: () => void }) {
+  const colors = useColors();
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Sign up and get 100 SawariCash" onPress={onPress}
+      style={({ pressed }) => [{ marginHorizontal: 20, marginTop: 12, marginBottom: 8 }, pressed && { opacity: 0.9 }]}>
+      <LinearGradient colors={['#111827', '#1F2937']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={{ borderRadius: 20, padding: 20, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.primary, fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.2, marginBottom: 6 }}>NEW HERE?</Text>
+          <Text style={{ fontFamily: 'Inter_700Bold', color: '#FFF', fontSize: 18, marginBottom: 6 }}>Get ₹100 SawariCash</Text>
+          <Text style={{ fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.7)', fontSize: 13, lineHeight: 18 }}>Sign up in 30 seconds with your mobile number and use it on your first ride.</Text>
+        </View>
+        <View style={{ backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, marginLeft: 12 }}>
+          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 13, color: '#000' }}>Sign up</Text>
+        </View>
+      </LinearGradient>
+    </Pressable>
+  );
+}

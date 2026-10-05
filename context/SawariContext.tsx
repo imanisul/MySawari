@@ -35,6 +35,8 @@ export type AppNotification = {
   read: boolean;
   /** Set when the notification is about a booking — tapping it opens that booking. */
   bookingId?: string;
+  link?: string;
+  data?: any;
 };
 
 export type AppCustomer = {
@@ -556,6 +558,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           date: n.createdAt,
           image: n.data?.image,
           bookingId: n.data?.bookingId ? String(n.data.bookingId) : undefined,
+          link: n.data?.link || n.data?.screen,
+          data: n.data,
           read: isAuthenticated ? n.isRead : guestReadIds.includes(n.id),
         }));
       setNotifications(mapped);
@@ -565,8 +569,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   }, [isAuthenticated]);
 
   const markNotificationRead = useCallback(async (id: string) => {
+    // Optimistic UI update for instantaneous feedback
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+
     if (!isAuthenticated) {
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
       try {
         const stored = await AsyncStorage.getItem('guest_read_notifications');
         const guestReadIds = stored ? JSON.parse(stored) : [];
@@ -579,11 +585,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     }
 
     const { NotificationsAPI } = require('@/services/api/notifications');
-    const success = await NotificationsAPI.markAsRead(id);
-    if (success) {
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    }
-    return success;
+    // Fire and forget to backend
+    NotificationsAPI.markAsRead(id).catch(() => {});
+    return true;
   }, [isAuthenticated]);
 
   // Refresh quote whenever dependencies change

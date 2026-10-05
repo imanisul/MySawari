@@ -6,12 +6,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 export default function ConfirmationScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { selectedCar, mode, pickup, dropoff, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, pricingQuote, lastBooking } = useSawari();
   
+  // Invalidate bookings cache so the next time Home or Bookings tab is visited, it fetches the fresh list.
+  React.useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ['bookings'] });
+  }, [queryClient]);
+
   // Use the backend-validated quote for display
   const payToday = pricingQuote?.onlinePayableNow || 0;
 

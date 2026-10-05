@@ -50,7 +50,12 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
           <Text style={[styles.availableText, { color: colors.foreground }]}>
             {(() => { 
               const a = car.availability ?? getAvailability(car);
-              if (!a.available) return a.headline;
+              if (!a.available) {
+                if (a.nextAvailableFrom) {
+                  return `${a.headline} · Next avail ${a.nextAvailableFrom}`;
+                }
+                return a.headline;
+              }
               if (a.freeUntil) {
                 if (a.startDate === a.freeUntil || (a.startDate === 'Today' && a.freeUntil === dayNumToLabel(todayDayNum()))) {
                   return a.startDate === 'Today' ? 'Avail only for today' : `Avail only for ${a.startDate}`;

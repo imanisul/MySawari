@@ -25,8 +25,8 @@ export const vehiclesQueryOptions = {
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(raw)).catch(() => {});
     return mapped;
   },
-  staleTime: 15 * 1000, // fresh for 15 s: moving between screens never re-downloads
-  refetchInterval: 30 * 1000, // and quietly re-checked every 30 s while the app is open (paused in the background)
+  staleTime: 5 * 60 * 1000, // fresh for 5 min
+  refetchInterval: 5 * 60 * 1000, // re-check every 5 min
   refetchOnWindowFocus: true, // re-checked when the app comes back to the foreground
   refetchOnReconnect: true,
 } as const;

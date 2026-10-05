@@ -6,7 +6,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import Reanimated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { getAvailability, splitDateRange } from '@/utils/sawari';
+import { getAvailability, splitDateRange, parseDayLabel } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import {
   Header,
@@ -147,9 +147,13 @@ export default function HomeScreen() {
     }
     selectCar(car!);
     const resume = () => {
-      router.push('/car-details');
-      if (stage === 'booking' || stage === 'payment') router.push('/booking');
-      if (stage === 'payment') router.push('/payment');
+      if (stage === 'payment') {
+        router.push('/payment');
+      } else if (stage === 'booking') {
+        router.push('/booking');
+      } else {
+        router.push('/car-details');
+      }
     };
     // The car page is open to everyone; checkout and payment need an account.
     if (stage === 'car') resume(); else requireLogin(resume);
@@ -290,16 +294,15 @@ export default function HomeScreen() {
       if (!isAuthLoading) {
         syncNotifications(); // Now safe for unauthenticated users too
         if (isAuthenticated) {
-          refetchBookings();
+          // React Query handles fetching bookings automatically via cache validation.
           // Picks up a just-activated membership (or SawariCash change) when coming back to Home.
           fetchWallet();
         }
       }
-    }, [isAuthLoading, isAuthenticated, refetchBookings, setBookingSource, fetchWallet, syncNotifications])
+    }, [isAuthLoading, isAuthenticated, setBookingSource, fetchWallet, syncNotifications])
   );
 
-  // People's Choice: show curated favourites (even if unavailable) plus available
-  // vehicles to fill up to 6 slots. Tiles already display availability status.
+  // People's Choice: show curated favourites that are available. Do not fill with random cars.
   const processVehicles = (vehicles: any[], type: string, favourites: string[]) => {
     const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
     const typed = vehicles
@@ -311,24 +314,31 @@ export default function HomeScreen() {
 
     const isFavourite = (v: any) => favourites.some(name => v.name.toLowerCase().includes(name));
     
-    // Favourites always show up (even if unavailable, they will show 'On a trip')
+    // Show all favourites (curated top cars), even if unavailable
     const favs = typed.filter(isFavourite);
-    // Fill remaining slots with other vehicles that ARE available
-    const others = typed.filter(v => !isFavourite(v) && v.isAvailable);
 
-    // Sort favourites by the curated order
     const rank = (v: any) => {
       const i = favourites.findIndex(name => v.name.toLowerCase().includes(name));
       return i === -1 ? favourites.length : i;
     };
-    favs.sort((a, b) => rank(a) - rank(b));
-    
-    // Fill remaining slots with other available vehicles
-    const combined = [...favs, ...others];
 
+    // Sort by: 1. Available first, 2. Next available date, 3. Curated order
+    favs.sort((a, b) => {
+      if (a.isAvailable && !b.isAvailable) return -1;
+      if (!a.isAvailable && b.isAvailable) return 1;
+      
+      if (!a.isAvailable && !b.isAvailable) {
+        const dateA = a.availability?.nextAvailableFrom ? parseDayLabel(a.availability.nextAvailableFrom) ?? 999 : 999;
+        const dateB = b.availability?.nextAvailableFrom ? parseDayLabel(b.availability.nextAvailableFrom) ?? 999 : 999;
+        if (dateA !== dateB) return dateA - dateB;
+      }
+      
+      return rank(a) - rank(b);
+    });
+    
     // Deduplicate by id
     const seen = new Set<string>();
-    const unique = combined.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
+    const unique = favs.filter(v => { if (seen.has(v.id)) return false; seen.add(v.id); return true; });
     return unique.slice(0, 6);
   };
 
@@ -437,11 +447,11 @@ export default function HomeScreen() {
                   {isAuthenticated && customer?.name ? (
                     <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>{customer.name.split(' ')[0]} 👋</Text>
                   ) : (
-                    <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}>
-                      <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground }]}>
-                        Log in <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>· get ₹100 SawariCash</Text>
+                    <View>
+                      <Text numberOfLines={1} style={[styles.topName, { color: colors.foreground, opacity: 0 }]}>
+                        Log in
                       </Text>
-                    </Pressable>
+                    </View>
                   )}
                 </View>
               }
@@ -576,10 +586,8 @@ export default function HomeScreen() {
         );
         break;
       case 'referEarn':
-        // Refer & Earn needs an account; a guest is shown the sign-up bonus instead.
-        content = isAuthenticated
-          ? <AnimatedReferBanner router={router} />
-          : <SignupBonusBanner onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }} />;
+        // Refer & Earn needs an account; if not authenticated, we don't show anything (per user request).
+        content = isAuthenticated ? <AnimatedReferBanner router={router} /> : null;
         break;
       case 'nextTrip': {
         if (!upcomingBooking) break;

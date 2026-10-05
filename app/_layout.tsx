@@ -264,11 +264,16 @@ function AppGate({
   const vehicles = useVehicles();
   const client = useQueryClient();
 
-  // Once the saved session is known, load what Home shows for this person (guest or signed in) before
-  // the loading screen lifts, so they land on a fully filled Home screen.
   const [homeDataReady, setHomeDataReady] = useState(false);
   const [loadRun, setLoadRun] = useState(0);
   const [loadSteps, setLoadSteps] = useState<HomeLoadStep[]>([]);
+  
+  // Prefetch public data immediately to parallelize with auth loading
+  useEffect(() => {
+    import('@/hooks/useVehicles').then(({ vehiclesQueryOptions }) => client.prefetchQuery(vehiclesQueryOptions));
+    import('@/services/api/offers').then(({ offersQueryOptions }) => client.prefetchQuery(offersQueryOptions));
+  }, [client]);
+
   useEffect(() => {
     if (isAuthLoading || homeDataReady) return;
     let cancelled = false;

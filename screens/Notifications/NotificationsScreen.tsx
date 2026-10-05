@@ -38,10 +38,12 @@ export default function NotificationsScreen() {
 
   const handlePressNotification = async (item: any) => {
     if (!item.read) {
-      await markNotificationRead(item.id);
+      markNotificationRead(item.id); // now optimistic, fire-and-forget
     }
     if (item.bookingId) {
       router.push({ pathname: '/booking-detail', params: { id: item.bookingId } });
+    } else if (item.link) {
+      router.push(item.link);
     }
   };
 

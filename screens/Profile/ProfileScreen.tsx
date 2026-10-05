@@ -94,6 +94,7 @@ export default function ProfileScreen() {
   };
 
   const menuItems = [
+    { id: 'wishlist', title: 'My Wishlist', icon: 'heart' },
     { id: 'membership', title: 'Membership', icon: 'award' },
     { id: 'rewards', title: 'My Rewards', icon: 'gift' },
     { id: 'refer', title: 'Refer and Earn', icon: 'users' },
@@ -106,7 +107,9 @@ export default function ProfileScreen() {
 
   const handleMenuPress = async (item: any) => {
     Haptics.selectionAsync();
-    if (item.id === 'membership') {
+    if (item.id === 'wishlist') {
+      router.push('/wishlist');
+    } else if (item.id === 'membership') {
       router.push('/membership');
     } else if (item.id === 'rewards') {
       router.push('/rewards');

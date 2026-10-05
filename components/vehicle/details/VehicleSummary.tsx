@@ -107,14 +107,7 @@ export function VehicleSummary({ car, isAvailable, availabilityNote }: { car: Ca
         </View>
       )}
 
-      {isAvailable && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, paddingHorizontal: 4 }}>
-          <Feather name="map-pin" size={14} color={colors.primaryText} />
-          <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.mutedForeground }}>
-            MySawari, Kahilipara, Guwahati
-          </Text>
-        </View>
-      )}
+      {/* Pickup location is shown once, in its own card under About. */}
     </View>
   );
 }

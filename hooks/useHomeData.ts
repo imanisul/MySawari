@@ -10,13 +10,13 @@ import { getRecentlyViewed } from '@/utils/recentlyViewed';
 export const recentlyViewedQueryOptions = (userId?: string | null) => ({
   queryKey: ['recentlyViewed', userId || 'guest'] as const,
   queryFn: () => getRecentlyViewed(userId),
-  staleTime: 0,
+  staleTime: 5 * 60 * 1000,
 });
 
 export const recentSearchesQueryOptions = (userId?: string | null) => ({
   queryKey: ['recentSearches', userId || 'guest'] as const,
   queryFn: () => getRecentSearches(userId),
-  staleTime: 0,
+  staleTime: 5 * 60 * 1000,
 });
 
 /** The signed-in customer's bookings (Home's "Your next trip" card). Shared with HomeScreen. */
@@ -26,13 +26,13 @@ export const bookingsQueryOptions = {
     const userBookings = await API.getAllBookings();
     return userBookings.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
-  staleTime: 15 * 1000,
-  refetchInterval: 60 * 1000,
+  staleTime: 5 * 60 * 1000,
+  refetchInterval: 5 * 60 * 1000,
   refetchOnWindowFocus: true,
 };
 
 // The loading screen never waits longer than this; anything still missing then loads on the Home screen.
-const HOME_DATA_MAX_WAIT_MS = 10 * 1000;
+const HOME_DATA_MAX_WAIT_MS = 4 * 1000;
 
 export type HomeLoadStep = { key: 'vehicles' | 'offers' | 'trips' | 'wallet'; label: string; done: boolean };
 

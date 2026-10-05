@@ -64,16 +64,16 @@ export function DetailsTabs({
 
       {/* Tab Content */}
       <View style={styles.tabContent}>
-        {activeTab === 'about' && <AboutTab car={car} />}
-        {activeTab === 'gallery' && <GalleryTab car={car} />}
-        {activeTab === 'reviews' && <ReviewsTab car={car} />}
+        {activeTab === 'about' && <AboutSection car={car} />}
+        {activeTab === 'gallery' && <GallerySection car={car} />}
+        {activeTab === 'reviews' && <ReviewsSection car={car} />}
       </View>
     </View>
   );
 }
 
 // --- TAB: ABOUT ---
-function AboutTab({ car }: { car: Car }) {
+export function AboutSection({ car }: { car: Car }) {
   const colors = useColors();
   const isBike = car.type === 'Bike';
   const highlights = car.highlights || getCarHighlights(car);
@@ -81,13 +81,13 @@ function AboutTab({ car }: { car: Car }) {
   return (
     <View style={styles.tabSection}>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>About this {car.type.toLowerCase()}</Text>
-      <Text style={[styles.description, { color: colors.mutedForeground }]}>
-        {car.description || `A well-maintained ${car.type.toLowerCase()} perfect for your trips. Reliable, comfortable, and ready to go.`}
-      </Text>
+      {!!car.description && (
+        <Text style={[styles.description, { color: colors.mutedForeground }]}>{car.description}</Text>
+      )}
 
       {highlights.length > 0 && (
         <>
-          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28 }]}>Good for</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: car.description ? 28 : 4 }]}>Good for</Text>
           <View style={styles.highlightsRow}>
             {highlights.map(tag => (
               <View key={tag} style={[styles.highlightChip, { backgroundColor: colors.tintLight, borderColor: colors.primary + '30' }]}>
@@ -99,52 +99,36 @@ function AboutTab({ car }: { car: Car }) {
         </>
       )}
 
-      <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28 }]}>
+    </View>
+  );
+}
+
+// --- TAB: SPECS ---
+export function SpecsSection({ car }: { car: Car }) {
+  const colors = useColors();
+  const isBike = car.type === 'Bike';
+  
+  return (
+    <View style={styles.tabSection}>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
         {isBike ? 'Bike Specifications' : 'Vehicle Specifications'}
       </Text>
-      <View style={[styles.specsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {/* Row 1: Core specs */}
-        <View style={styles.specsGrid}>
-          <SpecBox icon="settings" label="Transmission" value={car.transmission} colors={colors} />
-          <SpecBox icon="droplet" label="Fuel Type" value={car.fuel} colors={colors} />
-          <SpecBox icon="users" label={isBike ? 'Riders' : 'Seating'} value={car.seats} colors={colors} />
-          {car.engine && <SpecBox icon="cpu" label="Engine" value={car.engine} colors={colors} />}
-        </View>
-
-        <View style={[styles.specsDivider, { backgroundColor: colors.border }]} />
-
-        {/* Row 2: Performance */}
-        <View style={styles.specsGrid}>
-          {car.mileage && car.mileage !== 'N/A' && <SpecBox icon="bar-chart-2" label="Mileage" value={car.mileage} colors={colors} />}
-          {car.topSpeed && <SpecBox icon="wind" label="Top Speed" value={car.topSpeed} colors={colors} />}
-          {car.acceleration && <SpecBox icon="zap" label="0-100 km/h" value={car.acceleration} colors={colors} />}
-          {car.tankCapacity && <SpecBox icon="battery" label={car.fuel === 'EV' ? 'Battery' : 'Tank'} value={car.tankCapacity} colors={colors} />}
-        </View>
-
-        {/* Row 3: Build (only if we have data) */}
-        {(car.groundClearance || car.kerbWeight || car.bootSpace || car.airbags) && (
-          <>
-            <View style={[styles.specsDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.specsGrid}>
-              {car.groundClearance && <SpecBox icon="arrow-up" label="Clearance" value={car.groundClearance} colors={colors} />}
-              {car.kerbWeight && <SpecBox icon="box" label="Weight" value={car.kerbWeight} colors={colors} />}
-              {!isBike && car.bootSpace && <SpecBox icon="briefcase" label="Boot Space" value={car.bootSpace} colors={colors} />}
-              {!isBike && car.airbags && <SpecBox icon="shield" label="Airbags" value={car.airbags} colors={colors} />}
-            </View>
-          </>
-        )}
-
-        {/* Row 4: Wheels & Brakes */}
-        {(car.brakes || car.tyreSize) && (
-          <>
-            <View style={[styles.specsDivider, { backgroundColor: colors.border }]} />
-            <View style={styles.specsGrid}>
-              {car.brakes && <SpecBox icon="disc" label="Brakes" value={car.brakes} colors={colors} />}
-              {car.tyreSize && <SpecBox icon="circle" label="Tyre Size" value={car.tyreSize} colors={colors} />}
-            </View>
-          </>
-        )}
-      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.specsScroll}>
+        <SpecBox icon="settings" label="Transmission" value={car.transmission} colors={colors} />
+        <SpecBox icon="droplet" label="Fuel Type" value={car.fuel} colors={colors} />
+        <SpecBox icon="users" label={isBike ? 'Riders' : 'Seating'} value={car.seats} colors={colors} />
+        {car.engine && <SpecBox icon="cpu" label="Engine" value={car.engine} colors={colors} />}
+        {car.mileage && car.mileage !== 'N/A' && <SpecBox icon="bar-chart-2" label="Mileage" value={car.mileage} colors={colors} />}
+        {car.topSpeed && <SpecBox icon="wind" label="Top Speed" value={car.topSpeed} colors={colors} />}
+        {car.acceleration && <SpecBox icon="zap" label="0-100 km/h" value={car.acceleration} colors={colors} />}
+        {car.tankCapacity && <SpecBox icon="battery" label={car.fuel === 'EV' ? 'Battery' : 'Tank'} value={car.tankCapacity} colors={colors} />}
+        {car.groundClearance && <SpecBox icon="arrow-up" label="Clearance" value={car.groundClearance} colors={colors} />}
+        {car.kerbWeight && <SpecBox icon="box" label="Weight" value={car.kerbWeight} colors={colors} />}
+        {!isBike && car.bootSpace && <SpecBox icon="briefcase" label="Boot Space" value={car.bootSpace} colors={colors} />}
+        {!isBike && car.airbags && <SpecBox icon="shield" label="Airbags" value={car.airbags} colors={colors} />}
+        {car.brakes && <SpecBox icon="disc" label="Brakes" value={car.brakes} colors={colors} />}
+        {car.tyreSize && <SpecBox icon="circle" label="Tyre Size" value={car.tyreSize} colors={colors} />}
+      </ScrollView>
 
       {/* Vehicle Info — from DB */}
       {(car.color || car.registrationYear || car.manufacturer || car.variant || (!isBike && car.doors) || car.luggage) && (
@@ -160,10 +144,21 @@ function AboutTab({ car }: { car: Car }) {
           </View>
         </>
       )}
+    </View>
+  );
+}
 
-      <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 28 }]}>Features & Amenities</Text>
+// --- TAB: FEATURES ---
+export function FeaturesSection({ car }: { car: Car }) {
+  const colors = useColors();
+  
+  if (!car.features?.length) return null;
+  
+  return (
+    <View style={styles.tabSection}>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Features & Amenities</Text>
       <View style={styles.featuresGrid}>
-        {(car.features || ['Air Conditioning', 'Power Steering', 'Bluetooth']).map(feature => (
+        {car.features.map(feature => (
           <View key={feature} style={[styles.featureItem, { backgroundColor: colors.surfaceSoft, borderColor: colors.border }]}>
             <Feather name="check" size={16} color={colors.primaryText} />
             <Text style={[styles.featureText, { color: colors.foreground }]}>{feature}</Text>
@@ -176,7 +171,7 @@ function AboutTab({ car }: { car: Car }) {
 
 function SpecBox({ icon, label, value, colors }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; colors: any }) {
   return (
-    <View style={styles.specBox}>
+    <View style={[styles.specBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={[styles.specIconWrap, { backgroundColor: colors.tintLight }]}>
         <Feather name={icon} size={16} color={colors.primaryText} />
       </View>
@@ -197,11 +192,12 @@ function DetailRow({ label, value }: { label: string, value: string }) {
 }
 
 // --- TAB: GALLERY ---
-function GalleryTab({ car }: { car: Car }) {
+export function GallerySection({ car }: { car: Car }) {
   const colors = useColors();
   const images = car.images || [car.image];
   const { data: reviews = [] } = useCarReviews(car.id);
   const [viewer, setViewer] = useState<string | null>(null);
+  const [viewerSource, setViewerSource] = useState<any>(null);
 
   // Trip photos customers attached to their reviews.
   const guestPhotos = reviews.flatMap((r: Review) =>
@@ -210,11 +206,19 @@ function GalleryTab({ car }: { car: Car }) {
 
   return (
     <View style={styles.tabSection}>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Gallery</Text>
       <View style={styles.galleryGrid}>
         {images.map((img, i) => (
-          <View key={i} style={styles.galleryImageWrap}>
+          <Pressable 
+            key={i} 
+            style={styles.galleryImageWrap}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              setViewerSource(img);
+            }}
+          >
             <Image source={img} style={styles.galleryImage} resizeMode="cover" />
-          </View>
+          </Pressable>
         ))}
       </View>
 
@@ -251,7 +255,7 @@ function GalleryTab({ car }: { car: Car }) {
         </>
       )}
 
-      <PhotoViewer uri={viewer} onClose={() => setViewer(null)} />
+      <PhotoViewer uri={viewer} source={viewerSource} onClose={() => { setViewer(null); setViewerSource(null); }} />
     </View>
   );
 }
@@ -265,13 +269,14 @@ function useCarReviews(carId: string) {
   });
 }
 
-function PhotoViewer({ uri, onClose }: { uri: string | null; onClose: () => void }) {
+function PhotoViewer({ uri, source, onClose }: { uri?: string | null; source?: any; onClose: () => void }) {
+  const actualSource = source || (uri ? { uri } : null);
   return (
-    <Modal visible={!!uri} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={!!actualSource} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.viewerOverlay} onPress={onClose}>
-        {!!uri && (
+        {!!actualSource && (
           <View style={{ width: '100%', height: '80%' }}>
-            <LoadingImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+            <LoadingImage source={actualSource} style={StyleSheet.absoluteFill} contentFit="contain" />
           </View>
         )}
         <View style={styles.viewerClose}><Feather name="x" size={24} color="#FFF" /></View>
@@ -281,7 +286,7 @@ function PhotoViewer({ uri, onClose }: { uri: string | null; onClose: () => void
 }
 
 // --- TAB: REVIEWS ---
-function ReviewsTab({ car }: { car: Car }) {
+export function ReviewsSection({ car }: { car: Car }) {
   const colors = useColors();
   const { isAuthenticated } = useSawari();
   const { data: dbReviews = [], isLoading: isLoadingReviews } = useCarReviews(car.id);
@@ -327,6 +332,7 @@ function ReviewsTab({ car }: { car: Car }) {
   if (isLoadingReviews && reviews.length === 0) {
     return (
       <View style={styles.tabSection}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
         <ReviewListSkeleton />
       </View>
     );
@@ -334,7 +340,8 @@ function ReviewsTab({ car }: { car: Car }) {
 
   if (reviews.length === 0) {
     return (
-      <View style={[styles.tabSection, { alignItems: 'center', paddingVertical: 40 }]}>
+      <View style={[styles.tabSection, { alignItems: 'center', paddingVertical: 24 }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, alignSelf: 'flex-start', marginBottom: 20 }]}>Reviews</Text>
         <Feather name="message-square" size={40} color={colors.muted} />
         <Text style={[styles.emptyReviewText, { color: colors.mutedForeground, marginTop: 16, marginBottom: 24 }]}>
           No reviews yet.{'\n'}Reviews are only visible after completing a trip.
@@ -375,7 +382,7 @@ function ReviewsTab({ car }: { car: Car }) {
   return (
     <View style={styles.tabSection}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Customer Reviews</Text>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Reviews</Text>
         {/* Write button only shown to users who completed a trip on this car */}
         {canReview && (
           <Pressable onPress={handleWriteReview} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -527,6 +534,8 @@ const styles = StyleSheet.create({
   },
   tabSection: {
     paddingBottom: 24,
+    paddingTop: 24,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
     fontFamily: 'Inter_600SemiBold',
@@ -599,22 +608,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   // Specs card
-  specsCard: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 16,
-    overflow: 'hidden',
-  },
-  specsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 4,
+  specsScroll: {
+    gap: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
   },
   specBox: {
-    width: '48%',
+    width: 100,
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
   },
   specIconWrap: {
     width: 36,

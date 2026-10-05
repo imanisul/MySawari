@@ -3,6 +3,8 @@ import { QueryClient, useQuery } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { offersQueryOptions } from '@/services/api/offers';
 
+import { Image } from 'expo-image';
+
 /** The one place vehicles are fetched: Home, Explore and Search all share this query (and its cache). */
 export const VEHICLES_KEY = ['vehicles'] as const;
 
@@ -16,6 +18,26 @@ const STORAGE_KEY = '@vehicles_cache_v2';
 let liveVehiclesAt = 0;
 export const hasLiveVehicles = () => liveVehiclesAt > 0;
 
+function prefetchVehicleImages(vehicles: any[]) {
+  try {
+    const urlsToPrefetch: string[] = [];
+    vehicles.forEach(car => {
+      if (car.image && typeof car.image === 'string') urlsToPrefetch.push(car.image);
+      if (car.images && Array.isArray(car.images)) {
+        car.images.forEach((img: any) => {
+          if (typeof img === 'string') urlsToPrefetch.push(img);
+        });
+      }
+    });
+    const uniqueUrls = [...new Set(urlsToPrefetch)].filter(Boolean);
+    if (uniqueUrls.length > 0) {
+      Image.prefetch(uniqueUrls);
+    }
+  } catch (e) {
+    console.warn('Failed to prefetch images', e);
+  }
+}
+
 export const vehiclesQueryOptions = {
   queryKey: VEHICLES_KEY,
   queryFn: async () => {
@@ -23,6 +45,10 @@ export const vehiclesQueryOptions = {
     const mapped = API.mapVehicles(raw);
     liveVehiclesAt = Date.now();
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(raw)).catch(() => {});
+    
+    // Aggressively cache all images in the background
+    prefetchVehicleImages(mapped);
+    
     return mapped;
   },
   staleTime: 5 * 60 * 1000, // fresh for 5 min
@@ -50,7 +76,9 @@ export function primeVehicles(queryClient: QueryClient) {
       try {
         const raw = JSON.parse(cached);
         if (Array.isArray(raw)) {
-          queryClient.setQueryData(VEHICLES_KEY, API.mapVehicles(raw));
+          const mapped = API.mapVehicles(raw);
+          queryClient.setQueryData(VEHICLES_KEY, mapped);
+          prefetchVehicleImages(mapped);
         }
       } catch (e) {}
     }

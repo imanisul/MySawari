@@ -28,6 +28,7 @@ import { useQuery } from '@tanstack/react-query';
 import { offersQueryOptions } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
+import { bookingsQueryOptions } from '@/hooks/useHomeData';
 import { Reveal } from '@/components/common/Reveal';
 import { SocialLinks } from '@/components/common/SocialLinks';
 import * as Location from 'expo-location';
@@ -142,15 +143,8 @@ export default function HomeScreen() {
   const [manualRefreshing, setManualRefreshing] = useState(false);
 
   const { data: bookings = [], refetch: refetchBookings } = useQuery({
-    queryKey: ['bookings'],
-    queryFn: async () => {
-      const userBookings = await API.getAllBookings();
-      return userBookings.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    },
+    ...bookingsQueryOptions,
     enabled: !!(isAuthenticated && !isAuthLoading),
-    staleTime: 15 * 1000,
-    refetchInterval: 60 * 1000,
-    refetchOnWindowFocus: true,
   });
 
   const upcomingBooking = useMemo(() => {

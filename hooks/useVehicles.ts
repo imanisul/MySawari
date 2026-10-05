@@ -11,11 +11,17 @@ const LEGACY_STORAGE_KEY = '@vehicles_cache_v1';
 
 const STORAGE_KEY = '@vehicles_cache_v2';
 
+// When the vehicles last arrived from the server (0 = only the saved copy so far). The loading screen
+// waits for this, so the saved copy is never mistaken for live data.
+let liveVehiclesAt = 0;
+export const hasLiveVehicles = () => liveVehiclesAt > 0;
+
 export const vehiclesQueryOptions = {
   queryKey: VEHICLES_KEY,
   queryFn: async () => {
     const raw = await API.getVehiclesRaw();
     const mapped = API.mapVehicles(raw);
+    liveVehiclesAt = Date.now();
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(raw)).catch(() => {});
     return mapped;
   },

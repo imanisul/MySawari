@@ -8,9 +8,10 @@ LogBox.ignoreLogs([
   'PushNotificationIOS has been extracted from react-native core'
 ]);
 
-import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
 import { AppState } from 'react-native';
 import { primeVehicles, useVehicles } from '@/hooks/useVehicles';
+import { loadHomeData } from '@/hooks/useHomeData';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
@@ -259,9 +260,24 @@ function AppGate({
   children: React.ReactNode;
   fontError: boolean;
 }) {
-  const { isAuthLoading } = useSawari();
+  const { isAuthLoading, isAuthenticated, fetchWallet } = useSawari();
   const vehicles = useVehicles();
-  const vehiclesLoaded = vehicles.data !== undefined;
+  const client = useQueryClient();
+
+  // Once the saved session is known, load what Home shows for this person (guest or signed in) before
+  // the loading screen lifts, so they land on a fully filled Home screen.
+  const [homeDataReady, setHomeDataReady] = useState(false);
+  const [loadRun, setLoadRun] = useState(0);
+  useEffect(() => {
+    if (isAuthLoading || homeDataReady) return;
+    let cancelled = false;
+    loadHomeData(client, { isAuthenticated: !!isAuthenticated, fetchWallet })
+      .finally(() => { if (!cancelled) setHomeDataReady(true); });
+    return () => { cancelled = true; };
+    // Runs once per launch (and again on Retry); later sign-ins / refreshes are handled by the screens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthLoading, loadRun]);
+  const vehiclesLoaded = homeDataReady && vehicles.data !== undefined;
   const colors = useColors();
   const splashHidden = useRef(false);
 
@@ -286,8 +302,8 @@ function AppGate({
       <AnimatedSplash
         isReady={status === 'ready' || status === 'error'}
         isDataReady={vehiclesLoaded}
-        loadFailed={vehicles.isError && !vehiclesLoaded && !vehicles.isFetching}
-        onRetry={() => vehicles.refetch()}
+        loadFailed={homeDataReady && vehicles.data === undefined && vehicles.isError && !vehicles.isFetching}
+        onRetry={() => { setHomeDataReady(false); setLoadRun((n) => n + 1); }}
       >
         {children}
       </AnimatedSplash>

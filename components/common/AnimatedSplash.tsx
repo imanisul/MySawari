@@ -228,7 +228,7 @@ export function AnimatedSplash({
                     />
                   </View>
                   <Text style={[styles.statusText, { color: colors.mutedForeground }]}>
-                    {isDataReady ? 'Ready' : 'Loading available vehicles…'}
+                    {isDataReady ? 'Ready' : 'Getting everything ready for you…'}
                   </Text>
                 </Animated.View>
               )}

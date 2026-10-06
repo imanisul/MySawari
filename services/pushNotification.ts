@@ -78,12 +78,15 @@ export async function registerDeviceForPushNotifications(authToken?: string) {
       headers['Authorization'] = `Bearer ${authToken}`;
     }
 
+    const guestSessionId = await SecureStore.getItemAsync('guest_session_id');
+
     await fetch(`${BACKEND_URL}${endpoint}`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         expoPushToken: expoPushToken,
-        deviceType: Platform.OS
+        deviceType: Platform.OS,
+        guestSessionId: guestSessionId || undefined
       })
     });
 

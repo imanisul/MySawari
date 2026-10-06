@@ -5,7 +5,6 @@ import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API } from '@/services/backend/api';
 import { BookingSnapshot } from '@/services/backend/api';
-import { MockRequests } from '@/utils/mockRequests';
 
 export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { visible: boolean; onClose: () => void; booking: BookingSnapshot; onSuccess: (updatedSnapshot: BookingSnapshot) => void }) {
   const colors = useColors();

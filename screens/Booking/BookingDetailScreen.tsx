@@ -12,7 +12,7 @@ import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
-import { MockRequests, PendingRefund } from '@/utils/mockRequests';
+// Removed MockRequests
 import { useQuery } from '@tanstack/react-query';
 import { useVehicles } from '@/hooks/useVehicles';
 import { bookingsQueryOptions } from '@/hooks/useHomeData';
@@ -48,18 +48,9 @@ export default function BookingDetailScreen() {
   const [showCancel, setShowCancel] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);
-  const [pendingRefund, setPendingRefund] = useState<PendingRefund | null>(null);
-
+  const pendingRefund = snapshot?.pendingRefund;
   const hasPendingExtension = snapshot?.extensions?.some((e: any) => e.status === 'pending');
   const hasRejectedExtension = snapshot?.extensions?.some((e: any) => e.status === 'rejected');
-
-  const fetchMockRequests = React.useCallback(async () => {
-    if (!id) return;
-    const refund = await MockRequests.getRefundForBooking(id);
-    setPendingRefund(refund);
-  }, [id, snapshot]);
-
-  useFocusEffect(React.useCallback(() => { fetchMockRequests(); }, [fetchMockRequests]));
 
   const { data: myReviews } = useQuery({
     queryKey: ['myReviews'],

@@ -41,6 +41,7 @@ export type BookingSnapshot = {
   refundAmount?: number;
   refundStatus?: string;
   cancelledAt?: string;
+  pendingRefund?: { refundAmount: number; requestedAt: string; reason?: string; status?: string };
   // Extension fields
   driverMode?: string;
   extensions?: any[];
@@ -1085,6 +1086,7 @@ export const API = {
           refundAmount: b.refundAmount,
           refundStatus: b.refundStatus,
           cancelledAt: b.cancelledAt,
+          pendingRefund: b.pendingRefund || undefined,
           extensions: (b.extensions || []).map((e: any) => ({
             id: e._id,
             daysToAdd: e.additionalDays,

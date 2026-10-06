@@ -299,7 +299,7 @@ export default function BookingsScreen() {
                       <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Booking Amount</Text>
                       <Text style={{ color: textColor, fontFamily: 'Inter_700Bold', fontSize: 16, marginTop: 2 }}>₹{booking.onlinePayableNow.toLocaleString('en-IN')}</Text>
                     </View>
-                    {booking.remainingRentalAmount > 0 && (
+                    {booking.remainingRentalAmount > 0 && booking.status !== 'CANCELLED' && (
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Balance Due</Text>
                         <Text style={{ color: textColor, fontFamily: 'Inter_700Bold', fontSize: 16, marginTop: 2 }}>₹{booking.remainingRentalAmount.toLocaleString('en-IN')}</Text>

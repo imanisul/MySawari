@@ -343,12 +343,14 @@ export default function BookingDetailScreen() {
                 Txn: {s.razorpayPaymentId}
               </Text>
             )}
-            <View style={[styles.remainingBadge, { backgroundColor: s.remainingRentalAmount <= 0 ? colors.success + '18' : colors.destructive + '10' }]}>
-              <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.mutedForeground }}>Remaining Balance</Text>
-              <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: s.remainingRentalAmount <= 0 ? colors.success : colors.destructive }}>
-                {s.remainingRentalAmount <= 0 ? '✓ Fully Paid' : `₹${s.remainingRentalAmount.toLocaleString('en-IN')}`}
-              </Text>
-            </View>
+            {s.status !== 'CANCELLED' && (
+              <View style={[styles.remainingBadge, { backgroundColor: s.remainingRentalAmount <= 0 ? colors.success + '18' : colors.destructive + '10' }]}>
+                <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.mutedForeground }}>Remaining Balance</Text>
+                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: s.remainingRentalAmount <= 0 ? colors.success : colors.destructive }}>
+                  {s.remainingRentalAmount <= 0 ? '✓ Fully Paid' : `₹${s.remainingRentalAmount.toLocaleString('en-IN')}`}
+                </Text>
+              </View>
+            )}
 
             {s.totalRentalAmount && s.totalRentalAmount > s.rentalAmount ? (
               <>

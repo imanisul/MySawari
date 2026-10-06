@@ -15,7 +15,7 @@ export default function NotificationsScreen() {
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { notifications, syncNotifications, markNotificationRead } = useSawari();
+  const { notifications, syncNotifications, markNotificationRead, clearAllNotifications } = useSawari();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -79,7 +79,13 @@ export default function NotificationsScreen() {
           <Feather name="arrow-left" size={24} color={colors.foreground} />
         </Pressable>
         <Text style={[styles.title, { color: colors.foreground }]}>Notifications</Text>
-        <View style={{ width: 40 }} />
+        {notifications.length > 0 ? (
+          <Pressable onPress={() => clearAllNotifications()} style={({ pressed }) => [{ paddingHorizontal: 12, paddingVertical: 6 }, pressed && styles.pressed]}>
+            <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 14, color: colors.destructive || colors.primary }}>Clear</Text>
+          </Pressable>
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <FlatList

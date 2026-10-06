@@ -22,7 +22,7 @@ import { LoadingImage } from '@/components/common/LoadingImage';
 const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string; label: string }> = {
   CONFIRMED: { color: '#2563EB', bg: '#2563EB18', icon: 'check-circle', label: 'Confirmed' },
   PENDING:   { color: '#D97706', bg: '#D9770618', icon: 'clock',        label: 'Pending' },
-  ONGOING:   { color: '#059669', bg: '#05966918', icon: 'navigation',   label: 'Ongoing' },
+  ONGOING:   { color: '#059669', bg: '#05966918', icon: 'navigation',   label: 'On Trip' },
   COMPLETED: { color: '#16A34A', bg: '#16A34A18', icon: 'check-circle', label: 'Completed' },
   CANCELLED: { color: '#DC2626', bg: '#DC262618', icon: 'x-circle',     label: 'Cancelled' },
   FAILED:    { color: '#DC2626', bg: '#DC262618', icon: 'alert-circle',  label: 'Failed' },

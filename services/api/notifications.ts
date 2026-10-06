@@ -50,6 +50,19 @@ export const NotificationsAPI = {
     }
   },
 
+  clearAll: async (): Promise<boolean> => {
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/notifications`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      return !!data.success;
+    } catch (error) {
+      console.error('Error clearing notifications:', error);
+      return false;
+    }
+  },
+
   registerDevice: async (expoPushToken: string, deviceType: string): Promise<boolean> => {
     try {
       const res = await fetchWithAuth(`${BACKEND_URL}/notifications/register-device`, {

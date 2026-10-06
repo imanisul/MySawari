@@ -189,7 +189,7 @@ export default function BookingsScreen() {
               const dividerColor = isActive ? '#2A364C' : colors.border;
 
               const isOverdue = booking.status === 'ONGOING' && booking.rawEndDate && new Date() > new Date(booking.rawEndDate);
-              const displayStatus = isOverdue ? 'OVERDUE' : booking.status;
+              const displayStatus = isOverdue ? 'OVERDUE' : (booking.status === 'ONGOING' ? 'ON TRIP' : booking.status);
               
               return (
               <Reanimated.View key={booking.id} entering={rise()}>

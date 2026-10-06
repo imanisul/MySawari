@@ -136,6 +136,7 @@ type SawariContextValue = {
   clearBooking: () => void;
   addNotification: (notification: Omit<AppNotification, 'read'>) => void;
   markAllAsRead: () => void;
+  clearAllNotifications: () => Promise<void>;
   syncNotifications: () => Promise<void>;
   markNotificationRead: (id: string) => Promise<boolean>;
   setPushToken: (token: string) => void;
@@ -791,6 +792,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       },
       markAllAsRead: () => {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      },
+      clearAllNotifications: async () => {
+        setNotifications([]);
+        const { NotificationsAPI } = require('@/services/api/notifications');
+        await NotificationsAPI.clearAll();
       },
       syncNotifications,
       markNotificationRead,

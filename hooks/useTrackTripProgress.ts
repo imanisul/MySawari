@@ -14,19 +14,9 @@ export function useTrackTripProgress(stage: SearchStage) {
   } = useSawari();
 
   useFocusEffect(useCallback(() => {
-    if (!dropoff?.name) return;
     const withCar = stage !== 'results' && selectedCar?.id;
-    markSearchProgress(
-      isAuthenticated ? customer?.id : null,
-      { dropoff, dateRange, duration, pickupTime, returnTime, vehicleType },
-      stage,
-      {
-        carId: withCar ? String(selectedCar.id) : undefined,
-        carName: withCar ? selectedCar.name : undefined,
-        trip: { mode, isDeliveryRequested, deliveryMode, pickup, returnAddress },
-      },
-    ).catch(() => {});
-
+    
+    // Always update recently viewed so cars opened from Home can resume their checkout state
     if (withCar) {
       import('@/utils/recentlyViewed').then(({ addRecentlyViewed }) => {
         addRecentlyViewed(isAuthenticated ? customer?.id : null, {
@@ -41,6 +31,20 @@ export function useTrackTripProgress(stage: SearchStage) {
         });
       }).catch(() => {});
     }
+
+    if (!dropoff?.name) return;
+    
+    markSearchProgress(
+      isAuthenticated ? customer?.id : null,
+      { dropoff, dateRange, duration, pickupTime, returnTime, vehicleType },
+      stage,
+      {
+        carId: withCar ? String(selectedCar.id) : undefined,
+        carName: withCar ? selectedCar.name : undefined,
+        trip: { mode, isDeliveryRequested, deliveryMode, pickup, returnAddress },
+      },
+    ).catch(() => {});
+
   }, [stage, isAuthenticated, customer?.id, dropoff, dateRange, duration, pickupTime, returnTime, vehicleType,
       selectedCar?.id, mode, isDeliveryRequested, deliveryMode, pickup, returnAddress]));
 }

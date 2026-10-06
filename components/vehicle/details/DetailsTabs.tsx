@@ -196,8 +196,8 @@ export function GallerySection({ car }: { car: Car }) {
   const colors = useColors();
   const images = car.images || [car.image];
   const { data: reviews = [] } = useCarReviews(car.id);
-  const [viewer, setViewer] = useState<string | null>(null);
-  const [viewerSource, setViewerSource] = useState<any>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [viewerImages, setViewerImages] = useState<any[]>([]);
 
   // Trip photos customers attached to their reviews.
   const guestPhotos = reviews.flatMap((r: Review) =>
@@ -213,7 +213,8 @@ export function GallerySection({ car }: { car: Car }) {
             style={styles.mosaicMain}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              setViewerSource(images[0]);
+              setViewerImages(images);
+              setViewerIndex(0);
             }}
           >
             <LoadingImage source={images[0]} style={styles.galleryImage} contentFit="cover" transition={200} />
@@ -231,7 +232,8 @@ export function GallerySection({ car }: { car: Car }) {
                   style={styles.mosaicSubImageWrap}
                   onPress={() => {
                     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setViewerSource(img);
+                    setViewerImages(images);
+                    setViewerIndex(i + 1);
                   }}
                 >
                   <LoadingImage source={img} style={styles.galleryImage} contentFit="cover" transition={200} />
@@ -260,7 +262,10 @@ export function GallerySection({ car }: { car: Car }) {
                 accessibilityRole="button"
                 accessibilityLabel={`Photo from ${p.place || 'a guest trip'}, by ${p.by}`}
                 style={[styles.guestCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setViewer(p.url)}
+                onPress={() => {
+                  setViewerImages(guestPhotos.map(p => ({ uri: p.url })));
+                  setViewerIndex(i);
+                }}
               >
                 <View style={[styles.guestImage, { overflow: 'hidden' }]}>
                   <LoadingImage source={{ uri: p.url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
@@ -280,7 +285,9 @@ export function GallerySection({ car }: { car: Car }) {
         </>
       )}
 
-      <PhotoViewer uri={viewer} source={viewerSource} onClose={() => { setViewer(null); setViewerSource(null); }} />
+      {viewerIndex !== null && (
+        <PhotoViewer images={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
+      )}
     </View>
   );
 }
@@ -294,18 +301,43 @@ function useCarReviews(carId: string) {
   });
 }
 
-function PhotoViewer({ uri, source, onClose }: { uri?: string | null; source?: any; onClose: () => void }) {
-  const actualSource = source || (uri ? { uri } : null);
+function PhotoViewer({ images, initialIndex, onClose }: { images: any[]; initialIndex: number; onClose: () => void }) {
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const width = Dimensions.get('window').width;
+
+  if (images.length === 0) return null;
+
   return (
-    <Modal visible={!!actualSource} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.viewerOverlay} onPress={onClose}>
-        {!!actualSource && (
-          <View style={{ width: '100%', height: '80%' }}>
-            <LoadingImage source={actualSource} style={StyleSheet.absoluteFill} contentFit="contain" />
-          </View>
+    <Modal visible={true} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.viewerOverlay}>
+        <FlatList
+          data={images}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          initialScrollIndex={initialIndex}
+          getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
+          onMomentumScrollEnd={(e) => {
+            const index = Math.round(e.nativeEvent.contentOffset.x / width);
+            setCurrentIndex(index);
+          }}
+          renderItem={({ item }) => (
+            <Pressable style={{ width, height: '100%', alignItems: 'center', justifyContent: 'center' }} onPress={onClose}>
+              <View style={{ width: '100%', height: '80%' }}>
+                <LoadingImage source={item} style={StyleSheet.absoluteFill} contentFit="contain" />
+              </View>
+            </Pressable>
+          )}
+        />
+        {images.length > 1 && (
+          <Text style={{ position: 'absolute', bottom: 40, color: 'white', fontFamily: 'Inter_600SemiBold' }}>
+            {currentIndex + 1} / {images.length}
+          </Text>
         )}
-        <View style={styles.viewerClose}><Feather name="x" size={24} color="#FFF" /></View>
-      </Pressable>
+        <Pressable style={styles.viewerClose} onPress={onClose}>
+          <Feather name="x" size={24} color="#FFF" />
+        </Pressable>
+      </View>
     </Modal>
   );
 }
@@ -477,7 +509,8 @@ export function ReviewsSection({ car }: { car: Car }) {
 
 function ReviewCard({ review }: { review: Review }) {
   const colors = useColors();
-  const [viewer, setViewer] = useState<string | null>(null);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [viewerImages, setViewerImages] = useState<any[]>([]);
   const initials = review.userName.substring(0, 2).toUpperCase();
 
   return (
@@ -511,7 +544,10 @@ function ReviewCard({ review }: { review: Review }) {
       {!!review.images && review.images.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 12 }}>
           {review.images.map((url, i) => (
-            <Pressable key={url + i} onPress={() => setViewer(url)}>
+            <Pressable key={url + i} onPress={() => {
+              setViewerImages(review.images!.map(u => ({ uri: u })));
+              setViewerIndex(i);
+            }}>
               <View style={{ width: 88, height: 88, borderRadius: 10, overflow: 'hidden' }}>
                 <LoadingImage source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
               </View>
@@ -519,7 +555,9 @@ function ReviewCard({ review }: { review: Review }) {
           ))}
         </ScrollView>
       )}
-      <PhotoViewer uri={viewer} onClose={() => setViewer(null)} />
+      {viewerIndex !== null && (
+        <PhotoViewer images={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
+      )}
       <View style={styles.reviewCardFooter}>
         <Text style={[styles.reviewDate, { color: colors.mutedForeground }]}>{review.date}</Text>
       </View>

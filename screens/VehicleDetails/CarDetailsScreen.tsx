@@ -103,12 +103,12 @@ export default function CarDetailsScreen() {
 
   useEffect(() => {
     mainScrollRef.current?.scrollTo({ y: 0, animated: true });
-    setActiveSection('gallery');
+    setActiveSection('about');
   }, [selectedCar?.id]);
 
   // ── One scrolling page with a sticky section bar (About · Gallery · Reviews) ──
   // The bar highlights the section being read as the page scrolls; tapping a tab scrolls to it.
-  const [activeSection, setActiveSection] = useState<SectionKey>('gallery');
+  const [activeSection, setActiveSection] = useState<SectionKey>('about');
   const sectionTops = useRef<Record<SectionKey, number>>({ gallery: 0, about: 0, specifications: 0, features: 0, location: 0, reviews: 0 });
   const tabBarHeight = useRef(48);
   const jumpingUntil = useRef(0); // ignore scroll updates while a tap-scroll animation is running
@@ -121,7 +121,7 @@ export default function CarDetailsScreen() {
     if (Date.now() < jumpingUntil.current) return;
     const { contentOffset, layoutMeasurement, contentSize } = e.nativeEvent;
     const line = contentOffset.y + tabBarHeight.current + 24;
-    let next: SectionKey = 'gallery';
+    let next: SectionKey = 'about';
     for (const key of SECTIONS.map((x) => x.key)) if (sectionTops.current[key] > 0 && sectionTops.current[key] <= line) next = key;
     // At the very bottom the last (often short) section is the one being read.
     if (contentOffset.y + layoutMeasurement.height >= contentSize.height - 8) next = 'reviews';

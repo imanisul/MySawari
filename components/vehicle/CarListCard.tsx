@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
-import { Car, getAvailability } from '@/utils/sawari';
+import { Car, getAvailability, dayNumToLabel, todayDayNum } from '@/utils/sawari';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useSawari } from '@/context/SawariContext';
 import { ActivityAPI } from '@/services/api/activity';
@@ -30,6 +30,7 @@ type CarListCardProps = {
 
 const CarListCardUI = React.memo(function CarListCardUI({
   car,
+  isExplore,
   effectiveDateRange,
   style,
   globalDateRange,
@@ -41,9 +42,17 @@ const CarListCardUI = React.memo(function CarListCardUI({
 
   const availability = car.availability ?? getAvailability(car);
   const unavailable = car.isAvailable === false || !availability.available;
-  // Badge: simple "Available" for available cars (dates are redundant since user already searched),
-  // or the unavailability headline for unavailable ones.
-  const badgeText = !unavailable ? 'Available' : availability.headline;
+  // Badge text: on Explore page show full date range (user hasn't searched dates yet),
+  // on search results just show "Available" (dates are redundant).
+  const badgeText = !unavailable
+    ? (isExplore
+        ? (availability.freeUntil
+            ? (availability.startDate === availability.freeUntil || (availability.startDate === 'Today' && availability.freeUntil === dayNumToLabel(todayDayNum())))
+              ? (availability.startDate === 'Today' ? 'Avail only for today' : `Avail only for ${availability.startDate}`)
+              : `Avail · ${availability.startDate} – ${availability.freeUntil}`
+            : `Avail · ${availability.startDate} – Onwards`)
+        : 'Available')
+    : availability.headline;
 
   const image = (car as any).images?.[0] ?? car.image;
   const price = car.perDay ? formatCurrency(car.perDay) : car.price;

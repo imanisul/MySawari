@@ -40,6 +40,10 @@
         "backgroundColor": "#F9F9F8"
       }
     },
+    "notification": {
+      "icon": "./assets/images/notification_icon.png",
+      "color": "#D3302D"
+    },
     "androidStatusBar": {
       "translucent": true,
       "backgroundColor": "#00000000"

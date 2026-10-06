@@ -201,7 +201,7 @@ export default function HomeScreen() {
   }, [fetchedVehicles, selectCar, setBookingSource, router]);
   
   const renderLuxury = useCallback(({ item }: any) => (
-    <CarListCard car={item} style={{ width: 280, marginHorizontal: 8, marginBottom: 0 }} />
+    <CarListCard car={item} isExplore={true} style={{ width: 280, marginHorizontal: 8, marginBottom: 0 }} />
   ), []);
 
   /** Tapping a recently viewed vehicle reopens its detail page with full context. */

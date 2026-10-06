@@ -178,6 +178,11 @@ export function DatesSheet() {
           <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: rentalDays > 0 ? colors.primaryText : colors.mutedForeground, marginTop: 4 }}>
             {rentalDays} Day{rentalDays !== 1 ? 's' : ''}
           </Text>
+          {start && effectiveEnd && rentalDays > calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), '8:00 AM', '8:00 AM') && (
+            <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 10, color: colors.destructive, marginTop: 2, textAlign: 'center' }}>
+              +1 Day (Late Return)
+            </Text>
+          )}
         </View>
 
         <View style={styles.selectedCol}>

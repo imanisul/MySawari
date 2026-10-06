@@ -26,21 +26,21 @@ const asString = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() :
  */
 export function PushNotificationHandler() {
   const navReady = !!useRootNavigationState()?.key;
-  const { isAuthenticated, syncNotifications, markNotificationRead } = useSawari();
+  const { isAuthenticated, syncNotifications, markNotificationRead, selectCar } = useSawari();
 
   // Listeners are registered once, so they read the latest values from here.
-  const latest = useRef({ isAuthenticated, syncNotifications, markNotificationRead, navReady });
-  latest.current = { isAuthenticated, syncNotifications, markNotificationRead, navReady };
+  const latest = useRef({ isAuthenticated, syncNotifications, markNotificationRead, navReady, selectCar });
+  latest.current = { isAuthenticated, syncNotifications, markNotificationRead, navReady, selectCar };
 
   const pending = useRef<PushData>(null);
   // One tap can be reported by both expo-notifications and Firebase — act on it once.
   const handled = useRef(new Set<string>());
 
   const navigateFor = (data: PushData) => {
-    const { isAuthenticated: authed, syncNotifications: sync, markNotificationRead: markRead } = latest.current;
+    const { isAuthenticated: authed, syncNotifications: sync, markNotificationRead: markRead, selectCar } = latest.current;
     const notificationId = asString(data?.notificationId);
     const bookingId = asString(data?.bookingId);
-
+    const carId = asString(data?.carId);
     const link = asString(data?.link);
 
     if (notificationId) markRead(notificationId).catch(() => {});
@@ -48,6 +48,18 @@ export function PushNotificationHandler() {
 
     if (bookingId && authed) {
       router.push({ pathname: '/booking-detail', params: { id: bookingId } });
+    } else if (carId) {
+      import('@/services/backend/api').then(({ API }) => {
+        API.getVehiclesWithAvailability().then((cars: any[]) => {
+          const car = cars.find(c => String(c.id) === carId);
+          if (car) {
+            selectCar(car);
+            router.push('/car-details');
+          } else {
+            router.push('/explore');
+          }
+        }).catch(() => router.push('/explore'));
+      });
     } else if (link) {
       router.push(link as any);
     } else {

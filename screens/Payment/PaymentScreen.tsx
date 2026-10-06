@@ -334,25 +334,19 @@ export default function PaymentScreen() {
         </ScrollView>
 
         <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Pay now</Text>
-            <Text style={{ color: colors.foreground, fontSize: 24, fontFamily: 'Inter_700Bold' }}>
-              {formatCurrency(pricingQuote?.onlinePayableNow || 0)}
-            </Text>
-          </View>
           <Pressable
             disabled={isQuoteLoading || !pricingQuote || isTripIncomplete}
             onPress={() => {
               import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_started', 'PaymentScreen', { amount: pricingQuote?.onlinePayableNow }));
               router.push('/payment-processing');
             }}
-            style={[styles.payButton, { backgroundColor: isQuoteLoading || isTripIncomplete ? colors.muted : colors.primary }]}
+            style={[styles.payButton, { flex: 1, backgroundColor: isQuoteLoading || isTripIncomplete ? colors.muted : colors.primary }]}
           >
             {isQuoteLoading ? (
               <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>
-                Pay
+              <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
+                Pay {formatCurrency(pricingQuote?.onlinePayableNow || 0)}
               </Text>
             )}
           </Pressable>

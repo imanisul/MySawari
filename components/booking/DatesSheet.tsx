@@ -67,6 +67,7 @@ export function DatesSheet() {
   const [tempReturnTime, setTempReturnTime] = useState<string | null>(!freshPick && returnTime && returnTime !== '--:--' ? returnTime.replace(/^0/, '') : null);
   
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
+  const [showLateReturnModal, setShowLateReturnModal] = useState(false);
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
@@ -348,18 +349,20 @@ export function DatesSheet() {
                   key={'return_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
+                    
+                    const timeIndex = ALL_TIMES.indexOf(time);
+                    if (timeIndex !== -1 && timeIndex < 16) {
+                      setShowEarlyPickupModal(true);
+                      return;
+                    }
+
                     if (start && effectiveEnd) {
                       const newRentalDays = calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', time);
                       const rawDateDiff = calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), '8:00 AM', '8:00 AM');
                       
                       if (newRentalDays > rawDateDiff) {
-                        const newEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() + newRentalDays);
-                        newEnd.setHours(0, 0, 0, 0);
-                        setEnd(newEnd);
-                        setTempReturnTime('8:00 AM');
-                        if (newEnd.getMonth() !== currentMonth.getMonth()) {
-                          setCurrentMonth(new Date(newEnd.getFullYear(), newEnd.getMonth(), 1));
-                        }
+                        setShowLateReturnModal(true);
+                        setTempReturnTime(time);
                         return;
                       }
                     }
@@ -435,9 +438,9 @@ export function DatesSheet() {
             <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.destructive + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
               <Feather name="clock" size={32} color={colors.destructive} />
             </View>
-            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Early Pickup</Text>
+            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Early Timing</Text>
             <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
-              For vehicle pickup before 8:00 AM, please connect with our Customer Care to confirm availability.
+              For vehicle timings before 8:00 AM, please connect with our Customer Care to confirm availability.
             </Text>
             
             <View style={{ width: '100%', gap: 12 }}>
@@ -462,6 +465,29 @@ export function DatesSheet() {
                 style={{ paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
               >
                 <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.mutedForeground }}>Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showLateReturnModal} transparent animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+              <Feather name="info" size={32} color={colors.primary} />
+            </View>
+            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Late Return</Text>
+            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
+              Our standard time is 8:00 AM to 8:00 AM. Selecting this time adds 1 extra day to your rental.
+            </Text>
+            
+            <View style={{ width: '100%', gap: 12 }}>
+              <Pressable 
+                onPress={() => setShowLateReturnModal(false)}
+                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8 }}
+              >
+                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.primaryForeground }}>Understood</Text>
               </Pressable>
             </View>
           </View>

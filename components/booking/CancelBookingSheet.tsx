@@ -38,8 +38,14 @@ export function CancelBookingSheet({ visible, onClose, booking, onSuccess }: { v
             customerMobile: customer.mobile
           });
         }
-        onSuccess(response.snapshot);
-        onClose();
+        Alert.alert(
+          'Booking Cancelled',
+          'Your booking has been successfully cancelled.',
+          [{ text: 'OK', onPress: () => {
+            onSuccess(response.snapshot);
+            onClose();
+          }}]
+        );
       } else {
         Alert.alert('Cancellation Failed', 'The booking could not be cancelled. Please try again or contact support.');
       }

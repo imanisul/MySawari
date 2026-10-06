@@ -94,9 +94,14 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
         reason.trim()
       );
       
-      // Notify parent that a request was made
-      onSuccess(booking); 
-      onClose();
+      Alert.alert(
+        'Request Submitted', 
+        'Your extension request has been sent successfully. Please wait for approval.',
+        [{ text: 'OK', onPress: () => {
+          onSuccess(booking); 
+          onClose();
+        }}]
+      );
     } catch(e: any) {
       Alert.alert('Request Failed', e.message || 'Failed to submit extension request');
     } finally {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { getDevicePosition, POSITION_FAILURE_MESSAGE } from '@/utils/location';
 import { useColors } from '@/hooks/useColors';
@@ -14,6 +14,7 @@ import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
 export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean; isDestination?: boolean } = {}) {
   const colors = useColors();
   const router = useRouter();
+  const { forSpecificCar } = useLocalSearchParams();
   const { 
     pickup: pickupLocation, 
     setPickup: setPickupLocation, 
@@ -172,7 +173,11 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
 
       if (mode === 'destination') {
         setDropoff(loc);
-        router.back();
+        if (forSpecificCar === 'true') {
+          router.replace('/booking');
+        } else {
+          router.back();
+        }
       } else if (mode === 'pickup') {
         setPickupLocation(loc);
         if (deliveryMode === 'both') {
@@ -216,7 +221,11 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
 
     if (mode === 'destination') {
       setDropoff(loc);
-      router.back();
+      if (forSpecificCar === 'true') {
+        router.replace('/booking');
+      } else {
+        router.back();
+      }
     } else if (mode === 'pickup') {
       setPickupLocation(loc);
       if (deliveryMode === 'both') {

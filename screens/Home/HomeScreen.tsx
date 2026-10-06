@@ -24,7 +24,7 @@ import {
   SpecialDealCard,
 } from '@/components';
 import { RideJourneyCard } from '@/components/home/RideJourneyCard';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { offersQueryOptions } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
@@ -542,7 +542,13 @@ export default function HomeScreen() {
                     style={({ pressed }) => [styles.recentCard, { backgroundColor: colors.card, borderColor: colors.border }, pressed && { opacity: 0.8 }]}
                   >
                     <View style={[styles.recentIcon, { backgroundColor: colors.tintLight }]}>
-                      <Feather name={s.stage === 'booking' || s.stage === 'payment' ? 'arrow-right-circle' : 'clock'} size={15} color={colors.primaryText} />
+                      {s.vehicleType === 'bike' ? (
+                        <Ionicons name="bicycle-outline" size={16} color={colors.primaryText} />
+                      ) : s.vehicleType === 'car' && s.stage !== 'booking' && s.stage !== 'payment' ? (
+                        <Ionicons name="car-outline" size={16} color={colors.primaryText} />
+                      ) : (
+                        <Feather name={s.stage === 'booking' || s.stage === 'payment' ? 'arrow-right-circle' : 'clock'} size={15} color={colors.primaryText} />
+                      )}
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text numberOfLines={1} style={[styles.recentTitle, { color: colors.foreground }]}>{s.dropoff.name}</Text>

@@ -433,14 +433,11 @@ export function DatesSheet() {
               if (returnBack === 'true') {
                 router.back();
               } else if (forSpecificCar === 'true') {
-                router.dismissAll();
-                setTimeout(() => {
-                  if (!dropoff?.name) {
-                    router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
-                  } else {
-                    router.push('/booking');
-                  }
-                }, 100);
+                if (!dropoff?.name) {
+                  router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+                } else {
+                  router.replace('/booking');
+                }
               } else {
                 router.dismissAll();
                 setTimeout(() => {

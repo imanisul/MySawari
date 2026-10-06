@@ -211,7 +211,7 @@ export default function ExploreScreen() {
   const keyExtractor = useCallback((item: Car) => item.id, []);
 
   const renderCar = useCallback(({ item }: { item: typeof cars[0] }) => (
-    <CarListCard car={item} effectiveDateRange={exploreDate} />
+    <CarListCard car={item} effectiveDateRange={exploreDate} isExplore={true} />
   ), [exploreDate]);
 
 

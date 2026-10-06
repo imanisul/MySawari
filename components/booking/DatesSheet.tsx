@@ -8,6 +8,7 @@ import { useSawari } from '@/context/SawariContext';
 import { SheetFrame, SheetHeader } from '../common/SheetFrame';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { calculateRentalDays } from '@/services/backend/pricingEngine';
+import { checkCarAvailability } from '@/utils/sawari';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -32,9 +33,9 @@ export function DatesSheet() {
   const router = useRouter();
   // fresh: opened right after choosing a destination (or for a trip whose dates have passed) — the
   // customer picks the dates themselves, nothing is pre-filled from an earlier search.
-  const { returnBack, fresh } = useLocalSearchParams();
+  const { returnBack, fresh, forSpecificCar } = useLocalSearchParams();
   const freshPick = fresh === 'true';
-  const { setDates, setTimes, dateRange, pickupTime, returnTime } = useSawari();
+  const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, dropoff } = useSawari();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -135,7 +136,6 @@ export function DatesSheet() {
       } else {
         // Picked a date after start, make it the end
         setEnd(date);
-        setTempReturnTime('8:00 AM');
         hasAutoBumped.current = false;
       }
       return;
@@ -184,7 +184,7 @@ export function DatesSheet() {
             {formatDateStr(start)}
           </Text>
           <Text style={[styles.timeLabel, { color: start ? colors.blue : colors.mutedForeground }]}>
-            {start ? tempPickupTime : '--:--'}
+            {start ? (tempPickupTime || 'Select Time') : '--:--'}
           </Text>
         </View>
 
@@ -201,7 +201,7 @@ export function DatesSheet() {
             {formatDateStr(effectiveEnd)}
           </Text>
           <Text style={[styles.timeLabel, { color: effectiveEnd ? colors.blue : colors.mutedForeground }]}>
-            {effectiveEnd ? tempReturnTime : '--:--'}
+            {effectiveEnd ? (tempReturnTime || 'Select Time') : '--:--'}
           </Text>
         </View>
       </View>
@@ -230,7 +230,13 @@ export function DatesSheet() {
           {days.map((date, index) => {
             if (!date) return <View key={index} style={styles.dateCell} />;
             
-            const isPast = date < today;
+            const isPastTemp = date < today;
+            let isCarUnavailable = false;
+            if (forSpecificCar === 'true' && selectedCar && date && !isPastTemp) {
+              const dateStr = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+              isCarUnavailable = !checkCarAvailability(selectedCar, dateStr, dateStr);
+            }
+            const isPast = isPastTemp || isCarUnavailable;
             const isStart = start && date.getTime() === start.getTime();
             const isEnd = end && date.getTime() === end.getTime();
             const selected = isStart || isEnd;
@@ -413,7 +419,7 @@ export function DatesSheet() {
 
       <View style={{ paddingTop: 16 }}>
         <PrimaryButton 
-          label={returnBack === 'true' ? "Confirm Dates" : "Search Cars"}
+          label={forSpecificCar === 'true' ? (!dropoff?.name ? "Next: Select Destination" : "Continue to Booking") : (returnBack === 'true' ? "Confirm Dates" : "Search Cars")}
           disabled={!canApply}
           onPress={() => {
             if (start) {
@@ -433,6 +439,13 @@ export function DatesSheet() {
 
               if (returnBack === 'true') {
                 router.back();
+              } else if (forSpecificCar === 'true') {
+                router.dismissAll();
+                if (!dropoff?.name) {
+                  router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+                } else {
+                  router.push('/booking');
+                }
               } else {
                 router.dismissAll();
                 router.push('/search');

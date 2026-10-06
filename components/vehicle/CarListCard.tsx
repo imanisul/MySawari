@@ -166,12 +166,12 @@ export function CarListCard(props: CarListCardProps) {
     if (!isDateSelected && props.onIntercept) {
       props.onIntercept();
     } else {
-      if (props.effectiveDateRange && props.effectiveDateRange !== globalDateRange) {
-        setDateRange(props.effectiveDateRange);
+      if (props.isExplore || (props.effectiveDateRange && props.effectiveDateRange !== globalDateRange)) {
+        setDateRange(props.effectiveDateRange || '');
       }
       router.push('/car-details');
     }
-  }, [props.car, selectCar, props.onIntercept, props.effectiveDateRange, globalDateRange, setDateRange, router]);
+  }, [props.car, selectCar, props.onIntercept, props.effectiveDateRange, globalDateRange, setDateRange, router, props.isExplore]);
 
   return (
     <CarListCardUI 

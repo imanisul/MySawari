@@ -35,7 +35,7 @@ export function DropoffSheet() {
   const { setDropoff } = useSawari();
   // returnBack: opened from a screen that wants the customer back afterwards (booking page, trip sheet).
   // q: opened from a state on Home's "Explore Northeast", pre-filtered to it.
-  const params = useLocalSearchParams<{ returnBack?: string; q?: string }>();
+  const params = useLocalSearchParams<{ returnBack?: string; q?: string; forSpecificCar?: string }>();
   const [searchQuery, setSearchQuery] = useState(typeof params.q === 'string' ? params.q : '');
 
   // Combine static pickup locations and Major Destinations
@@ -65,8 +65,15 @@ export function DropoffSheet() {
     Haptics.selectionAsync();
     setDropoff({ id: location.id, name: location.name, address: location.desc, latitude: 0, longitude: 0, source: 'database' });
     import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: location.name }));
-    // Straight on to the dates — the next thing a trip needs — instead of back to the form.
-    router.replace({ pathname: '/dates', params: { returnBack: params.returnBack === 'true' ? 'true' : 'false', fresh: 'true' } });
+    
+    if (params.forSpecificCar === 'true') {
+      router.dismissAll();
+      router.push('/booking');
+    } else {
+      // Pushing instead of replacing because Expo Router sometimes dismisses the modal entirely on replace.
+      // The dates sheet uses dismissAll() when done, so stacking modals is perfectly fine here.
+      router.push({ pathname: '/dates', params: { returnBack: params.returnBack === 'true' ? 'true' : 'false', fresh: 'true' } });
+    }
   };
 
   const getIcon = (type: string) => {
@@ -80,7 +87,7 @@ export function DropoffSheet() {
   };
 
   return (
-    <SheetFrame height={700}>
+    <SheetFrame fill>
       <SheetHeader title="Where are you going?" subtitle="Select your drop-off destination." />
       
       <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>

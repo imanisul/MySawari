@@ -23,6 +23,7 @@ import {
   LoginBottomSheet,
   SpecialDealCard,
 } from '@/components';
+import { RideJourneyCard } from '@/components/home/RideJourneyCard';
 import { Feather } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { offersQueryOptions } from '@/services/api/offers';
@@ -434,6 +435,7 @@ export default function HomeScreen() {
   // refer) and inspiration (destinations).
   const sections = useMemo(() => [
     { type: 'header', key: 'header' },
+    { type: 'rideJourney', key: 'rideJourney' },
     { type: 'recentSearches', key: 'recentSearches' },
     { type: 'recentlyViewedCars', key: 'recentlyViewedCars' },
     { type: 'recentlyViewedBikes', key: 'recentlyViewedBikes' },
@@ -514,6 +516,9 @@ export default function HomeScreen() {
             />
           </>
         );
+        break;
+      case 'rideJourney':
+        content = <RideJourneyCard />;
         break;
       case 'recentSearches': {
         if (!recentSearches.length) break;

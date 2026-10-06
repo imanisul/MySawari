@@ -70,7 +70,8 @@ export default function CarDetailsScreen() {
   const handleBookingProceed = () => {
     const isMissingEnd = !endStr || endStr.includes('Select');
     if (bookingSource === 'explore' || !dropoff?.name || isMissingEnd) {
-      setShowSearchSheet(true);
+      Haptics.selectionAsync(); 
+      router.push({ pathname: '/dates', params: { forSpecificCar: 'true' } });
     } else {
       router.push('/booking');
     }
@@ -327,25 +328,15 @@ export default function CarDetailsScreen() {
       
       <StickyBookingBar 
         isAvailable={isAvailable} 
-        onCheckAvailability={() => { Haptics.selectionAsync(); setShowSearchSheet(true); }}
+        onCheckAvailability={() => { 
+          Haptics.selectionAsync(); 
+          router.push({ pathname: '/dates', params: { forSpecificCar: 'true' } });
+        }}
         onNeedLogin={() => {
           setPendingAction(() => handleBookingProceed);
           setShowLogin(true);
         }} 
         onBookNow={handleBookingProceed}
-      />
-      <SearchSheet
-        visible={showSearchSheet}
-        onClose={() => setShowSearchSheet(false)}
-        onContinue={() => {
-          setShowSearchSheet(false);
-          if (isAuthenticated) {
-            router.push('/booking');
-          } else {
-            setPendingAction(() => () => router.push('/booking'));
-            setShowLogin(true);
-          }
-        }}
       />
       <LoginBottomSheet 
         visible={showLogin} 

@@ -37,7 +37,7 @@ export function PlannerSheet() {
           {mode === 'Self Drive' ? 'No driver charges' : 'Driver charges apply'}
         </Text>
       </Pressable>
-      <PrimaryButton label="Search cars" onPress={() => router.replace('/search')} />
+      <PrimaryButton label="Search cars" onPress={() => { router.dismissAll(); router.push('/search'); }} />
     </SheetFrame>
   );
 }

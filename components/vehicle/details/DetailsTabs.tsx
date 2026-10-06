@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Image } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, FlatList, Dimensions } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -316,12 +316,12 @@ function PhotoViewer({ images, initialIndex, onClose }: { images: any[]; initial
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           initialScrollIndex={initialIndex}
-          getItemLayout={(data, index) => ({ length: width, offset: width * index, index })}
-          onMomentumScrollEnd={(e) => {
+          getItemLayout={(data: any, index: number) => ({ length: width, offset: width * index, index })}
+          onMomentumScrollEnd={(e: any) => {
             const index = Math.round(e.nativeEvent.contentOffset.x / width);
             setCurrentIndex(index);
           }}
-          renderItem={({ item }) => (
+          renderItem={({ item }: { item: any }) => (
             <Pressable style={{ width, height: '100%', alignItems: 'center', justifyContent: 'center' }} onPress={onClose}>
               <View style={{ width: '100%', height: '80%' }}>
                 <LoadingImage source={item} style={StyleSheet.absoluteFill} contentFit="contain" />

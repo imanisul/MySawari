@@ -769,7 +769,7 @@ export default function HomeScreen() {
       case 'offers':
         // Guards against every coupon expiring/being deactivated at once — showing the heading with
         // nothing under it would read as a broken section rather than an intentionally quiet one.
-        if (!isLoadingOffers && offers.length === 0) break;
+        if (isLoadingOffers || offers.length === 0) break;
         content = (
           <>
             <SectionHeading title="Exclusive Offers" kicker="COUPONS & DISCOUNTS" />

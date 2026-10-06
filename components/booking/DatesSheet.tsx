@@ -67,14 +67,11 @@ export function DatesSheet() {
   const [tempReturnTime, setTempReturnTime] = useState<string | null>(!freshPick && returnTime && returnTime !== '--:--' ? returnTime.replace(/^0/, '') : null);
   
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
-  const [showStandardTimeNote, setShowStandardTimeNote] = useState(false);
-  const noteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
   const pickupScrollRef = useRef<ScrollView>(null);
   const returnScrollRef = useRef<ScrollView>(null);
-  const hasAutoBumped = useRef(false);
   
   useEffect(() => {
     setTimeout(() => {
@@ -115,7 +112,6 @@ export function DatesSheet() {
       setStart(date);
       setEnd(null);
       setTempReturnTime(null);
-      hasAutoBumped.current = false;
       return;
     }
     
@@ -126,17 +122,14 @@ export function DatesSheet() {
         setStart(date);
         setEnd(null);
         setTempReturnTime(null);
-        hasAutoBumped.current = false;
       } else if (date.getTime() === start.getTime()) {
         // Tapping the same start date again → deselect it entirely
         setStart(null);
         setEnd(null);
         setTempReturnTime(null);
-        hasAutoBumped.current = false;
       } else {
         // Picked a date after start, make it the end
         setEnd(date);
-        hasAutoBumped.current = false;
       }
       return;
     }
@@ -145,7 +138,6 @@ export function DatesSheet() {
     setStart(date);
     setEnd(null);
     setTempReturnTime(null);
-    hasAutoBumped.current = false;
   };
 
   const formatDateStr = (date: Date | null) => {
@@ -155,14 +147,7 @@ export function DatesSheet() {
 
   const effectiveEnd = end || start;
   const isSameDay = !!(start && effectiveEnd && start.getTime() === effectiveEnd.getTime());
-  // When return time >= 9 AM, the end date was already bumped +1 day to account for the extra time.
-  // So for rental days calculation, use '8:00 AM' to avoid double-counting.
-  const effectiveReturnTimeForCalc = (() => {
-    if (!tempReturnTime) return '8:00 AM';
-    const idx = ALL_TIMES.indexOf(tempReturnTime);
-    return idx >= 18 ? '8:00 AM' : tempReturnTime;
-  })();
-  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', effectiveReturnTimeForCalc) : 0;
+  const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', tempReturnTime || '8:00 AM') : 0;
   const canApply = start !== null && effectiveEnd !== null && tempPickupTime !== null && tempReturnTime !== null;
 
   return (
@@ -358,34 +343,7 @@ export function DatesSheet() {
                   key={'return_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    const timeIndex = ALL_TIMES.indexOf(time);
-                    if (timeIndex >= 18) {
-                      // >= 9:00 AM
-                      if (!hasAutoBumped.current) {
-                        // First time selecting >= 9 AM: bump end date by exactly 1 day
-                        const currentEnd = end || start || new Date(today);
-                        const nextDay = new Date(currentEnd);
-                        nextDay.setDate(nextDay.getDate() + 1);
-                        setEnd(nextDay);
-                        hasAutoBumped.current = true;
-                      }
-                      // Show the standard time note and auto-hide after 4 seconds
-                      setShowStandardTimeNote(true);
-                      if (noteTimerRef.current) clearTimeout(noteTimerRef.current);
-                      noteTimerRef.current = setTimeout(() => setShowStandardTimeNote(false), 4000);
-                      // Always update the green highlight to whichever >= 9 AM time was tapped
-                      setTempReturnTime(time);
-                    } else {
-                      // < 9:00 AM selected
-                      if (hasAutoBumped.current && end) {
-                        // Was previously bumped, reverse it (decrease date by 1)
-                        const prevDay = new Date(end);
-                        prevDay.setDate(prevDay.getDate() - 1);
-                        setEnd(prevDay);
-                        hasAutoBumped.current = false;
-                      }
-                      setTempReturnTime(time);
-                    }
+                    setTempReturnTime(time);
                   }}
                   style={[
                     styles.timeChip,
@@ -405,15 +363,6 @@ export function DatesSheet() {
               );
             })}
           </ScrollView>
-
-          {showStandardTimeNote && (
-            <View style={{ marginTop: 8, marginHorizontal: 4, backgroundColor: colors.gold + '18', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 12, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Feather name="info" size={13} color={colors.goldDark} />
-              <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 11.5, color: colors.goldDark, flex: 1 }}>
-                Our standard rental time is 8:00 AM to 8:00 AM. An extra day has been added.
-              </Text>
-            </View>
-          )}
         </View>
       </ScrollView>
 

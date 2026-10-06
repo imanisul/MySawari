@@ -119,16 +119,31 @@ export function calculateRentalDays(start: string, end: string, startTime?: stri
     const currentYear = new Date().getFullYear();
     const normStart = start.replace(/Sept/gi, 'Sep');
     const normEnd = end.replace(/Sept/gi, 'Sep');
-    const startDate = new Date(`${normStart} ${currentYear}`);
-    const endDate = new Date(`${normEnd} ${currentYear}`);
+    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    const parseCustomDate = (dateStr: string) => {
+      const parts = dateStr.trim().split(' ');
+      if (parts.length >= 2) {
+        const day = parseInt(parts[0], 10);
+        const monthStr = parts[1].substring(0, 3); // 'Sep', 'Oct', etc
+        const monthIndex = MONTHS.findIndex(m => m.toLowerCase() === monthStr.toLowerCase());
+        if (!isNaN(day) && monthIndex !== -1) {
+          return new Date(currentYear, monthIndex, day, 0, 0, 0, 0);
+        }
+      }
+      return new Date('invalid'); // fallback
+    };
+
+    const startDate = parseCustomDate(normStart);
+    const endDate = parseCustomDate(normEnd);
 
     const applyTime = (timeStr: string | undefined, dateObj: Date) => {
       if (!timeStr) return;
       const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
       if (match) {
         let [_, h, m, period] = match;
-        let hours = parseInt(h);
-        const minutes = parseInt(m);
+        let hours = parseInt(h, 10);
+        const minutes = parseInt(m, 10);
         if (period.toUpperCase() === 'PM' && hours < 12) hours += 12;
         if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
         dateObj.setHours(hours, minutes, 0, 0);

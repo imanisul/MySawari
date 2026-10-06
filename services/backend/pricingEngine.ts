@@ -165,8 +165,15 @@ export function calculateRentalDays(start: string, end: string, startTime?: stri
 
     const diffTime = endDate.getTime() - startDate.getTime();
     if (diffTime <= 0) return 1;
-    // 59-minute grace period: 9:00 AM and beyond triggers an extra day.
-    const diffDays = Math.max(1, Math.ceil((diffTime - (59 * 60 * 1000)) / (1000 * 60 * 60 * 24)));
+    
+    // HACK for Option D: The pricing engine now strictly uses Calendar Date difference.
+    // Late returns (times > 8:00 AM) are handled directly by the frontend UI bumping the endDate.
+    const startCalendarDate = new Date(startDate);
+    startCalendarDate.setHours(0,0,0,0);
+    const endCalendarDate = new Date(endDate);
+    endCalendarDate.setHours(0,0,0,0);
+    
+    const diffDays = Math.max(1, Math.round((endCalendarDate.getTime() - startCalendarDate.getTime()) / (1000 * 60 * 60 * 24)));
 
     return diffDays;
   } catch (e) {

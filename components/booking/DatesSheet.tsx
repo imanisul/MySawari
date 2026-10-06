@@ -396,14 +396,18 @@ export function DatesSheet() {
                 router.back();
               } else if (forSpecificCar === 'true') {
                 router.dismissAll();
-                if (!dropoff?.name) {
-                  router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
-                } else {
-                  router.push('/booking');
-                }
+                setTimeout(() => {
+                  if (!dropoff?.name) {
+                    router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+                  } else {
+                    router.push('/booking');
+                  }
+                }, 100);
               } else {
                 router.dismissAll();
-                router.push('/search');
+                setTimeout(() => {
+                  router.push('/search');
+                }, 100);
               }
             }
           }}

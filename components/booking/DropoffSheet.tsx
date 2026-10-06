@@ -68,7 +68,9 @@ export function DropoffSheet() {
     
     if (params.forSpecificCar === 'true') {
       router.dismissAll();
-      router.push('/booking');
+      setTimeout(() => {
+        router.push('/booking');
+      }, 100);
     } else {
       // Pushing instead of replacing because Expo Router sometimes dismisses the modal entirely on replace.
       // The dates sheet uses dismissAll() when done, so stacking modals is perfectly fine here.

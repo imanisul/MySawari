@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { Pressable, StyleSheet, Text, TextInput, View, Alert } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View, Alert, Switch, LayoutAnimation } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ export default function BookingScreen() {
     mode, 
     setMode,
     selectedCar, 
-    pickup, dropoff, returnAddress, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
+    pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested, deliveryMode, setDeliveryMode, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
 
   const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -123,28 +123,76 @@ export default function BookingScreen() {
             isMissing={!dropoff?.name}
             onPress={() => router.push({ pathname: '/dropoff', params: { returnBack: 'true' } })}
           />
-          {isDeliveryRequested && (
-            <>
-              {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
-                <DetailRow
-                  icon="map-pin"
-                  label="Drop off"
-                  value={pickup?.name || 'Select Location'}
-                  isMissing={isMissingPickup}
-                  onPress={() => router.push('/location')}
-                />
-              )}
-              {(deliveryMode === 'both' || deliveryMode === 'return') && (
-                <DetailRow
-                  icon="map-pin"
-                  label="Pick up"
-                  value={returnAddress?.name || 'Select Location'}
-                  isMissing={isMissingDrop}
-                  onPress={() => router.push('/return-location')}
-                />
-              )}
-            </>
-          )}
+          <View style={{ marginTop: 8, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border, marginBottom: 8 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDeliveryRequested ? 16 : 0 }}>
+              <View style={{ flex: 1, paddingRight: 16 }}>
+                <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.foreground }}>Get car delivered?</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 2 }}>We will drop and pick up the car at your location</Text>
+              </View>
+              <Switch 
+                value={isDeliveryRequested} 
+                onValueChange={(val) => {
+                  Haptics.selectionAsync();
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setIsDeliveryRequested(val);
+                }}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor={'#FFF'}
+              />
+            </View>
+            
+            {isDeliveryRequested && (
+              <View>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                  {(['delivery', 'return', 'both'] as const).map(m => {
+                    const label = m === 'delivery' ? 'Drop off' : m === 'return' ? 'Pick up' : 'Both';
+                    const isSelected = deliveryMode === m;
+                    return (
+                      <Pressable
+                        key={m}
+                        onPress={() => {
+                          Haptics.selectionAsync();
+                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                          setDeliveryMode(m);
+                        }}
+                        style={{
+                          flex: 1, paddingVertical: 10, alignItems: 'center',
+                          backgroundColor: isSelected ? colors.primary : 'transparent',
+                          borderRadius: 12, borderWidth: 1,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium', color: isSelected ? colors.primaryForeground : colors.mutedForeground }}>
+                          {label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <View>
+                  {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
+                    <DetailRow
+                      icon="map-pin"
+                      label="Deliver To"
+                      value={pickup?.name || 'Select Location'}
+                      isMissing={isMissingPickup}
+                      onPress={() => router.push('/location')}
+                    />
+                  )}
+                  {(deliveryMode === 'both' || deliveryMode === 'return') && (
+                    <DetailRow
+                      icon="map-pin"
+                      label="Collect From"
+                      value={returnAddress?.name || 'Select Location'}
+                      isMissing={isMissingDrop}
+                      onPress={() => router.push('/return-location')}
+                    />
+                  )}
+                </View>
+              </View>
+            )}
+          </View>
           <DetailRow
             icon="calendar"
             label="Dates & Time"

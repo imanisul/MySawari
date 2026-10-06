@@ -348,6 +348,21 @@ export function DatesSheet() {
                   key={'return_'+time}
                   onPress={() => {
                     Haptics.selectionAsync();
+                    if (start && effectiveEnd) {
+                      const newRentalDays = calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', time);
+                      const rawDateDiff = calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), '8:00 AM', '8:00 AM');
+                      
+                      if (newRentalDays > rawDateDiff) {
+                        const newEnd = new Date(start.getFullYear(), start.getMonth(), start.getDate() + newRentalDays);
+                        newEnd.setHours(0, 0, 0, 0);
+                        setEnd(newEnd);
+                        setTempReturnTime('8:00 AM');
+                        if (newEnd.getMonth() !== currentMonth.getMonth()) {
+                          setCurrentMonth(new Date(newEnd.getFullYear(), newEnd.getMonth(), 1));
+                        }
+                        return;
+                      }
+                    }
                     setTempReturnTime(time);
                   }}
                   style={[

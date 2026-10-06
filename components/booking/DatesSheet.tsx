@@ -409,6 +409,14 @@ export function DatesSheet() {
             if (start) {
               const finalReturnTime = tempReturnTime || '8:00 AM';
               const finalPickupTime = tempPickupTime || '8:00 AM';
+              if (forSpecificCar === 'true' && selectedCar) {
+                const isAvail = checkCarAvailability(selectedCar, formatDateStr(start), formatDateStr(effectiveEnd));
+                if (!isAvail) {
+                  Alert.alert('Car Not Available', 'The selected car is not available for these dates. Please choose different dates.');
+                  return;
+                }
+              }
+
               setDates(`${formatDateStr(start)} – ${formatDateStr(effectiveEnd)}`, `${rentalDays} Day${rentalDays !== 1 ? 's' : ''}`);
               setTimes(finalPickupTime, finalReturnTime);
               

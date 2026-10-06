@@ -424,14 +424,15 @@ export function DatesSheet() {
           onPress={() => {
             if (start) {
               const finalReturnTime = tempReturnTime || '8:00 AM';
+              const finalPickupTime = tempPickupTime || '8:00 AM';
               setDates(`${formatDateStr(start)} – ${formatDateStr(effectiveEnd)}`, `${rentalDays} Day${rentalDays !== 1 ? 's' : ''}`);
-              setTimes(tempPickupTime, finalReturnTime);
+              setTimes(finalPickupTime, finalReturnTime);
               
               import('@/services/api/activity').then(({ ActivityAPI }) => {
                 ActivityAPI.logActivity('select_dates', 'DatesSheet', { 
                   startDate: formatDateStr(start), 
                   endDate: formatDateStr(effectiveEnd),
-                  pickupTime: tempPickupTime,
+                  pickupTime: finalPickupTime,
                   returnTime: finalReturnTime,
                   rentalDays
                 });

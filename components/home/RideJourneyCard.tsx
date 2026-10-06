@@ -69,11 +69,13 @@ export function RideJourneyCard() {
         setRewardAmount(claimed?.reward.amount ?? null);
         earnSawariCash(milestone.rewardAmount);
         queryClient.invalidateQueries({ queryKey: ['ride-journey'] });
+        CustomAlert.alert("Congratulations! 🎊", `You have claimed ₹${claimed?.reward.amount ?? milestone.rewardAmount} Sawari Cash!`, [{ text: "Awesome!" }]);
       } catch (e) {
-        // Already claimed or error — still show modal
+        CustomAlert.alert("Congratulations! 🎊", "You have already claimed this milestone reward.", [{ text: "Awesome!" }]);
       }
+    } else {
+      CustomAlert.alert("Congratulations! 🎊", "You have already claimed this milestone reward.", [{ text: "Awesome!" }]);
     }
-    setShowRewardModal(true);
   };
 
   // Only show if the user has completed at least one ride
@@ -156,13 +158,6 @@ export function RideJourneyCard() {
           </>
         )}
       </View>
-
-      <CustomAlert
-        visible={showRewardModal}
-        title="Congratulations! 🎊"
-        message={rewardAmount ? `You have claimed ₹${rewardAmount} Sawari Cash!` : "You have already claimed this milestone reward."}
-        buttons={[{ text: "Awesome!", onPress: () => setShowRewardModal(false) }]}
-      />
     </>
   );
 }

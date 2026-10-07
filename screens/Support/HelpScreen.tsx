@@ -5,6 +5,7 @@ import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 // Enable LayoutAnimation for Android on older architecture
 const isFabricEnabled = (globalThis as any)?.nativeFabricUIManager != null;
@@ -103,7 +104,7 @@ export default function HelpScreen() {
               style={[styles.chatButton, { backgroundColor: colors.primary }]}
               onPress={() => {
                 import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('contact_support', 'HelpScreen', { method: 'whatsapp' }));
-                Linking.openURL('https://wa.me/919876543210');
+                Linking.openURL(SUPPORT_WHATSAPP_URL).catch(() => {});
               }}
             >
               <Text style={styles.chatButtonText}>Chat on WhatsApp</Text>

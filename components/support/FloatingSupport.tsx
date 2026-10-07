@@ -8,6 +8,7 @@ import { shadows } from '@/constants/shadows';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useSupportFabHidden } from '@/hooks/useSupportFab';
+import { SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 const HIDDEN_ROUTES = [
   '/payment',
@@ -65,7 +66,8 @@ function FloatingSupportInner() {
 
   const handleWhatsApp = () => {
     Haptics.selectionAsync();
-    Linking.openURL('whatsapp://send?text=Hello MySawari&phone=+919365557500');
+    // wa.me works with or without the WhatsApp app installed (the whatsapp:// scheme threw when it wasn't).
+    Linking.openURL(`${SUPPORT_WHATSAPP_URL}?text=${encodeURIComponent('Hello MySawari')}`).catch(() => {});
     toggleMenu();
   };
 

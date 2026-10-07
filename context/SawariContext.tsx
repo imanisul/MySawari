@@ -12,7 +12,7 @@ import Notifications from '@/utils/notifications';
 import { AppState } from 'react-native';
 import { getDevicePosition } from '@/utils/location';
 import { calculateDistanceKm } from '@/services/backend/pricingEngine';
-import { registerDeviceForPushNotifications } from '@/services/pushNotification';
+import { registerDeviceForPushNotifications, unregisterDeviceForPushNotifications } from '@/services/pushNotification';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 
 let messaging: any = null;
@@ -881,6 +881,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           } catch {}
           // Revoke the session server-side too (a copied refresh token stops working right away).
           const refreshToken = await SecureStore.getItemAsync('refresh_token').catch(() => null);
+          // Before the tokens are deleted: this phone must stop receiving this customer's booking pushes.
+          const authToken = await SecureStore.getItemAsync('auth_token').catch(() => null);
+          await unregisterDeviceForPushNotifications(authToken);
           API.logoutServer(refreshToken);
           await SecureStore.deleteItemAsync('auth_token');
           await SecureStore.deleteItemAsync('refresh_token');

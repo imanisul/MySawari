@@ -9,6 +9,7 @@ import { SheetFrame, SheetHeader } from '../common/SheetFrame';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { calculateRentalDays } from '@/services/backend/pricingEngine';
 import { checkCarAvailability } from '@/utils/sawari';
+import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -462,7 +463,7 @@ export function DatesSheet() {
             
             <View style={{ width: '100%', gap: 12 }}>
               <Pressable 
-                onPress={() => Linking.openURL('tel:+919365557500')}
+                onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8 }}
               >
                 <Feather name="phone-call" size={18} color={colors.primaryForeground} />
@@ -470,7 +471,7 @@ export function DatesSheet() {
               </Pressable>
               
               <Pressable 
-                onPress={() => Linking.openURL('https://wa.me/919365557500')}
+                onPress={() => Linking.openURL(SUPPORT_WHATSAPP_URL)}
                 style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', paddingVertical: 14, borderRadius: 14, gap: 8 }}
               >
                 <Feather name="message-circle" size={18} color="#fff" />

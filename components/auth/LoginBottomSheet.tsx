@@ -90,7 +90,7 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
     if (step === 1 && mobile.length >= 10) {
       try {
         setLoading(true);
-        const res = await API.sendOtp(mobile); console.log("OTP Res:", res);
+        const res = await API.sendOtp(mobile);
         setIsExistingUser(!!res.isExistingUser);
         setStep(2);
         setResendTimer(30);

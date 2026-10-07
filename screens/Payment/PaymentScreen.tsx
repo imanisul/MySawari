@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
-import { formatCurrency } from '@/services/backend/pricingEngine';
+import { formatCurrency, calculateCouponDiscount } from '@/services/backend/pricingEngine';
 import { Reveal } from '@/components/common/Reveal';
 import { PriceSummarySkeleton } from '@/components/loading/ScreenSkeletons';
 
@@ -51,7 +51,19 @@ export default function PaymentScreen() {
     API.getCoupons().then(res => setAvailableCoupons(res)).catch(() => setAvailableCoupons([]));
   }, []);
 
-  const handleApplyCoupon = (code: string) => {
+  const [couponError, setCouponError] = useState<string | null>(null);
+
+  // A code that gives nothing off (typo, expired, minimum not met) used to show "Coupon Applied … You saved ₹0".
+  // It is checked against the server's coupon list with the same rule the booking uses before it is applied.
+  const handleApplyCoupon = async (raw: string) => {
+    const code = raw.trim().toUpperCase();
+    if (!code) return;
+    setCouponError(null);
+    await API.getCoupons().catch(() => []);
+    if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code) <= 0) {
+      setCouponError(`${code} isn't valid for this booking.`);
+      return;
+    }
     applyCoupon(code);
   };
 
@@ -91,7 +103,7 @@ export default function PaymentScreen() {
           <Text style={[styles.title, { color: colors.foreground }]}>Checkout</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 + insets.bottom }]} showsVerticalScrollIndicator={false}>
 
           {/* YOUR TRIP — read-only summary of choices already made earlier in the funnel */}
           <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
@@ -112,7 +124,7 @@ export default function PaymentScreen() {
             {!isDeliveryRequested ? (
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Destination</Text>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>
+                <Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
                   {dropoff?.name || 'Select Destination'}
                 </Text>
               </View>
@@ -121,7 +133,7 @@ export default function PaymentScreen() {
                 {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
                   <View style={[styles.row, { marginTop: 12 }]}>
                     <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Pickup</Text>
-                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>
+                    <Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
                       {pricingQuote && pricingQuote.pickupCharge > 0 ? pricingQuote.pickupLocationName : 'Select Location'}
                     </Text>
                   </View>
@@ -129,7 +141,7 @@ export default function PaymentScreen() {
                 {(deliveryMode === 'both' || deliveryMode === 'return') && (
                   <View style={[styles.row, { marginTop: 12 }]}>
                     <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Return</Text>
-                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>
+                    <Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
                       {pricingQuote && pricingQuote.dropCharge > 0 ? pricingQuote.dropLocationName : 'Select Location'}
                     </Text>
                   </View>
@@ -182,13 +194,16 @@ export default function PaymentScreen() {
                     placeholder="Enter coupon code"
                     placeholderTextColor={colors.mutedForeground}
                     value={couponInput}
-                    onChangeText={setCouponInput}
+                    onChangeText={(t) => { setCouponInput(t); setCouponError(null); }}
                     autoCapitalize="characters"
                   />
                   <Pressable onPress={() => handleApplyCoupon(couponInput)} style={[styles.applyBtn, { backgroundColor: colors.foreground }]}>
                     <Text style={{ color: colors.background, fontFamily: 'Inter_600SemiBold' }}>Apply</Text>
                   </Pressable>
                 </View>
+                {!!couponError && (
+                  <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 12, marginTop: 8 }}>{couponError}</Text>
+                )}
                 <Pressable onPress={() => setShowCoupons(!showCoupons)} style={{ marginTop: 12 }}>
                   <Text style={{ color: colors.blue, fontFamily: 'Inter_500Medium' }}>{showCoupons ? 'Hide available coupons' : 'View available coupons'}</Text>
                 </Pressable>
@@ -249,8 +264,8 @@ export default function PaymentScreen() {
           <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Transparent pricing — no surprises before you pay.</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.row}>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>Car Rental ({pricingQuote?.rentalDays || 1} days)</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency((pricingQuote?.rentalAmount || 0) - (pricingQuote?.driverCharge || 0))}</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular' }}>{selectedCar.type === 'Bike' ? 'Bike' : 'Car'} Rental ({pricingQuote?.rentalDays || 1} days)</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{formatCurrency(pricingQuote?.rentalAmount || 0)}</Text>
             </View>
 
             {pricingQuote && pricingQuote.driverCharge > 0 && (
@@ -340,7 +355,7 @@ export default function PaymentScreen() {
               import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_started', 'PaymentScreen', { amount: pricingQuote?.onlinePayableNow }));
               router.push('/payment-processing');
             }}
-            style={[styles.payButton, { flex: 1, backgroundColor: isQuoteLoading || isTripIncomplete ? colors.muted : colors.primary }]}
+            style={[styles.payButton, { flex: 1, backgroundColor: isQuoteLoading || isTripIncomplete || !pricingQuote ? colors.muted : colors.primary }]}
           >
             {isQuoteLoading ? (
               <ActivityIndicator color={colors.primaryForeground} />

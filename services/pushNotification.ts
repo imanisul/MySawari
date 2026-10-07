@@ -4,6 +4,10 @@ import { Platform } from 'react-native';
 import * as SecureStore from '@/utils/secureStore';
 import { BACKEND_URL } from '@/services/backend/api';
 import Constants from 'expo-constants';
+import { getSessionId } from '@/services/api/activity';
+
+// The token this install registered last, so logout can detach it from the account.
+let lastExpoPushToken: string | null = null;
 
 let Notifications: any = null;
 try {
@@ -68,6 +72,7 @@ export async function registerDeviceForPushNotifications(authToken?: string) {
     const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
     const expoPushToken = tokenData.data;
+    lastExpoPushToken = expoPushToken;
 
     // 4. Send it to your Customer Backend!
     const endpoint = authToken ? '/notifications/register-device' : '/notifications/register-anonymous-device';
@@ -78,7 +83,9 @@ export async function registerDeviceForPushNotifications(authToken?: string) {
       headers['Authorization'] = `Bearer ${authToken}`;
     }
 
-    const guestSessionId = await SecureStore.getItemAsync('guest_session_id');
+    // The guest session id lives in AsyncStorage (services/api/activity.ts), not SecureStore — reading it from
+    // SecureStore always returned null, so guest-targeted pushes never found this device.
+    const guestSessionId = await getSessionId().catch(() => null);
 
     await fetch(`${BACKEND_URL}${endpoint}`, {
       method: 'POST',
@@ -94,5 +101,25 @@ export async function registerDeviceForPushNotifications(authToken?: string) {
 
   } catch (error) {
     console.log("Failed to register device token or push notifications unsupported:", error);
+  }
+}
+
+/**
+ * Detaches this phone from the account on logout, so the next person using it never receives the previous
+ * customer's booking pushes. Must run while the auth token still exists. Best effort, never throws.
+ */
+export async function unregisterDeviceForPushNotifications(authToken: string | null) {
+  if (!authToken || !lastExpoPushToken) return;
+  try {
+    await Promise.race([
+      fetch(`${BACKEND_URL}/notifications/unregister-device`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ expoPushToken: lastExpoPushToken }),
+      }),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch (error) {
+    console.log('Failed to unregister push device:', error);
   }
 }

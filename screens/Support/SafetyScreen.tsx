@@ -4,6 +4,7 @@ import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { SUPPORT_PHONE } from '@/constants/support';
 
 export default function SafetyScreen() {
   const colors = useColors();
@@ -78,7 +79,7 @@ export default function SafetyScreen() {
             <Pressable 
               onPress={() => {
                 import('react-native').then(({ Linking }) => {
-                  Linking.openURL('tel:+911800123456');
+                  Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {});
                 });
               }}
               style={{

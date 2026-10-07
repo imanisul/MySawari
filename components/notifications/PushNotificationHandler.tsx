@@ -60,7 +60,8 @@ export function PushNotificationHandler() {
           }
         }).catch(() => router.push('/explore'));
       });
-    } else if (link) {
+    } else if (link && link.startsWith('/') && !link.startsWith('//')) {
+      // Only in-app routes; a push must never be able to send the app to an outside address.
       router.push(link as any);
     } else {
       router.push('/notifications');

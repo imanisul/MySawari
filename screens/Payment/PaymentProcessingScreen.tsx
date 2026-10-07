@@ -88,9 +88,22 @@ export default function PaymentProcessingScreen() {
 
   const completeBookingFlow = async (paymentDetails: { razorpayOrderId?: string, razorpayPaymentId?: string } | null) => {
     setStatus('VERIFYING');
+    // The confirm call is safe to repeat (the server answers "already confirmed"). A timeout or dropped
+    // connection — common while the server wakes up — does not mean it failed, so it is retried, never cancelled.
+    const isConnectionError = (e: any) => /connect|taking too long|network/i.test(String(e?.message || ''));
+    const confirmWithRetry = async () => {
+      for (let attempt = 1; ; attempt++) {
+        try {
+          return await confirmBookingPayment(paymentDetails || {}, holdId.current || undefined);
+        } catch (e: any) {
+          if (attempt >= 3 || !isConnectionError(e)) throw e;
+          await new Promise((r) => setTimeout(r, 2000 * attempt));
+        }
+      }
+    };
     try {
       // Step 3: Confirm Booking Payment securely
-      await confirmBookingPayment(paymentDetails || {}, holdId.current || undefined);
+      await confirmWithRetry();
       
       confirmBooking();
       setStatus('SUCCESS');
@@ -104,24 +117,15 @@ export default function PaymentProcessingScreen() {
       const reason = e.message || 'Failed to confirm booking';
       
       if (paymentDetails?.razorpayPaymentId) {
-        // Payment was successful but booking confirmation failed (e.g. car taken by someone else or network error)
-        // Automatically formally cancel the hold so the system processes the refund.
-        try {
-          if (holdId.current) {
-            await API.cancelBooking(holdId.current, 'Payment successful but booking confirmation failed');
-          }
-        } catch (cancelErr) {
-          // Backend might have already cancelled it
-        }
-        
+        // Money has moved. The app never cancels this booking itself: when the car was lost or the checkout
+        // had closed, the server has already cancelled the hold and handled the refund (its message says
+        // so), and when the server simply couldn't be reached the booking may well be confirmed.
         import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_failed', 'PaymentProcessingScreen', { reason, paymentId: paymentDetails?.razorpayPaymentId }));
 
-        setErrorMsg(`Your payment (${paymentDetails.razorpayPaymentId}) was received, but the booking could not be saved: ${reason}. It has been cancelled and a refund will be processed.`);
+        setErrorMsg(isConnectionError(e)
+          ? `Your payment (${paymentDetails.razorpayPaymentId}) was received, but we couldn't reach our server to confirm the booking. Please check My Bookings in a minute — if it isn't there, contact support with this payment ID.`
+          : `Your payment (${paymentDetails.razorpayPaymentId}) was received, but the booking could not be confirmed: ${reason}`);
         setStatus('ERROR');
-        
-        setTimeout(() => {
-          router.replace('/bookings');
-        }, 3500);
       } else {
         import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_failed', 'PaymentProcessingScreen', { reason }));
         setErrorMsg(reason);
@@ -162,11 +166,18 @@ export default function PaymentProcessingScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center' }]}>
         <Feather name="x-circle" size={48} color={colors.destructive} style={{ marginBottom: 16 }} />
-        <Text style={[styles.title, { color: colors.foreground }]}>Payment Failed</Text>
+        <Text style={[styles.title, { color: colors.foreground }]}>{paid.current ? 'Booking Not Confirmed' : 'Payment Failed'}</Text>
         <Text style={[styles.subtitle, { color: colors.mutedForeground, textAlign: 'center', marginHorizontal: 32 }]}>{errorMsg}</Text>
-        <Pressable onPress={handleCancel} style={[styles.btn, { backgroundColor: colors.primary, marginTop: 32 }]}>
-          <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>Back to Checkout</Text>
-        </Pressable>
+        {paid.current ? (
+          // Paid: going back to checkout would invite paying a second time.
+          <Pressable onPress={() => router.replace('/bookings')} style={[styles.btn, { backgroundColor: colors.primary, marginTop: 32 }]}>
+            <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>View My Bookings</Text>
+          </Pressable>
+        ) : (
+          <Pressable onPress={handleCancel} style={[styles.btn, { backgroundColor: colors.primary, marginTop: 32 }]}>
+            <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>Back to Checkout</Text>
+          </Pressable>
+        )}
       </View>
     );
   }
@@ -194,7 +205,7 @@ export default function PaymentProcessingScreen() {
 const styles = StyleSheet.create({
   screen: { alignItems: 'center', flex: 1, justifyContent: 'center' },
   razorpayMock: { padding: 32, backgroundColor: '#1A1A1A', borderRadius: 20, width: '85%', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 15, borderWidth: 1, borderColor: '#333' },
-  btn: { width: '100%', paddingVertical: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  btn: { alignSelf: 'stretch', marginHorizontal: 24, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
   title: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
   subtitle: { fontFamily: 'Inter_400Regular', fontSize: 15, marginTop: 8 },
 });

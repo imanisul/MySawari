@@ -74,6 +74,13 @@ export function PushNotificationHandler() {
       if (handled.current.has(key)) return;
       handled.current.add(key);
     }
+
+    if (fallbackKey) {
+      Notifications.dismissNotificationAsync?.(fallbackKey).catch(() => {});
+    } else if (key) {
+      Notifications.dismissNotificationAsync?.(key).catch(() => {});
+    }
+
     if (!latest.current.navReady) {
       pending.current = data || {}; // cold start: navigate once the app's screens exist
       return;

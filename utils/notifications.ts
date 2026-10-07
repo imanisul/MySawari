@@ -10,6 +10,7 @@ const mockNotifications = {
   getPermissionsAsync: async () => ({ status: 'granted' }),
   getExpoPushTokenAsync: async () => ({ data: 'mock-token' }),
   setNotificationHandler: () => {},
+  dismissNotificationAsync: async () => {},
 };
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;

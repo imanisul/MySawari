@@ -68,8 +68,6 @@ export function DatesSheet() {
   const [tempReturnTime, setTempReturnTime] = useState<string | null>(!freshPick && returnTime && returnTime !== '--:--' ? returnTime.replace(/^0/, '') : null);
   
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
-  const [hasAutoJumpedLate, setHasAutoJumpedLate] = useState(false);
-  const [showLateReturnModal, setShowLateReturnModal] = useState(false);
 
   const [currentMonth, setCurrentMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
 
@@ -115,7 +113,6 @@ export function DatesSheet() {
       setStart(date);
       setEnd(null);
       setTempReturnTime(null);
-      setHasAutoJumpedLate(false);
       return;
     }
     
@@ -126,17 +123,14 @@ export function DatesSheet() {
         setStart(date);
         setEnd(null);
         setTempReturnTime(null);
-        setHasAutoJumpedLate(false);
       } else if (date.getTime() === start.getTime()) {
         // Tapping the same start date again → deselect it entirely
         setStart(null);
         setEnd(null);
         setTempReturnTime(null);
-        setHasAutoJumpedLate(false);
       } else {
         // Picked a date after start, make it the end
         setEnd(date);
-        setHasAutoJumpedLate(false);
       }
       return;
     }
@@ -145,7 +139,6 @@ export function DatesSheet() {
     setStart(date);
     setEnd(null);
     setTempReturnTime(null);
-    setHasAutoJumpedLate(false);
   };
 
   const formatDateStr = (date: Date | null) => {
@@ -280,7 +273,6 @@ export function DatesSheet() {
                     
                     setTempPickupTime('8:00 AM');
                     setTempReturnTime('8:00 AM');
-                    setHasAutoJumpedLate(false);
                     
                     if (newEnd.getMonth() !== currentMonth.getMonth()) {
                        setCurrentMonth(new Date(newEnd.getFullYear(), newEnd.getMonth(), 1));
@@ -359,26 +351,7 @@ export function DatesSheet() {
                       return;
                     }
 
-                    if (start && effectiveEnd) {
-                      if (timeIndex > 16 && !hasAutoJumpedLate) {
-                        const newEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate() + 1);
-                        newEnd.setHours(0, 0, 0, 0);
-                        setEnd(newEnd);
-                        setHasAutoJumpedLate(true);
-                        setShowLateReturnModal(true);
-                        if (newEnd.getMonth() !== currentMonth.getMonth()) {
-                          setCurrentMonth(new Date(newEnd.getFullYear(), newEnd.getMonth(), 1));
-                        }
-                      } else if (timeIndex <= 16 && hasAutoJumpedLate) {
-                        const newEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate() - 1);
-                        newEnd.setHours(0, 0, 0, 0);
-                        setEnd(newEnd);
-                        setHasAutoJumpedLate(false);
-                        if (newEnd.getMonth() !== currentMonth.getMonth()) {
-                          setCurrentMonth(new Date(newEnd.getFullYear(), newEnd.getMonth(), 1));
-                        }
-                      }
-                    }
+
                     setTempReturnTime(time);
                   }}
                   style={[
@@ -489,28 +462,7 @@ export function DatesSheet() {
         </View>
       </Modal>
 
-      <Modal visible={showLateReturnModal} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 }}>
-          <View style={{ backgroundColor: colors.card, borderRadius: 24, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <Feather name="info" size={32} color={colors.primary} />
-            </View>
-            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Late Return</Text>
-            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
-              Our standard time is 8:00 AM to 8:00 AM. Selecting this time adds 1 extra day to your rental.
-            </Text>
-            
-            <View style={{ width: '100%', gap: 12 }}>
-              <Pressable 
-                onPress={() => setShowLateReturnModal(false)}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8 }}
-              >
-                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.primaryForeground }}>Understood</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+
     </SheetFrame>
   );
 }

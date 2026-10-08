@@ -43,7 +43,18 @@ export async function registerDeviceForPushNotifications(authToken?: string) {
     return;
   }
 
-  // 1. Request Permission
+  // 1. Android channel first (Android 8+). On Android 13+ the permission prompt is not shown at all until
+  // the app has a channel, so creating it after asking left new installs without notifications.
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'Default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: 'default',
+    });
+  }
+
+  // 2. Request Permission
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
   let finalStatus = existingStatus;
   
@@ -55,16 +66,6 @@ export async function registerDeviceForPushNotifications(authToken?: string) {
   if (finalStatus !== 'granted') {
     console.log('User denied push notification permissions!');
     return;
-  }
-
-  // 2. Setup Android Channel (Required for Android 8.0+)
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
   }
 
   try {

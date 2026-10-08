@@ -21,10 +21,14 @@
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
       "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
         "NSLocationWhenInUseUsageDescription": "MySawari uses your location to find nearby drivers and set pickup points.",
         "NSCameraUsageDescription": "MySawari uses your camera so you can take photos of your trip for reviews, and verify your identity or driver's license for rentals.",
         "NSPhotoLibraryUsageDescription": "MySawari uses your photo library so you can add trip photos to your reviews and upload documents for identity verification."
-      }
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "backgroundColor": "#FAFAF9",

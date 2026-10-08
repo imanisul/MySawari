@@ -42,3 +42,6 @@ yarn-error.*
 
 # Backend lives in its own repository: github.com/mysawari/mysawari_customer_backend
 /mysawari_customer_backend/
+
+# Firebase config (has the Android API key) — kept off GitHub; EAS still uploads it (.easignore does not list it)
+google-services.json

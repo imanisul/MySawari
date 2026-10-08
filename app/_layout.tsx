@@ -48,18 +48,7 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Register background handler for Firebase Cloud Messaging when the app is killed
-import Constants, { ExecutionEnvironment } from 'expo-constants';
-if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
-  try {
-    const messaging = require('@react-native-firebase/messaging').default;
-    messaging().setBackgroundMessageHandler(async (remoteMessage: any) => {
-      console.log('Message handled in the background!', remoteMessage);
-    });
-  } catch (error) {
-    console.log('Firebase messaging not available for background handler');
-  }
-}
+// The background / closed-app push handler is registered in index.js (it must run before the router loads).
 
 /** booting: splash stays up, nothing renders · ready: app is shown · error: fonts failed, app still opens on system fonts. */
 type AppStatus = 'booting' | 'ready' | 'error';

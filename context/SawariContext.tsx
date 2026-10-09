@@ -524,10 +524,17 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
 
+      let clearedDateStr = null;
+      try {
+        clearedDateStr = await AsyncStorage.getItem('@local_cleared_date');
+      } catch {}
+      const clearedDate = clearedDateStr ? new Date(clearedDateStr).getTime() : 0;
+
       const mapped = data
         .filter((n: any) => {
           if (!n.createdAt) return true;
-          return new Date(n.createdAt).getTime() >= installDate;
+          const time = new Date(n.createdAt).getTime();
+          return time >= installDate && time > clearedDate;
         })
         .map((n: any) => ({
           id: n.id,
@@ -770,6 +777,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       },
       clearAllNotifications: async () => {
         setNotifications([]);
+        setUnreadCount(0);
+        try {
+          await AsyncStorage.setItem('@local_cleared_date', new Date().toISOString());
+        } catch {}
         const { NotificationsAPI } = require('@/services/api/notifications');
         await NotificationsAPI.clearAll();
       },

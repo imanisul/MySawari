@@ -34,7 +34,7 @@
     "android": {
       "backgroundColor": "#FAFAF9",
       "package": "com.mysawari.customer",
-      "versionCode": 2,
+      "versionCode": 3,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_COARSE_LOCATION",

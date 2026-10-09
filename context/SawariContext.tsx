@@ -777,7 +777,6 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       },
       clearAllNotifications: async () => {
         setNotifications([]);
-        setUnreadCount(0);
         try {
           await AsyncStorage.setItem('@local_cleared_date', new Date().toISOString());
         } catch {}

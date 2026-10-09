@@ -70,8 +70,7 @@ export async function loadHomeData(
   const tasks: Promise<unknown>[] = [
     // staleTime 0 when only the saved copy is there, so a live fetch is made (or the running one joined).
     // Then the card photos, so Home opens with its pictures instead of grey placeholders.
-    step('vehicles', queryClient.fetchQuery({ ...vehiclesQueryOptions, staleTime: hasLiveVehicles() ? vehiclesQueryOptions.staleTime : 0 })
-      .then(() => waitForCardImages(CARD_IMAGES_MAX_WAIT_MS))),
+    step('vehicles', queryClient.fetchQuery({ ...vehiclesQueryOptions, staleTime: hasLiveVehicles() ? vehiclesQueryOptions.staleTime : 0 })),
     step('offers', queryClient.fetchQuery(offersQueryOptions)),
     // The bell's unread count is right from the first frame.
     ...(syncNotifications ? [syncNotifications().catch(() => {})] : []),

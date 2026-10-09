@@ -86,8 +86,6 @@
       "expo-secure-store",
       "expo-notifications",
       "@react-native-community/datetimepicker",
-      "@react-native-firebase/app",
-      "@react-native-firebase/messaging",
       [
         "expo-build-properties",
         {

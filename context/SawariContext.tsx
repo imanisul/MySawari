@@ -219,6 +219,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  // Latest notification sync + login state for the long-lived listeners below (registered once).
+  const liveRef = useRef<{ sync?: () => Promise<void>; authed: boolean | null }>({ authed: null });
+
   // --- Start Push Notification Listener ---
   useEffect(() => {
     const sub = Notifications.addNotificationReceivedListener((notification: any) => {
@@ -242,6 +245,17 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           ...prev,
         ];
       });
+
+      // The push is about something that just changed (trip started / completed, booking confirmed or
+      // cancelled, refund): the screens showing it update now instead of on their next timed refresh.
+      const { sync, authed } = liveRef.current;
+      if (authed && bookingId) {
+        queryClient.invalidateQueries({ queryKey: ['bookings'] });
+        invalidateWalletCache();
+        API.getWallet(true).then(applyWallet).catch(() => {});
+      }
+      // The server's copy (with its image / link) replaces the one built from the push.
+      sync?.().catch(() => {});
     });
     return () => sub.remove();
   }, []);
@@ -499,11 +513,34 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     }
   }, [quoteParams]);
 
+  // "Clear" hides everything up to the newest cleared notification's own (server) time, per account — the
+  // old single phone-clock date hid new notifications on a phone whose clock ran fast, and carried one
+  // account's clear over to the next person who logged in on the phone.
+  const clearedKey = `@notifications_cleared_${customer.id || 'guest'}`;
+  const clearedAtRef = useRef<{ key: string; at: number } | null>(null);
+  const readClearedAt = useCallback(async (key: string) => {
+    if (clearedAtRef.current?.key === key) return clearedAtRef.current.at;
+    let at = 0;
+    try {
+      const stored = await AsyncStorage.getItem(key);
+      // Older builds kept one phone-wide date; it still counts for the guest list it was made for.
+      const legacy = key.endsWith('_guest') ? await AsyncStorage.getItem('@local_cleared_date') : null;
+      at = Math.max(Number(stored) || 0, legacy ? new Date(legacy).getTime() || 0 : 0);
+    } catch {}
+    if (clearedAtRef.current?.key !== key) clearedAtRef.current = { key, at };
+    return clearedAtRef.current.at;
+  }, []);
+
+  // Only the newest sync may update the list: an older, slower reply (e.g. one started just before "Clear")
+  // must not bring cleared notifications back.
+  const notificationSyncSeq = useRef(0);
   const syncNotifications = useCallback(async () => {
     // Allowed for guests too, they just get 'all' targeted broadcast notifications
+    const seq = ++notificationSyncSeq.current;
     try {
       const { NotificationsAPI } = require('@/services/api/notifications');
       const data = await NotificationsAPI.getNotifications();
+      if (seq !== notificationSyncSeq.current) return;
       
       let installDateStr = null;
       try {
@@ -524,11 +561,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         } catch {}
       }
 
-      let clearedDateStr = null;
-      try {
-        clearedDateStr = await AsyncStorage.getItem('@local_cleared_date');
-      } catch {}
-      const clearedDate = clearedDateStr ? new Date(clearedDateStr).getTime() : 0;
+      const clearedDate = await readClearedAt(clearedKey);
+      if (seq !== notificationSyncSeq.current) return;
 
       const mapped = data
         .filter((n: any) => {
@@ -552,9 +586,27 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         return mapped.map((n: any) => ({ ...n, read: n.read || locallyRead.has(n.id) }));
       });
     } catch (e) {
+      // Network / server problem: the list on screen stays as it was.
       console.error('syncNotifications error:', e);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, clearedKey, readClearedAt]);
+
+  liveRef.current = { sync: syncNotifications, authed: isAuthenticated };
+
+  // Pushes that arrived while the app was in the background or closed never reach the listener above:
+  // coming back to the app picks them (and any booking status change) up.
+  useEffect(() => {
+    let previous = AppState.currentState;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && previous !== 'active') {
+        const { sync, authed } = liveRef.current;
+        sync?.().catch(() => {});
+        if (authed) queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      }
+      previous = state;
+    });
+    return () => sub.remove();
+  }, [queryClient]);
 
   const markNotificationRead = useCallback(async (id: string) => {
     // Optimistic UI update for instantaneous feedback
@@ -776,10 +828,16 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       },
       clearAllNotifications: async () => {
+        notificationSyncSeq.current++; // a sync already running must not put the old list back
+        // Everything up to the newest notification shown is cleared (its server time, not the phone's clock).
+        const newest = notifications.reduce((max, n) => Math.max(max, new Date(n.date).getTime() || 0), 0);
+        const clearedAt = Math.max(newest || Date.now(), clearedAtRef.current?.key === clearedKey ? clearedAtRef.current.at : 0);
+        clearedAtRef.current = { key: clearedKey, at: clearedAt };
         setNotifications([]);
-        try {
-          await AsyncStorage.setItem('@local_cleared_date', new Date().toISOString());
-        } catch {}
+        AsyncStorage.setItem(clearedKey, String(clearedAt)).catch(() => {});
+        // The ones still sitting in the phone's notification tray (and the app-icon badge) go too.
+        Notifications.dismissAllNotificationsAsync?.().catch(() => {});
+        Notifications.setBadgeCountAsync?.(0).catch(() => {});
         const { NotificationsAPI } = require('@/services/api/notifications');
         await NotificationsAPI.clearAll();
       },

@@ -30,10 +30,11 @@ export const NotificationsAPI = {
           createdAt: n.createdAt
         }));
       }
-      return [];
+      throw new Error(data?.message || `Could not load notifications (${res.status})`);
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      return [];
+      // Thrown, not []: an empty list here wiped the notifications on screen whenever one refresh failed.
+      throw error;
     }
   },
 
@@ -52,11 +53,15 @@ export const NotificationsAPI = {
 
   clearAll: async (): Promise<boolean> => {
     try {
+      // A guest's own notifications are found by this install's session id, so the clear needs it too.
+      let guestSession = '';
+      try { guestSession = await getSessionId(); } catch {}
       const res = await fetchWithAuth(`${BACKEND_URL}/notifications`, {
-        method: 'DELETE'
+        method: 'DELETE',
+        headers: guestSession ? { 'X-Guest-Session': guestSession } : {},
       });
-      const data = await res.json();
-      return !!data.success;
+      const data = await res.json().catch(() => ({}));
+      return res.ok && !!data.success;
     } catch (error) {
       console.error('Error clearing notifications:', error);
       return false;

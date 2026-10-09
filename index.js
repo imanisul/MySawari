@@ -22,26 +22,7 @@ if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
     Notifications = null;
   }
 
-  try {
-    const messaging = require('@react-native-firebase/messaging').default;
-    // Background / closed app. A push with a `notification` part is shown by Android itself; a data-only
-    // push is not, so it is shown here (same as the operations app).
-    messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-      if (!Notifications || remoteMessage?.notification || !remoteMessage?.data) return;
-      const { title, body } = remoteMessage.data;
-      if (!title && !body) return;
-      try {
-        await Notifications.scheduleNotificationAsync({
-          content: { title: String(title || 'MySawari'), body: String(body || ''), data: remoteMessage.data, sound: 'default' },
-          trigger: null,
-        });
-      } catch (e) {
-        console.warn('Background notification failed', e);
-      }
-    });
-  } catch (e) {
-    console.log('Firebase messaging not available for background handler');
-  }
-}
+  // Removed @react-native-firebase/messaging conflict.
+  // expo-notifications will handle background pushes natively.
 
 require('expo-router/entry');

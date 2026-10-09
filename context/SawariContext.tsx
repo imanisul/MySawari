@@ -14,16 +14,7 @@ import { getDevicePosition } from '@/utils/location';
 import { calculateDistanceKm } from '@/services/backend/pricingEngine';
 import { registerDeviceForPushNotifications, unregisterDeviceForPushNotifications } from '@/services/pushNotification';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
-
-let messaging: any = null;
-if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
-  try {
-    messaging = require('@react-native-firebase/messaging').default;
-  } catch (e) {
-    console.warn("Firebase messaging not available");
-  }
-}
-
+// Removed @react-native-firebase/messaging completely to allow expo-notifications to handle background pushes
 export type PaymentMethod = string;
 export type BookingStatus = 'upcoming' | 'active' | 'completed' | 'cancelled';
 
@@ -413,10 +404,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
 
             // Booking pushes (confirmed / trip started / cancelled) go to the customer_<mobile> topic. It was
             // only joined at login, so a reinstall or a new Firebase token on a saved session lost them.
-            if (messaging && userProfile.mobile) {
-              const topicMobile = String(userProfile.mobile).replace(/[^a-zA-Z0-9-_.~%]/g, '');
-              messaging().subscribeToTopic(`customer_${topicMobile}`).catch(() => {});
-            }
+            // (Removed Firebase Topic subscription logic to let expo-notifications handle pushes)
             
             // Load other data concurrently
             const [storedRewards, storedBookings] = await Promise.all([
@@ -464,20 +452,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!isAuthLoading) {
       registerDeviceForPushNotifications();
-      // Subscribe to global topic for broadcasts
-      if (messaging) {
-        messaging().requestPermission().then(() => {
-          messaging().subscribeToTopic('all_customers');
-        }).catch((err: any) => console.warn('Global FCM subscription failed', err));
-
-        // Someone who hasn't logged in still gets pushes picked from what they browse, on this install's
-        // own topic. Once logged in they get them on their account's topic instead.
-        import('@/services/api/activity').then(({ getSessionId }) => getSessionId()).then((sessionId) => {
-          if (!sessionId) return;
-          const topic = `customer_guest_${sessionId.replace(/[^a-zA-Z0-9-_.~%]/g, '')}`;
-          return isAuthenticated ? messaging().unsubscribeFromTopic(topic) : messaging().subscribeToTopic(topic);
-        }).catch(() => {});
-      }
+      // (Removed global FCM topic subscription logic to let expo-notifications handle pushes)
     }
   }, [isAuthLoading, isAuthenticated]);
 
@@ -853,12 +828,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           API.getWallet(true).then(applyWallet).catch(() => {});
 
           const sanitizedMobile = String(newCustomer.mobile || '').replace(/[^a-zA-Z0-9-_.~%]/g, '');
-          if (messaging && sanitizedMobile) {
-            messaging().requestPermission()
-              .then(() => messaging().subscribeToTopic(`customer_${sanitizedMobile}`))
-              .then(() => { if (__DEV__) console.log(`Subscribed to topic: customer_${sanitizedMobile}`); })
-              .catch((fcmError: any) => console.warn('FCM Topic Subscription Failed:', fcmError));
-          }
+          // (Removed FCM Topic Subscription Failed logic to let expo-notifications handle pushes)
 
           import('@/services/api/activity').then(({ ActivityAPI }) => {
             ActivityAPI.logActivity('AUTH_LOGIN', 'System', { userId: user.id });
@@ -893,10 +863,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           if (customer?.mobile) {
             try {
               const sanitizedMobile = customer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');
-            if (messaging) {
-              await messaging().unsubscribeFromTopic(`customer_${sanitizedMobile}`);
-            }
-              if (__DEV__) console.log(`Unsubscribed from topic: customer_${sanitizedMobile}`);
+              // (Removed FCM Topic Unsubscribe Failed logic to let expo-notifications handle pushes)
             } catch (fcmError) {
               console.warn('FCM Topic Unsubscribe Failed:', fcmError);
             }

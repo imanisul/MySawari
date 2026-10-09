@@ -2,7 +2,7 @@
   "expo": {
     "name": "MySawari",
     "slug": "car-rental-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/MySawari.png",
     "scheme": "car-rental-mobile",
@@ -17,6 +17,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.mysawari.customer",
+      "buildNumber": "2",
       "backgroundColor": "#FAFAF9",
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
@@ -33,6 +34,7 @@
     "android": {
       "backgroundColor": "#FAFAF9",
       "package": "com.mysawari.customer",
+      "versionCode": 2,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_COARSE_LOCATION",

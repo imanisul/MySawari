@@ -10,7 +10,7 @@ LogBox.ignoreLogs([
 
 import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
 import { AppState } from 'react-native';
-import { primeVehicles, useVehicles } from '@/hooks/useVehicles';
+import { primeVehicles, useVehicles, hasLiveVehicles } from '@/hooks/useVehicles';
 import { loadHomeData, homeLoadSteps, HomeLoadStep } from '@/hooks/useHomeData';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -249,7 +249,7 @@ function AppGate({
   children: React.ReactNode;
   fontError: boolean;
 }) {
-  const { isAuthLoading, isAuthenticated, fetchWallet, customer } = useSawari();
+  const { isAuthLoading, isAuthenticated, fetchWallet, syncNotifications, customer } = useSawari();
   const vehicles = useVehicles();
   const client = useQueryClient();
 
@@ -268,7 +268,7 @@ function AppGate({
     let cancelled = false;
     setLoadSteps(homeLoadSteps(!!isAuthenticated));
     loadHomeData(client, {
-      isAuthenticated: !!isAuthenticated, fetchWallet, userId: customer?.id,
+      isAuthenticated: !!isAuthenticated, fetchWallet, syncNotifications, userId: customer?.id,
       onStep: (key) => { if (!cancelled) setLoadSteps((prev) => prev.map((s) => (s.key === key ? { ...s, done: true } : s))); },
     })
       .finally(() => { if (!cancelled) setHomeDataReady(true); });
@@ -276,7 +276,10 @@ function AppGate({
     // Runs once per launch (and again on Retry); later sign-ins / refreshes are handled by the screens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthLoading, loadRun]);
-  const vehiclesLoaded = homeDataReady && vehicles.data !== undefined;
+  // Ready only with the live fleet from the server — the copy saved on the phone (shown instantly to
+  // the screens underneath) can be out of date, so it never ends the loading screen on its own.
+  const liveVehicles = hasLiveVehicles() && vehicles.data !== undefined;
+  const vehiclesLoaded = homeDataReady && liveVehicles;
   const colors = useColors();
   const splashHidden = useRef(false);
 
@@ -301,7 +304,7 @@ function AppGate({
       <AnimatedSplash
         isReady={status === 'ready' || status === 'error'}
         isDataReady={vehiclesLoaded}
-        loadFailed={homeDataReady && vehicles.data === undefined && vehicles.isError && !vehicles.isFetching}
+        loadFailed={homeDataReady && !liveVehicles}
         onRetry={() => { setHomeDataReady(false); setLoadRun((n) => n + 1); }}
         steps={loadSteps}
       >

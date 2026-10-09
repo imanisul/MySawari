@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { offersQueryOptions } from '@/services/api/offers';
-import { vehiclesQueryOptions, hasLiveVehicles } from '@/hooks/useVehicles';
+import { vehiclesQueryOptions, hasLiveVehicles, waitForCardImages } from '@/hooks/useVehicles';
 import { getRecentSearches } from '@/utils/recentSearches';
 import { getRecentlyViewed } from '@/utils/recentlyViewed';
 
@@ -31,8 +31,12 @@ export const bookingsQueryOptions = {
   refetchOnWindowFocus: true,
 };
 
-// The loading screen never waits longer than this; anything still missing then loads on the Home screen.
-const HOME_DATA_MAX_WAIT_MS = 4 * 1000;
+// Safety net only: every request has its own timeout and retries, and the loading screen offers
+// Retry / Continue after a few seconds of waiting. (It used to give up after 4 s, so Home often opened on the
+// saved copy of the fleet with offers, trips, wallet and photos still popping in afterwards.)
+const HOME_DATA_MAX_WAIT_MS = 45 * 1000;
+// Card photos are plate-processed on the server; after a deploy that can be slow, so they get a shorter wait.
+const CARD_IMAGES_MAX_WAIT_MS = 8 * 1000;
 
 export type HomeLoadStep = { key: 'vehicles' | 'offers' | 'trips' | 'wallet'; label: string; done: boolean };
 
@@ -57,16 +61,20 @@ export function homeLoadSteps(isAuthenticated: boolean): HomeLoadStep[] {
  */
 export async function loadHomeData(
   queryClient: QueryClient,
-  { isAuthenticated, fetchWallet, userId, onStep }: {
-    isAuthenticated: boolean; fetchWallet: () => Promise<void>; userId?: string | null;
-    onStep?: (key: HomeLoadStep['key']) => void;
+  { isAuthenticated, fetchWallet, syncNotifications, userId, onStep }: {
+    isAuthenticated: boolean; fetchWallet: () => Promise<void>; syncNotifications?: () => Promise<void>;
+    userId?: string | null; onStep?: (key: HomeLoadStep['key']) => void;
   },
 ): Promise<void> {
   const step = <T,>(key: HomeLoadStep['key'], p: Promise<T>) => p.finally(() => onStep?.(key));
   const tasks: Promise<unknown>[] = [
     // staleTime 0 when only the saved copy is there, so a live fetch is made (or the running one joined).
-    step('vehicles', queryClient.fetchQuery({ ...vehiclesQueryOptions, staleTime: hasLiveVehicles() ? vehiclesQueryOptions.staleTime : 0 })),
+    // Then the card photos, so Home opens with its pictures instead of grey placeholders.
+    step('vehicles', queryClient.fetchQuery({ ...vehiclesQueryOptions, staleTime: hasLiveVehicles() ? vehiclesQueryOptions.staleTime : 0 })
+      .then(() => waitForCardImages(CARD_IMAGES_MAX_WAIT_MS))),
     step('offers', queryClient.fetchQuery(offersQueryOptions)),
+    // The bell's unread count is right from the first frame.
+    ...(syncNotifications ? [syncNotifications().catch(() => {})] : []),
     queryClient.fetchQuery(recentSearchesQueryOptions(isAuthenticated ? userId : null)),
     queryClient.fetchQuery(recentlyViewedQueryOptions(isAuthenticated ? userId : null)),
   ];

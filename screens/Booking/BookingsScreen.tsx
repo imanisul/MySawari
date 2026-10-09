@@ -53,7 +53,8 @@ export default function BookingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (isAuthenticated) refetch();
+      // Joins a request already running (e.g. the first load) instead of cancelling it and starting over.
+      if (isAuthenticated) refetch({ cancelRefetch: false });
     }, [isAuthenticated, refetch])
   );
 
@@ -135,7 +136,7 @@ export default function BookingsScreen() {
             <BookingSkeleton index={1} />
             <BookingSkeleton index={2} />
           </Reanimated.View>
-        ) : fetchError ? (
+        ) : fetchError && bookings.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={[styles.emptyCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Feather name="alert-circle" size={24} color={colors.destructive} />

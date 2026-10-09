@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LoadingImage } from '@/components/common/LoadingImage';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -29,7 +30,9 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
       }}
       style={({ pressed }) => [styles.carTile, pressed && styles.cardPressed]}
     >
-      <Image source={car.image} resizeMode="cover" style={styles.carImage} />
+      <View style={[styles.carImage, { overflow: 'hidden' }]}>
+        <LoadingImage source={car.image} contentFit="cover" style={StyleSheet.absoluteFill} />
+      </View>
       <View style={[styles.carTileCopy]}>
         <View style={styles.carHeader}>
           <Text numberOfLines={1} style={[styles.carName, { color: colors.foreground }]}>

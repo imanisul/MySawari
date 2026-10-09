@@ -18,20 +18,34 @@ const STORAGE_KEY = '@vehicles_cache_v2';
 let liveVehiclesAt = 0;
 export const hasLiveVehicles = () => liveVehiclesAt > 0;
 
+// Each photo is asked for once per app session (the saved copy and the live list carry the same URLs).
+const prefetchedImages = new Set<string>();
+// Settles when every card photo asked for so far has downloaded (or failed) — the loading screen waits on it.
+let cardImagesPromise: Promise<unknown> = Promise.resolve();
+
+/** Resolves once the vehicle card photos are on the device, or after `maxWaitMs` — never rejects. */
+export function waitForCardImages(maxWaitMs: number): Promise<void> {
+  return Promise.race([
+    cardImagesPromise.then(() => undefined, () => undefined),
+    new Promise<void>((resolve) => setTimeout(resolve, maxWaitMs)),
+  ]);
+}
+
+/**
+ * Warms only the card photo of each vehicle. Every photo is plate-processed by the backend (CPU-heavy, two at
+ * a time), so prefetching every gallery photo of the whole fleet at launch queued dozens of jobs ahead of the
+ * cards on screen and slowed the API (login, bookings) running on the same server. Gallery photos load when
+ * the vehicle is opened.
+ */
 function prefetchVehicleImages(vehicles: any[]) {
   try {
-    const urlsToPrefetch: string[] = [];
-    vehicles.forEach(car => {
-      if (car.image && typeof car.image === 'string') urlsToPrefetch.push(car.image);
-      if (car.images && Array.isArray(car.images)) {
-        car.images.forEach((img: any) => {
-          if (typeof img === 'string') urlsToPrefetch.push(img);
-        });
-      }
-    });
-    const uniqueUrls = [...new Set(urlsToPrefetch)].filter(Boolean);
+    const uniqueUrls = vehicles
+      .map((car) => car?.image)
+      .filter((url): url is string => typeof url === 'string' && !!url && !prefetchedImages.has(url));
     if (uniqueUrls.length > 0) {
-      Image.prefetch(uniqueUrls);
+      uniqueUrls.forEach((url) => prefetchedImages.add(url));
+      const batch = Image.prefetch(uniqueUrls, 'memory-disk').catch(() => false);
+      cardImagesPromise = Promise.all([cardImagesPromise, batch]);
     }
   } catch (e) {
     console.warn('Failed to prefetch images', e);

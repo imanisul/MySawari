@@ -35,16 +35,20 @@ export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id?: string }>();
 
   // From the shared bookings list (usually already loaded, so it opens instantly); refreshed on focus.
-  const { data: allBookings, isLoading: listLoading, isError: listFailed, refetch: refetchBookings } = useQuery({
+  const { data: allBookings, isLoading: listLoading, isFetching: listFetching, isError: listFailed, refetch: refetchBookings } = useQuery({
     ...bookingsQueryOptions,
     enabled: !!id,
   });
   // A cancel / extend answer from the sheets shows straight away, before the list catches up.
   const [updated, setUpdated] = useState<BookingSnapshot | null>(null);
+  // Once the refreshed list arrives it is the truth again (later status changes from the ops team show).
+  useEffect(() => { setUpdated(null); }, [allBookings]);
   const snapshot: BookingSnapshot | null = updated && updated.id === id ? updated : (allBookings || []).find((b) => b.id === id) || null;
-  const loading = !!id && listLoading && !snapshot;
-  const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); };
-  useFocusEffect(React.useCallback(() => { if (id) refetchBookings(); }, [id, refetchBookings]));
+  // A trip opened from a notification may be newer than the cached list: wait for the refresh
+  // instead of flashing "Booking not found".
+  const loading = !!id && !snapshot && (listLoading || listFetching);
+  const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); }; // a fresh request: one already running predates the change
+  useFocusEffect(React.useCallback(() => { if (id) refetchBookings({ cancelRefetch: false }); }, [id, refetchBookings]));
   const [showCancel, setShowCancel] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);

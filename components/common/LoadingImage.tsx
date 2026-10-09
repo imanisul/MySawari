@@ -47,7 +47,10 @@ export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageP
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   let optimizedSource = optimizeCloudinaryUrl(props.source);
-  
+  // Keyed on the photo itself, not the retry URL below: keying on that reset `attempt` to 0 on every retry,
+  // so a failing photo re-requested forever every 2 s and never showed the "unavailable" placeholder.
+  const sourceKey = JSON.stringify(optimizedSource ?? null);
+
   // Cache busting: append a retry query string so expo-image refetches the file without destroying the view.
   if (attempt > 0 && typeof optimizedSource === 'string') {
     optimizedSource = `${optimizedSource}${optimizedSource.includes('?') ? '&' : '?'}retry=${attempt}`;
@@ -55,7 +58,6 @@ export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageP
     optimizedSource = { ...optimizedSource, uri: `${optimizedSource.uri}${optimizedSource.uri.includes('?') ? '&' : '?'}retry=${attempt}` };
   }
 
-  const sourceKey = JSON.stringify(optimizedSource ?? null);
   useEffect(() => {
     setReady(false);
     setFailed(false);

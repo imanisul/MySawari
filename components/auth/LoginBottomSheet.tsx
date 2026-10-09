@@ -63,16 +63,11 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
       const { token, refreshToken, user } = await API.verifyOtp(mobile, otp, finalName, isExistingUser ? '' : referralCode);
       await login(token, refreshToken, user);
       
-      // Request Notifications Permission Just-In-Time
-      try {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        if (existingStatus !== 'granted') {
-          await Notifications.requestPermissionsAsync();
-        }
-      } catch (error) {
-        console.warn('Failed to request notification permission:', error);
-      }
-      
+      // Request Notifications Permission Just-In-Time — without holding the sheet open until it is answered.
+      Notifications.getPermissionsAsync()
+        .then(({ status }: { status: string }) => (status !== 'granted' ? Notifications.requestPermissionsAsync() : null))
+        .catch((error: any) => console.warn('Failed to request notification permission:', error));
+
       onClose();
       // After the modal is closed, continue the interrupted flow
       // (e.g. navigate to search, booking, membership, etc.)

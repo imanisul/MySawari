@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -28,7 +29,9 @@ export function NextTrip({ car, vehicleName, dateRangeStr, label = 'Your next tr
       ]}
     >
       {car?.image ? (
-        <Image source={car.image} resizeMode="cover" style={styles.tripImage} />
+        <View style={[styles.tripImage, { overflow: 'hidden' }]}>
+          <LoadingImage source={car.image} contentFit="cover" style={StyleSheet.absoluteFill} />
+        </View>
       ) : (
         <View style={[styles.tripImage, { backgroundColor: colors.tintLight, alignItems: 'center', justifyContent: 'center' }]}>
           <Feather name="truck" size={28} color={colors.primaryText} />

@@ -1099,11 +1099,13 @@ export const API = {
       });
     } catch (e: any) {
       console.error('getAllBookings error:', e);
-      return [];
+      // Thrown, not []: an empty list here replaced the customer's real trips with "No upcoming trips"
+      // whenever one refresh failed. React Query keeps the last good list and the screens offer a retry.
+      throw e;
     }
   },
 
-  async cancelBooking(id: string, reason?: string): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
+  async cancelBooking(id: string, reason?: string, existing?: BookingSnapshot): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${id}/cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1113,9 +1115,10 @@ export const API = {
     if (!response.ok) throw new Error(data.message || 'Failed to cancel booking');
     invalidateWalletCache(); // cancelled bookings can refund SawariCash
 
-    const existing = await this.getBooking(id);
+    // The cancel has already gone through: a failed re-read of the list must not turn it into an error.
+    const base = existing || (await this.getBooking(id).catch(() => null));
     const snapshot: BookingSnapshot = {
-      ...(existing as BookingSnapshot),
+      ...(base as BookingSnapshot),
       status: 'CANCELLED',
       cancellationReason: data.data.cancellationReason,
       cancellationFee: data.data.cancellationFee,

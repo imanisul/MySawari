@@ -26,7 +26,7 @@ export function CancelBookingSheet({ visible, onClose, booking, onSuccess }: { v
   const handleCancel = async () => {
     setLoading(true);
     try {
-      const response = await API.cancelBooking(booking.id, 'Change of plans');
+      const response = await API.cancelBooking(booking.id, 'Change of plans', booking);
       if (response.success) {
         if (refund > 0) {
           await API.requestRefund({

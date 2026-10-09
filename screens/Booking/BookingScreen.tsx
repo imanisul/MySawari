@@ -15,6 +15,7 @@ import { StatusBarScrim } from '@/components/common/StatusBarScrim';
 import { rise } from '@/components/common/motion';
 import { API } from '@/services/backend/api';
 import { ActivityAPI } from '@/services/api/activity';
+import { useVehicles } from '@/hooks/useVehicles';
 
 export default function BookingScreen() {
   useTrackTripProgress('booking'); // Recent searches resume this trip on this page
@@ -62,7 +63,11 @@ export default function BookingScreen() {
   const isMissingDestination = !dropoff?.name;
   
   const [startStr, endStr] = (dateRange || '').split(' – ');
-  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(selectedCar, startStr, endStr);
+  // Checked against the live fleet (refreshed every few minutes), not the copy of the car saved when it was
+  // tapped — that copy missed bookings made since, and the clash only surfaced after payment.
+  const { data: liveVehicles } = useVehicles();
+  const liveCar = liveVehicles?.find((v) => v.id === selectedCar.id) || selectedCar;
+  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr);
 
   const validateAndProceed = () => {
     if (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) {

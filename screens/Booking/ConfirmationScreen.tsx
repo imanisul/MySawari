@@ -1,5 +1,6 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -39,7 +40,9 @@ export default function ConfirmationScreen() {
             <Text style={[styles.reference, { color: colors.foreground }]}>{lastBooking?.bookingCode || '—'}</Text>
           </View>
           <View style={[styles.carRow, { borderTopColor: colors.border }]}>
-            <Image source={selectedCar.image} resizeMode="cover" style={styles.carImage} />
+            <View style={[styles.carImage, { overflow: 'hidden' }]}>
+              <LoadingImage source={selectedCar.image} contentFit="cover" style={StyleSheet.absoluteFill} />
+            </View>
             <View>
               <Text style={[styles.carName, { color: colors.foreground }]}>{lastBooking?.vehicleName || selectedCar.name}</Text>
               <Text style={[styles.carMode, { color: colors.mutedForeground }]}>{lastBooking?.driverMode === 'with-driver' ? 'With Driver' : 'Self Drive'}</Text>

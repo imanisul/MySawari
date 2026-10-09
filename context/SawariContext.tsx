@@ -839,33 +839,33 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           // and nothing in the app reads it back from this cache, so it's kept in memory only, never persisted.
           const { license: _license, ...cacheableCustomer } = newCustomer;
           await AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(cacheableCustomer));
-          
-          // SET CASH AND REWARDS DIRECTLY FROM BACKEND
-          applyWallet(await API.getWallet(true));
 
           const rewards = user.rewards || [];
           setEarnedRewards(rewards);
-          await AsyncStorage.setItem(`@earned_rewards_${user.id}`, JSON.stringify(rewards));
+          AsyncStorage.setItem(`@earned_rewards_${user.id}`, JSON.stringify(rewards)).catch(() => {});
 
-          try {
-            const sanitizedMobile = newCustomer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');
-          if (messaging) {
-            await messaging().requestPermission();
-            await messaging().subscribeToTopic(`customer_${sanitizedMobile}`);
+          // Signed in as soon as the session is saved. The wallet request and the push-topic subscription
+          // (a permission prompt plus a call to Firebase) used to be awaited here, holding the login
+          // spinner for several seconds — or much longer on a slow network. They now finish in the background.
+          setIsAuthenticated(true);
+
+          invalidateWalletCache();
+          API.getWallet(true).then(applyWallet).catch(() => {});
+
+          const sanitizedMobile = String(newCustomer.mobile || '').replace(/[^a-zA-Z0-9-_.~%]/g, '');
+          if (messaging && sanitizedMobile) {
+            messaging().requestPermission()
+              .then(() => messaging().subscribeToTopic(`customer_${sanitizedMobile}`))
+              .then(() => { if (__DEV__) console.log(`Subscribed to topic: customer_${sanitizedMobile}`); })
+              .catch((fcmError: any) => console.warn('FCM Topic Subscription Failed:', fcmError));
           }
-            if (__DEV__) console.log(`Subscribed to topic: customer_${sanitizedMobile}`);
-          } catch (fcmError) {
-            console.warn('FCM Topic Subscription Failed:', fcmError);
-          }
-          
+
           import('@/services/api/activity').then(({ ActivityAPI }) => {
             ActivityAPI.logActivity('AUTH_LOGIN', 'System', { userId: user.id });
           });
           // Trips searched as a guest on this phone stay in their recent searches.
           import('@/utils/recentSearches').then(({ adoptGuestSearches }) => adoptGuestSearches(String(user.id))).catch(() => {});
           import('@/utils/recentlyViewed').then(({ adoptGuestViewed }) => adoptGuestViewed(String(user.id))).catch(() => {});
-
-          setIsAuthenticated(true);
         } catch (e) {
           console.error(e);
         }

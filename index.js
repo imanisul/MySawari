@@ -24,5 +24,6 @@ if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
 
   // Removed @react-native-firebase/messaging conflict.
   // expo-notifications will handle background pushes natively.
+}
 
 require('expo-router/entry');

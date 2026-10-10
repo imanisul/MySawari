@@ -29,6 +29,10 @@ export function DetailsTabs({
   const [internalActiveTab, setInternalActiveTab] = useState<DetailsTab>('about');
   const activeTab = controlledActiveTab ?? internalActiveTab;
 
+  // Preload reviews in the background the moment the details screen opens. 
+  // This makes switching to the Gallery or Reviews tab completely instant.
+  useCarReviews(car.id);
+
   const handleTabPress = (tab: DetailsTab) => {
     Haptics.selectionAsync();
     setInternalActiveTab(tab);

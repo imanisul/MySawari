@@ -47,7 +47,7 @@ export default function PaymentScreen() {
   const useCash = sawariCashToApply > 0;
 
   useEffect(() => {
-    // Fetch coupons
+    // Fetch coupons (likely already cached from startup warm-up, so this is instant)
     API.getCoupons().then(res => setAvailableCoupons(res)).catch(() => setAvailableCoupons([]));
   }, []);
 
@@ -229,11 +229,13 @@ export default function PaymentScreen() {
             )}
           </View>
 
-          {/* SAWARI CASH */}
+          {/* SAWARI CASH — separate and clearly labeled section */}
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>SawariCash</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Use your earned credits to reduce the advance.</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
             <View>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Use SawariCash</Text>
-              <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>Available Balance: ₹{sawariCash}</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Apply SawariCash</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>Balance: ₹{sawariCash.toFixed(0)}</Text>
             </View>
             <Switch
               value={useCash}

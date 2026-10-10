@@ -630,10 +630,18 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, [isAuthenticated]);
 
-  // Refresh quote whenever dependencies change
+  // Refresh quote whenever dependencies change — debounced so rapid changes
+  // (date selection, location pick, mode toggle) don't each fire a network call.
   useEffect(() => {
-    refreshQuote();
+    const t = setTimeout(() => { refreshQuote(); }, 300);
+    return () => clearTimeout(t);
   }, [refreshQuote]);
+
+  // Pre-warm the coupon list at startup so the payment screen's coupon section
+  // shows available deals instantly without an extra network round-trip.
+  useEffect(() => {
+    import('@/services/backend/api').then(({ API }) => { API.getCoupons().catch(() => {}); });
+  }, []);
 
   const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 

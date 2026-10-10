@@ -137,8 +137,12 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
     <Modal visible={visible} transparent animationType="fade">
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.overlay}>
-          {/* Background dismiss */}
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+          {/* Background dismiss — only allowed on step 1 (mobile entry), never while loading */}
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            activeOpacity={1}
+            onPress={() => { if (step === 1 && !loading) onClose(); }}
+          />
           
           <KeyboardAvoidingView 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
@@ -199,7 +203,7 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
                 </View>
               )}
 
-              {/* Step 2: OTP */}
+              {/* Step 2: OTP — auto-submits on 4 digits so the user never has to tap Verify */}
               {step === 2 && (
                 <>
                   <View style={[styles.inputBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
@@ -210,8 +214,35 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
                       keyboardType="number-pad"
                       maxLength={4}
                       value={otp}
-                      onChangeText={setOtp}
+                      onChangeText={(t) => {
+                        setOtp(t);
+                        // Auto-verify the moment all 4 digits are typed
+                        if (t.length === 4 && !loading) {
+                          if (isExistingUser) {
+                            // performLogin reads `otp` state, so pass the fresh value directly
+                            (async () => {
+                              try {
+                                setLoading(true);
+                                const { token, refreshToken, user } = await API.verifyOtp(mobile, t, '', '');
+                                await login(token, refreshToken, user);
+                                Notifications.getPermissionsAsync()
+                                  .then(({ status }: { status: string }) => (status !== 'granted' ? Notifications.requestPermissionsAsync() : null))
+                                  .catch(() => {});
+                                onClose();
+                                if (onLoginSuccess) setTimeout(() => onLoginSuccess(), 300);
+                              } catch (e: any) {
+                                Alert.alert('Error', e.message || 'Invalid OTP');
+                              } finally {
+                                setLoading(false);
+                              }
+                            })();
+                          } else {
+                            setStep(3);
+                          }
+                        }
+                      }}
                       autoFocus
+                      editable={!loading}
                     />
                   </View>
                   
@@ -285,6 +316,10 @@ export function LoginBottomSheet({ visible, onClose, onLoginSuccess }: { visible
               </Text>
               
             </Animated.View>
+            {/* Full-sheet loading overlay — prevents double-taps while the API request is in flight */}
+            {loading && (
+              <View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', borderTopLeftRadius: 24, borderTopRightRadius: 24, backgroundColor: 'transparent' }]} pointerEvents="box-only" />
+            )}
           </KeyboardAvoidingView>
         </View>
       </TouchableWithoutFeedback>

@@ -269,7 +269,7 @@ const COUPON_TTL_MS = 5 * 60 * 1000;
 
 // Wallet balance cache (cleared whenever the balance can change: booking, cancel, reward).
 let walletCache: { at: number; data: any } | null = null;
-const WALLET_TTL_MS = 20 * 1000;
+const WALLET_TTL_MS = 3 * 60 * 1000; // 3 min — wallet doesn't need sub-second freshness on the checkout page
 export function invalidateWalletCache() {
   walletCache = null;
 }
@@ -622,24 +622,23 @@ export const API = {
    * POST /api/bookings/quote
    */
   async quoteBooking(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<PricingQuote> {
-    // Fetch the user's SawariCash balance and membership securely
+    // Fetch wallet and coupons in parallel — they don't depend on each other
     let availableSawariCash = 0;
     let membership: QuoteParams['membership'] = null;
-    try {
-      const walletData = await this.getWallet();
-      availableSawariCash = walletData?.walletBalance || 0;
-      if (walletData?.membership) {
+    const [walletData] = await Promise.all([
+      this.getWallet().catch(() => null),
+      // Pre-warm the coupon cache so applyCoupon() is instant; result not needed here
+      params.couponCode ? this.getCoupons().catch(() => []) : Promise.resolve([]),
+    ]);
+    if (walletData && !walletData.failed) {
+      availableSawariCash = walletData.walletBalance || 0;
+      if (walletData.membership) {
         membership = {
           plan: walletData.membership.plan,
           totalSaved: walletData.membership.totalSaved || 0,
           expiresAt: walletData.membership.expiresAt,
         };
       }
-    } catch(e) {}
-
-    // Price a coupon with the server's own list, so the discount shown is the one the booking gets.
-    if (params.couponCode) {
-      await this.getCoupons().catch(() => {});
     }
     
     const quote = await calculateBookingPrice({

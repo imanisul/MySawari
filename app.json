@@ -2,22 +2,60 @@
   "expo": {
     "name": "MySawari",
     "slug": "car-rental-mobile",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/MySawari.png",
     "scheme": "car-rental-mobile",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#F9F9F8"
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/7eae244d-1043-4c00-b2af-e384e4a921e4",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
     },
     "ios": {
-      "supportsTablet": false
+      "bundleIdentifier": "com.mysawari.customer",
+      "buildNumber": "2",
+      "backgroundColor": "#FAFAF9",
+      "supportsTablet": false,
+      "icon": "./assets/images/MySawari.png",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "remote-notification"
+        ],
+        "NSLocationWhenInUseUsageDescription": "MySawari uses your location to find nearby drivers and set pickup points.",
+        "NSCameraUsageDescription": "MySawari uses your camera so you can take photos of your trip for reviews, and verify your identity or driver's license for rentals.",
+        "NSPhotoLibraryUsageDescription": "MySawari uses your photo library so you can add trip photos to your reviews and upload documents for identity verification."
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.anisul17.mysawari"
+      "backgroundColor": "#FAFAF9",
+      "package": "com.mysawari.customer",
+      "versionCode": 4,
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#F9F9F8"
+      }
+    },
+    "notification": {
+      "icon": "./assets/images/notification_icon.png",
+      "color": "#D3302D"
+    },
+    "androidStatusBar": {
+      "translucent": true,
+      "backgroundColor": "#00000000"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
       [
@@ -26,18 +64,48 @@
           "origin": "https://mysawari.app/"
         }
       ],
+      [
+        "expo-navigation-bar",
+        {
+          "position": "absolute",
+          "visibility": "visible",
+          "behavior": "inset-swipe",
+          "backgroundColor": "#00000000"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/transparent.png",
+          "imageWidth": 1,
+          "resizeMode": "contain",
+          "backgroundColor": "#FAFAF9"
+        }
+      ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-updates",
+      "expo-secure-store",
+      "expo-notifications",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": false
     },
     "extra": {
       "eas": {
-        "projectId": "640f7262-fb50-4d44-8d81-3c497c59c448"
+        "projectId": "7eae244d-1043-4c00-b2af-e384e4a921e4"
       }
     },
-    "owner": "anisul17"
+    "owner": "mysawari"
   }
 }

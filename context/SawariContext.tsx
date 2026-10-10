@@ -1,15 +1,70 @@
-import React, { createContext, useContext, useMemo, useState } from 'react';
-import { Car, cars, DriverMode } from '@/lib/sawari';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Car, cars, DriverMode, LocationResult } from '@/utils/sawari';
+import { Offer } from '@/services/api/offers';
+import { API, invalidateWalletCache } from '@/services/backend/api';
+import { PricingQuote, QuoteParams } from '@/services/backend/pricingEngine';
+import { BookingSnapshot } from '@/services/backend/api';
 
-export type PaymentMethod = 'UPI' | 'Card' | 'Net banking';
-export type BookingStatus = 'upcoming' | 'active';
+import * as SecureStore from '@/utils/secureStore';
+import Notifications from '@/utils/notifications';
+import { AppState } from 'react-native';
+import { getDevicePosition } from '@/utils/location';
+import { calculateDistanceKm } from '@/services/backend/pricingEngine';
+import { registerDeviceForPushNotifications, unregisterDeviceForPushNotifications } from '@/services/pushNotification';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
+// Removed @react-native-firebase/messaging completely to allow expo-notifications to handle background pushes
+export type PaymentMethod = string;
+export type BookingStatus = 'upcoming' | 'active' | 'completed' | 'cancelled';
+
+export type AppNotification = {
+  id: string;
+  title: string;
+  body: string;
+  date: string;
+  image?: string;
+  read: boolean;
+  /** Set when the notification is about a booking — tapping it opens that booking. */
+  bookingId?: string;
+  link?: string;
+  data?: any;
+};
+
+export type AppCustomer = {
+  id: string;
+  name: string;
+  mobile: string;
+  email: string;
+  license: string;
+  dob: string;
+  gender: string;
+  joinedOn: string;
+  referralCode: string;
+};
+
+/** Lives on the wallet record, not the customer profile — fetched alongside SawariCash. */
+export type Membership = {
+  plan: 'starter' | 'plus' | 'pro';
+  activatedAt: string;
+  expiresAt: string;
+  totalSaved: number;
+} | null;
 
 type SawariContextValue = {
+  vehicleType: 'car' | 'bike';
+  setVehicleType: (type: 'car' | 'bike') => void;
   mode: DriverMode;
   selectedCar: Car;
   bookingConfirmed: boolean;
-  pickup: string;
+  bookingSource: 'home' | 'explore' | null;
+  setBookingSource: (source: 'home' | 'explore' | null) => void;
+  pickup: LocationResult | null;
+  dropoff: LocationResult | null;
   dateRange: string;
+  setDateRange: (range: string) => void;
+  selectedDate: string;
+  setSelectedDate: (date: string) => void;
   duration: string;
   durationDays: number;
   pickupTime: string;
@@ -17,78 +72,675 @@ type SawariContextValue = {
   paymentMethod: PaymentMethod;
   paymentAttempts: number;
   bookingStatus: BookingStatus;
-  customer: {
-    name: string;
-    mobile: string;
-    email: string;
-    license: string;
-  };
+  
+  isDeliveryRequested: boolean;
+  setIsDeliveryRequested: (val: boolean) => void;
+  deliveryMode: 'delivery' | 'return' | 'both';
+  setDeliveryMode: (mode: 'delivery' | 'return' | 'both') => void;
+  returnAddress: LocationResult | null;
+  setReturnAddress: (loc: LocationResult | null) => void;
+  
+  // NEW BOOKING STATE
+  pricingQuote: PricingQuote | null;
+  quoteParams: Omit<QuoteParams, 'availableSawariCash'>;
+  isQuoteLoading: boolean;
+  quoteError: string | null;
+  appliedCouponCode: string | null;
+  sawariCashToApply: number;
+  fuelEstimate: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number } | null;
+  refreshQuote: () => Promise<void>;
+  
+  applyCoupon: (code: string | null) => void;
+  applySawariCash: (amount: number) => void;
+  setFuelEstimate: (estimate: SawariContextValue['fuelEstimate']) => void;
+  createBookingSnapshot: () => Promise<BookingSnapshot | null>;
+  confirmBookingPayment: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => Promise<void>;
+  lastBooking: BookingSnapshot | null;
+
+  customer: AppCustomer;
+  notifications: AppNotification[];
+  unreadCount: number;
+  expoPushToken: string | null;
+  earnedRewards: Offer[];
+  sawariCash: number;
+  membership: Membership;
+  totalBookings: number;
+  incrementBookings: () => void;
   setMode: (mode: DriverMode) => void;
   selectCar: (car: Car) => void;
-  setPickup: (pickup: string) => void;
+  setPickup: (pickup: LocationResult | null) => void;
+  setDropoff: (dropoff: LocationResult | null) => void;
+  swapLocations: () => void;
   setDates: (dateRange: string, duration: string) => void;
   setTimes: (pickupTime: string, returnTime: string) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
-  updateCustomer: (field: 'name' | 'mobile' | 'email' | 'license', value: string) => void;
+  updateCustomer: (field: 'name' | 'mobile' | 'email' | 'license' | 'dob' | 'gender' | 'referralCode', value: string) => void;
+  saveProfile: (data: Partial<AppCustomer>) => Promise<void>;
+  earnReward: (reward: Offer) => void;
+  earnSawariCash: (amount: number) => void;
+  useSawariCash: (amount: number) => void;
   payBooking: () => void;
   confirmBooking: () => void;
   setBookingStatus: (status: BookingStatus) => void;
+  completeBooking: () => void;
+  cancelBooking: () => void;
   clearBooking: () => void;
+  addNotification: (notification: Omit<AppNotification, 'read'>) => void;
+  markAllAsRead: () => void;
+  clearAllNotifications: () => Promise<void>;
+  syncNotifications: () => Promise<void>;
+  markNotificationRead: (id: string) => Promise<boolean>;
+  setPushToken: (token: string) => void;
+  hasSeenPermissions: boolean | null;
+  completeOnboarding: () => Promise<void>;
+  isAuthenticated: boolean | null;
+  isAuthLoading: boolean;
+  login: (token: string, refreshToken: string, user: any) => Promise<void>;
+  logout: () => Promise<void>;
+  fetchWallet: () => Promise<void>;
+  
+  // Favorites
+  favorites: string[];
+  toggleFavorite: (carId: string) => void;
+  
+  // Theme
+  isDarkMode: boolean;
+  toggleDarkMode: (value: boolean) => void;
 };
 
 const SawariContext = createContext<SawariContextValue | null>(null);
 
-const getMockDateRange = () => {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const nextWeek = new Date();
-  nextWeek.setDate(nextWeek.getDate() + 5);
-  const format = (d: Date) => {
-    const parts = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).split(' ');
-    return `${parts[0]} ${parts[1]}`;
-  };
-  return `${format(tomorrow)} – ${format(nextWeek)}`;
-};
+
 
 export function SawariProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
+  const [vehicleType, setVehicleType] = useState<'car' | 'bike'>('car');
   const [mode, setMode] = useState<DriverMode>('Self Drive');
   const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
-  const [bookingConfirmed, setBookingConfirmed] = useState(true);
-  const [pickup, setPickup] = useState('Guwahati');
-  const [dateRange, setDateRange] = useState(getMockDateRange());
+  const [bookingConfirmed, setBookingConfirmed] = useState(false);
+  const [bookingSource, setBookingSource] = useState<'home' | 'explore' | null>(null);
+  const [pickup, setPickup] = useState<LocationResult | null>(null);
+  // Always the latest pickup, for background tasks (GPS refresh) that must not read stale state.
+  const pickupRef = useRef<LocationResult | null>(null);
+  pickupRef.current = pickup;
+  const [dropoff, setDropoff] = useState<LocationResult | null>(null);
+  const [isDeliveryRequested, setIsDeliveryRequested] = useState(false);
+  const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'return' | 'both'>('both');
+  const [returnAddress, setReturnAddress] = useState<LocationResult | null>(null);
+  
+  const defaultToday = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const [dateRange, setDateRangeState] = useState('Select Dates');
+  const [selectedDate, setSelectedDateState] = useState(defaultToday);
+  
   const [duration, setDuration] = useState('5 days');
-  const [pickupTime, setPickupTime] = useState('09:00 AM');
-  const [returnTime, setReturnTime] = useState('09:00 AM');
+  const [pickupTime, setPickupTime] = useState('08:00 AM');
+  const [returnTime, setReturnTime] = useState('08:00 AM');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
   const [paymentAttempts, setPaymentAttempts] = useState(0);
   const [bookingStatus, setBookingStatus] = useState<BookingStatus>('upcoming');
-  const [customer, setCustomer] = useState({
-    name: 'Rahul',
+  const [customer, setCustomer] = useState<AppCustomer>({
+    id: '',
+    name: '',
     mobile: '',
-    email: 'rahul@example.com',
+    email: '',
     license: '',
+    dob: '',
+    gender: '',
+    joinedOn: '',
+    referralCode: '',
   });
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [earnedRewards, setEarnedRewards] = useState<Offer[]>([]);
+  const [sawariCash, setSawariCash] = useState(0);
+  const [membership, setMembership] = useState<Membership>(null);
+  // Wallet balance and membership status arrive together from the same endpoint — keep them in sync.
+  const applyWallet = useCallback((wallet: { walletBalance?: number; membership?: Membership; failed?: boolean } | null | undefined) => {
+    // A failed request keeps the last known balance and membership (never resets a member to "none").
+    if (!wallet || wallet.failed) return;
+    setSawariCash(wallet.walletBalance || 0);
+    setMembership(wallet.membership || null);
+  }, []);
 
-  const value = useMemo(
-    () => ({
-      mode,
+  const fetchWallet = useCallback(async () => {
+    applyWallet(await API.getWallet(true));
+  }, [applyWallet]);
+
+  const [totalBookings, setTotalBookings] = useState(0);
+  const [expoPushToken, setPushToken] = useState<string | null>(null);
+  const [hasSeenPermissions, setHasSeenPermissions] = useState<boolean | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    import('@/services/api/activity').then(({ ActivityAPI }) => {
+      ActivityAPI.logActivity('APP_OPENED', 'System');
+    });
+  }, []);
+
+  // Latest notification sync + login state for the long-lived listeners below (registered once).
+  const liveRef = useRef<{ sync?: () => Promise<void>; authed: boolean | null }>({ authed: null });
+
+  // --- Start Push Notification Listener ---
+  useEffect(() => {
+    const sub = Notifications.addNotificationReceivedListener((notification: any) => {
+      const { title, body, data } = notification.request.content;
+      // The server's id when there is one, so the next sync from the server doesn't add it a second time.
+      const id = (typeof data?.notificationId === 'string' && data.notificationId) || notification.request.identifier;
+      const bookingId = typeof data?.bookingId === 'string' && data.bookingId ? data.bookingId : undefined;
+      
+      setNotifications((prev) => {
+        // Prevent duplicates
+        if (prev.some((n) => n.id === id)) return prev;
+        return [
+          {
+            id,
+            title: title || 'Update from MySawari',
+            body: body || '',
+            date: new Date().toISOString(),
+            read: false,
+            bookingId,
+          },
+          ...prev,
+        ];
+      });
+
+      // The push is about something that just changed (trip started / completed, booking confirmed or
+      // cancelled, refund): the screens showing it update now instead of on their next timed refresh.
+      const { sync, authed } = liveRef.current;
+      if (authed && bookingId) {
+        queryClient.invalidateQueries({ queryKey: ['bookings'] });
+        invalidateWalletCache();
+        API.getWallet(true).then(applyWallet).catch(() => {});
+      }
+      // The server's copy (with its image / link) replaces the one built from the push.
+      sync?.().catch(() => {});
+    });
+    return () => sub.remove();
+  }, []);
+  // --- End Push Notification Listener ---
+
+  // NEW BOOKING STATE
+  const [pricingQuote, setPricingQuote] = useState<PricingQuote | null>(null);
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [sawariCashToApply, setSawariCashToApply] = useState(0);
+  const [fuelEstimate, setFuelEstimate] = useState<SawariContextValue['fuelEstimate']>(null);
+  const [lastBooking, setLastBooking] = useState<BookingSnapshot | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const { DeviceEventEmitter } = require('react-native');
+    const sessionExpiryListener = DeviceEventEmitter.addListener('onSessionExpired', async () => {
+      invalidateWalletCache(); // never show one account's balance to the next
+      if (isMounted) {
+        setIsAuthenticated(false);
+        setCustomer({ id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: '' });
+      }
+    });
+
+    // Auto-detected default location. Only ever replaces a location that was itself auto-detected
+    // (never one the customer chose), and only when they have actually moved (> 300 m).
+    let lastGpsCheck = 0;
+    const detectGps = async (preferFresh: boolean) => {
+      if (Date.now() - lastGpsCheck < 60 * 1000 && preferFresh) return; // don't hammer the GPS
+      lastGpsCheck = Date.now();
+      try {
+        const result = await getDevicePosition({ preferFresh, askPermission: !preferFresh });
+        if (!result.ok || !isMounted) return;
+        const { latitude, longitude } = result.position.coords;
+
+        const isAuto = (loc: LocationResult | null) => !loc || (loc.source === 'gps' && String(loc.id).startsWith('auto_'));
+        const current = pickupRef.current;
+        if (!isAuto(current)) return; // the customer chose their own location — leave it alone
+        if (current && calculateDistanceKm(current, { latitude, longitude }) <= 0.3) return; // hasn't moved
+
+        let addressStr = 'Current Location';
+        let placeName = 'My Current Location';
+        try {
+          const reverseData = await API.reverseGeocode(latitude, longitude, { areaOnly: true });
+          if (reverseData) {
+            addressStr = reverseData.address || addressStr;
+            placeName = reverseData.name || placeName;
+          }
+        } catch (e) {
+          console.warn('Reverse geocode failed', e);
+        }
+
+        const detected: LocationResult = {
+          id: `auto_${Date.now()}`,
+          address: addressStr,
+          latitude,
+          longitude,
+          name: placeName,
+          source: 'gps',
+        };
+        if (isMounted) {
+          setPickup((prev) => (isAuto(prev) ? detected : prev));
+          setReturnAddress((prev) => (isAuto(prev) ? detected : prev));
+        }
+      } catch (e) {
+        console.warn('Failed to auto-detect location', e);
+      }
+    };
+
+    // Coming back to the app after moving around → refresh the auto-detected location.
+    const appStateSub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') detectGps(true);
+    });
+
+    (async () => {
+      try {
+        // Fetch independent initial data concurrently
+        const [permissionsVal, token, userId, themeVal, storedSelectedDate, storedDateRange] = await Promise.all([
+          AsyncStorage.getItem('@has_seen_permissions'),
+          SecureStore.getItemAsync('auth_token'),
+          SecureStore.getItemAsync('user_id'),
+          AsyncStorage.getItem('@app_theme_dark'),
+          AsyncStorage.getItem('@sawari_selected_date'),
+          AsyncStorage.getItem('@sawari_date_range')
+        ]);
+        
+        if (isMounted) {
+          setHasSeenPermissions(permissionsVal === 'true');
+          setIsDarkMode(themeVal === 'true');
+          
+          if (storedDateRange && storedDateRange !== 'Select Dates') {
+            const parts = storedDateRange.split(/[-–]/).map(d => d.trim());
+            const startLabel = parts[0];
+            if (startLabel) {
+              const dayParts = startLabel.split(' ');
+              if (dayParts.length >= 2) {
+                const day = parseInt(dayParts[0], 10);
+                const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+                let month = MONTHS.indexOf(dayParts[1]);
+                if (month === 12) month = 8;
+                if (month !== -1 && !isNaN(day)) {
+                  const currentYear = new Date().getFullYear();
+                  const parsedDate = new Date(currentYear, month, day);
+                  const today = new Date(new Date().setHours(0,0,0,0));
+                  if (parsedDate >= today) {
+                    setDateRangeState(storedDateRange);
+                  }
+                }
+              }
+            }
+          }
+          
+          if (storedSelectedDate) {
+             // 'All Dates' is deprecated; default to today's date
+             if (storedSelectedDate === 'All Dates') {
+               setSelectedDateState(defaultToday);
+             } else {
+               // Validate date is not in the past
+               const parts = storedSelectedDate.trim().split(' ');
+               if (parts.length >= 2) {
+                 const day = parseInt(parts[0], 10);
+                 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
+                 let month = MONTHS.indexOf(parts[1]);
+                 if (month === 12) month = 8;
+                 if (month !== -1 && !isNaN(day)) {
+                   const currentYear = new Date().getFullYear();
+                   const parsedDate = new Date(currentYear, month, day);
+                   const today = new Date(new Date().setHours(0,0,0,0));
+                   if (parsedDate >= today) {
+                     setSelectedDateState(storedSelectedDate);
+                   }
+                 }
+               }
+             }
+          }
+        }
+        
+        if (token && userId) {
+          // For a fully decoupled frontend, read the locally saved customer info
+          const storedProfile = await AsyncStorage.getItem(`@customer_info_${userId}`);
+          
+          if (storedProfile && isMounted) {
+            const userProfile = JSON.parse(storedProfile);
+            setCustomer({
+              id: userProfile.id || userId,
+              name: userProfile.name || '',
+              mobile: userProfile.mobile || '',
+              email: userProfile.email || '',
+              license: userProfile.license || '',
+              dob: userProfile.dob || '',
+              gender: userProfile.gender || '',
+              joinedOn: userProfile.joinedOn || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+              referralCode: userProfile.referralCode || '',
+            });
+            
+            // Only consider them authenticated if the profile successfully fetched
+            setIsAuthenticated(true);
+
+            // Booking pushes (confirmed / trip started / cancelled) go to the customer_<mobile> topic. It was
+            // only joined at login, so a reinstall or a new Firebase token on a saved session lost them.
+            // (Removed Firebase Topic subscription logic to let expo-notifications handle pushes)
+            
+            // Load other data concurrently
+            const [storedRewards, storedBookings] = await Promise.all([
+              AsyncStorage.getItem(`@earned_rewards_${userId}`),
+              AsyncStorage.getItem(`@total_bookings_${userId}`),
+            ]);
+            
+            if (isMounted) {
+              if (storedRewards) setEarnedRewards(JSON.parse(storedRewards));
+              if (storedBookings) setTotalBookings(Number(storedBookings));
+            }
+
+            // The wallet loads in the background — the app opens without waiting for the network.
+            API.getWallet().then((walletData) => {
+              if (isMounted) applyWallet(walletData);
+            });
+          } else if (isMounted) {
+            setIsAuthenticated(false);
+          }
+        } else if (isMounted) {
+          setIsAuthenticated(false);
+        }
+      } catch (e) {
+        if (isMounted) {
+          setHasSeenPermissions(false);
+          setIsAuthenticated(false);
+        }
+      } finally {
+        if (isMounted) {
+          setIsAuthLoading(false);
+        }
+      }
+
+      // Default pickup / return = where the customer is right now (runs after the app is already usable).
+      detectGps(false);
+    })();
+    return () => { 
+      isMounted = false; 
+      sessionExpiryListener.remove();
+      appStateSub.remove();
+    };
+  }, []);
+
+  // Register push notifications (for both authenticated and anonymous users)
+  useEffect(() => {
+    if (!isAuthLoading) {
+      registerDeviceForPushNotifications();
+      // (Removed global FCM topic subscription logic to let expo-notifications handle pushes)
+    }
+  }, [isAuthLoading, isAuthenticated]);
+
+  const quoteParams = useMemo(() => {
+    // Split by either en-dash '–' or standard hyphen '-'
+    const dates = dateRange.split(/[-–]/).map(d => d.trim());
+    const pickupDateStr = dates[0] || '15 Sep';
+    const returnDateStr = dates[1] || '20 Sep';
+
+    return {
+      dailyRate: selectedCar.perDay,
+      pickupDateStr,
+      returnDateStr,
+      pickupTime,
+      returnTime,
+      pickupLocation: pickup,
+      dropoffLocation: dropoff,
+      returnLocation: returnAddress,
+      couponCode: appliedCouponCode || undefined,
+      sawariCashToApply,
+      driverMode: mode,
+      isDeliveryRequested,
+      deliveryMode
+    };
+  }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode]);
+
+  // Only the newest quote may update the screen: when details change quickly, an older, slower quote
+  // used to finish last and overwrite the correct price.
+  const quoteSeq = useRef(0);
+  const refreshQuote = useCallback(async () => {
+    const seq = ++quoteSeq.current;
+    setIsQuoteLoading(true);
+    setQuoteError(null);
+    try {
+      const quote = await API.quoteBooking(quoteParams);
+      if (seq !== quoteSeq.current) return;
+      setPricingQuote(quote);
+    } catch (e: any) {
+      if (seq !== quoteSeq.current) return;
+      setQuoteError(e.message || 'Failed to calculate pricing');
+      setPricingQuote(null);
+    } finally {
+      if (seq === quoteSeq.current) setIsQuoteLoading(false);
+    }
+  }, [quoteParams]);
+
+  // "Clear" hides everything up to the newest cleared notification's own (server) time, per account — the
+  // old single phone-clock date hid new notifications on a phone whose clock ran fast, and carried one
+  // account's clear over to the next person who logged in on the phone.
+  const clearedKey = `@notifications_cleared_${customer.id || 'guest'}`;
+  const clearedAtRef = useRef<{ key: string; at: number } | null>(null);
+  const readClearedAt = useCallback(async (key: string) => {
+    if (clearedAtRef.current?.key === key) return clearedAtRef.current.at;
+    let at = 0;
+    try {
+      const stored = await AsyncStorage.getItem(key);
+      // Older builds kept one phone-wide date; it still counts for the guest list it was made for.
+      const legacy = key.endsWith('_guest') ? await AsyncStorage.getItem('@local_cleared_date') : null;
+      at = Math.max(Number(stored) || 0, legacy ? new Date(legacy).getTime() || 0 : 0);
+    } catch {}
+    if (clearedAtRef.current?.key !== key) clearedAtRef.current = { key, at };
+    return clearedAtRef.current.at;
+  }, []);
+
+  // Only the newest sync may update the list: an older, slower reply (e.g. one started just before "Clear")
+  // must not bring cleared notifications back.
+  const notificationSyncSeq = useRef(0);
+  const syncNotifications = useCallback(async () => {
+    // Allowed for guests too, they just get 'all' targeted broadcast notifications
+    const seq = ++notificationSyncSeq.current;
+    try {
+      const { NotificationsAPI } = require('@/services/api/notifications');
+      const data = await NotificationsAPI.getNotifications();
+      if (seq !== notificationSyncSeq.current) return;
+      
+      let installDateStr = null;
+      try {
+        installDateStr = await AsyncStorage.getItem('app_install_date');
+        if (!installDateStr) {
+          installDateStr = new Date().toISOString();
+          await AsyncStorage.setItem('app_install_date', installDateStr);
+        }
+      } catch {}
+
+      const installDate = installDateStr ? new Date(installDateStr).getTime() : 0;
+
+      let guestReadIds: string[] = [];
+      if (!isAuthenticated) {
+        try {
+          const stored = await AsyncStorage.getItem('guest_read_notifications');
+          if (stored) guestReadIds = JSON.parse(stored);
+        } catch {}
+      }
+
+      const clearedDate = await readClearedAt(clearedKey);
+      if (seq !== notificationSyncSeq.current) return;
+
+      const mapped = data
+        .filter((n: any) => {
+          if (!n.createdAt) return true;
+          const time = new Date(n.createdAt).getTime();
+          return time >= installDate && time > clearedDate;
+        })
+        .map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          body: n.body,
+          date: n.createdAt,
+          image: n.data?.image,
+          bookingId: n.data?.bookingId ? String(n.data.bookingId) : undefined,
+          link: n.data?.link || n.data?.screen,
+          data: n.data,
+          read: isAuthenticated ? n.isRead : guestReadIds.includes(n.id),
+        }));
+      setNotifications((prev) => {
+        const locallyRead = new Set(prev.filter(n => n.read).map(n => n.id));
+        return mapped.map((n: any) => ({ ...n, read: n.read || locallyRead.has(n.id) }));
+      });
+    } catch (e) {
+      // Network / server problem: the list on screen stays as it was.
+      console.error('syncNotifications error:', e);
+    }
+  }, [isAuthenticated, clearedKey, readClearedAt]);
+
+  liveRef.current = { sync: syncNotifications, authed: isAuthenticated };
+
+  // Pushes that arrived while the app was in the background or closed never reach the listener above:
+  // coming back to the app picks them (and any booking status change) up.
+  useEffect(() => {
+    let previous = AppState.currentState;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && previous !== 'active') {
+        const { sync, authed } = liveRef.current;
+        sync?.().catch(() => {});
+        if (authed) queryClient.invalidateQueries({ queryKey: ['bookings'] });
+      }
+      previous = state;
+    });
+    return () => sub.remove();
+  }, [queryClient]);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    // Optimistic UI update for instantaneous feedback
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+
+    if (!isAuthenticated) {
+      try {
+        const stored = await AsyncStorage.getItem('guest_read_notifications');
+        const guestReadIds = stored ? JSON.parse(stored) : [];
+        if (!guestReadIds.includes(id)) {
+          guestReadIds.push(id);
+          await AsyncStorage.setItem('guest_read_notifications', JSON.stringify(guestReadIds));
+        }
+      } catch {}
+      return true;
+    }
+
+    const { NotificationsAPI } = require('@/services/api/notifications');
+    // Fire and forget to backend
+    NotificationsAPI.markAsRead(id).catch(() => {});
+    return true;
+  }, [isAuthenticated]);
+
+  // Refresh quote whenever dependencies change — debounced so rapid changes
+  // (date selection, location pick, mode toggle) don't each fire a network call.
+  useEffect(() => {
+    const t = setTimeout(() => { refreshQuote(); }, 300);
+    return () => clearTimeout(t);
+  }, [refreshQuote]);
+
+  // Pre-warm the coupon list at startup so the payment screen's coupon section
+  // shows available deals instantly without an extra network round-trip.
+  useEffect(() => {
+    import('@/services/backend/api').then(({ API }) => { API.getCoupons().catch(() => {}); });
+  }, []);
+
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
+
+  const contextValue = useMemo<SawariContextValue>(() => ({
+    vehicleType,
+    setVehicleType: (val: 'car' | 'bike') => {
+      import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('change_vehicle_type', 'SawariContext', { vehicleType: val }));
+      setVehicleType(val);
+    },
+    mode,
+    setMode: (val: DriverMode) => {
+      import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('change_driver_mode', 'SawariContext', { mode: val }));
+      setMode(val);
+    },
       selectedCar,
       bookingConfirmed,
       pickup,
+      dropoff,
       dateRange,
+      setDateRange: (range: string) => {
+        setDateRangeState(range);
+        AsyncStorage.setItem('@sawari_date_range', range).catch(() => {});
+      },
+      selectedDate,
+      setSelectedDate: (date: string) => {
+        setSelectedDateState(date);
+        AsyncStorage.setItem('@sawari_selected_date', date).catch(() => {});
+      },
+      bookingSource,
+      setBookingSource,
       duration,
-      durationDays: parseInt(duration.split(' ')[0]) || 0,
+      durationDays: pricingQuote?.rentalDays || 1, // Fallback to 1 if quote not loaded
       pickupTime,
       returnTime,
       paymentMethod,
       paymentAttempts,
       bookingStatus,
+      isDeliveryRequested,
+      setIsDeliveryRequested,
+      deliveryMode,
+      setDeliveryMode,
+      returnAddress,
+      setReturnAddress,
       customer,
-      setMode,
+      sawariCash,
+      membership,
+      totalBookings,
+      pricingQuote,
+      quoteParams,
+      isQuoteLoading,
+      quoteError,
+      appliedCouponCode,
+      sawariCashToApply,
+      fuelEstimate,
+      refreshQuote,
+      applyCoupon: setAppliedCouponCode,
+      applySawariCash: setSawariCashToApply,
+      setFuelEstimate,
+      lastBooking,
+      createBookingSnapshot: async () => {
+        if (!pricingQuote) return null;
+        const snapshot = await API.createBooking(
+          quoteParams,
+          selectedCar.id,
+          selectedCar.name,
+          customer,
+          {}, // Payment details no longer needed here (it's a hold)
+          fuelEstimate || undefined
+        );
+        setLastBooking(snapshot);
+        // Refresh cash from DB to reflect pending hold (if backend updates wallet)
+        applyWallet(await API.getWallet(true));
+        return snapshot;
+      },
+      confirmBookingPayment: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => {
+        // The id is passed in by the payment screen: reading `lastBooking` here could see an old copy of
+        // state (it is set moments earlier in the same flow), which failed with "No active booking hold".
+        const id = bookingId || lastBooking?.id;
+        if (!id) throw new Error('No active booking hold found');
+        const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId);
+        
+        // Update the lastBooking state with the confirmed booking info so the ConfirmationScreen can read the real bookingCode
+        if (lastBooking) {
+          setLastBooking({ ...lastBooking, bookingCode: confirmedBooking.bookingCode });
+        }
+        
+        // Refresh cash to reflect deduction
+        applyWallet(await API.getWallet(true));
+      },
       selectCar: setSelectedCar,
       setPickup,
+      setDropoff,
+      swapLocations: () => {
+        setPickup(dropoff);
+        setDropoff(pickup);
+      },
       setDates: (nextDateRange: string, nextDuration: string) => {
-        setDateRange(nextDateRange);
+        setDateRangeState(nextDateRange);
+        AsyncStorage.setItem('@sawari_date_range', nextDateRange).catch(() => {});
         setDuration(nextDuration);
       },
       setTimes: (nextPickupTime: string, nextReturnTime: string) => {
@@ -96,42 +748,286 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         setReturnTime(nextReturnTime);
       },
       setPaymentMethod,
-      updateCustomer: (field: 'name' | 'mobile' | 'email' | 'license', value: string) => {
-        setCustomer((current) => ({ ...current, [field]: value }));
+      updateCustomer: async (field: string, val: string) => {
+        setCustomer((prev) => {
+          const next = { ...prev, [field]: val };
+          // License is never persisted to AsyncStorage (unencrypted) — see login() for why.
+          const { license: _license, ...cacheable } = next;
+          AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(cacheable)).catch(() => {});
+          return next;
+        });
+      },
+      saveProfile: async (data: Partial<AppCustomer>) => {
+        try {
+          // 1. Call Backend API
+          await API.updateProfile({
+            customerName: data.name,
+            email: data.email,
+            dob: data.dob,
+            gender: data.gender
+          } as any);
+
+          // 2. Update local state seamlessly
+          setCustomer((prev) => {
+            const next = { ...prev, ...data };
+            // License is never persisted to AsyncStorage (unencrypted) — see login() for why.
+            const { license: _license, ...cacheable } = next;
+            AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(cacheable)).catch(() => {});
+            return next;
+          });
+        } catch (e) {
+          console.error("Failed to save profile", e);
+          throw e; // Let the UI handle the error
+        }
+      },
+      earnReward: async (reward: Offer) => {
+        setEarnedRewards((prev) => {
+          const next = [reward, ...prev];
+          AsyncStorage.setItem(`@earned_rewards_${customer.id || 'guest'}`, JSON.stringify(next)).catch(() => {});
+          return next;
+        });
+      },
+      earnSawariCash: async (amount: number) => {
+        // Just refresh the backend wallet state
+        applyWallet(await API.getWallet(true));
+      },
+      useSawariCash: async (amount: number) => {
+        // Real deduction happens in API on booking creation, but we can refresh here
+        applyWallet(await API.getWallet(true));
+      },
+      incrementBookings: async () => {
+        setTotalBookings((prev) => {
+          const next = prev + 1;
+          AsyncStorage.setItem(`@total_bookings_${customer.id || 'guest'}`, next.toString()).catch(() => {});
+          return next;
+        });
       },
       payBooking: () => {
         setPaymentAttempts((attempts) => attempts + 1);
       },
       confirmBooking: () => setBookingConfirmed(true),
       setBookingStatus,
+      completeBooking: async () => {
+        setBookingStatus('completed');
+        if (pricingQuote) {
+          // Trigger a wallet refresh because backend may have awarded a bonus
+          applyWallet(await API.getWallet(true));
+        }
+      },
+      cancelBooking: () => {
+        setBookingStatus('cancelled');
+      },
       clearBooking: () => {
         setBookingConfirmed(false);
+        setBookingStatus('upcoming');
         setPaymentAttempts(0);
+        setAppliedCouponCode(null);
+        setSawariCashToApply(0);
+        setFuelEstimate(null);
       },
+      notifications,
+      earnedRewards,
+      unreadCount,
+      expoPushToken,
+      addNotification: (n: Omit<AppNotification, 'read'>) => {
+        setNotifications((prev) => [{ ...n, read: false }, ...prev]);
+      },
+      markAllAsRead: () => {
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      },
+      clearAllNotifications: async () => {
+        notificationSyncSeq.current++; // a sync already running must not put the old list back
+        // Everything up to the newest notification shown is cleared (its server time, not the phone's clock).
+        const newest = notifications.reduce((max, n) => Math.max(max, new Date(n.date).getTime() || 0), 0);
+        const clearedAt = Math.max(newest || Date.now(), clearedAtRef.current?.key === clearedKey ? clearedAtRef.current.at : 0);
+        clearedAtRef.current = { key: clearedKey, at: clearedAt };
+        setNotifications([]);
+        AsyncStorage.setItem(clearedKey, String(clearedAt)).catch(() => {});
+        // The ones still sitting in the phone's notification tray (and the app-icon badge) go too.
+        Notifications.dismissAllNotificationsAsync?.().catch(() => {});
+        Notifications.setBadgeCountAsync?.(0).catch(() => {});
+        const { NotificationsAPI } = require('@/services/api/notifications');
+        await NotificationsAPI.clearAll();
+      },
+      syncNotifications,
+      markNotificationRead,
+      setPushToken,
+      hasSeenPermissions,
+      completeOnboarding: async () => {
+        try {
+          await AsyncStorage.setItem('@has_seen_permissions', 'true');
+          setHasSeenPermissions(true);
+        } catch (e) {
+          if (__DEV__) console.warn('Failed to save permissions state', e);
+        }
+      },
+      isAuthenticated,
+      isAuthLoading,
+      login: async (token: string, refreshToken: string, user: any) => {
+        try {
+          // Do NOT set isAuthLoading here — it would unmount the entire navigation
+          // tree (AppGate returns null while booting), losing the user's position
+          // (e.g. car-details → booking). Auth loading is only for the initial
+          // cold boot session restore.
+          await SecureStore.setItemAsync('auth_token', String(token));
+          if (refreshToken) await SecureStore.setItemAsync('refresh_token', String(refreshToken));
+          await SecureStore.setItemAsync('user_id', String(user.id));
+          
+          const newCustomer = {
+            id: user._id || user.id,
+            name: user.fullName || user.name,
+            mobile: user.mobileNumber || user.mobile,
+            email: user.email || '',
+            license: user.drivingLicenseNumber || user.license || '',
+            dob: user.dob || '',
+            gender: user.gender || '',
+            joinedOn: new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+            referralCode: user.referralCode,
+          };
+          
+          setCustomer(newCustomer);
+          // AsyncStorage is unencrypted on-device storage — a driving license number is a government ID
+          // and nothing in the app reads it back from this cache, so it's kept in memory only, never persisted.
+          const { license: _license, ...cacheableCustomer } = newCustomer;
+          await AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(cacheableCustomer));
+
+          const rewards = user.rewards || [];
+          setEarnedRewards(rewards);
+          AsyncStorage.setItem(`@earned_rewards_${user.id}`, JSON.stringify(rewards)).catch(() => {});
+
+          // Signed in as soon as the session is saved. The wallet request and the push-topic subscription
+          // (a permission prompt plus a call to Firebase) used to be awaited here, holding the login
+          // spinner for several seconds — or much longer on a slow network. They now finish in the background.
+          setIsAuthenticated(true);
+
+          invalidateWalletCache();
+          API.getWallet(true).then(applyWallet).catch(() => {});
+
+          const sanitizedMobile = String(newCustomer.mobile || '').replace(/[^a-zA-Z0-9-_.~%]/g, '');
+          // (Removed FCM Topic Subscription Failed logic to let expo-notifications handle pushes)
+
+          import('@/services/api/activity').then(({ ActivityAPI }) => {
+            ActivityAPI.logActivity('AUTH_LOGIN', 'System', { userId: user.id });
+          });
+          // Trips searched as a guest on this phone stay in their recent searches.
+          import('@/utils/recentSearches').then(({ adoptGuestSearches }) => adoptGuestSearches(String(user.id))).catch(() => {});
+          import('@/utils/recentlyViewed').then(({ adoptGuestViewed }) => adoptGuestViewed(String(user.id))).catch(() => {});
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      logout: async () => {
+        try {
+          invalidateWalletCache();
+          // Logged while the session still exists, so the entry carries the customer's id and number.
+          try {
+            const { ActivityAPI } = await import('@/services/api/activity');
+            // Never holds the logout up for more than 2 s on a slow network.
+            await Promise.race([ActivityAPI.logActivity('AUTH_LOGOUT', 'System'), new Promise((r) => setTimeout(r, 2000))]);
+          } catch {}
+          // Revoke the session server-side too (a copied refresh token stops working right away).
+          const refreshToken = await SecureStore.getItemAsync('refresh_token').catch(() => null);
+          // Before the tokens are deleted: this phone must stop receiving this customer's booking pushes.
+          const authToken = await SecureStore.getItemAsync('auth_token').catch(() => null);
+          await unregisterDeviceForPushNotifications(authToken);
+          API.logoutServer(refreshToken);
+          await SecureStore.deleteItemAsync('auth_token');
+          await SecureStore.deleteItemAsync('refresh_token');
+          await SecureStore.deleteItemAsync('user_id');
+
+
+          if (customer?.mobile) {
+            try {
+              const sanitizedMobile = customer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');
+              // (Removed FCM Topic Unsubscribe Failed logic to let expo-notifications handle pushes)
+            } catch (fcmError) {
+              console.warn('FCM Topic Unsubscribe Failed:', fcmError);
+            }
+          }
+
+          setCustomer({
+            id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: ''
+          });
+          setSawariCash(0);
+          setMembership(null);
+          setEarnedRewards([]);
+          setTotalBookings(0);
+          setNotifications([]);
+          setFavorites([]);
+          queryClient.clear();
+          setIsAuthenticated(false);
+        } catch (e) {
+          if (__DEV__) console.warn('Logout failed', e);
+        }
+      },
+      favorites,
+      toggleFavorite: (carId: string) => {
+        setFavorites(prev => {
+          const isRemoving = prev.includes(carId);
+          import('@/services/api/activity').then(({ ActivityAPI }) => {
+            ActivityAPI.logActivity(isRemoving ? 'remove_favorite' : 'add_favorite', 'SawariContext', { carId });
+          });
+          return isRemoving ? prev.filter(id => id !== carId) : [...prev, carId];
+        });
+      },
+      isDarkMode,
+      toggleDarkMode: (value: boolean) => {
+        setIsDarkMode(value);
+        AsyncStorage.setItem('@app_theme_dark', value ? 'true' : 'false').catch(() => {});
+      },
+      fetchWallet,
     }),
     [
+      mode,
+      selectedDate,
+      bookingSource,
+      selectedCar,
       bookingConfirmed,
-      bookingStatus,
-      customer,
+      pickup,
+      dropoff,
       dateRange,
       duration,
-      mode,
-      paymentAttempts,
-      paymentMethod,
-      pickup,
       pickupTime,
       returnTime,
-      selectedCar,
-    ],
+      paymentMethod,
+      paymentAttempts,
+      bookingStatus,
+      isDeliveryRequested,
+      deliveryMode,
+      returnAddress,
+      customer,
+      notifications,
+      unreadCount,
+      expoPushToken,
+      earnedRewards,
+      sawariCash,
+      membership,
+      totalBookings,
+      hasSeenPermissions,
+      isAuthenticated,
+      isAuthLoading,
+      pricingQuote,
+      isQuoteLoading,
+      quoteError,
+      appliedCouponCode,
+      sawariCashToApply,
+      fuelEstimate,
+      lastBooking,
+      refreshQuote,
+      vehicleType,
+      quoteParams,
+      favorites,
+      isDarkMode
+    ]
   );
 
-  return <SawariContext.Provider value={value}>{children}</SawariContext.Provider>;
+  return <SawariContext.Provider value={contextValue}>{children}</SawariContext.Provider>;
 }
 
 export function useSawari() {
   const context = useContext(SawariContext);
   if (!context) {
-    throw new Error('useSawari must be used inside SawariProvider');
+    throw new Error('useSawari must be used within a SawariProvider');
   }
   return context;
 }

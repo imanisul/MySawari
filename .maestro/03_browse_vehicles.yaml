@@ -1,0 +1,9 @@
+appId: com.anisul17.mysawari
+---
+- launchApp
+- assertVisible: "Search for a vehicle"
+- tapOn: "Search" # Usually a Search or Find Vehicle button
+- assertVisible: "Filter" # Wait for the vehicle listing screen to appear
+- scroll
+- scroll
+- tapOn: "Home"

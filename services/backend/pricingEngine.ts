@@ -111,6 +111,8 @@ export type FuelEstimate = {
   estimatedCost: number;
 };
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 export function calculateRentalDays(start: string, end: string, startTime?: string, endTime?: string): number {
   try {
     // A placeholder like "Select Dates" is not a date. Some engines (Chrome) still parse it as 1 Jan,
@@ -119,7 +121,6 @@ export function calculateRentalDays(start: string, end: string, startTime?: stri
     const currentYear = new Date().getFullYear();
     const normStart = start.replace(/Sept/gi, 'Sep');
     const normEnd = end.replace(/Sept/gi, 'Sep');
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
     const parseCustomDate = (dateStr: string) => {
       const parts = dateStr.trim().split(' ');
@@ -136,6 +137,13 @@ export function calculateRentalDays(start: string, end: string, startTime?: stri
 
     const startDate = parseCustomDate(normStart);
     const endDate = parseCustomDate(normEnd);
+
+    // The labels carry no year, so both dates start out in the current year. A trip that crosses
+    // New Year ("30 Dec" → "2 Jan") then had its return before its pickup and was priced as 1 day.
+    // A return that falls before the pickup date belongs to the following year.
+    if (!isNaN(startDate.getTime()) && !isNaN(endDate.getTime()) && endDate.getTime() < startDate.getTime()) {
+      endDate.setFullYear(endDate.getFullYear() + 1);
+    }
 
     const applyTime = (timeStr: string | undefined, dateObj: Date) => {
       if (!timeStr) return;
@@ -324,6 +332,13 @@ export function calculateFuelEstimate(
   return { fuelRequiredLitres, estimatedCost };
 }
 
+// Membership subscription discount rules (defined once instead of on every quote).
+const MEMBERSHIP_PLANS: Record<string, { discountRate: number; tripCap: number; annualCap: number }> = {
+  starter: { discountRate: 0.05,  tripCap: 499, annualCap: 10000 },
+  plus:    { discountRate: 0.10,  tripCap: 799, annualCap: 15000 },
+  pro:     { discountRate: 0.125, tripCap: 999, annualCap: 20000 },
+};
+
 export async function calculateBookingPrice(params: QuoteParams): Promise<PricingQuote> {
   const {
     dailyRate, pickupDateStr, returnDateStr, pickupTime, returnTime,
@@ -343,11 +358,6 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const totalAmount = calculateTripTotal(discountedRentalAmount, pickup.charge, drop.charge);
 
   // ── Membership subscription discount ───────────────────────────────────────
-  const MEMBERSHIP_PLANS: Record<string, { discountRate: number; tripCap: number; annualCap: number }> = {
-    starter: { discountRate: 0.05,  tripCap: 499, annualCap: 10000 },
-    plus:    { discountRate: 0.10,  tripCap: 799, annualCap: 15000 },
-    pro:     { discountRate: 0.125, tripCap: 999, annualCap: 20000 },
-  };
   const isMembershipActive = !!(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()));
   let subscriptionDiscount = 0;
   if (isMembershipActive && membership && MEMBERSHIP_PLANS[membership.plan]) {

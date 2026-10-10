@@ -101,10 +101,10 @@ export default function NotificationsScreen() {
           const dateString = date.toLocaleDateString([], { day: 'numeric', month: 'short' });
 
           return (
-            <Pressable 
+            <Pressable
               onPress={() => handlePressNotification(item)}
               style={({ pressed }) => [
-                styles.card, 
+                styles.card,
                 { backgroundColor: item.read ? colors.card : colors.tintLight, borderColor: colors.border },
                 pressed && { opacity: 0.8 }
               ]}
@@ -125,7 +125,7 @@ export default function NotificationsScreen() {
               {item.image && (
                 <LoadingImage source={item.image} style={styles.attachedImage} contentFit="cover" />
               )}
-              
+
               {!!item.body && (
                 <Text style={[styles.cardBody, { color: colors.mutedForeground }]}>{item.body}</Text>
               )}

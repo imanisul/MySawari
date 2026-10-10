@@ -8,7 +8,7 @@ import { useColors } from '@/hooks/useColors';
 let hasShownSplash = false;
 
 // Phase 1 — the brand: "MySawari · Your ride, your way" stays up at least this long.
-const BRAND_MS = 1400;
+const BRAND_MS = 300;
 // After this long without data, say so instead of leaving the customer looking at a spinner.
 const SLOW_LOAD_MS = 12000;
 
@@ -65,18 +65,18 @@ export function AnimatedSplash({
   // Phase 1: brand entrance.
   useEffect(() => {
     if (skipSplash) return;
-    Animated.stagger(150, [
+    Animated.stagger(50, [
       Animated.parallel([
-        Animated.timing(logoOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
         Animated.spring(logoScale, { toValue: 1, tension: 12, friction: 5, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(titleY, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(taglineOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(taglineY, { toValue: 0, duration: 400, useNativeDriver: true }),
+        Animated.timing(taglineOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+        Animated.timing(taglineY, { toValue: 0, duration: 200, useNativeDriver: true }),
       ]),
     ]).start();
     const t = setTimeout(() => setBrandDone(true), BRAND_MS);

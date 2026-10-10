@@ -276,10 +276,10 @@ function AppGate({
     // Runs once per launch (and again on Retry); later sign-ins / refreshes are handled by the screens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthLoading, loadRun]);
-  // Ready only with the live fleet from the server — the copy saved on the phone (shown instantly to
-  // the screens underneath) can be out of date, so it never ends the loading screen on its own.
-  const liveVehicles = hasLiveVehicles() && vehicles.data !== undefined;
-  const vehiclesLoaded = homeDataReady && liveVehicles;
+  // Use cached vehicles instantly to avoid long loading screen times (Render backend latency).
+  // On first launch, it will still wait because vehicles.data will be undefined.
+  const liveVehicles = vehicles.data !== undefined;
+  const vehiclesLoaded = liveVehicles;
   const colors = useColors();
   const splashHidden = useRef(false);
 

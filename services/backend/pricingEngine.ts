@@ -343,20 +343,19 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const totalAmount = calculateTripTotal(discountedRentalAmount, pickup.charge, drop.charge);
 
   // ── Membership subscription discount ───────────────────────────────────────
-  const MEMBERSHIP_PLANS: Record<string, { discountRate: number; annualCap: number }> = {
-    starter: { discountRate: 0.05,  annualCap: 10000 },
-    plus:    { discountRate: 0.10,  annualCap: 15000 },
-    pro:     { discountRate: 0.125, annualCap: 20000 },
+  const MEMBERSHIP_PLANS: Record<string, { discountRate: number; tripCap: number; annualCap: number }> = {
+    starter: { discountRate: 0.05,  tripCap: 499, annualCap: 10000 },
+    plus:    { discountRate: 0.10,  tripCap: 799, annualCap: 15000 },
+    pro:     { discountRate: 0.125, tripCap: 999, annualCap: 20000 },
   };
-  const PER_TRIP_CAP = 999;
   const isMembershipActive = !!(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()));
   let subscriptionDiscount = 0;
   if (isMembershipActive && membership && MEMBERSHIP_PLANS[membership.plan]) {
-    const { discountRate, annualCap } = MEMBERSHIP_PLANS[membership.plan];
+    const { discountRate, tripCap, annualCap } = MEMBERSHIP_PLANS[membership.plan];
     const remaining = Math.max(0, annualCap - (membership.totalSaved || 0));
     subscriptionDiscount = Math.min(
-      Math.round(discountedRentalAmount * discountRate),
-      PER_TRIP_CAP,
+      Math.round(totalAmount * discountRate),
+      tripCap,
       remaining
     );
   }

@@ -52,6 +52,7 @@ export type BookingSnapshot = {
   dropCharge?: number;
   dropDistanceKm?: number;
   dropLocationName?: string;
+  membershipDiscount?: number;
   pickupType?: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
@@ -1067,7 +1068,8 @@ export const API = {
           dropCharge: asAmount(p.dropCharge) || undefined,
           fastagAmount: asAmount(p.fastagAmount) || undefined,
           securityDeposit: asAmount(p.securityDeposit) || undefined,
-          couponDiscount: asAmount(p.discountAmount),
+          couponDiscount: Math.max(0, asAmount(p.discountAmount) - asAmount(b.membershipDiscount)),
+          membershipDiscount: asAmount(b.membershipDiscount) || 0,
           sawariCashUsed: 0,
           bookingAdvance: bookingPaid,
           onlinePayableNow: bookingPaid,

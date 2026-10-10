@@ -322,6 +322,7 @@ export default function BookingDetailScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <PaymentRow label={`Car Rental (${s.rentalDays} days)`} value={`₹${s.rentalAmount.toLocaleString('en-IN')}`} colors={colors} />
             {s.couponDiscount > 0 && <PaymentRow label={`Coupon${s.couponCode ? ` (${s.couponCode})` : ''}`} value={`-₹${s.couponDiscount.toLocaleString('en-IN')}`} accent colors={colors} />}
+            {(s.membershipDiscount || 0) > 0 && <PaymentRow label="Membership Discount" value={`-₹${(s.membershipDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />}
             {(s.pickupCharge || 0) > 0 && <PaymentRow label={`Pickup Service (${s.pickupDistanceKm || 0} km)`} value={`₹${(s.pickupCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
             {(s.dropCharge || 0) > 0 && <PaymentRow label={`Drop Service (${s.dropDistanceKm || 0} km)`} value={`₹${(s.dropCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
             {(s.fastagAmount || 0) > 0 && <PaymentRow label="Fastag" value={`₹${(s.fastagAmount || 0).toLocaleString('en-IN')}`} colors={colors} />}

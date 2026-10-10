@@ -8,6 +8,7 @@ import { NotificationsAPI, BackendNotification } from '@/services/api/notificati
 import { useFocusEffect } from 'expo-router';
 
 import { NotificationSkeleton } from '@/components/loading/ScreenSkeletons';
+import { LoadingImage } from '@/components/common/LoadingImage';
 
 import { useSawari } from '@/context/SawariContext';
 
@@ -122,7 +123,7 @@ export default function NotificationsScreen() {
               </View>
 
               {item.image && (
-                <Image source={{ uri: item.image }} style={styles.attachedImage} resizeMode="cover" />
+                <LoadingImage source={item.image} style={styles.attachedImage} contentFit="cover" />
               )}
               
               {!!item.body && (

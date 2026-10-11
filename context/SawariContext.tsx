@@ -575,7 +575,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           title: n.title,
           body: n.body,
           date: n.createdAt,
-          image: n.data?.image,
+          image: n.imageUrl || n.data?.imageUrl || n.data?.image,
           bookingId: n.data?.bookingId ? String(n.data.bookingId) : undefined,
           link: n.data?.link || n.data?.screen,
           data: n.data,

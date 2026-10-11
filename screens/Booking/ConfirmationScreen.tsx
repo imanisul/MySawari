@@ -62,6 +62,42 @@ export default function ConfirmationScreen() {
           )}
           <InfoRow icon="calendar" value={`${dateRange} · ${lastBooking?.rentalDays || duration} Days`} />
           <InfoRow icon="clock" value={`${lastBooking?.pickupTime || pickupTime} – ${lastBooking?.dropTime || returnTime}`} />
+
+          {((pricingQuote?.couponDiscount || 0) > 0 || (pricingQuote?.subscriptionDiscount || 0) > 0 || (pricingQuote?.sawariCashUsed || 0) > 0) && (
+            <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10, marginTop: 10, gap: 6 }}>
+              {pricingQuote && pricingQuote.couponDiscount > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_500Medium' }}>
+                    Coupon Discount{pricingQuote.couponCode ? ` (${pricingQuote.couponCode})` : ''} 🏷️
+                  </Text>
+                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                    -₹{pricingQuote.couponDiscount.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              )}
+              {pricingQuote && pricingQuote.subscriptionDiscount > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.primaryText || colors.primary, fontSize: 13, fontFamily: 'Inter_500Medium' }}>
+                    Membership Discount ★
+                  </Text>
+                  <Text style={{ color: colors.primaryText || colors.primary, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                    -₹{pricingQuote.subscriptionDiscount.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              )}
+              {pricingQuote && pricingQuote.sawariCashUsed > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_500Medium' }}>
+                    SawariCash Applied 💰
+                  </Text>
+                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+                    -₹{pricingQuote.sawariCashUsed.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
           <View style={[styles.paidRow, { borderTopColor: colors.border }]}>
             <Text style={[styles.paidLabel, { color: colors.foreground }]}>Paid today</Text>
             <Text style={[styles.paidValue, { color: colors.foreground }]}>₹{payToday.toLocaleString('en-IN')}</Text>

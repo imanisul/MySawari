@@ -41,8 +41,26 @@ export type BookingSnapshot = {
   refundAmount?: number;
   refundStatus?: string;
   cancelledAt?: string;
-  pendingRefund?: { refundAmount: number; requestedAt: string; reason?: string; status?: string };
-  // Extension fields
+  pendingRefund?: {
+    id?: string;
+    refundAmount: number;
+    requestedAt: string;
+    reason?: string;
+    status?: string;
+    refundType?: 'upi' | 'bank_account';
+    upiId?: string;
+    accountDetails?: {
+      accountNumber?: string;
+      ifscCode?: string;
+      accountHolderName?: string;
+      bankName?: string;
+    };
+    approvedAt?: string;
+    refundedAt?: string;
+    rejectedAt?: string;
+    rejectionReason?: string;
+    transactionReference?: string;
+  };
   driverMode?: string;
   extensions?: any[];
   totalRentalAmount?: number;
@@ -187,6 +205,10 @@ const PLATE_PROXY_VERSION = 'pv=6';
 export function plateSafeImageUrl(url: string): string {
   if (!url) return '';
   const absolute = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  // Already a processed-photo URL that is plate-safe on Cloudinary CDN
+  if (absolute.includes('/plate-safe/')) {
+    return absolute;
+  }
   // Already a processed-photo URL from the backend (an encrypted token, or the older ?target= form).
   if (absolute.includes('/images/blur?')) {
     return absolute.includes(PLATE_PROXY_VERSION) ? absolute : `${absolute}&${PLATE_PROXY_VERSION}`;
@@ -463,6 +485,7 @@ export const API = {
       const hasImages = Array.isArray(v.images) && v.images.length > 0 && typeof v.images[0]?.url === 'string' && v.images[0].url;
       const getFullUrl = (url: string) => {
         if (!url) return '';
+        if (url.includes('/plate-safe/')) return url;
         let finalUrl = url;
         // If the backend already wrapped it, extract the target to optimize it
         if (finalUrl.includes('/images/blur?target=')) {
@@ -487,9 +510,43 @@ export const API = {
         return plateSafeImageUrl(finalUrl);
       };
 
+      // Proper vehicle display name (uses DB displayName, e.g. "Alto 800 Red", falling back to vehicleName without plate numbers)
+      const rawName = (v.displayName && typeof v.displayName === 'string' && v.displayName.trim())
+        ? v.displayName.trim()
+        : (v.vehicleName || 'Vehicle');
+      const resolvedDisplayName = rawName.replace(/\s+\d{3,4}$/, '').trim() || 'Vehicle';
+
       // Enrich with curated real-world specs from the knowledge base
       const vehicleType: 'Car' | 'Bike' = isBike ? 'Bike' : 'Car';
       const knowledge = getVehicleKnowledge(v.vehicleName, vehicleType);
+
+      // Extract DB features & amenities
+      const dbFeatures: string[] = [];
+      const isYes = (val: any) => {
+        if (!val) return false;
+        if (typeof val === 'boolean') return val;
+        const s = String(val).trim().toLowerCase();
+        return s === 'yes' || s === 'true' || s === '1' || s === 'available' || s === 'equipped';
+      };
+
+      if (isYes(v.ac)) dbFeatures.push('Air Conditioning');
+      if (isYes(v.carPlay)) dbFeatures.push('Android Auto & Apple CarPlay');
+      if (isYes(v.bluetooth)) dbFeatures.push('Bluetooth Audio');
+      if (isYes(v.touchscreen)) dbFeatures.push('Touchscreen Display');
+      if (isYes(v.usbCharging)) dbFeatures.push('USB Charging Port');
+      if (isYes(v.sunroof)) dbFeatures.push('Sunroof');
+      if (isYes(v.airbags)) dbFeatures.push('Airbags');
+      if (isYes(v.absEbd)) dbFeatures.push('ABS with EBD');
+      if (isYes(v.rearParkingSensors)) dbFeatures.push('Rear Parking Sensors');
+      if (isYes(v.rearCamera)) dbFeatures.push('Rear Camera');
+      if (isYes(v.gps)) dbFeatures.push('GPS Navigation');
+      if (isYes(v.digitalDisplay)) dbFeatures.push('Digital Display');
+      if (isYes(v.bikeAbs)) dbFeatures.push('ABS (Anti-lock Braking)');
+      if (isYes(v.discBrakes)) dbFeatures.push('Disc Brakes');
+      if (isYes(v.cbs)) dbFeatures.push('CBS (Combined Braking)');
+
+      // Merge with knowledge features without duplicates
+      const mergedFeatures = Array.from(new Set([...dbFeatures, ...(knowledge.features || [])]));
 
       // Registration year from DB date
       const regYear = v.registrationDate ? new Date(v.registrationDate).getFullYear().toString() : undefined;
@@ -523,8 +580,10 @@ export const API = {
       return {
         id: v._id,
         type: vehicleType,
-        name: v.vehicleName,
-        category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : v.vehicleType),
+        name: resolvedDisplayName,
+        displayName: resolvedDisplayName,
+        vehicleName: resolvedDisplayName,
+        category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : (v.vehicleType || 'Car')),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
         image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,
@@ -541,21 +600,25 @@ export const API = {
         registrationYear: regYear,
         vehicleNumber: v.vehicleNumber || undefined,
 
-        // Knowledge base enrichment
-        description: knowledge.description,
-        mileage: knowledge.mileage || 'N/A',
-        engine: knowledge.engine,
+        // Specifications & Features from DB with knowledge base enrichment
+        description: (v.notes && typeof v.notes === 'string' && v.notes.trim()) ? v.notes.trim() : knowledge.description,
+        mileage: (v.mileage && typeof v.mileage === 'string' && v.mileage.trim())
+          ? (v.mileage.toLowerCase().includes('km') ? v.mileage.trim() : `${v.mileage.trim()} km/l`)
+          : (knowledge.mileage || 'N/A'),
+        engine: (v.engineCapacity && typeof v.engineCapacity === 'string' && v.engineCapacity.trim())
+          ? v.engineCapacity.trim()
+          : knowledge.engine,
         bootSpace: knowledge.bootSpace,
         groundClearance: knowledge.groundClearance,
         kerbWeight: knowledge.kerbWeight,
         doors: knowledge.doors,
-        airbags: knowledge.airbags,
+        airbags: isYes(v.airbags) ? (knowledge.airbags || 'Equipped') : (knowledge.airbags || undefined),
         tankCapacity: knowledge.tankCapacity,
         topSpeed: knowledge.topSpeed,
         acceleration: knowledge.acceleration,
         tyreSize: knowledge.tyreSize,
-        brakes: knowledge.brakes,
-        features: knowledge.features,
+        brakes: isYes(v.discBrakes) ? 'Front & Rear Disc' : knowledge.brakes,
+        features: mergedFeatures,
         highlights: knowledge.highlights,
         luggage: knowledge.luggage,
 
@@ -749,6 +812,7 @@ export const API = {
       
       couponCode: quote.couponCode,
       couponDiscount: quote.couponDiscount,
+      membershipDiscount: quote.subscriptionDiscount || 0,
       sawariCashUsed: quote.sawariCashUsed,
       
       bookingAdvance: quote.bookingAdvance,
@@ -798,6 +862,7 @@ export const API = {
       body: JSON.stringify({
         vehicleId: vehicleId,
         vehicleName: vehicleName,
+        displayName: vehicleName,
         fromDate: toExactLocalTime(params.pickupDateStr, params.pickupTime || '10:00 AM'),
         toDate: toExactLocalTime(params.returnDateStr, params.returnTime || '10:00 AM'),
         pickupTime: params.pickupTime || '10:00 AM',
@@ -1035,10 +1100,25 @@ export const API = {
         const p = b.payment || {};
         const days = b.totalDays || 1;
         const totalAmount = asAmount(p.totalAmount);
-        // Operations-app bookings itemise the price; the total there also includes fastag and any pickup/drop
-        // charge, so "rental" must be the vehicle rent alone. Customer-app bookings only carry the total.
         const vehicleRent = asAmount(p.vehicleRent);
-        const rentalAmount = vehicleRent || totalAmount;
+        const memDiscount = asAmount(b.membershipDiscount ?? p.membershipDiscount ?? 0);
+        const rawCouponDiscount = b.couponDiscount !== undefined ? asAmount(b.couponDiscount) : (p.couponDiscount !== undefined ? asAmount(p.couponDiscount) : undefined);
+        const cashUsed = asAmount(b.sawariCashUsed ?? p.sawariCashUsed ?? b.sawariCashDiscount ?? p.sawariCashDiscount ?? 0);
+        const couponCode = (b.couponCode || p.couponCode || '').trim() || undefined;
+
+        // Defensive calculation for couponDiscount if not explicitly provided
+        const couponDiscount = rawCouponDiscount !== undefined 
+          ? rawCouponDiscount 
+          : Math.max(0, asAmount(p.discountAmount) - memDiscount - cashUsed);
+
+        // Derive base rental amount before discounts:
+        const dailyRateFromVeh = asAmount(b.vehicleId?.pricePerDay);
+        const baseFromDaily = dailyRateFromVeh > 0 ? dailyRateFromVeh * days : 0;
+        const rentalAmount = baseFromDaily > 0 
+          ? baseFromDaily 
+          : (totalAmount > vehicleRent ? totalAmount : (vehicleRent > 0 && couponDiscount > 0 ? vehicleRent + couponDiscount : (vehicleRent || totalAmount)));
+        const dailyRate = dailyRateFromVeh > 0 ? dailyRateFromVeh : (Math.round(rentalAmount / days) || 0);
+
         const bookingPaid = asAmount(p.bookingAmountPaid);
         const collected = asAmount(p.totalCollected);
         const pickupName = placeLabel(b.pickup) || b.pickupLocationName;
@@ -1049,14 +1129,19 @@ export const API = {
           bookingCode: b.bookingCode,
           status: normalizeBookingStatus(b.status),
           vehicleId: b.vehicleId?._id || b.vehicleId,
-          vehicleName: b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle',
+          vehicleName: ((b.vehicleId?.displayName && typeof b.vehicleId.displayName === 'string' && b.vehicleId.displayName.trim())
+            ? b.vehicleId.displayName.trim()
+            : (b.displayName || b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle')).replace(/\s+\d{3,4}$/, '').trim() || 'Vehicle',
+          displayName: ((b.vehicleId?.displayName && typeof b.vehicleId.displayName === 'string' && b.vehicleId.displayName.trim())
+            ? b.vehicleId.displayName.trim()
+            : (b.displayName || b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle')).replace(/\s+\d{3,4}$/, '').trim() || 'Vehicle',
           pickupDate: fmt(b.fromDate),
           returnDate: fmt(b.toDate),
           rawEndDate: b.toDate,
           pickupTime: b.pickupTime || undefined,
           dropTime: b.dropTime || undefined,
           rentalDays: days,
-          dailyRate: b.vehicleId?.pricePerDay || Math.round(rentalAmount / days) || 0,
+          dailyRate,
           rentalAmount,
           distanceKm: 0,
           ratePerKm: 0,
@@ -1067,9 +1152,10 @@ export const API = {
           dropCharge: asAmount(p.dropCharge) || undefined,
           fastagAmount: asAmount(p.fastagAmount) || undefined,
           securityDeposit: asAmount(p.securityDeposit) || undefined,
-          couponDiscount: Math.max(0, asAmount(p.discountAmount) - asAmount(b.membershipDiscount)),
-          membershipDiscount: asAmount(b.membershipDiscount) || 0,
-          sawariCashUsed: 0,
+          couponCode,
+          couponDiscount,
+          membershipDiscount: memDiscount,
+          sawariCashUsed: cashUsed,
           bookingAdvance: bookingPaid,
           onlinePayableNow: bookingPaid,
           totalCollected: collected || undefined,
@@ -1130,7 +1216,21 @@ export const API = {
     return { success: true, snapshot };
   },
 
-  async requestRefund(data: { bookingId: string; amount: number; reason: string; customerId: string; customerMobile: string }): Promise<any> {
+  async requestRefund(data: { 
+    bookingId: string; 
+    amount: number; 
+    reason?: string; 
+    customerId: string; 
+    customerMobile?: string;
+    refundType?: 'upi' | 'bank_account';
+    upiId?: string;
+    accountDetails?: {
+      accountNumber?: string;
+      ifscCode?: string;
+      accountHolderName?: string;
+      bankName?: string;
+    };
+  }): Promise<any> {
     const response = await fetchWithAuth(`${BACKEND_URL}/refunds`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1138,6 +1238,26 @@ export const API = {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to request refund');
+    return result;
+  },
+
+  async updateRefundPayoutDetails(refundId: string, data: {
+    refundType: 'upi' | 'bank_account';
+    upiId?: string;
+    accountDetails?: {
+      accountNumber?: string;
+      ifscCode?: string;
+      accountHolderName?: string;
+      bankName?: string;
+    };
+  }): Promise<any> {
+    const response = await fetchWithAuth(`${BACKEND_URL}/refunds/${refundId}/payout-details`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to update payout details');
     return result;
   },
 

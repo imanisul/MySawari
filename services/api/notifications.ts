@@ -6,6 +6,7 @@ export interface BackendNotification {
   target: 'all' | 'specific';
   title: string;
   body: string;
+  imageUrl?: string;
   data: any;
   isRead: boolean;
   createdAt: string;
@@ -25,6 +26,7 @@ export const NotificationsAPI = {
           target: n.target,
           title: n.title,
           body: n.body,
+          imageUrl: n.imageUrl,
           data: n.data,
           isRead: n.isRead,
           createdAt: n.createdAt

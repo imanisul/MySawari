@@ -293,6 +293,27 @@ export default function BookingsScreen() {
                     )}
                   </View>
                   
+                  {((booking.couponDiscount || 0) > 0 || (booking.membershipDiscount || 0) > 0) && (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                      {booking.couponDiscount > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                          <Feather name="tag" size={11} color={colors.success} />
+                          <Text style={{ color: colors.success, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                            Coupon{booking.couponCode ? ` (${booking.couponCode})` : ''}: -₹{booking.couponDiscount.toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      )}
+                      {(booking.membershipDiscount || 0) > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '18', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                          <Feather name="award" size={11} color={colors.primary} />
+                          <Text style={{ color: colors.primaryText || colors.primary, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                            Membership: -₹{(booking.membershipDiscount || 0).toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
                   <View style={{ height: 1, backgroundColor: dividerColor, marginVertical: 16 }} />
                   
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -308,13 +329,32 @@ export default function BookingsScreen() {
                     )}
                   </View>
                   
-                  {booking.status === 'CANCELLED' && booking.refundAmount !== undefined && booking.refundAmount > 0 && (
-                    <View style={{ marginTop: 12, padding: 12, backgroundColor: booking.refundStatus === 'PROCESSING' ? colors.warning + '14' : colors.success + '1A', borderRadius: 8 }}>
-                      <Text style={{ color: booking.refundStatus === 'PROCESSING' ? colors.warning : colors.success, fontFamily: 'Inter_500Medium', fontSize: 13 }}>
-                        {booking.refundStatus === 'PROCESSING' ? 'Refund Processing' : 'Refund Processed'}: ₹{booking.refundAmount.toLocaleString('en-IN')}
-                      </Text>
-                    </View>
-                  )}
+                  {booking.status === 'CANCELLED' && booking.refundAmount !== undefined && booking.refundAmount > 0 && (() => {
+                    const st = (booking.refundStatus || 'PROCESSING').toUpperCase();
+                    const isRef = st === 'REFUNDED';
+                    const isApp = st === 'APPROVED';
+                    const isRej = st === 'REJECTED';
+                    const bg = isRef ? '#D1FAE5' : isApp ? '#EEF2FF' : isRej ? '#FEE2E2' : colors.warning + '18';
+                    const fg = isRef ? '#065F46' : isApp ? '#3730A3' : isRej ? '#991B1B' : colors.warning;
+                    const label = isRef
+                      ? 'Refund Processed'
+                      : isApp
+                      ? 'Refund Approved'
+                      : isRej
+                      ? 'Refund Rejected'
+                      : 'Refund In Review';
+
+                    return (
+                      <View style={{ marginTop: 12, padding: 12, backgroundColor: bg, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ color: fg, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
+                          {label}: ₹{booking.refundAmount.toLocaleString('en-IN')}
+                        </Text>
+                        <Text style={{ color: fg, fontFamily: 'Inter_500Medium', fontSize: 11 }}>
+                          Track →
+                        </Text>
+                      </View>
+                    );
+                  })()}
                   {booking.status === 'CANCELLED' && booking.refundAmount === 0 && (
                     <View style={{ marginTop: 12, padding: 12, backgroundColor: colors.destructive + '15', borderRadius: 8 }}>
                       <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>No Refund (Cancelled within 24 hours)</Text>

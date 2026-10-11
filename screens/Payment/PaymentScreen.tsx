@@ -32,7 +32,8 @@ export default function PaymentScreen() {
     dropoff,
     isDeliveryRequested,
     deliveryMode,
-    isAuthenticated
+    isAuthenticated,
+    membership
   } = useSawari();
 
   // Same checks the booking screen makes before opening checkout; a direct link here skips that screen.
@@ -173,6 +174,37 @@ export default function PaymentScreen() {
           </View>
 
 
+          {/* MEMBERSHIP STATUS CARD */}
+          {membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()) && (
+            <View style={{ marginTop: 20 }}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0 }]}>Membership Benefits</Text>
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.primary + '55', borderWidth: 1.5 }]}>
+                <View style={styles.row}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary + '18', alignItems: 'center', justifyContent: 'center' }}>
+                      <Feather name="award" size={20} color={colors.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>
+                        {membership.plan.toUpperCase()} Membership Active
+                      </Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 2 }}>
+                        {pricingQuote && pricingQuote.subscriptionDiscount > 0
+                          ? `₹${pricingQuote.subscriptionDiscount} discount applied to this booking!`
+                          : 'Plan discounts automatically apply at checkout.'}
+                      </Text>
+                    </View>
+                  </View>
+                  {pricingQuote && pricingQuote.subscriptionDiscount > 0 && (
+                    <View style={{ backgroundColor: colors.primary + '20', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, borderColor: colors.primary + '40' }}>
+                      <Text style={{ color: colors.primaryText || colors.primary, fontFamily: 'Inter_700Bold', fontSize: 13 }}>-₹{pricingQuote.subscriptionDiscount}</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* COUPON SECTION */}
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Special Deals</Text>
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -279,7 +311,12 @@ export default function PaymentScreen() {
 
             {pricingQuote && pricingQuote.couponDiscount > 0 && (
               <View style={[styles.row, { marginTop: 12 }]}>
-                <Text style={{ color: colors.success, fontFamily: 'Inter_400Regular' }}>Coupon Discount</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Feather name="tag" size={14} color={colors.success} />
+                  <Text style={{ color: colors.success, fontFamily: 'Inter_400Regular' }}>
+                    Coupon Discount{pricingQuote.couponCode ? ` (${pricingQuote.couponCode})` : (appliedCouponCode ? ` (${appliedCouponCode})` : '')}
+                  </Text>
+                </View>
                 <Text style={{ color: colors.success, fontFamily: 'Inter_500Medium' }}>- {formatCurrency(pricingQuote.couponDiscount)}</Text>
               </View>
             )}
@@ -288,7 +325,9 @@ export default function PaymentScreen() {
               <View style={[styles.row, { marginTop: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Feather name="award" size={14} color={colors.primary} />
-                  <Text style={{ color: colors.primaryText, fontFamily: 'Inter_500Medium' }}>Membership Discount</Text>
+                  <Text style={{ color: colors.primaryText, fontFamily: 'Inter_500Medium' }}>
+                    Membership Discount{membership?.plan ? ` (${membership.plan.toUpperCase()})` : ''}
+                  </Text>
                 </View>
                 <Text style={{ color: colors.primaryText, fontFamily: 'Inter_600SemiBold' }}>- {formatCurrency(pricingQuote.subscriptionDiscount)}</Text>
               </View>
@@ -312,7 +351,9 @@ export default function PaymentScreen() {
 
             <View style={[styles.row, { marginTop: 12 }]}>
               <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 15 }}>Trip Cost</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 15 }}>{formatCurrency((pricingQuote?.discountedRentalAmount || 0) + (pricingQuote?.pickupCharge || 0) + (pricingQuote?.dropCharge || 0))}</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 15 }}>
+                {formatCurrency(Math.max(0, (pricingQuote?.discountedRentalAmount || 0) + (pricingQuote?.pickupCharge || 0) + (pricingQuote?.dropCharge || 0) - (pricingQuote?.subscriptionDiscount || 0)))}
+              </Text>
             </View>
 
             <View style={[styles.divider, { backgroundColor: colors.border, marginVertical: 12 }]} />

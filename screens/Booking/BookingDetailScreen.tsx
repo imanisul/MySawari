@@ -11,6 +11,7 @@ import { cars } from '@/utils/sawari';
 import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal } from '@/components/booking/ReviewModal';
+import { RefundTrackingModal } from '@/components/booking/RefundTrackingModal';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
 // Removed MockRequests
 import { useQuery } from '@tanstack/react-query';
@@ -52,6 +53,7 @@ export default function BookingDetailScreen() {
   const [showCancel, setShowCancel] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [showRefundTrack, setShowRefundTrack] = useState(false);
   const pendingRefund = snapshot?.pendingRefund;
   const hasPendingExtension = snapshot?.extensions?.some((e: any) => e.status === 'pending');
   const hasRejectedExtension = snapshot?.extensions?.some((e: any) => e.status === 'rejected');
@@ -321,13 +323,26 @@ export default function BookingDetailScreen() {
           <SectionLabel label="PAYMENT" colors={colors} />
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <PaymentRow label={`Car Rental (${s.rentalDays} days)`} value={`₹${s.rentalAmount.toLocaleString('en-IN')}`} colors={colors} />
-            {s.couponDiscount > 0 && <PaymentRow label={`Coupon${s.couponCode ? ` (${s.couponCode})` : ''}`} value={`-₹${s.couponDiscount.toLocaleString('en-IN')}`} accent colors={colors} />}
-            {(s.membershipDiscount || 0) > 0 && <PaymentRow label="Membership Discount" value={`-₹${(s.membershipDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />}
+            {s.couponDiscount > 0 && (
+              <PaymentRow label={`Coupon Discount${s.couponCode ? ` (${s.couponCode})` : ''} 🏷️`} value={`-₹${s.couponDiscount.toLocaleString('en-IN')}`} accent colors={colors} />
+            )}
+            {(s.membershipDiscount || 0) > 0 && (
+              <PaymentRow label="Membership Discount ★" value={`-₹${(s.membershipDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />
+            )}
             {(s.pickupCharge || 0) > 0 && <PaymentRow label={`Pickup Service (${s.pickupDistanceKm || 0} km)`} value={`₹${(s.pickupCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
             {(s.dropCharge || 0) > 0 && <PaymentRow label={`Drop Service (${s.dropDistanceKm || 0} km)`} value={`₹${(s.dropCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
             {(s.fastagAmount || 0) > 0 && <PaymentRow label="Fastag" value={`₹${(s.fastagAmount || 0).toLocaleString('en-IN')}`} colors={colors} />}
             {(s.securityDeposit || 0) > 0 && <PaymentRow label="Security Deposit" value={`₹${(s.securityDeposit || 0).toLocaleString('en-IN')}`} colors={colors} />}
-            {s.sawariCashUsed > 0 && <PaymentRow label="SawariCash Applied" value={`-₹${s.sawariCashUsed.toLocaleString('en-IN')}`} accent colors={colors} />}
+            {s.sawariCashUsed > 0 && <PaymentRow label="SawariCash Applied 💰" value={`-₹${s.sawariCashUsed.toLocaleString('en-IN')}`} accent colors={colors} />}
+
+            {((s.couponDiscount || 0) > 0 || (s.membershipDiscount || 0) > 0 || (s.sawariCashUsed || 0) > 0) && (
+              <View style={{ backgroundColor: colors.success + '14', borderColor: colors.success + '35', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Feather name="check-circle" size={14} color={colors.success} />
+                <Text style={{ color: colors.success, fontSize: 12, fontFamily: 'Inter_600SemiBold', flex: 1 }}>
+                  Total Savings: ₹{(((s.couponDiscount || 0) + (s.membershipDiscount || 0) + (s.sawariCashUsed || 0))).toLocaleString('en-IN')}
+                </Text>
+              </View>
+            )}
 
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <PaymentRow label="Booking Amount Paid" value={`₹${s.onlinePayableNow.toLocaleString('en-IN')}`} strong colors={colors} />
@@ -365,17 +380,115 @@ export default function BookingDetailScreen() {
             <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.destructive + '40' }]}>
               <InfoRow label="Reason" value={s.cancellationReason || '—'} colors={colors} />
               <InfoRow label="Cancellation Fee" value={`₹${(s.cancellationFee || 0).toLocaleString('en-IN')}`} colors={colors} destructive />
-              {pendingRefund ? (
-                <View style={[styles.alertBox, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B40' }]}>
-                  <Feather name="clock" size={14} color="#B45309" />
+              {s.refundAmount && s.refundAmount > 0 ? (
+                <Pressable
+                  onPress={() => setShowRefundTrack(true)}
+                  style={({ pressed }) => [
+                    styles.alertBox,
+                    {
+                      backgroundColor:
+                        pendingRefund?.status === 'refunded'
+                          ? '#10B98118'
+                          : pendingRefund?.status === 'approved'
+                          ? '#4F46E518'
+                          : pendingRefund?.status === 'rejected'
+                          ? '#EF444418'
+                          : '#F59E0B18',
+                      borderColor:
+                        pendingRefund?.status === 'refunded'
+                          ? '#10B98140'
+                          : pendingRefund?.status === 'approved'
+                          ? '#4F46E540'
+                          : pendingRefund?.status === 'rejected'
+                          ? '#EF444440'
+                          : '#F59E0B40',
+                      marginTop: 10,
+                      opacity: pressed ? 0.85 : 1,
+                    },
+                  ]}
+                >
+                  <Feather
+                    name={
+                      pendingRefund?.status === 'refunded'
+                        ? 'check-circle'
+                        : pendingRefund?.status === 'approved'
+                        ? 'check'
+                        : pendingRefund?.status === 'rejected'
+                        ? 'x-circle'
+                        : 'clock'
+                    }
+                    size={18}
+                    color={
+                      pendingRefund?.status === 'refunded'
+                        ? '#10B981'
+                        : pendingRefund?.status === 'approved'
+                        ? '#4F46E5'
+                        : pendingRefund?.status === 'rejected'
+                        ? '#EF4444'
+                        : '#B45309'
+                    }
+                  />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#B45309', fontSize: 13 }}>Refund Requested</Text>
-                    <Text style={{ fontFamily: 'Inter_700Bold', color: '#B45309', fontSize: 14 }}>₹{(s.refundAmount || 0).toLocaleString('en-IN')}</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text
+                        style={{
+                          fontFamily: 'Inter_600SemiBold',
+                          color:
+                            pendingRefund?.status === 'refunded'
+                              ? '#065F46'
+                              : pendingRefund?.status === 'approved'
+                              ? '#3730A3'
+                              : pendingRefund?.status === 'rejected'
+                              ? '#991B1B'
+                              : '#B45309',
+                          fontSize: 13,
+                        }}
+                      >
+                        {pendingRefund?.status === 'refunded'
+                          ? 'Refund Processed'
+                          : pendingRefund?.status === 'approved'
+                          ? 'Refund Approved'
+                          : pendingRefund?.status === 'rejected'
+                          ? 'Refund Rejected'
+                          : 'Refund Requested'}
+                      </Text>
+                      <Text
+                        style={{
+                          fontFamily: 'Inter_700Bold',
+                          color:
+                            pendingRefund?.status === 'refunded'
+                              ? '#065F46'
+                              : pendingRefund?.status === 'approved'
+                              ? '#3730A3'
+                              : pendingRefund?.status === 'rejected'
+                              ? '#991B1B'
+                              : '#B45309',
+                          fontSize: 14,
+                        }}
+                      >
+                        ₹{(s.refundAmount || 0).toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+
+                    {pendingRefund?.refundType === 'bank_account' && pendingRefund?.accountDetails?.accountNumber ? (
+                      <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
+                        Bank A/C: ••••{pendingRefund.accountDetails.accountNumber.slice(-4)} ({pendingRefund.accountDetails.ifscCode})
+                      </Text>
+                    ) : pendingRefund?.upiId ? (
+                      <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
+                        UPI: {pendingRefund.upiId}
+                      </Text>
+                    ) : null}
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#4F46E5' }}>
+                        Track refund progress & details
+                      </Text>
+                      <Feather name="chevron-right" size={12} color="#4F46E5" style={{ marginLeft: 2 }} />
+                    </View>
                   </View>
-                </View>
-              ) : (
-                <InfoRow label="Refund Received" value={`₹${(s.refundAmount || 0).toLocaleString('en-IN')}`} colors={colors} success />
-              )}
+                </Pressable>
+              ) : null}
             </View>
           </Animated.View>
         )}
@@ -390,6 +503,7 @@ export default function BookingDetailScreen() {
       </Animated.ScrollView>
 
       {/* ── SHEETS ── */}
+      <RefundTrackingModal visible={showRefundTrack} onClose={() => setShowRefundTrack(false)} booking={s} onRefundUpdated={() => refetchBookings()} />
       <CancelBookingSheet visible={showCancel} onClose={() => setShowCancel(false)} booking={s} onSuccess={setSnapshot} />
       <ExtendBookingSheet visible={showExtend} onClose={() => setShowExtend(false)} booking={s} onSuccess={setSnapshot} />
       <ReviewModal

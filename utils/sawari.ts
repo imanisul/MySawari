@@ -16,6 +16,8 @@ export type Car = {
   type: "Car" | "Bike";
   id: string;
   name: string;
+  displayName?: string;
+  vehicleName?: string;
   category: Exclude<Category, 'All'>;
   price: string;
   perDay: number;

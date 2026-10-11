@@ -115,99 +115,35 @@ export function SpecsSection({ car }: { car: Car }) {
   return (
     <View style={styles.tabSection}>
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-        {isBike ? 'Bike Specifications' : 'Vehicle Specifications'}
+        {isBike ? 'Bike Specifications' : 'Technical Specifications'}
       </Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.specsScroll}>
-        <SpecBox icon="settings" label="Transmission" value={car.transmission} colors={colors} />
-        <SpecBox icon="droplet" label="Fuel Type" value={car.fuel} colors={colors} />
-        <SpecBox icon="users" label={isBike ? 'Riders' : 'Seating'} value={car.seats} colors={colors} />
-        {car.mileage && car.mileage !== 'N/A' && <SpecBox icon="bar-chart-2" label="Mileage" value={car.mileage} colors={colors} />}
-        {!isBike && car.ac !== false && <SpecBox icon="wind" label="Air Conditioning" value="Equipped" colors={colors} />}
-        {car.sunroof && <SpecBox icon="sun" label="Sunroof" value="Equipped" colors={colors} />}
         {car.engine && <SpecBox icon="cpu" label="Engine" value={car.engine} colors={colors} />}
-        {!isBike && (car.airbags || car.airbagsEquipped) && (
-          <SpecBox 
-            icon="shield" 
-            label="Airbags" 
-            value={car.airbags ? (car.airbags.includes('Airbag') ? car.airbags : `${car.airbags} Airbags`) : 'Equipped'} 
-            colors={colors} 
-          />
-        )}
-        {car.topSpeed && <SpecBox icon="wind" label="Top Speed" value={car.topSpeed} colors={colors} />}
-        {car.acceleration && <SpecBox icon="zap" label="0-100 km/h" value={car.acceleration} colors={colors} />}
-        {car.tankCapacity && <SpecBox icon="battery" label={car.fuel === 'EV' ? 'Battery' : 'Tank'} value={car.tankCapacity} colors={colors} />}
-        {car.groundClearance && <SpecBox icon="arrow-up" label="Clearance" value={car.groundClearance} colors={colors} />}
-        {car.kerbWeight && <SpecBox icon="box" label="Weight" value={car.kerbWeight} colors={colors} />}
         {!isBike && car.bootSpace && <SpecBox icon="briefcase" label="Boot Space" value={car.bootSpace} colors={colors} />}
+        {car.groundClearance && <SpecBox icon="arrow-up" label="Clearance" value={car.groundClearance} colors={colors} />}
+        {car.tankCapacity && <SpecBox icon="battery" label={car.fuel === 'EV' ? 'Battery' : 'Tank'} value={car.tankCapacity} colors={colors} />}
+        {car.kerbWeight && <SpecBox icon="box" label="Weight" value={car.kerbWeight} colors={colors} />}
         {car.brakes && <SpecBox icon="disc" label="Brakes" value={car.brakes} colors={colors} />}
         {car.tyreSize && <SpecBox icon="circle" label="Tyre Size" value={car.tyreSize} colors={colors} />}
+        {car.topSpeed && <SpecBox icon="wind" label="Top Speed" value={car.topSpeed} colors={colors} />}
+        {car.acceleration && <SpecBox icon="zap" label="0-100 km/h" value={car.acceleration} colors={colors} />}
       </ScrollView>
 
-      {/* Safety & Security — from DB */}
-      {(!isBike || car.bikeAbs || car.discBrakes || car.cbs || car.gps) && (
-        <>
-          <View style={[styles.sectionHeaderRow, { marginTop: 28 }]}>
-            <View style={[styles.sectionHeaderIconWrap, { backgroundColor: colors.tintLight }]}>
-              <Feather name="shield" size={15} color={colors.primaryText} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Safety & Security</Text>
-          </View>
-          <View style={[styles.grid, { borderColor: colors.border, backgroundColor: colors.card, marginTop: 12 }]}>
-            {!isBike && (
-              <DetailRow 
-                label="Airbags" 
-                value={car.airbags ? (car.airbags.includes('Airbag') ? car.airbags : `${car.airbags} Airbags`) : (car.airbagsEquipped ? 'Equipped' : 'Standard Protection')} 
-              />
-            )}
-            {!isBike && (car.absEbd !== false) && (
-              <DetailRow label="Braking Safety" value="ABS with EBD" />
-            )}
-            {isBike && car.bikeAbs && <DetailRow label="Braking Safety" value="Anti-lock Braking System (ABS)" />}
-            {isBike && car.discBrakes && <DetailRow label="Disc Brakes" value="Front & Rear Disc" />}
-            {isBike && car.cbs && <DetailRow label="Combined Brakes" value="CBS Equipped" />}
-            {car.rearParkingSensors && <DetailRow label="Parking Sensors" value="Rear Ultrasonic Sensors" />}
-            {car.rearCamera && <DetailRow label="Rear Camera" value="Park Assist Camera" />}
-            {car.gps && <DetailRow label="GPS Tracking" value="Real-time GPS Navigation" />}
-          </View>
-        </>
-      )}
-
-      {/* Connectivity & Infotainment — from DB */}
-      {(car.carPlay || car.touchscreen || car.bluetooth || car.usbCharging || (!isBike && car.ac !== false) || car.sunroof) && (
-        <>
-          <View style={[styles.sectionHeaderRow, { marginTop: 28 }]}>
-            <View style={[styles.sectionHeaderIconWrap, { backgroundColor: colors.tintLight }]}>
-              <Feather name="smartphone" size={15} color={colors.primaryText} />
-            </View>
-            <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Infotainment & Convenience</Text>
-          </View>
-          <View style={[styles.grid, { borderColor: colors.border, backgroundColor: colors.card, marginTop: 12 }]}>
-            {car.carPlay && <DetailRow label="Smartphone Link" value="Apple CarPlay & Android Auto" />}
-            {car.touchscreen && <DetailRow label="Touchscreen Display" value="Infotainment Screen" />}
-            {car.bluetooth && <DetailRow label="Bluetooth Audio" value="Hands-free & Music" />}
-            {car.usbCharging && <DetailRow label="USB Charging" value="Fast Device Charging" />}
-            {!isBike && car.ac !== false && <DetailRow label="Air Conditioning" value="Climate Control (AC)" />}
-            {car.sunroof && <DetailRow label="Sunroof" value="Electric Sunroof" />}
-          </View>
-        </>
-      )}
-
       {/* Vehicle Info — from DB */}
-      {(car.color || car.registrationYear || car.manufacturer || car.variant || (!isBike && car.doors) || car.luggage) && (
+      {(car.color || car.registrationYear || car.manufacturer || car.variant || (!isBike && car.doors)) && (
         <>
           <View style={[styles.sectionHeaderRow, { marginTop: 28 }]}>
             <View style={[styles.sectionHeaderIconWrap, { backgroundColor: colors.tintLight }]}>
               <Feather name="info" size={15} color={colors.primaryText} />
             </View>
-            <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Vehicle Info</Text>
+            <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Vehicle Details</Text>
           </View>
           <View style={[styles.grid, { borderColor: colors.border, backgroundColor: colors.card, marginTop: 12 }]}>
             {car.manufacturer && <DetailRow label="Manufacturer" value={car.manufacturer} />}
-            {car.variant && <DetailRow label="Variant" value={car.variant} />}
+            {car.variant && <DetailRow label="Variant / Model" value={car.variant} />}
             {car.color && <DetailRow label="Colour" value={car.color} />}
-            {car.registrationYear && <DetailRow label="Reg. Year" value={car.registrationYear} />}
+            {car.registrationYear && <DetailRow label="Registration Year" value={car.registrationYear} />}
             {!isBike && car.doors && <DetailRow label="Doors" value={car.doors} />}
-            {car.luggage && <DetailRow label="Luggage" value={car.luggage} />}
           </View>
         </>
       )}
@@ -215,10 +151,16 @@ export function SpecsSection({ car }: { car: Car }) {
   );
 }
 
-// Helper to group vehicle features into distinct categories
+// Helper to group vehicle features into distinct categories without repetition
 function getCategorizedFeatures(car: Car) {
   const isBike = car.type === 'Bike';
-  const allFeatures = [...(car.features || [])];
+  const rawList = (car.features && car.features.length > 0)
+    ? car.features
+    : [
+        ...(car.safetyFeatures || []),
+        ...(car.techFeatures || []),
+        ...(car.comfortFeatures || []),
+      ];
 
   const safetyKeywords = /safety|airbag|abs|ebd|sensor|camera|gps|brake|cbs|disc|traction|isofix|child lock|immobilizer|seat belt|central lock/i;
   const techKeywords = /carplay|android auto|bluetooth|touchscreen|infotainment|audio|sound|speaker|usb|charging|display|cluster|navigation|wireless/i;
@@ -229,71 +171,43 @@ function getCategorizedFeatures(car: Car) {
   const comfortItems: string[] = [];
   const generalItems: string[] = [];
 
-  const seen = new Set<string>();
+  const seenKeys = new Set<string>();
 
-  const addItem = (list: string[], text: string) => {
-    const key = text.trim().toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    list.push(text.trim());
+  const getCanonicalKey = (text: string) => {
+    const s = text.toLowerCase();
+    if (/(auto\s*ac|air\s*condition|climate\s*control)/i.test(s)) return 'ac';
+    if (/sunroof/i.test(s)) return 'sunroof';
+    if (/airbag/i.test(s)) return 'airbag';
+    if (/(rear|reverse|backup)\s*camera/i.test(s)) return 'camera';
+    if (/(touchscreen|hd\s*display|infotainment)/i.test(s)) return 'screen';
+    if (/usb/i.test(s)) return 'usb';
+    if (/(carplay|android\s*auto)/i.test(s)) return 'carplay';
+    if (/bluetooth/i.test(s)) return 'bluetooth';
+    if (/parking\s*sensor/i.test(s)) return 'sensor';
+    if (/gps/i.test(s)) return 'gps';
+    if (/abs/i.test(s)) return 'abs';
+    if (/cruise/i.test(s)) return 'cruise';
+    if (/ventilated/i.test(s)) return 'ventilated';
+    if (/(push\s*start|keyless)/i.test(s)) return 'keyless';
+    return s.trim();
   };
 
-  // 1. Explicit DB features
-  if (car.safetyFeatures?.length) {
-    for (const item of car.safetyFeatures) addItem(safetyItems, item);
-  } else {
-    if (!isBike && (car.airbags || car.airbagsEquipped)) {
-      const label = car.airbags ? (car.airbags.includes('Airbag') ? car.airbags : `${car.airbags} Airbags`) : 'Airbags Protection';
-      addItem(safetyItems, label);
-    }
-    if (car.absEbd) addItem(safetyItems, 'ABS with EBD');
-    if (car.rearParkingSensors) addItem(safetyItems, 'Rear Parking Sensors');
-    if (car.rearCamera) addItem(safetyItems, 'Rear View Camera');
-    if (car.gps) addItem(safetyItems, 'GPS Navigation & Tracking');
-    if (isBike && car.bikeAbs) addItem(safetyItems, 'Anti-lock Braking System (ABS)');
-    if (isBike && car.discBrakes) addItem(safetyItems, 'Front & Rear Disc Brakes');
-    if (isBike && car.cbs) addItem(safetyItems, 'Combined Braking System (CBS)');
-  }
+  for (const item of rawList) {
+    if (!item || !item.trim()) continue;
+    const trimmed = item.trim();
+    const canonKey = getCanonicalKey(trimmed);
+    if (seenKeys.has(canonKey)) continue;
+    seenKeys.add(canonKey);
 
-  if (car.techFeatures?.length) {
-    for (const item of car.techFeatures) addItem(techItems, item);
-  } else {
-    if (car.carPlay) addItem(techItems, 'Apple CarPlay & Android Auto');
-    if (car.touchscreen) addItem(techItems, 'Touchscreen Infotainment');
-    if (car.bluetooth) addItem(techItems, 'Bluetooth Audio & Handsfree');
-    if (car.usbCharging) addItem(techItems, 'USB Fast Charging');
-    if (car.digitalDisplay) addItem(techItems, 'Digital Instrument Cluster');
-  }
-
-  if (car.comfortFeatures?.length) {
-    for (const item of car.comfortFeatures) addItem(comfortItems, item);
-  } else {
-    if (!isBike && car.ac !== false) addItem(comfortItems, 'Air Conditioning (AC)');
-    if (car.sunroof) addItem(comfortItems, 'Electric Sunroof');
-  }
-
-  // 2. Classify any remaining items from car.features
-  for (const item of allFeatures) {
-    const lower = item.trim().toLowerCase();
-    if (seen.has(lower)) continue;
-
-    let alreadyCovered = false;
-    for (const s of seen) {
-      if (s === lower || (s.length > 4 && lower.length > 4 && (s.includes(lower) || lower.includes(s)))) {
-        alreadyCovered = true;
-        break;
-      }
-    }
-    if (alreadyCovered) continue;
-
+    const lower = trimmed.toLowerCase();
     if (safetyKeywords.test(lower)) {
-      addItem(safetyItems, item);
+      safetyItems.push(trimmed);
     } else if (techKeywords.test(lower)) {
-      addItem(techItems, item);
+      techItems.push(trimmed);
     } else if (comfortKeywords.test(lower)) {
-      addItem(comfortItems, item);
+      comfortItems.push(trimmed);
     } else {
-      addItem(generalItems, item);
+      generalItems.push(trimmed);
     }
   }
 

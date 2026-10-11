@@ -581,8 +581,53 @@ export const API = {
         ...safetyFeatures,
       ];
 
-      // Merge with knowledge features without duplicates
-      const mergedFeatures = Array.from(new Set([...dbFeatures, ...(knowledge.features || [])]));
+      // Merge with knowledge features without duplicates or overlapping synonyms
+      const mergedFeatures: string[] = [...dbFeatures];
+      const normalizedDbKeys = dbFeatures.map(f => f.toLowerCase());
+
+      for (const kf of (knowledge.features || [])) {
+        const lower = kf.toLowerCase();
+        // Skip synonyms or duplicates
+        const isAc = /(auto\s*ac|air\s*condition|climate\s*control)/i.test(lower);
+        const isSunroof = /sunroof/i.test(lower);
+        const isCamera = /(rear|reverse|backup)\s*camera/i.test(lower);
+        const isScreen = /(touchscreen|display|infotainment)/i.test(lower);
+        const isUsb = /usb/i.test(lower);
+        const isCarPlay = /(carplay|android\s*auto)/i.test(lower);
+        const isBt = /bluetooth/i.test(lower);
+        const isAirbag = /airbag/i.test(lower);
+        const isAbs = /abs/i.test(lower);
+        const isSensor = /sensor/i.test(lower);
+        const isGps = /gps/i.test(lower);
+
+        if (isAc && normalizedDbKeys.some(k => k.includes('air conditioning'))) continue;
+        if (isSunroof && normalizedDbKeys.some(k => k.includes('sunroof'))) {
+          if (lower.includes('panoramic')) {
+            const idx = mergedFeatures.findIndex(f => f.toLowerCase().includes('sunroof'));
+            if (idx !== -1) mergedFeatures[idx] = 'Panoramic Sunroof';
+          }
+          continue;
+        }
+        if (isCamera && normalizedDbKeys.some(k => k.includes('rear view camera'))) continue;
+        if (isScreen && normalizedDbKeys.some(k => k.includes('touchscreen'))) {
+          if (/\d+(\.\d+)?["”]/.test(kf)) {
+            const idx = mergedFeatures.findIndex(f => f.toLowerCase().includes('touchscreen'));
+            if (idx !== -1) mergedFeatures[idx] = kf;
+          }
+          continue;
+        }
+        if (isUsb && normalizedDbKeys.some(k => k.includes('usb'))) continue;
+        if (isCarPlay && normalizedDbKeys.some(k => k.includes('carplay'))) continue;
+        if (isBt && normalizedDbKeys.some(k => k.includes('bluetooth'))) continue;
+        if (isAirbag && normalizedDbKeys.some(k => k.includes('airbag'))) continue;
+        if (isAbs && normalizedDbKeys.some(k => k.includes('abs'))) continue;
+        if (isSensor && normalizedDbKeys.some(k => k.includes('sensor'))) continue;
+        if (isGps && normalizedDbKeys.some(k => k.includes('gps'))) continue;
+
+        if (!mergedFeatures.some(f => f.toLowerCase() === lower)) {
+          mergedFeatures.push(kf);
+        }
+      }
 
       // Registration year from DB date
       const regYear = v.registrationDate ? new Date(v.registrationDate).getFullYear().toString() : undefined;

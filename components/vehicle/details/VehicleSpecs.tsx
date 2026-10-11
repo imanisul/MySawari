@@ -29,10 +29,89 @@ export function VehicleSpecs({ car }: { car: Car }) {
           <Text style={[styles.specText, { color: colors.foreground }]}>{car.fuel}</Text>
         </View>
 
-        {car.mileage && (
+        {car.type !== 'Bike' && (car.ac !== false) && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="wind" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>Air Conditioning</Text>
+          </View>
+        )}
+
+        {car.mileage && car.mileage !== 'N/A' && (
           <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="bar-chart-2" size={15} color={colors.primaryText} />
             <Text style={[styles.specText, { color: colors.foreground }]}>{car.mileage}</Text>
+          </View>
+        )}
+
+        {car.carPlay && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="smartphone" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>Apple CarPlay / Android Auto</Text>
+          </View>
+        )}
+
+        {car.touchscreen && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="tv" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>Touchscreen</Text>
+          </View>
+        )}
+
+        {car.sunroof && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="sun" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>Sunroof</Text>
+          </View>
+        )}
+
+        {(car.airbagsEquipped || !!car.airbags) && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="shield" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>
+              {car.airbags ? (car.airbags.includes('Airbag') ? car.airbags : `${car.airbags} Airbags`) : 'Airbags'}
+            </Text>
+          </View>
+        )}
+
+        {car.absEbd && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="check-circle" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>ABS + EBD</Text>
+          </View>
+        )}
+
+        {car.rearCamera && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="video" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>Rear Camera</Text>
+          </View>
+        )}
+
+        {car.rearParkingSensors && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="radio" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>Parking Sensors</Text>
+          </View>
+        )}
+
+        {car.gps && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="navigation" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>GPS Navigation</Text>
+          </View>
+        )}
+
+        {car.usbCharging && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="battery-charging" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>USB Charging</Text>
+          </View>
+        )}
+
+        {car.bluetooth && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="bluetooth" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>Bluetooth</Text>
           </View>
         )}
 

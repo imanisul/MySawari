@@ -149,7 +149,7 @@ export default function CarDetailsScreen() {
   });
   const reviewCount = [...(selectedCar?.reviews || []), ...(dbReviews as any[])].filter((r: any) => r.rating >= MIN_PUBLIC_REVIEW_RATING).length;
   const photoCount = (selectedCar?.images || (selectedCar?.image ? [selectedCar.image] : [])).length;
-  const tabCount: Record<SectionKey, number | null> = { gallery: photoCount || null, about: null, specifications: null, features: null, location: null, reviews: reviewCount || null };
+  const tabCount: Record<SectionKey, number | null> = { gallery: photoCount || null, about: null, specifications: null, features: enrichedCar?.features?.length || null, location: null, reviews: reviewCount || null };
 
   const scrollToSection = (key: SectionKey) => {
     Haptics.selectionAsync();

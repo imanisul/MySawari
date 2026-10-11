@@ -60,6 +60,25 @@ export type Car = {
   reviewCount?: number;
   description?: string;
   features?: string[];
+  // DB Specifications & Safety
+  ac?: boolean;
+  carPlay?: boolean;
+  bluetooth?: boolean;
+  touchscreen?: boolean;
+  usbCharging?: boolean;
+  sunroof?: boolean;
+  airbagsEquipped?: boolean;
+  absEbd?: boolean;
+  rearParkingSensors?: boolean;
+  rearCamera?: boolean;
+  gps?: boolean;
+  digitalDisplay?: boolean;
+  bikeAbs?: boolean;
+  discBrakes?: boolean;
+  cbs?: boolean;
+  safetyFeatures?: string[];
+  techFeatures?: string[];
+  comfortFeatures?: string[];
   luggage?: string;
   doors?: string;
   modelYear?: string;

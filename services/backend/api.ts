@@ -521,7 +521,6 @@ export const API = {
       const knowledge = getVehicleKnowledge(v.vehicleName, vehicleType);
 
       // Extract DB features & amenities
-      const dbFeatures: string[] = [];
       const isYes = (val: any) => {
         if (!val) return false;
         if (typeof val === 'boolean') return val;
@@ -529,21 +528,58 @@ export const API = {
         return s === 'yes' || s === 'true' || s === '1' || s === 'available' || s === 'equipped';
       };
 
-      if (isYes(v.ac)) dbFeatures.push('Air Conditioning');
-      if (isYes(v.carPlay)) dbFeatures.push('Android Auto & Apple CarPlay');
-      if (isYes(v.bluetooth)) dbFeatures.push('Bluetooth Audio');
-      if (isYes(v.touchscreen)) dbFeatures.push('Touchscreen Display');
-      if (isYes(v.usbCharging)) dbFeatures.push('USB Charging Port');
-      if (isYes(v.sunroof)) dbFeatures.push('Sunroof');
-      if (isYes(v.airbags)) dbFeatures.push('Airbags');
-      if (isYes(v.absEbd)) dbFeatures.push('ABS with EBD');
-      if (isYes(v.rearParkingSensors)) dbFeatures.push('Rear Parking Sensors');
-      if (isYes(v.rearCamera)) dbFeatures.push('Rear Camera');
-      if (isYes(v.gps)) dbFeatures.push('GPS Navigation');
-      if (isYes(v.digitalDisplay)) dbFeatures.push('Digital Display');
-      if (isYes(v.bikeAbs)) dbFeatures.push('ABS (Anti-lock Braking)');
-      if (isYes(v.discBrakes)) dbFeatures.push('Disc Brakes');
-      if (isYes(v.cbs)) dbFeatures.push('CBS (Combined Braking)');
+      const isNo = (val: any) => {
+        if (!val) return false;
+        if (typeof val === 'boolean') return !val;
+        const s = String(val).trim().toLowerCase();
+        return s === 'no' || s === 'false' || s === '0' || s === 'none';
+      };
+
+      const hasAc = !isBike && (isYes(v.ac) || (!isNo(v.ac) && (v.ac === undefined || v.ac === '' || v.ac === null)));
+      const hasCarPlay = isYes(v.carPlay);
+      const hasBluetooth = isYes(v.bluetooth);
+      const hasTouchscreen = isYes(v.touchscreen);
+      const hasUsbCharging = isYes(v.usbCharging);
+      const hasSunroof = isYes(v.sunroof);
+      const hasAirbags = isYes(v.airbags) || (!isBike && Boolean(knowledge.airbags));
+      const hasAbsEbd = isYes(v.absEbd);
+      const hasRearSensors = isYes(v.rearParkingSensors);
+      const hasRearCamera = isYes(v.rearCamera);
+      const hasGps = isYes(v.gps);
+      const hasDigitalDisplay = isYes(v.digitalDisplay);
+      const hasBikeAbs = isYes(v.bikeAbs);
+      const hasDiscBrakes = isYes(v.discBrakes);
+      const hasCbs = isYes(v.cbs);
+
+      // Dedicated Safety Features
+      const safetyFeatures: string[] = [];
+      if (hasAirbags) safetyFeatures.push(knowledge.airbags ? `${knowledge.airbags} Airbags` : 'Airbags Protection');
+      if (hasAbsEbd) safetyFeatures.push('ABS with EBD');
+      if (hasRearSensors) safetyFeatures.push('Rear Parking Sensors');
+      if (hasRearCamera) safetyFeatures.push('Rear View Camera');
+      if (hasGps) safetyFeatures.push('GPS Real-time Tracking & Navigation');
+      if (hasBikeAbs) safetyFeatures.push('Anti-lock Braking System (ABS)');
+      if (hasDiscBrakes) safetyFeatures.push('Front & Rear Disc Brakes');
+      if (hasCbs) safetyFeatures.push('Combined Braking System (CBS)');
+
+      // Dedicated Tech & Infotainment Features
+      const techFeatures: string[] = [];
+      if (hasCarPlay) techFeatures.push('Apple CarPlay & Android Auto');
+      if (hasBluetooth) techFeatures.push('Bluetooth Audio & Handsfree');
+      if (hasTouchscreen) techFeatures.push('Touchscreen Infotainment');
+      if (hasUsbCharging) techFeatures.push('USB Fast Charging Port');
+      if (hasDigitalDisplay) techFeatures.push('Digital Instrument Cluster');
+
+      // Dedicated Comfort & Convenience Features
+      const comfortFeatures: string[] = [];
+      if (hasAc) comfortFeatures.push('Air Conditioning (AC)');
+      if (hasSunroof) comfortFeatures.push('Electric Sunroof');
+
+      const dbFeatures: string[] = [
+        ...comfortFeatures,
+        ...techFeatures,
+        ...safetyFeatures,
+      ];
 
       // Merge with knowledge features without duplicates
       const mergedFeatures = Array.from(new Set([...dbFeatures, ...(knowledge.features || [])]));
@@ -612,15 +648,35 @@ export const API = {
         groundClearance: knowledge.groundClearance,
         kerbWeight: knowledge.kerbWeight,
         doors: knowledge.doors,
-        airbags: isYes(v.airbags) ? (knowledge.airbags || 'Equipped') : (knowledge.airbags || undefined),
+        airbags: hasAirbags ? (knowledge.airbags || 'Equipped') : (isBike ? undefined : (knowledge.airbags || undefined)),
         tankCapacity: knowledge.tankCapacity,
         topSpeed: knowledge.topSpeed,
         acceleration: knowledge.acceleration,
         tyreSize: knowledge.tyreSize,
-        brakes: isYes(v.discBrakes) ? 'Front & Rear Disc' : knowledge.brakes,
+        brakes: hasDiscBrakes ? 'Front & Rear Disc' : knowledge.brakes,
         features: mergedFeatures,
         highlights: knowledge.highlights,
         luggage: knowledge.luggage,
+
+        // DB Specifications, Safety & Amenities flags
+        ac: hasAc,
+        carPlay: hasCarPlay,
+        bluetooth: hasBluetooth,
+        touchscreen: hasTouchscreen,
+        usbCharging: hasUsbCharging,
+        sunroof: hasSunroof,
+        airbagsEquipped: hasAirbags,
+        absEbd: hasAbsEbd,
+        rearParkingSensors: hasRearSensors,
+        rearCamera: hasRearCamera,
+        gps: hasGps,
+        digitalDisplay: hasDigitalDisplay,
+        bikeAbs: hasBikeAbs,
+        discBrakes: hasDiscBrakes,
+        cbs: hasCbs,
+        safetyFeatures,
+        techFeatures,
+        comfortFeatures,
 
         // Availability is derived from these facts (see getAvailability in utils/sawari).
         dbStatus: v.status || 'available',

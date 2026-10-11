@@ -34,9 +34,9 @@ export const bookingsQueryOptions = {
 // Safety net only: every request has its own timeout and retries, and the loading screen offers
 // Retry / Continue after a few seconds of waiting. (It used to give up after 4 s, so Home often opened on the
 // saved copy of the fleet with offers, trips, wallet and photos still popping in afterwards.)
-const HOME_DATA_MAX_WAIT_MS = 45 * 1000;
+const HOME_DATA_MAX_WAIT_MS = 8 * 1000;
 // Card photos are plate-processed on the server; after a deploy that can be slow, so they get a shorter wait.
-const CARD_IMAGES_MAX_WAIT_MS = 8 * 1000;
+const CARD_IMAGES_MAX_WAIT_MS = 6 * 1000;
 
 export type HomeLoadStep = { key: 'vehicles' | 'offers' | 'trips' | 'wallet'; label: string; done: boolean };
 
@@ -54,10 +54,9 @@ export function homeLoadSteps(isAuthenticated: boolean): HomeLoadStep[] {
 }
 
 /**
- * Everything the Home screen shows for this person, loaded from the server while the loading screen is up:
- * live vehicles (not the saved copy), offers and special deals, their recent searches and — when signed in —
- * their bookings and wallet / membership. Requests already in flight are joined, not repeated. Never throws.
- * `onStep` is told as each part arrives, so the loading page can tick it off.
+ * Everything the Home screen shows for this person, loaded quickly:
+ * live vehicles (or primed disk cache), offers and special deals, and — when signed in —
+ * their bookings and wallet / membership. Secondary tasks run without blocking.
  */
 export async function loadHomeData(
   queryClient: QueryClient,
@@ -67,19 +66,21 @@ export async function loadHomeData(
   },
 ): Promise<void> {
   const step = <T,>(key: HomeLoadStep['key'], p: Promise<T>) => p.finally(() => onStep?.(key));
+
+  // Background non-blocking syncs
+  if (syncNotifications) {
+    syncNotifications().catch(() => {});
+  }
+  queryClient.fetchQuery(recentSearchesQueryOptions(isAuthenticated ? userId : null)).catch(() => {});
+  queryClient.fetchQuery(recentlyViewedQueryOptions(isAuthenticated ? userId : null)).catch(() => {});
+
   const tasks: Promise<unknown>[] = [
-    // staleTime 0 when only the saved copy is there, so a live fetch is made (or the running one joined).
-    // Then the card photos, so Home opens with its pictures instead of grey placeholders.
-    step('vehicles', queryClient.fetchQuery({ ...vehiclesQueryOptions, staleTime: hasLiveVehicles() ? vehiclesQueryOptions.staleTime : 0 })),
+    step('vehicles', queryClient.fetchQuery(vehiclesQueryOptions)),
     step('offers', queryClient.fetchQuery(offersQueryOptions)),
-    // The bell's unread count is right from the first frame.
-    ...(syncNotifications ? [syncNotifications().catch(() => {})] : []),
-    queryClient.fetchQuery(recentSearchesQueryOptions(isAuthenticated ? userId : null)),
-    queryClient.fetchQuery(recentlyViewedQueryOptions(isAuthenticated ? userId : null)),
   ];
   if (isAuthenticated) {
     tasks.push(step('trips', queryClient.fetchQuery(bookingsQueryOptions)));
-    tasks.push(step('wallet', fetchWallet())); // membership card + SawariCash, applied to the app state
+    tasks.push(step('wallet', fetchWallet()));
   }
   await Promise.race([
     Promise.allSettled(tasks),

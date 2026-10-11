@@ -92,6 +92,7 @@ export function primeVehicles(queryClient: QueryClient) {
         if (Array.isArray(raw)) {
           const mapped = API.mapVehicles(raw);
           queryClient.setQueryData(VEHICLES_KEY, mapped);
+          liveVehiclesAt = Date.now();
           prefetchVehicleImages(mapped);
         }
       } catch (e) {}

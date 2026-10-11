@@ -479,13 +479,9 @@ export const API = {
   /** The vehicles exactly as the backend sends them (this is what is saved on the device). */
   async getVehiclesRaw(): Promise<any[]> {
     try {
-      let response = await fetchWithAuth(`${BACKEND_URL}/vehicles`);
-
-      // The vehicle list is public. An expired session must not turn into an empty fleet, so ask again without it.
-      if (response.status === 401) {
-        response = await timedFetch(`${BACKEND_URL}/vehicles`);
-      }
-      
+      // The vehicle catalogue is public; use timedFetch with X-Install-Id directly to eliminate SecureStore/token latency
+      const headers = await withInstallId();
+      const response = await timedFetch(`${BACKEND_URL}/vehicles`, { headers });
       const data = await response.json();
       
       if (!response.ok) throw new Error(data.message || 'Failed to fetch vehicles');
@@ -493,7 +489,7 @@ export const API = {
       // Extra safeguard: explicitly filter out any vehicles marked as deleted
       return (data.data || []).filter((v: any) => v.isDeleted !== true);
     } catch (e: any) {
-      console.error('getVehiclesWithAvailability error:', e);
+      console.error('getVehiclesRaw error:', e);
       throw e;
     }
   },

@@ -56,8 +56,9 @@ export function isOfferLive(offer: { active?: boolean; expiryDate?: string | Dat
 export const offersQueryOptions = {
   queryKey: ['offers'] as const,
   queryFn: () => fetchOffers(),
-  staleTime: 15 * 1000,
-  refetchOnWindowFocus: true,
+  staleTime: 5 * 60 * 1000,
+  refetchInterval: 5 * 60 * 1000,
+  refetchOnWindowFocus: false,
 };
 
 export async function fetchOffers(): Promise<Offer[]> {

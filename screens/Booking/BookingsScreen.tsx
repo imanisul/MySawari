@@ -293,21 +293,37 @@ export default function BookingsScreen() {
                     )}
                   </View>
                   
-                  {((booking.couponDiscount || 0) > 0 || (booking.membershipDiscount || 0) > 0) && (
+                  {((booking.couponDiscount || 0) > 0 || (booking.membershipDiscount || 0) > 0 || (booking.sawariCashUsed || 0) > 0 || (booking.manualDiscount || 0) > 0) && (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                      {booking.couponDiscount > 0 && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                          <Feather name="tag" size={11} color={colors.success} />
-                          <Text style={{ color: colors.success, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                            Coupon{booking.couponCode ? ` (${booking.couponCode})` : ''}: -₹{booking.couponDiscount.toLocaleString('en-IN')}
-                          </Text>
-                        </View>
-                      )}
                       {(booking.membershipDiscount || 0) > 0 && (
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '18', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
                           <Feather name="award" size={11} color={colors.primary} />
                           <Text style={{ color: colors.primaryText || colors.primary, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
                             Membership: -₹{(booking.membershipDiscount || 0).toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      )}
+                      {(booking.couponDiscount || 0) > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                          <Feather name="tag" size={11} color={colors.success} />
+                          <Text style={{ color: colors.success, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                            Coupon{booking.couponCode ? ` (${booking.couponCode})` : ''}: -₹{(booking.couponDiscount || 0).toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      )}
+                      {(booking.manualDiscount || 0) > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                          <Feather name="scissors" size={11} color="#D97706" />
+                          <Text style={{ color: '#B45309', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                            Special: -₹{(booking.manualDiscount || 0).toLocaleString('en-IN')}
+                          </Text>
+                        </View>
+                      )}
+                      {(booking.sawariCashUsed || 0) > 0 && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
+                          <Feather name="dollar-sign" size={11} color={colors.success} />
+                          <Text style={{ color: colors.success, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
+                            SawariCash: -₹{(booking.sawariCashUsed || 0).toLocaleString('en-IN')}
                           </Text>
                         </View>
                       )}

@@ -323,11 +323,14 @@ export default function BookingDetailScreen() {
           <SectionLabel label="PAYMENT" colors={colors} />
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <PaymentRow label={`Car Rental (${s.rentalDays} days)`} value={`₹${s.rentalAmount.toLocaleString('en-IN')}`} colors={colors} />
+            {(s.membershipDiscount || 0) > 0 && (
+              <PaymentRow label="Membership Discount ★" value={`-₹${(s.membershipDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />
+            )}
             {s.couponDiscount > 0 && (
               <PaymentRow label={`Coupon Discount${s.couponCode ? ` (${s.couponCode})` : ''} 🏷️`} value={`-₹${s.couponDiscount.toLocaleString('en-IN')}`} accent colors={colors} />
             )}
-            {(s.membershipDiscount || 0) > 0 && (
-              <PaymentRow label="Membership Discount ★" value={`-₹${(s.membershipDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />
+            {(s.manualDiscount || 0) > 0 && (
+              <PaymentRow label="Special Discount ✂️" value={`-₹${(s.manualDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />
             )}
             {(s.pickupCharge || 0) > 0 && <PaymentRow label={`Pickup Service (${s.pickupDistanceKm || 0} km)`} value={`₹${(s.pickupCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
             {(s.dropCharge || 0) > 0 && <PaymentRow label={`Drop Service (${s.dropDistanceKm || 0} km)`} value={`₹${(s.dropCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
@@ -335,11 +338,11 @@ export default function BookingDetailScreen() {
             {(s.securityDeposit || 0) > 0 && <PaymentRow label="Security Deposit" value={`₹${(s.securityDeposit || 0).toLocaleString('en-IN')}`} colors={colors} />}
             {s.sawariCashUsed > 0 && <PaymentRow label="SawariCash Applied 💰" value={`-₹${s.sawariCashUsed.toLocaleString('en-IN')}`} accent colors={colors} />}
 
-            {((s.couponDiscount || 0) > 0 || (s.membershipDiscount || 0) > 0 || (s.sawariCashUsed || 0) > 0) && (
+            {((s.couponDiscount || 0) > 0 || (s.membershipDiscount || 0) > 0 || (s.sawariCashUsed || 0) > 0 || (s.manualDiscount || 0) > 0) && (
               <View style={{ backgroundColor: colors.success + '14', borderColor: colors.success + '35', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Feather name="check-circle" size={14} color={colors.success} />
                 <Text style={{ color: colors.success, fontSize: 12, fontFamily: 'Inter_600SemiBold', flex: 1 }}>
-                  Total Savings: ₹{(((s.couponDiscount || 0) + (s.membershipDiscount || 0) + (s.sawariCashUsed || 0))).toLocaleString('en-IN')}
+                  Total Savings: ₹{(((s.couponDiscount || 0) + (s.membershipDiscount || 0) + (s.sawariCashUsed || 0) + (s.manualDiscount || 0))).toLocaleString('en-IN')}
                 </Text>
               </View>
             )}

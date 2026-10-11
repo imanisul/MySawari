@@ -71,6 +71,7 @@ export type BookingSnapshot = {
   dropDistanceKm?: number;
   dropLocationName?: string;
   membershipDiscount?: number;
+  manualDiscount?: number;
   pickupType?: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
@@ -1017,7 +1018,11 @@ export const API = {
           fastagAmount: 0,
           securityDeposit: 0,
           totalAmount: quote.rentalAmount,
-          discountAmount: quote.couponDiscount,
+          discountAmount: (quote.couponDiscount || 0) + (quote.subscriptionDiscount || 0) + (quote.sawariCashUsed || 0),
+          membershipDiscount: quote.subscriptionDiscount || 0,
+          couponDiscount: quote.couponDiscount || 0,
+          couponCode: quote.couponCode || '',
+          sawariCashUsed: quote.sawariCashUsed || 0,
           bookingAmountPaid: quote.onlinePayableNow,
           paymentMethod: quote.onlinePayableNow > 0 ? 'online' : 'wallet',
           balanceAmount: quote.remainingRentalAmount,
@@ -1033,9 +1038,11 @@ export const API = {
         },
         sawariCashUsed: quote.sawariCashUsed,
         subscriptionDiscount: quote.subscriptionDiscount,
+        membershipDiscount: quote.subscriptionDiscount || 0,
         // The server re-validates the code and recomputes the discount; without it the booking was
         // priced at ₹0 off on the server and rejected as a mismatch.
         couponCode: quote.couponDiscount > 0 ? quote.couponCode : undefined,
+        couponDiscount: quote.couponDiscount || 0,
       })
     });
     const saved = await response.json().catch(() => ({}));
@@ -1231,12 +1238,13 @@ export const API = {
         const memDiscount = asAmount(b.membershipDiscount ?? p.membershipDiscount ?? 0);
         const rawCouponDiscount = b.couponDiscount !== undefined ? asAmount(b.couponDiscount) : (p.couponDiscount !== undefined ? asAmount(p.couponDiscount) : undefined);
         const cashUsed = asAmount(b.sawariCashUsed ?? p.sawariCashUsed ?? b.sawariCashDiscount ?? p.sawariCashDiscount ?? 0);
+        const manualDiscount = asAmount(b.manualDiscount ?? p.manualDiscount ?? 0);
         const couponCode = (b.couponCode || p.couponCode || '').trim() || undefined;
 
         // Defensive calculation for couponDiscount if not explicitly provided
         const couponDiscount = rawCouponDiscount !== undefined 
           ? rawCouponDiscount 
-          : Math.max(0, asAmount(p.discountAmount) - memDiscount - cashUsed);
+          : Math.max(0, asAmount(p.discountAmount) - memDiscount - cashUsed - manualDiscount);
 
         // Derive base rental amount before discounts:
         const dailyRateFromVeh = asAmount(b.vehicleId?.pricePerDay);
@@ -1282,6 +1290,7 @@ export const API = {
           couponCode,
           couponDiscount,
           membershipDiscount: memDiscount,
+          manualDiscount,
           sawariCashUsed: cashUsed,
           bookingAdvance: bookingPaid,
           onlinePayableNow: bookingPaid,

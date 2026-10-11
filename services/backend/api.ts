@@ -364,9 +364,11 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     throw error;
   }
 
-  // If server is cold-starting on Render (502/503/504), wait 2s and retry once automatically
-  if (response.status === 502 || response.status === 503 || response.status === 504) {
-    await new Promise((r) => setTimeout(r, 2000));
+  // If server is cold-starting on Render (502/503/504), retry automatically with backoff
+  let retryCount = 0;
+  while ((response.status === 502 || response.status === 503 || response.status === 504) && retryCount < 2) {
+    retryCount++;
+    await new Promise((r) => setTimeout(r, retryCount * 2000));
     try {
       response = await timedFetch(url, { ...options, headers });
     } catch {}

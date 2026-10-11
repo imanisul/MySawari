@@ -179,7 +179,8 @@ export async function timedFetch(url: string, options: RequestInit = {}, timeout
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   try {
-    return await fetch(url, { ...options, signal: controller.signal });
+    const rawRes = await fetch(url, { ...options, signal: controller.signal });
+    return await normalizeResponse(rawRes);
   } catch (error: any) {
     if (timedOut) {
       throw new Error('The server is taking too long to respond. Please check your connection and try again.');
@@ -309,21 +310,39 @@ const onRefreshed = (token: string) => {
 };
 
 /**
- * The backend answers a missing or invalid login with a 500 "Authentication required" instead of a 401.
- * Turn that into a real 401 so guests get the logged-out view and expired sessions go through the
- * refresh below, instead of every screen showing a server error.
+ * Normalizes HTTP responses from the backend:
+ * 1. If Render/Cloudflare returns 502/503/504 Bad Gateway (HTML), intercept it and return a valid JSON response
+ *    so `.json()` callers NEVER crash with "JSON Parse error: Unexpected character: <".
+ * 2. If the backend returns 500 "Authentication required" or "Invalid or expired token", normalize it to a clean 401.
  */
-async function normalizeAuthError(response: Response): Promise<Response> {
-  if (response.status !== 500) return response;
-  try {
-    const body = await response.clone().json();
-    if (body?.message === 'Authentication required' || body?.message === 'Invalid or expired token') {
-      return new Response(JSON.stringify({ success: false, message: body.message }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    }
-  } catch {}
+async function normalizeResponse(response: Response): Promise<Response> {
+  const contentType = response.headers.get('content-type') || '';
+  
+  // Intercept HTML gateway errors (502, 503, 504 from Render/Cloudflare)
+  if (!response.ok && !contentType.includes('application/json')) {
+    const isGatewayError = response.status === 502 || response.status === 503 || response.status === 504;
+    const message = isGatewayError
+      ? 'The server is temporarily starting up. Please try again in a few moments.'
+      : `Server returned HTTP ${response.status}. Please try again later.`;
+    return new Response(JSON.stringify({ success: false, message, isGatewayError: true }), {
+      status: response.status,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Normalize legacy 500 auth errors to 401
+  if (response.status === 500) {
+    try {
+      const body = await response.clone().json();
+      if (body?.message === 'Authentication required' || body?.message === 'Invalid or expired token') {
+        return new Response(JSON.stringify({ success: false, message: body.message }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+    } catch {}
+  }
+
   return response;
 }
 
@@ -344,7 +363,16 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
     }
     throw error;
   }
-  response = await normalizeAuthError(response);
+
+  // If server is cold-starting on Render (502/503/504), wait 2s and retry once automatically
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      response = await timedFetch(url, { ...options, headers });
+    } catch {}
+  }
+
+  response = await normalizeResponse(response);
 
   if (response.status === 401) {
     if (!token) {
@@ -420,7 +448,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
       }
       throw error;
     }
-    response = await normalizeAuthError(response);
+    response = await normalizeResponse(response);
   }
 
   return response;

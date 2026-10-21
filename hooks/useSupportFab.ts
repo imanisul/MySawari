@@ -43,3 +43,30 @@ export function useHideSupportWhileScrolling() {
 
   return { onScrollBeginDrag, onScrollEndDrag: show, onMomentumScrollEnd: show };
 }
+
+// Screens with the bottom tab bar carry their own Help button, so the floating
+// support button steps aside while one is mounted.
+let navHelpCount = 0;
+const navHelpListeners = new Set<() => void>();
+
+export function useRegisterNavHelp() {
+  useEffect(() => {
+    navHelpCount += 1;
+    navHelpListeners.forEach((l) => l());
+    return () => {
+      navHelpCount -= 1;
+      navHelpListeners.forEach((l) => l());
+    };
+  }, []);
+}
+
+export function useNavHelpPresent() {
+  return useSyncExternalStore(
+    (cb) => {
+      navHelpListeners.add(cb);
+      return () => { navHelpListeners.delete(cb); };
+    },
+    () => navHelpCount > 0,
+    () => false
+  );
+}

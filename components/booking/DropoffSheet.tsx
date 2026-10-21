@@ -113,7 +113,7 @@ export function DropoffSheet() {
         {filteredDestinations.map(loc => (
           <Pressable 
             key={loc.id} 
-            style={({ pressed }) => [styles.locationItem, { borderBottomColor: colors.border }, pressed && { backgroundColor: colors.tintLight }]}
+            style={[styles.locationItem, { borderBottomColor: colors.border, backgroundColor: 'transparent' }]}
             onPress={() => handleSelect(loc)}
           >
             <View style={[styles.iconWrap, { backgroundColor: colors.blue + '15' }]}>
@@ -128,7 +128,7 @@ export function DropoffSheet() {
         {/* A place that isn't listed can still be the destination — never a dead end. */}
         {searchQuery.trim().length >= 3 && !filteredDestinations.some((l) => l.name.toLowerCase() === searchQuery.trim().toLowerCase()) && (
           <Pressable
-            style={({ pressed }) => [styles.locationItem, { borderBottomColor: colors.border }, pressed && { backgroundColor: colors.tintLight }]}
+            style={[styles.locationItem, { borderBottomColor: colors.border, backgroundColor: 'transparent' }]}
             onPress={() => handleSelect({ id: `custom-${searchQuery.trim().toLowerCase()}`, name: searchQuery.trim(), desc: 'Your destination', type: 'map' })}
           >
             <View style={[styles.iconWrap, { backgroundColor: colors.primary + '20' }]}>

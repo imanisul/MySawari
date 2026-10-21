@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -119,7 +119,7 @@ export default function BookingsScreen() {
             />
           </View>
         </View>
-        <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
+        <LoginBottomSheet visible={showLogin} required onClose={() => setShowLogin(false)} />
         <BottomNavigation />
       </View>
     );
@@ -128,7 +128,8 @@ export default function BookingsScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <View style={[styles.content, { paddingTop: Math.max(insets.top + 16, 16) }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Your bookings</Text>
+        {/* Figma header: "Activity" in Semibold 24px black, on the 16px gutter. */}
+        <Text style={[styles.title, { color: '#000000', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, lineHeight: 36, letterSpacing: 0 }]}>Activity</Text>
         
         {loading ? (
           <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 32, paddingBottom: insets.bottom + 100 }}>
@@ -149,30 +150,28 @@ export default function BookingsScreen() {
           </View>
         ) : (
           <>
-            <View style={{ marginTop: 24, marginBottom: 12, marginHorizontal: -24 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingHorizontal: 24 }}>
+            {/* Figma tab row: 8px top/bottom, 16px side gutter; the selected tab is blue with a 3px underline. */}
+            <View style={{ marginTop: 16, marginBottom: 8, marginHorizontal: -16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 2, paddingHorizontal: 16 }}>
                 {tabs.map((item) => {
                   const isSelected = tab === item;
                   return (
-                    <Pressable 
-                      key={item} 
-                      onPress={() => setTab(item)} 
-                      style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 8,
-                        borderRadius: 99,
-                        backgroundColor: isSelected ? colors.primary : colors.card,
-                        borderWidth: 1,
-                        borderColor: isSelected ? colors.primary : colors.border,
-                      }}
+                    <Pressable
+                      key={item}
+                      accessibilityRole="tab"
+                      accessibilityState={{ selected: isSelected }}
+                      onPress={() => setTab(item)}
+                      style={{ alignItems: 'center', height: 22, paddingHorizontal: 12, justifyContent: 'center' }}
                     >
-                      <Text style={{ 
-                        color: isSelected ? colors.primaryForeground : colors.foreground, 
-                        fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium',
-                        fontSize: 14 
+                      <Text style={{
+                        color: isSelected ? '#2F3E75' : '#737373',
+                        fontFamily: isSelected ? 'PlusJakartaSans_600SemiBold' : 'PlusJakartaSans_500Medium',
+                        fontSize: 13,
+                        lineHeight: 20,
                       }}>
                         {item}
                       </Text>
+                      {isSelected && <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 3, borderRadius: 1, backgroundColor: '#2F3E75' }} />}
                     </Pressable>
                   );
                 })}
@@ -205,6 +204,13 @@ export default function BookingsScreen() {
                   }
                 ]}
               >
+                <View style={styles.bookingRow}>
+                {/* Figma: 120 x 116 car photo, 6px corners, on the left of the card. */}
+                <View style={[styles.upcomingPhoto, { backgroundColor: colors.muted }]}>
+                  {booking.vehicleImage ? (
+                    <Image source={{ uri: booking.vehicleImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  ) : null}
+                </View>
                 <View style={styles.upcomingCopy}>
                   <View style={styles.upcomingTitleRow}>
                     <Text style={[styles.upcomingName, { color: textColor, fontSize: 18, fontFamily: 'Inter_700Bold' }]}>{booking.vehicleName}</Text>
@@ -376,7 +382,10 @@ export default function BookingsScreen() {
                       <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>No Refund (Cancelled within 24 hours)</Text>
                     </View>
                   )}
-                  <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'flex-end' }}>
+                </View>
+                </View>
+                <View style={styles.bookingBand}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
                     {(tab === 'Upcoming' && (booking.status === 'CONFIRMED' || booking.status === 'PENDING')) && (
                       <Pressable 
                         onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('cancel'); }}
@@ -495,14 +504,20 @@ function EmptyState({ title, copy, colors }: { title: string; copy: string, colo
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: 24 },
+  content: { flex: 1, paddingHorizontal: 16 },
   title: { fontFamily: 'Inter_700Bold', fontSize: 24, letterSpacing: -0.5 },
   tabs: { gap: 24, paddingBottom: 2 },
   tab: { paddingVertical: 12, position: 'relative' },
   tabText: { fontSize: 15 },
   tabUnderline: { bottom: 0, height: 2, left: 0, position: 'absolute', right: 0 },
-  upcomingCard: { borderRadius: 16, flexDirection: 'row', marginBottom: 16, overflow: 'hidden' },
-  upcomingCopy: { flex: 1, padding: 16 },
+  // Figma booking card: 8px padding, 12px corners, 1px Primary/blue-50 border.
+  // Figma booking card: column of [photo + text] then the action band; 8px padding, 12px gap, 12px corners.
+  upcomingCard: { borderRadius: 12, flexDirection: 'column', gap: 6, marginBottom: 16, overflow: 'hidden', padding: 8 },
+  bookingRow: { flexDirection: 'row', gap: 12 },
+  // Figma band: 48px tall; with the 116px photo row and 6px gap the card comes to 188px.
+  bookingBand: { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4', borderRadius: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', height: 48, paddingHorizontal: 8 },
+  upcomingCopy: { flex: 1, paddingHorizontal: 12, paddingVertical: 2 },
+  upcomingPhoto: { borderRadius: 6, height: 116, overflow: 'hidden', width: 120 },
   upcomingTitleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   upcomingName: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
   upcomingStatus: { alignItems: 'center', flexDirection: 'row', gap: 6 },

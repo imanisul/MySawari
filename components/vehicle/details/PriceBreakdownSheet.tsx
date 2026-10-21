@@ -2,12 +2,14 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableWithoutFeedback, Animated, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import { useSawari } from '@/context/SawariContext';
+import type { TripPrice } from './useTripPrice';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 
-export function PriceBreakdownSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+type ReadyPrice = Extract<TripPrice, { state: 'ready' }>;
+
+/** Price breakup for the car details page; every figure comes from the trip's pricing quote. */
+export function PriceBreakdownSheet({ visible, onClose, price }: { visible: boolean; onClose: () => void; price: ReadyPrice }) {
   const colors = useColors();
-  const { pricingQuote } = useSawari();
   const slideAnim = useRef(new Animated.Value(400)).current;
 
   useEffect(() => {
@@ -26,7 +28,10 @@ export function PriceBreakdownSheet({ visible, onClose }: { visible: boolean; on
     }
   }, [visible]);
 
-  if (!pricingQuote) return null;
+  if (!visible) return null;
+
+  const { days, perDay, rentalAmount, driverCharge, pickupCharge, dropCharge, couponCode, couponDiscount, membershipDiscount, planName } = price;
+  const green = colors.success;
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
@@ -43,45 +48,63 @@ export function PriceBreakdownSheet({ visible, onClose }: { visible: boolean; on
 
               <View style={styles.content}>
                 <View style={styles.row}>
-                  <Text style={[styles.label, { color: colors.mutedForeground }]}>Rental Amount ({pricingQuote.rentalDays} Days)</Text>
-                  <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(pricingQuote.rentalAmount)}</Text>
+                  <Text style={[styles.label, { color: colors.mutedForeground }]}>Rent ({formatCurrency(perDay)} × {days} day{days === 1 ? '' : 's'})</Text>
+                  <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(rentalAmount)}</Text>
                 </View>
-                {pricingQuote.pickupCharge > 0 && (
+                {driverCharge > 0 && (
+                  <View style={styles.row}>
+                    <Text style={[styles.label, { color: colors.mutedForeground }]}>Driver</Text>
+                    <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(driverCharge)}</Text>
+                  </View>
+                )}
+                {pickupCharge > 0 && (
                   <View style={[styles.row, { alignItems: 'flex-start' }]}>
                     <View>
                       <Text style={[styles.label, { color: colors.mutedForeground }]}>Delivery (Pickup) Charge</Text>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.pickupDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{price.pickupDistanceKm} km × ₹{price.ratePerKm}/km</Text>
                     </View>
-                    <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(pricingQuote.pickupCharge)}</Text>
+                    <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(pickupCharge)}</Text>
                   </View>
                 )}
-                {pricingQuote.dropCharge > 0 && (
+                {dropCharge > 0 && (
                   <View style={[styles.row, { alignItems: 'flex-start' }]}>
                     <View>
                       <Text style={[styles.label, { color: colors.mutedForeground }]}>Collection (Drop) Charge</Text>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{pricingQuote.dropDistanceKm} km × ₹{pricingQuote.ratePerKm}/km</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>{price.dropDistanceKm} km × ₹{price.ratePerKm}/km</Text>
                     </View>
-                    <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(pricingQuote.dropCharge)}</Text>
+                    <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(dropCharge)}</Text>
+                  </View>
+                )}
+                {couponDiscount > 0 && (
+                  <View style={styles.row}>
+                    <Text style={[styles.label, { color: green }]}>Coupon{couponCode ? ` (${couponCode})` : ''}</Text>
+                    <Text style={[styles.value, { color: green, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>-{formatCurrency(couponDiscount)}</Text>
+                  </View>
+                )}
+                {membershipDiscount > 0 && (
+                  <View style={styles.row}>
+                    <Text style={[styles.label, { color: green }]}>Member discount{planName ? ` (${planName})` : ''}</Text>
+                    <Text style={[styles.value, { color: green, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>-{formatCurrency(membershipDiscount)}</Text>
                   </View>
                 )}
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 <View style={styles.row}>
                   <Text style={[styles.boldLabel, { color: colors.foreground }]}>Total Trip Price</Text>
                   <Text style={[styles.boldValue, { color: colors.foreground }]}>
-                    {formatCurrency(pricingQuote.discountedRentalAmount + pricingQuote.pickupCharge + pricingQuote.dropCharge)}
+                    {formatCurrency(price.final)}
                   </Text>
                 </View>
 
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 
                 <View style={styles.row}>
-                  <Text style={[styles.highlightLabel, { color: colors.foreground }]}>Payable Now</Text>
-                  <Text style={[styles.highlightValue, { color: colors.foreground }]}>{formatCurrency(pricingQuote.onlinePayableNow)}</Text>
+                  <Text style={[styles.highlightLabel, { color: colors.foreground }]}>Payable Now (Advance)</Text>
+                  <Text style={[styles.highlightValue, { color: green }]}>{formatCurrency(price.payableNow)}</Text>
                 </View>
 
                 <View style={[styles.row, { marginTop: 8 }]}>
-                  <Text style={[styles.highlightLabel, { color: colors.foreground }]}>Remaining Balance</Text>
-                  <Text style={[styles.highlightValue, { color: colors.foreground }]}>{formatCurrency(pricingQuote.remainingRentalAmount)}</Text>
+                  <Text style={[styles.highlightLabel, { color: colors.mutedForeground }]}>Remaining Balance (At Handover)</Text>
+                  <Text style={[styles.highlightValue, { color: colors.foreground }]}>{formatCurrency(price.balance)}</Text>
                 </View>
               </View>
             </Animated.View>
@@ -96,15 +119,15 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 18 },
+  title: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 },
   closeBtn: { padding: 4 },
   content: { padding: 20 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  label: { fontFamily: 'Inter_400Regular', fontSize: 15 },
-  value: { fontFamily: 'Inter_500Medium', fontSize: 15 },
-  boldLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
-  boldValue: { fontFamily: 'Inter_700Bold', fontSize: 16 },
-  highlightLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
-  highlightValue: { fontFamily: 'Inter_700Bold', fontSize: 15 },
+  label: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 15 },
+  value: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15 },
+  boldLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16 },
+  boldValue: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16 },
+  highlightLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
+  highlightValue: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15 },
   divider: { height: 1, marginVertical: 16 }
 });

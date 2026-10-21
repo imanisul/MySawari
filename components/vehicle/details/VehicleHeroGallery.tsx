@@ -3,17 +3,20 @@ import { View, ScrollView, Pressable, StyleSheet, Dimensions, Modal, Text, Anima
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useColors } from '@/hooks/useColors';
 import { Car } from '@/utils/sawari';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useDetailsPalette } from './detailsPalette';
 
 const { width } = Dimensions.get('window');
-const HEIGHT = 280; // Larger, more premium height
+const SLIDE_W = width - 32;
+const HEIGHT = Math.round(SLIDE_W * 0.587); // 361 × 212 in the design
+const THUMBS = 5;
+const THUMB_GAP = 6;
+const THUMB_W = (SLIDE_W - THUMB_GAP * (THUMBS - 1)) / THUMBS;
 
 export function VehicleHeroGallery({ car }: { car: Car }) {
-  const colors = useColors();
-  
+  const p = useDetailsPalette();
+
   const rawImages = car.images && car.images.length > 0 ? car.images : [car.image];
   // Filter out any undefined/null images
   const images = rawImages.filter(Boolean);
@@ -21,18 +24,20 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isModalVisible, setIsModalVisible] = useState(false);
-  
+
   const scrollRef = useRef<ScrollView>(null);
   const modalScrollRef = useRef<ScrollView>(null);
+  const pausedUntil = useRef(0); // a thumbnail tap or swipe pauses the auto-slide for a while
 
   // Auto-slide logic
   useEffect(() => {
     if (images.length <= 1) return;
-    
+
     const interval = setInterval(() => {
+      if (Date.now() < pausedUntil.current) return;
       setActiveIndex((current) => {
         const nextIndex = (current + 1) % images.length;
-        scrollRef.current?.scrollTo({ x: nextIndex * (width - 32), animated: true });
+        scrollRef.current?.scrollTo({ x: nextIndex * SLIDE_W, animated: true });
         return nextIndex;
       });
     }, 3500); // Auto slide every 3.5 seconds
@@ -42,10 +47,18 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
 
   const onScroll = (e: any) => {
     const x = e.nativeEvent.contentOffset.x;
-    const index = Math.round(x / (width - 32));
+    const index = Math.round(x / SLIDE_W);
     if (index !== activeIndex && index >= 0 && index < images.length) {
+      pausedUntil.current = Date.now() + 6000;
       setActiveIndex(index);
     }
+  };
+
+  const goTo = (index: number) => {
+    Haptics.selectionAsync();
+    pausedUntil.current = Date.now() + 6000;
+    setActiveIndex(index);
+    scrollRef.current?.scrollTo({ x: index * SLIDE_W, animated: true });
   };
 
   const openFullScreen = () => {
@@ -55,7 +68,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
 
   return (
     <View style={styles.container}>
-      <View style={[styles.heroWrap, { backgroundColor: colors.surfaceSoft }]}>
+      <View style={[styles.heroWrap, { backgroundColor: p.soft }]}>
         <ScrollView
           ref={scrollRef}
           horizontal
@@ -65,43 +78,37 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
           scrollEventThrottle={16}
         >
           {images.map((img, i) => (
-            <Pressable key={i} onPress={openFullScreen} style={{ width: width - 32, height: HEIGHT }}>
-              <LoadingImage 
-                source={img} 
-                style={styles.heroImage} 
-                contentFit="cover" 
-                transition={300}
-              />
+            <Pressable key={i} accessibilityLabel={`Photo ${i + 1} of ${images.length}`} onPress={openFullScreen} style={{ width: SLIDE_W, height: HEIGHT }}>
+              <LoadingImage source={img} style={styles.heroImage} contentFit="cover" transition={300} />
             </Pressable>
           ))}
         </ScrollView>
 
-        {/* Premium Gradient Overlay at bottom for dots */}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.6)']}
-          style={styles.gradientOverlay}
-        />
-
-        {/* Expand Icon */}
-        <Pressable onPress={openFullScreen} style={styles.expandIcon}>
-          <Feather name="maximize-2" size={16} color="#FFF" />
-        </Pressable>
-
-        {/* Pagination Dots */}
+        {/* Pagination: a pill for the current photo, dots for the rest */}
         {images.length > 1 && (
-          <View style={styles.paginationContainer}>
+          <View style={styles.paginationContainer} pointerEvents="none">
             {images.map((_, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.dot,
-                  activeIndex === i ? styles.activeDot : styles.inactiveDot
-                ]}
-              />
+              <View key={i} style={[styles.dot, activeIndex === i ? styles.activeDot : styles.inactiveDot]} />
             ))}
           </View>
         )}
       </View>
+
+      {images.length > 1 && (
+        <View style={styles.thumbRow}>
+          {images.slice(0, THUMBS).map((img, i) => (
+            <Pressable
+              key={i}
+              accessibilityRole="button"
+              accessibilityLabel={`Show photo ${i + 1}`}
+              onPress={() => goTo(i)}
+              style={[styles.thumb, { backgroundColor: p.soft }]}
+            >
+              <LoadingImage source={img} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+            </Pressable>
+          ))}
+        </View>
+      )}
 
       {/* Full Screen Gallery Modal */}
       <Modal visible={isModalVisible} transparent={false} animationType="fade">
@@ -151,56 +158,51 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
 const styles = StyleSheet.create({
   container: {
     width: '100%',
-    paddingBottom: 16,
     paddingHorizontal: 16,
   },
   heroWrap: {
     width: '100%',
     height: HEIGHT,
     position: 'relative',
-    borderRadius: 24,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   heroImage: {
     width: '100%',
     height: '100%',
   },
-  gradientOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 80,
-  },
-  expandIcon: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    padding: 8,
-    borderRadius: 20,
-  },
   paginationContainer: {
     position: 'absolute',
-    bottom: 16,
+    bottom: 12,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   dot: {
-    height: 6,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
   },
   activeDot: {
-    width: 20,
+    width: 16,
     backgroundColor: '#FFF',
   },
   inactiveDot: {
-    width: 6,
-    backgroundColor: 'rgba(255,255,255,0.4)',
+    width: 4,
+    backgroundColor: '#D4D4D4',
+  },
+  thumbRow: {
+    flexDirection: 'row',
+    gap: THUMB_GAP,
+    marginTop: 6,
+  },
+  thumb: {
+    width: THUMB_W,
+    height: Math.round(THUMB_W * (45 / 67.5)),
+    borderRadius: 3,
+    overflow: 'hidden',
   },
   modalContainer: {
     flex: 1,
@@ -219,7 +221,7 @@ const styles = StyleSheet.create({
   },
   modalCounter: {
     color: '#FFF',
-    fontFamily: 'Inter_600SemiBold',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 16,
   },
   closeBtn: {

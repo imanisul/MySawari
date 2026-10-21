@@ -86,7 +86,7 @@ export default function ProfileScreen() {
             />
           </View>
         </View>
-        <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
+        <LoginBottomSheet visible={showLogin} required onClose={() => setShowLogin(false)} />
       </Page>
     );
   }

@@ -12,6 +12,8 @@ export * from './booking/DatesSheet';
 export * from './booking/DriverOptionSheet';
 export * from './booking/SearchSheet';
 export * from './booking/LocationSheet';
+export * from './booking/LocationSearchBody';
+export * from './booking/SetLocationSheet';
 export * from './booking/FilterSheet';
 export * from './booking/PlannerSheet';
 export * from './booking/DropoffSheet';

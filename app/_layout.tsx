@@ -22,6 +22,8 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
+import { Anton_400Regular } from '@expo-google-fonts/anton';
+import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { Feather, FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { Stack, DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -117,9 +119,9 @@ function RootLayoutNav() {
       <Stack.Screen name="booking" />
       <Stack.Screen name="planner" options={{ presentation: 'modal' }} />
       <Stack.Screen name="location" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="dates" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="times" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="dropoff" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="dates" /> {/* full-page date & time picker */}
+      <Stack.Screen name="times" />
+      <Stack.Screen name="dropoff" /> {/* full-page destination search */}
       <Stack.Screen name="return-location" options={{ presentation: 'modal' }} />
       <Stack.Screen name="driver-option" options={{ presentation: 'modal' }} />
       <Stack.Screen name="driver-charges" options={{ presentation: 'modal' }} />
@@ -129,7 +131,6 @@ function RootLayoutNav() {
       <Stack.Screen name="confirmation" />
       <Stack.Screen name="bookings" options={{ animation: 'none' }} />
       <Stack.Screen name="booking-detail" />
-      <Stack.Screen name="login" />
       <Stack.Screen name="profile" options={{ animation: 'none' }} />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="settings" />
@@ -138,6 +139,10 @@ function RootLayoutNav() {
       <Stack.Screen name="refer" />
       <Stack.Screen name="rewards" />
       <Stack.Screen name="help" />
+      <Stack.Screen name="faqs" />
+      <Stack.Screen name="policies" />
+      <Stack.Screen name="address-search" />
+      <Stack.Screen name="address-confirm" />
       <Stack.Screen name="safety" />
     </Stack>
     </ThemeProvider>
@@ -205,6 +210,11 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    Anton_400Regular, // Home banner headline ("LOWEST PRICE GUARANTEED")
+    PlusJakartaSans_400Regular, // Home destination field, card meta
+    PlusJakartaSans_500Medium, // Home section titles, Top Picks cards
+    PlusJakartaSans_600SemiBold, // Home Cars / Bikes tabs
+    PlusJakartaSans_700Bold, // Home membership button
     // Icon fonts load with the splash still up, so no screen ever shows empty circles where icons belong.
     ...Feather.font,
     ...Ionicons.font,

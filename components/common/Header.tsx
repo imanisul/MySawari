@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, Image, Animated } from 'react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View, Image, TextStyle } from 'react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
@@ -14,6 +14,8 @@ export function Header({
   hideLogo = false,
   absolute = false,
   leading,
+  titleStyle,
+  horizontalPadding = 20,
 }: {
   title?: string;
   back?: boolean;
@@ -21,42 +23,20 @@ export function Header({
   absolute?: boolean;
   /** Replaces the logo + app name on the left (Home shows a personal greeting there instead). */
   leading?: React.ReactNode;
+  /** Overrides the title text style for screens whose design sets its own (e.g. Explore's 24px title). */
+  titleStyle?: TextStyle;
+  /** Side padding of the bar; screens with a 16px gutter (Explore) pass 16. */
+  horizontalPadding?: number;
 }) {
   const colors = useColors();
   const router = useRouter();
   const { unreadCount, sawariCash, isAuthenticated, favorites, isDarkMode } = useSawari();
 
-  const flipAnim = useRef(new Animated.Value(0)).current;
-  const [showRupee, setShowRupee] = useState(false);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      Animated.timing(flipAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => {
-        setShowRupee(prev => !prev);
-        Animated.timing(flipAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-      });
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [flipAnim]);
-
-  const rotateX = flipAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '90deg']
-  });
-
   const insets = useSafeAreaInsets();
 
   const content = (
     <View style={[{ paddingTop: insets.top }, !absolute ? { backgroundColor: colors.background } : undefined]}>
-      <View style={[styles.header, { paddingBottom: 8 }]}>
+      <View style={[styles.header, { paddingBottom: 8, paddingHorizontal: horizontalPadding }]}>
         {leading && !back ? <View style={{ flex: 1, marginRight: 12 }}>{leading}</View> : (
         <Pressable
           accessibilityRole="button"
@@ -77,10 +57,10 @@ export function Header({
               resizeMode="contain" 
             />
           ) : null}
-          <Text style={[styles.appName, { color: colors.foreground }]}>{title}</Text>
+          <Text style={[styles.appName, { color: colors.foreground }, titleStyle]}>{title}</Text>
         </Pressable>
         )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           
           {/* Wishlist Badge - Only show if they have items */}
           {!hideLogo && favorites?.length > 0 && (
@@ -109,44 +89,17 @@ export function Header({
                 Haptics.selectionAsync();
                 router.push('/rewards');
               }}
-              style={[
+              style={({ pressed }) => [
                 styles.cashBadge,
-                { backgroundColor: colors.card, borderColor: colors.border }
+                isDarkMode && { backgroundColor: colors.card, borderColor: colors.border },
+                pressed && styles.pressed,
               ]}
             >
-              <Animated.View style={{ transform: [{ rotateX }], width: 16, alignItems: 'center' }}>
-                {showRupee ? (
-                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 14, color: colors.success, marginTop: -1 }}>₹</Text>
-                ) : (
-                  <FontAwesome5 name="coins" size={14} color="#FFD700" />
-                )}
-              </Animated.View>
-              <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 13, color: colors.foreground }}>
-                {sawariCash}
-              </Text>
+              <Text style={[styles.cashText, isDarkMode && { color: colors.foreground }]}>{sawariCash}</Text>
+              <FontAwesome5 name="coins" size={14} color="#F5A524" />
             </Pressable>
           )}
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Notifications"
-            testID="notifications"
-            onPress={() => {
-              Haptics.selectionAsync();
-              router.push('/notifications');
-            }}
-            style={[
-              styles.notificationButton,
-              { backgroundColor: colors.card, borderColor: colors.border }
-            ]}
-          >
-            <Feather name="bell" size={17} color={colors.foreground} />
-            {unreadCount > 0 && (
-              <View style={[styles.badge, { borderColor: colors.card }]}>
-                <Text style={styles.badgeText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-              </View>
-            )}
-          </Pressable>
         </View>
       </View>
     </View>
@@ -185,15 +138,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 44,
   },
+  // SawariCash pill + bell (Figma): lavender pill with the balance then a coin stack, light grey bell.
   cashBadge: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 6,
+    gap: 4,
     paddingHorizontal: 12,
-    height: 38,
-    borderRadius: 20,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 1,
     justifyContent: 'center',
+    backgroundColor: '#EEEBFD',
+    borderColor: '#C9C2F7',
+  },
+  cashText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: '#2F3E75' },
+  bellButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    backgroundColor: '#F7F7F7',
+    borderColor: '#E5E5E5',
   },
   badge: {
     position: 'absolute',

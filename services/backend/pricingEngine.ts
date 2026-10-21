@@ -339,6 +339,16 @@ const MEMBERSHIP_PLANS: Record<string, { discountRate: number; tripCap: number; 
   pro:     { discountRate: 0.125, tripCap: 999, annualCap: 20000 },
 };
 
+/** A member's price for one day of a vehicle: the same discount (rate, trip cap, annual cap) a one-day booking gets. */
+export function memberDayPrice(dailyRate: number, membership: QuoteParams['membership']): number | null {
+  const active = !!(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()));
+  const plan = active ? MEMBERSHIP_PLANS[membership!.plan] : undefined;
+  if (!plan || dailyRate <= 0) return null;
+  const remaining = Math.max(0, plan.annualCap - (membership!.totalSaved || 0));
+  const discount = Math.min(Math.round(dailyRate * plan.discountRate), plan.tripCap, remaining);
+  return discount > 0 ? dailyRate - discount : null;
+}
+
 export async function calculateBookingPrice(params: QuoteParams): Promise<PricingQuote> {
   const {
     dailyRate, pickupDateStr, returnDateStr, pickupTime, returnTime,

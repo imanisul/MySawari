@@ -24,10 +24,12 @@ export function VehicleSpecs({ car }: { car: Car }) {
           <Text style={[styles.specText, { color: colors.foreground }]}>{car.transmission}</Text>
         </View>
 
-        <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="droplet" size={15} color={colors.primaryText} />
-          <Text style={[styles.specText, { color: colors.foreground }]}>{car.fuel}</Text>
-        </View>
+        {!!car.fuel && (
+          <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="droplet" size={15} color={colors.primaryText} />
+            <Text style={[styles.specText, { color: colors.foreground }]}>{car.fuel}</Text>
+          </View>
+        )}
 
         {car.mileage && car.mileage !== 'N/A' && (
           <View style={[styles.specPill, { backgroundColor: colors.card, borderColor: colors.border }]}>

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator, Dimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
@@ -11,13 +12,29 @@ import { cars, getAvailability, splitDateRange } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
-import { CarListCard, Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
+import { Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
+import { ExploreCarCard } from '@/components/vehicle/ExploreCarCard';
+import { SortSheet, SortKey } from '@/components/booking/SortSheet';
 import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Car } from '@/utils/sawari';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
 import { rise } from '@/components/common/motion';
+
+/** Explore's chips: All, then body type and fuel (the Figma chip row). */
+const CATEGORY_CHIPS: { label: string; filter: Partial<FilterState> }[] = [
+  { label: 'All', filter: {} },
+  { label: 'SUV', filter: { category: 'SUV' } },
+  { label: 'Diesel', filter: { fuel: 'Diesel' } },
+  { label: 'Petrol', filter: { fuel: 'Petrol' } },
+  { label: 'Sedan', filter: { category: 'Sedan' } },
+];
+
+function isChipActive(chip: { label: string; filter: Partial<FilterState> }, filters: FilterState) {
+  if (chip.label === 'All') return filters.category === 'All' && filters.fuel === 'All';
+  if (chip.filter.category) return filters.category === chip.filter.category;
+  return filters.fuel === chip.filter.fuel;
+}
 
 export default function ExploreScreen() {
   const colors = useColors();
@@ -38,6 +55,8 @@ export default function ExploreScreen() {
   );
   
   const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [showSortSheet, setShowSortSheet] = useState(false);
+  const [sortBy, setSortBy] = useState<SortKey>('recommended');
   const [filters, setFilters] = useState<FilterState>(defaultFilters);
 
   
@@ -156,7 +175,8 @@ export default function ExploreScreen() {
                           car.category.toLowerCase().includes(query) ||
                           (car.manufacturer && car.manufacturer.toLowerCase().includes(query));
       
-      const carPriceNum = parseInt(car.price.replace(/[^0-9]/g, ''), 10);
+      // Budget is per day, so compare the day rate (the same number the card shows).
+      const carPriceNum = car.perDay ?? parseInt(car.price.replace(/[^0-9]/g, ''), 10);
       const matchFilterCategory = filters.category === 'All' || car.category === filters.category;
       const matchFilterPrice = filters.maxPrice === 10000 || carPriceNum <= filters.maxPrice;
       const matchFilterTrans = filters.transmission === 'All' || 
@@ -182,11 +202,18 @@ export default function ExploreScreen() {
       // Available vehicles always come first
       if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
       // Within the same availability group, sort by price
-      const priceA = parseInt(a.price.replace(/[^0-9]/g, ''), 10) || 0;
-      const priceB = parseInt(b.price.replace(/[^0-9]/g, ''), 10) || 0;
-      return filters.maxPrice !== 10000 ? priceB - priceA : priceA - priceB;
+      switch (sortBy) {
+        case 'price_asc': return (a.perDay ?? 0) - (b.perDay ?? 0);
+        case 'price_desc': return (b.perDay ?? 0) - (a.perDay ?? 0);
+        case 'rating': return (b.rating ?? 0) - (a.rating ?? 0);
+        default: {
+          const priceA = parseInt(a.price.replace(/[^0-9]/g, ''), 10) || 0;
+          const priceB = parseInt(b.price.replace(/[^0-9]/g, ''), 10) || 0;
+          return filters.maxPrice !== 10000 ? priceB - priceA : priceA - priceB;
+        }
+      }
     });
-  }, [fetchedCars, exploreDate, vehicleType, debouncedQuery, filters]);
+  }, [fetchedCars, exploreDate, vehicleType, debouncedQuery, filters, sortBy]);
 
   // Pagination slice
   const paginatedCars = useMemo(() => {
@@ -210,8 +237,9 @@ export default function ExploreScreen() {
 
   const keyExtractor = useCallback((item: Car) => item.id, []);
 
-  const renderCar = useCallback(({ item }: { item: typeof cars[0] }) => (
-    <CarListCard car={item} effectiveDateRange={exploreDate} isExplore={true} />
+  // Explore uses its own Figma card; the shared CarListCard stays as it is for the other screens.
+  const renderCar = useCallback(({ item, index }: { item: typeof cars[0]; index: number }) => (
+    <ExploreCarCard car={item} dateRange={exploreDate} index={index} />
   ), [exploreDate]);
 
 
@@ -229,51 +257,46 @@ export default function ExploreScreen() {
   const listHeaderElement = useMemo(() => (
     <Reanimated.View entering={rise()}>
       {/* ── SCROLLABLE: Explore Header ── */}
-      <Header title="Explore" hideLogo={true} />
+      {/* Figma: "Explore" is Semibold/xxl (24px) in black. */}
+      <Header
+        title="Explore"
+        hideLogo={true}
+        horizontalPadding={16}
+        titleStyle={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, lineHeight: 36, letterSpacing: 0, color: '#000000' }}
+      />
 
       {/* Search Bar */}
-      <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TextInput 
-          placeholder="Search by model or type..."
-          placeholderTextColor={colors.mutedForeground}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          style={[styles.searchText, { color: colors.foreground }]}
-          returnKeyType="search"
-        />
-        <Feather name="search" size={20} color={colors.foreground} />
+      {/* Figma: white 40px field, Primary/blue-50 border, search icon leading, "Search cars and bike",
+          and a 48px sliders button beside it (the same filter sheet as the chip row's Filter). */}
+      <View style={styles.searchRow}>
+        {/* Light mode uses the Figma values (white, Primary/blue-50 border); dark mode keeps the app's tokens. */}
+        <View style={[styles.searchBar, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF', borderColor: isDarkMode ? colors.border : '#EAECF1' }]}>
+          <Feather name="search" size={20} color="#737373" />
+          <TextInput
+            placeholder="Search cars and bike"
+            placeholderTextColor="#737373"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            style={[styles.searchText, { color: colors.foreground }]}
+            returnKeyType="search"
+          />
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Sort and filter"
+          onPress={() => {
+            Haptics.selectionAsync();
+            setShowSortSheet(true);
+          }}
+          style={[styles.sliderButton, { backgroundColor: isDarkMode ? colors.card : '#F9F9FB', borderColor: isDarkMode ? colors.border : '#EAECF1' }]}
+        >
+          <FilterLinesIcon color="#737373" />
+        </Pressable>
       </View>
 
       {/* Vehicle Type Toggle & Filter */}
-      <View style={styles.categoryRow}>
-        <View style={styles.categoryPills}>
-          {(['All', 'Cars', 'Bikes'] as const).map(type => {
-            const active = vehicleType === type;
-            return (
-              <Pressable
-                key={type}
-                accessibilityRole="button"
-                accessibilityLabel={`Show ${type}`}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setVehicleType(type as 'All' | 'Cars' | 'Bikes');
-                  setFilters(defaultFilters);
-                  setPage(1);
-                }}
-                style={[
-                  styles.categoryChip,
-                  active
-                    ? { backgroundColor: colors.foreground, borderColor: colors.foreground }
-                    : { backgroundColor: colors.card, borderColor: colors.border },
-                ]}
-              >
-                <Text style={[styles.categoryChipText, { color: active ? colors.background : colors.foreground }]}>
-                  {type}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      {/* Figma: one row that scrolls sideways: Filter first, then All / SUV / Diesel / Petrol / Sedan. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
@@ -284,113 +307,48 @@ export default function ExploreScreen() {
           style={[
             styles.filterButton,
             {
-              backgroundColor: activeFilterCount > 0 ? colors.primary : colors.card,
-              borderColor: activeFilterCount > 0 ? colors.primary : colors.border,
+              backgroundColor: activeFilterCount > 0 ? colors.primary : isDarkMode ? colors.card : '#F9F9FB',
+              borderColor: activeFilterCount > 0 ? colors.primary : isDarkMode ? colors.border : '#EAECF1',
             },
           ]}
         >
-          <Feather name="sliders" size={14} color={activeFilterCount > 0 ? colors.primaryForeground : colors.foreground} />
-          <Text style={[styles.filterButtonText, { color: activeFilterCount > 0 ? colors.primaryForeground : colors.foreground }]}>
+          <Feather name="filter" size={16} color={activeFilterCount > 0 ? colors.primaryForeground : isDarkMode ? colors.foreground : '#737373'} />
+          <Text style={[styles.filterButtonText, { color: activeFilterCount > 0 ? colors.primaryForeground : isDarkMode ? colors.foreground : '#737373' }]}>
             Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
           </Text>
         </Pressable>
-      </View>
-      
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.dateRow}
-      >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open calendar to pick date"
-          onPress={() => {
-            Haptics.selectionAsync();
-            setShowDatePicker(true);
-          }}
-          style={({ pressed }) => [
-            styles.dateChip,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              paddingHorizontal: 12,
-            },
-            pressed && styles.chipPressed,
-          ]}
-        >
-          <Feather name="calendar" size={16} color={colors.foreground} />
-        </Pressable>
-        {showDatePicker && (
-          <DateTimePicker
-            themeVariant={isDarkMode ? 'dark' : 'light'}
-            value={currentSelectedDateObj}
-            mode="date"
-            display="default"
-            minimumDate={new Date()}
-            onChange={onDateChange}
-          />
-        )}
-        {availableDates.map((date) => {
-          const active = date === exploreDate;
-          const isAllDates = date === 'All Dates';
+        {CATEGORY_CHIPS.map(chip => {
+          const active = isChipActive(chip, filters);
           return (
             <Pressable
-              key={date}
+              key={chip.label}
               accessibilityRole="button"
-              accessibilityLabel={`Filter by date: ${date}`}
+              accessibilityLabel={`Show ${chip.label}`}
               accessibilityState={{ selected: active }}
-              onPress={() => handleDateSelect(date)}
-              style={({ pressed }) => [
-                styles.dateChip,
+              onPress={() => {
+                Haptics.selectionAsync();
+                setVehicleType('All');
+                setFilters({ ...defaultFilters, ...chip.filter });
+                setPage(1);
+              }}
+              style={[
+                styles.categoryChip,
                 active
-                  ? {
-                      backgroundColor: colors.primary,
-                      borderColor: colors.primary,
-                      // Elevated shadow for active chip
-                      shadowColor: colors.primary,
-                      shadowOffset: { width: 0, height: 2 },
-                      shadowOpacity: 0.35,
-                      shadowRadius: 6,
-                      elevation: 4,
-                      transform: [{ scale: 1.05 }],
-                    }
-                  : {
-                      backgroundColor: colors.card,
-                      borderColor: colors.border,
-                    },
-                pressed && styles.chipPressed,
+                  ? { backgroundColor: '#2F3E75', borderColor: '#2F3E75' }
+                  : { backgroundColor: '#FFFFFF', borderColor: '#EAECF1' },
               ]}
             >
-              <View style={styles.dateChipContent}>
-                {isAllDates && (
-                  <Feather
-                    name="layers"
-                    size={13}
-                    color={active ? colors.primaryForeground : colors.foreground}
-                    style={{ marginRight: 5 }}
-                  />
-                )}
-                <Text
-                  style={[
-                    styles.dateChipText,
-                    {
-                      color: active ? colors.primaryForeground : colors.foreground,
-                      fontFamily: active ? 'Inter_700Bold' : 'Inter_500Medium',
-                    },
-                  ]}
-                >
-                  {date}
-                </Text>
-              </View>
+              <Text style={[styles.categoryChipText, { color: active ? '#FFFFFF' : '#737373' }]}>{chip.label}</Text>
             </Pressable>
           );
         })}
       </ScrollView>
+
     </Reanimated.View>
   ), [searchQuery, setSearchQuery, colors, vehicleType, setVehicleType, setFilters, setPage,
       activeFilterCount, showFilterSheet, setShowFilterSheet, exploreDate, handleDateSelect,
       availableDates, showDatePicker, setShowDatePicker, isDarkMode, currentSelectedDateObj,
-      onDateChange, defaultFilters]);
+      onDateChange, defaultFilters, filters]);
 
   /* ─── ListEmptyComponent ─── */
   const listEmptyElement = useMemo(() => {
@@ -483,6 +441,12 @@ export default function ExploreScreen() {
         }
       />
 
+      <SortSheet
+        visible={showSortSheet}
+        onClose={() => setShowSortSheet(false)}
+        value={sortBy}
+        onApply={setSortBy}
+      />
       <FilterSheet 
         visible={showFilterSheet} 
         onClose={() => setShowFilterSheet(false)} 
@@ -494,19 +458,35 @@ export default function ExploreScreen() {
   );
 }
 
+/** Figma filter icon: three centred horizontal bars, longest on top. */
+function FilterLinesIcon({ color }: { color: string }) {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path d="M3 6H21M6 12H18M9 18H15" stroke={color} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
-  searchBar: { alignItems: 'center', borderRadius: 15, borderWidth: 1, flexDirection: 'row', marginTop: 12, marginHorizontal: 20, paddingHorizontal: 16, paddingVertical: 12 },
-  searchText: { fontFamily: 'Inter_400Regular', fontSize: 14, flex: 1, paddingVertical: 4 },
+  // Figma: the search row sits on a 16px side gutter, 8px between the field and the sliders button.
+  // Figma: the search block starts 4px under the title (its own 4px top padding).
+  searchRow: { flexDirection: 'row', gap: 8, height: 40, marginTop: 4, marginHorizontal: 16 },
+  searchBar: { alignItems: 'center', borderRadius: 8, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 9, height: 40, paddingHorizontal: 12 },
+  sliderButton: { alignItems: 'center', borderRadius: 8, borderWidth: 1, height: 40, justifyContent: 'center', width: 48 },
+  searchText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, flex: 1, paddingVertical: 0 },
 
-  categoryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 16, marginBottom: 12 },
-  categoryPills: { flexDirection: 'row', gap: 10 },
-  categoryChip: { paddingVertical: 6, paddingHorizontal: 16, borderRadius: 16, borderWidth: 1 },
-  categoryChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  // Figma: the chip row is 8px top and bottom padding around the 36px chips.
+  // Scrolling row: the chips and Filter are 8px apart and start on the 16px gutter.
+  categoryRow: { alignItems: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8, marginBottom: 8 },
+  // Figma chips: 36px tall, 8px radius, 8px apart.
+  categoryPills: { flexDirection: 'row', gap: 8 },
+  categoryChip: { height: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
+  categoryChipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
 
-  filterButton: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 1 },
-  filterButtonText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  // Figma Filter chip: 70x36, padding 6/8, gap 4, 8px radius (min width keeps a count like "(12)" from clipping).
+  filterButton: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, minWidth: 70, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1 },
+  filterButtonText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
 
-  dateRow: { gap: 8, paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6 },
   dateChip: {
     height: 38,
     paddingHorizontal: 16,
@@ -519,7 +499,8 @@ const styles = StyleSheet.create({
   dateChipContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   chipPressed: { opacity: 0.7 },
 
-  listContent: { paddingBottom: 24 },
+  // Figma list: 16px side gutter; the cards are 361px wide.
+  listContent: { paddingBottom: 24, paddingHorizontal: 16 },
 
   emptyState: { borderRadius: 18, marginTop: 18, marginHorizontal: 20, padding: 20, alignItems: 'center' },
   emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },

@@ -7,6 +7,23 @@ import { useColors } from '@/hooks/useColors';
 // After login or any navigation within the same session, it is skipped entirely.
 let hasShownSplash = false;
 
+// Screens that must not animate while the launch overlay still covers them subscribe here.
+const splashGoneListeners = new Set<() => void>();
+
+/** Runs `cb` once the launch splash is off screen — immediately if it already is. */
+export function onSplashGone(cb: () => void): () => void {
+  if (hasShownSplash) return () => {};
+  splashGoneListeners.add(cb);
+  return () => splashGoneListeners.delete(cb);
+}
+
+function markSplashGone() {
+  hasShownSplash = true; // Never show splash again this session
+  const pending = [...splashGoneListeners];
+  splashGoneListeners.clear();
+  pending.forEach((cb) => cb());
+}
+
 // Phase 1 — the brand: "MySawari · Your ride, your way" stays up at least this long.
 const BRAND_MS = 300;
 // After this long without data, say so instead of leaving the customer looking at a spinner.
@@ -125,7 +142,7 @@ export function AnimatedSplash({
     if (skipSplash || !brandDone || !canExit) return;
     const t = setTimeout(() => {
       Animated.timing(overlayOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => {
-        hasShownSplash = true; // Never show splash again this session
+        markSplashGone();
         setIsAnimationComplete(true);
       });
     }, phase === 'loading' ? 350 : 0);

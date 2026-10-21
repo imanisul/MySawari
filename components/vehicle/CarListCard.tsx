@@ -128,7 +128,8 @@ const CarListCardUI = React.memo(function CarListCardUI({
           <View style={styles.specRow}>
             <Spec icon="users" text={car.seats} color={colors.mutedForeground} />
             <Spec icon="settings" text={car.transmission} color={colors.mutedForeground} />
-            <Spec icon="droplet" text={car.fuel} color={colors.mutedForeground} />
+            {/* Omitted rather than shown as an empty pill when the vehicle has no recorded fuel type. */}
+            {!!car.fuel && <Spec icon="droplet" text={car.fuel} color={colors.mutedForeground} />}
           </View>
 
           {/* Only show detail row for unavailable vehicles (e.g. "Next available 25 Sep") */}

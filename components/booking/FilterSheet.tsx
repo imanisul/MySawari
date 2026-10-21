@@ -1,10 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import * as Haptics from 'expo-haptics';
-import { PrimaryButton } from '../common/PrimaryButton';
 import { Category } from '@/utils/sawari';
 
 export type FilterState = {
@@ -35,6 +34,20 @@ export function FilterSheet({
   vehicleType?: 'All' | 'Cars' | 'Bikes';
 }) {
   const colors = useColors();
+
+  // The scrim fades in behind the sheet; the sheet slides up from the bottom and slides back down on close.
+  const SHEET_OFFSET = 600;
+  const slide = useRef(new Animated.Value(SHEET_OFFSET)).current;
+  useEffect(() => {
+    if (visible) {
+      Animated.timing(slide, { toValue: 0, duration: 260, useNativeDriver: true }).start();
+    } else {
+      slide.setValue(SHEET_OFFSET);
+    }
+  }, [visible, slide]);
+  const close = () => {
+    Animated.timing(slide, { toValue: SHEET_OFFSET, duration: 200, useNativeDriver: true }).start(() => onClose());
+  };
   
   const isBike = vehicleType === 'Bikes';
   const categories = isBike 
@@ -62,7 +75,7 @@ export function FilterSheet({
   const handleApply = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setFilters(localFilters);
-    onClose();
+    close();
   };
 
   const handleReset = () => {
@@ -71,17 +84,21 @@ export function FilterSheet({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <SafeAreaView style={{ flex: 1 }}>
+    // Figma Filter sheet: a bottom sheet with a round close button above it (not a full page).
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+      <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close filters" />
+      <Animated.View style={[styles.stack, { transform: [{ translateY: slide }] }]} pointerEvents="box-none">
+        <View style={styles.closeRow}>
+          <Pressable onPress={close} accessibilityRole="button" accessibilityLabel="Close filters" style={styles.closeCircle}>
+            <Feather name="x" size={16} color="#737373" />
+          </Pressable>
+        </View>
+        <SafeAreaView style={[styles.sheet, { backgroundColor: '#FFFFFF' }]}>
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Filters</Text>
             <Pressable onPress={handleReset} style={styles.resetBtn}>
               <Text style={[styles.resetText, { color: colors.primaryText }]}>Reset</Text>
             </Pressable>
-            <Pressable onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={24} color={colors.foreground} />
-            </Pressable>
+            <Text style={[styles.headerTitle, { color: colors.foreground }]}>Filters</Text>
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -115,11 +132,11 @@ export function FilterSheet({
 
             {/* PRICE */}
             <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Max Price per day</Text>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Budget per day</Text>
               <View style={styles.chipRow}>
                 {(isBike 
                   ? [{ label: 'Any Price', val: 10000 }, { label: 'Under ₹500', val: 500 }, { label: 'Under ₹1000', val: 1000 }, { label: 'Under ₹1500', val: 1500 }]
-                  : [{ label: 'Any Price', val: 10000 }, { label: 'Under ₹2000', val: 2000 }, { label: 'Under ₹3000', val: 3000 }, { label: 'Under ₹4000', val: 4000 }]
+                  : [{ label: 'Any Price', val: 10000 }, { label: 'Under ₹1500', val: 1500 }, { label: 'Under ₹2000', val: 2000 }, { label: 'Under ₹3000', val: 3000 }, { label: 'Under ₹5000', val: 5000 }]
                 ).map((price) => (
                   <Pressable
                     key={price.label}
@@ -186,16 +203,25 @@ export function FilterSheet({
           </ScrollView>
 
           <View style={[styles.footer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
-            <PrimaryButton label="Apply Filters" onPress={handleApply} />
+            {/* Figma CTA: 361 x 54, Primary/blue-500, 12px radius, white Semibold 17. */}
+            <Pressable accessibilityRole="button" onPress={handleApply} style={styles.applyBtn}>
+              <Text style={styles.applyText}>Apply Filters</Text>
+            </Pressable>
           </View>
         </SafeAreaView>
-      </View>
+      </Animated.View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  backdrop: { flex: 1, backgroundColor: 'rgba(38,38,38,0.32)' },
+  // The sheet sits 34px above the screen bottom (the home-indicator strip), as in the frame.
+  stack: { gap: 8, justifyContent: 'flex-end', paddingBottom: 34 },
+  closeRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 12 },
+  closeCircle: { alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: 30, height: 32, justifyContent: 'center', width: 32 },
+  // Figma sheet: 574 tall, white, 1px #E7EAF4 border on all sides, 24px top corners, 4px top padding.
+  sheet: { borderColor: '#E7EAF4', borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, height: 574, maxHeight: '90%', overflow: 'hidden', paddingTop: 4 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -219,8 +245,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
+  applyBtn: { alignItems: 'center', backgroundColor: '#2F3E75', borderRadius: 12, height: 54, justifyContent: 'center', width: '100%' },
+  applyText: { color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
   footer: {
-    padding: 20,
+    padding: 16,
     borderTopWidth: 1,
   }
 });

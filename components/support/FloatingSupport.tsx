@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { shadows } from '@/constants/shadows';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
-import { useSupportFabHidden } from '@/hooks/useSupportFab';
+import { useNavHelpPresent, useSupportFabHidden } from '@/hooks/useSupportFab';
 import { SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 const HIDDEN_ROUTES = [
@@ -24,7 +24,8 @@ const HIDDEN_ROUTES = [
 
 export function FloatingSupport() {
   const pathname = usePathname();
-  const isHidden = HIDDEN_ROUTES.includes(pathname);
+  const navHasHelp = useNavHelpPresent();
+  const isHidden = navHasHelp || HIDDEN_ROUTES.includes(pathname);
 
   // Return early BEFORE calling any hooks if hidden
   if (isHidden) {

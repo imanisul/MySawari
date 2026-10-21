@@ -263,6 +263,7 @@ function mapPhotonResponse(data: any) {
     latitude: feature.geometry.coordinates[1],
     postcode: feature.properties.postcode || null,
     country: feature.properties.country || null,
+    state: feature.properties.state || null,
   }));
 }
 
@@ -698,7 +699,10 @@ export const API = {
         images: hasImages ? v.images.map((img: any) => getFullUrl(img.url)) : [fallbackImage],
         seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
         transmission: v.transmission || 'Manual',
-        fuel: v.fuelType || 'Petrol',
+        // Never guess the fuel. Defaulting a missing fuelType to 'Petrol' made diesel cars (e.g. the Thar
+        // 1.5L AXT Diesel, whose name says Diesel and whose mileage is quoted in km/l) read as petrol —
+        // which also feeds Explore's fuel filter and SearchScreen. An unknown fuel simply omits the row.
+        fuel: (typeof v.fuelType === 'string' && v.fuelType.trim()) ? v.fuelType.trim() : '',
 
         // DB fields with smart fallbacks
         manufacturer: inferredMfg || undefined,
@@ -1264,6 +1268,7 @@ export const API = {
           bookingCode: b.bookingCode,
           status: normalizeBookingStatus(b.status),
           vehicleId: b.vehicleId?._id || b.vehicleId,
+          vehicleImage: b.vehicleImage || null,
           vehicleName: ((b.vehicleId?.displayName && typeof b.vehicleId.displayName === 'string' && b.vehicleId.displayName.trim())
             ? b.vehicleId.displayName.trim()
             : (b.displayName || b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle')).replace(/\s+\d{3,4}$/, '').trim() || 'Vehicle',
@@ -1684,6 +1689,7 @@ export const API = {
             latitude: parseFloat(item.lat),
             postcode: item.address?.postcode || null,
             country: item.address?.country || null,
+            state: item.address?.state || null,
           };
         });
         return remember(dedupeLocations(mapped));

@@ -15,49 +15,175 @@ import { Reveal } from '@/components/common/Reveal';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { LoyaltySkeleton } from '@/components/loading/ScreenSkeletons';
 
+// ─── Design tokens (from Figma) ────────────────────────────────────────────────
+const T = {
+  gradientTop: '#6152D8',
+  gradientBottom: '#9C90F3',
+  white: '#FFFFFF',
+  neutral800: '#262626',
+  neutral500: '#737373',
+  neutral50: '#FAFAFA',
+  surface: '#F9F9FB',
+  border: '#EAECF1',
+  sheetBorder: '#E7EAF4',
+  primary500: '#2F3E75',
+  chipBg: '#F4F6FA',
+  green500: '#008758',
+  violet: '#6B5AED',
+};
+
+const FONT = {
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+};
+
+type MenuItem = {
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon: keyof typeof Feather.glyphMap;
+  type?: 'link' | 'toggle';
+};
+
+// ─── Small building blocks ────────────────────────────────────────────────────
+function DashedDivider() {
+  // Single-side dashed borders are unreliable on iOS; this clips a dashed box to 1px.
+  return (
+    <View style={styles.dashedClip}>
+      <View style={styles.dashedLine} />
+    </View>
+  );
+}
+
+function SawariToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
+  }, [value]);
+
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
+  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: ['#D4D7E0', T.primary500] });
+
+  return (
+    <Pressable
+      hitSlop={8}
+      onPress={() => {
+        Haptics.selectionAsync();
+        onChange(!value);
+      }}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+    >
+      <Animated.View style={[styles.toggleTrack, { backgroundColor: trackColor }]}>
+        <Animated.View style={[styles.toggleThumb, { transform: [{ translateX }] }]} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function MenuGroup({
+  items,
+  onPress,
+  renderRight,
+  renderSubtitle,
+}: {
+  items: MenuItem[];
+  onPress: (item: MenuItem) => void;
+  renderRight?: (item: MenuItem) => React.ReactNode;
+  renderSubtitle?: (item: MenuItem) => React.ReactNode;
+}) {
+  return (
+    <View style={styles.menuCard}>
+      {items.map((item, index) => {
+        const custom = renderSubtitle?.(item);
+        return (
+          <View key={item.id}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles.menuRow}
+              onPress={() => onPress(item)}
+              disabled={item.type === 'toggle'}
+            >
+              <View style={styles.menuIconBox}>
+                <Feather name={item.icon} size={16} color={T.neutral800} />
+              </View>
+              <View style={styles.menuTextCol}>
+                <Text style={styles.menuTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+                {custom ?? (item.subtitle ? <Text style={styles.menuSubtitle}>{item.subtitle}</Text> : null)}
+              </View>
+              {renderRight?.(item) ?? <Feather name="chevron-right" size={16} color={T.neutral500} />}
+            </TouchableOpacity>
+            {index !== items.length - 1 && <DashedDivider />}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const colors = useColors();
   const { customer, sawariCash, isAuthenticated, earnSawariCash } = useSawari();
   const router = useRouter();
   const [showLogin, setShowLogin] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [useSawariCash, setUseSawariCash] = useState(true);
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
   const queryClient = useQueryClient();
-
 
   useFocusEffect(
     React.useCallback(() => {
       import('@/services/api/activity').then(({ ActivityAPI }) => {
         ActivityAPI.logActivity('view_profile', 'ProfileScreen');
       });
+      return () => setShowOptions(false);
     }, [])
   );
 
+  const formattedCash = `₹${Number(sawariCash || 0).toLocaleString('en-IN')}`;
+  const formattedWallet = `₹ ${Number(sawariCash || 0).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
-  const menuItems = [
-    { id: 'wishlist', title: 'My Wishlist', icon: 'heart' },
-    { id: 'membership', title: 'Membership', icon: 'award' },
-    { id: 'rewards', title: 'My Rewards', icon: 'gift' },
-    { id: 'refer', title: 'Refer and Earn', icon: 'users' },
-    { id: 'safety', title: 'Safety', icon: 'shield' },
-    { id: 'settings', title: 'Settings', icon: 'settings' },
-    { id: 'help', title: 'Help', icon: 'help-circle' },
+  const accountItems: MenuItem[] = [
+    { id: 'wishlist', title: 'Favourite Cars', subtitle: 'Saved vehicles', icon: 'heart' },
+    { id: 'addresses', title: 'Saved Addresses', subtitle: 'Home, work and other locations', icon: 'map-pin' },
+    { id: 'refer', title: 'Refer & Earn', subtitle: 'Invite friends and earn 10%', icon: 'credit-card' },
+    { id: 'sawari-cash', title: 'My Sawari Cash', icon: 'dollar-sign', type: 'toggle' },
+    { id: 'referral-tracking', title: 'Referral Tracking', subtitle: 'Tracking your referral', icon: 'users' },
+    { id: 'refunds', title: 'My Refunds', subtitle: 'Refunds on cancellations', icon: 'rotate-ccw' },
+    { id: 'rewards', title: 'Offers & coupons', subtitle: 'Choose a coupon to save on your trip', icon: 'tag' },
   ];
 
-  // Logout moved to Settings
+  const infoItems: MenuItem[] = [
+    { id: 'safety', title: 'Safety', icon: 'shield' },
+    { id: 'terms', title: 'Terms & Condition', icon: 'file-text' },
+    { id: 'cancellation', title: 'Cancellation Policy', icon: 'x-circle' },
+  ];
 
-  const handleMenuPress = async (item: any) => {
+  // Logout lives in Settings
+  const handleMenuPress = async (item: { id: string; title: string }) => {
     Haptics.selectionAsync();
+    setShowOptions(false);
     if (item.id === 'wishlist') {
       router.push('/wishlist');
     } else if (item.id === 'membership') {
       router.push('/membership');
     } else if (item.id === 'rewards') {
       router.push('/rewards');
-    } else if (item.id === 'refer') {
+    } else if (item.id === 'refer' || item.id === 'referral-tracking') {
       router.push('/refer');
-    } else if (item.id === 'settings') {
+    } else if (item.id === 'settings' || item.id === 'logout') {
       router.push('/settings');
+    } else if (item.id === 'edit-profile') {
+      router.push('/edit-profile');
     } else if (item.id === 'safety') {
       router.push('/safety');
     } else if (item.id === 'help') {
@@ -80,10 +206,7 @@ export default function ProfileScreen() {
             You need to be logged in to view your profile, SawariCash, and settings.
           </Text>
           <View style={{ width: '100%' }}>
-            <PrimaryButton 
-              label="Log In" 
-              onPress={() => setShowLogin(true)} 
-            />
+            <PrimaryButton label="Log In" onPress={() => setShowLogin(true)} />
           </View>
         </View>
         <LoginBottomSheet visible={showLogin} required onClose={() => setShowLogin(false)} />
@@ -93,308 +216,407 @@ export default function ProfileScreen() {
 
   return (
     <Page bottomNav scroll={false}>
-      <Header title="Profile" hideLogo={true} back={false} />
-      
-      <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomNavHeight + 24 }]} bounces={false}>
-        <Reveal delay={0}>
-        {/* Profile Card */}
-        <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
-                <Text style={[styles.avatarText, { color: colors.primaryText }]}>
-                  {customer.name ? customer.name.charAt(0).toUpperCase() : '?'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.profileInfo}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
-                <Text style={[styles.name, { color: colors.foreground, marginBottom: 0, marginRight: 8 }]}>
+      <View style={styles.root}>
+        {/* Purple gradient backdrop behind the header */}
+        <LinearGradient
+          colors={[T.gradientTop, T.gradientBottom]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={[styles.gradient, { height: insets.top + 240 }]}
+        />
+
+        <ScrollView
+          contentContainerStyle={{ paddingTop: insets.top + 4 }}
+          showsVerticalScrollIndicator={false}
+          bounces={false}
+          onScrollBeginDrag={() => setShowOptions(false)}
+        >
+          {/* Header: kebab + user details */}
+          <Reveal delay={0}>
+            <View style={styles.header}>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                hitSlop={10}
+                style={styles.kebab}
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setShowOptions(v => !v);
+                }}
+                accessibilityLabel="Profile options"
+              >
+                <Feather name="more-vertical" size={24} color={T.white} />
+              </TouchableOpacity>
+
+              <View style={styles.userInfo}>
+                <Text style={styles.name} numberOfLines={1}>
                   {customer.name || 'User'}
                 </Text>
-              </View>
-              <Text style={[styles.mobile, { color: colors.mutedForeground }]}>
-                {customer.mobile || 'Add Mobile Number'}
-              </Text>
-            </View>
-            <TouchableOpacity 
-              activeOpacity={1}
-              style={[styles.editButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                router.push('/edit-profile');
-              }}
-            >
-              <Feather name="edit-2" size={16} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        </Reveal>
-
-        <Reveal delay={90}>
-        {/* SawariCash Wallet */}
-        <LinearGradient 
-          colors={['#1F2937', '#111827']} 
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={[styles.walletCard, { borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }]}
-        >
-          {/* Header */}
-          <View style={styles.walletHeader}>
-            <View style={[styles.walletIconBox, { backgroundColor: 'rgba(16, 185, 129, 0.15)' }]}>
-              <Text style={{ color: '#10B981', fontSize: 18, fontFamily: 'Inter_700Bold' }}>₹</Text>
-            </View>
-            <Text style={[styles.walletTitle, { color: '#F9FAFB' }]}>SawariCash Balance</Text>
-          </View>
-
-          {/* Balance and Conversion */}
-          <View style={[styles.walletBalanceRow, { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }]}>
-            <View style={styles.balanceColumn}>
-              <View style={styles.balanceUnit}>
-                <Text style={[styles.walletBalance, { color: '#FBBF24' }]}>{sawariCash}</Text>
-                <Text style={[styles.walletCurrency, { color: '#D1D5DB' }]}> Coins</Text>
+                <Text style={styles.contact}>{customer.mobile || 'Add Mobile Number'}</Text>
+                {!!customer.email && <Text style={styles.contact}>{customer.email}</Text>}
               </View>
             </View>
-            
-            <View style={styles.walletEquals}>
-              <Feather name="arrow-right" size={20} color="#6B7280" />
-            </View>
+          </Reveal>
 
-            <View style={styles.balanceColumn}>
-              <View style={styles.balanceUnit}>
-                <Text style={[styles.walletCurrency, { color: '#F9FAFB' }]}>₹ </Text>
-                <Text style={[styles.walletBalance, { color: '#F9FAFB' }]}>{sawariCash.toLocaleString('en-IN')}</Text>
+          {/* White sheet */}
+          <View style={[styles.sheet, { paddingBottom: bottomNavHeight + insets.bottom + 24 }]}>
+            {/* Membership */}
+            <Reveal delay={60}>
+              <View style={styles.section}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.membershipCard}
+                  onPress={() => handleMenuPress({ id: 'membership', title: 'Membership' })}
+                >
+                  <View style={styles.membershipTop}>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.membershipTitleRow}>
+                        <View style={styles.tierRow}>
+                          <Feather name="award" size={16} color="#F5B400" />
+                          <Text style={styles.tierText}>Starter</Text>
+                        </View>
+                        <View style={styles.savingsPill}>
+                          <Text style={styles.savingsPillText}>Max ₹499 savings per trip</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.tierText}>Save up to ₹10,000/year</Text>
+                    </View>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      style={styles.upgradeBtn}
+                      onPress={() => handleMenuPress({ id: 'membership', title: 'Membership' })}
+                    >
+                      <Text style={styles.upgradeText}>Upgrade</Text>
+                      <Feather name="arrow-right" size={10} color={T.white} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.membershipSub}>Enjoy member-only deals on your rentals.</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          </View>
+            </Reveal>
 
-          {/* Footer Info */}
-          <View style={styles.walletFooter}>
-            <Feather name="check-circle" size={15} color="#10B981" style={{ marginRight: 6 }} />
-            <Text style={[styles.walletSubtitle, { color: '#D1D5DB' }]}>
-              Available to apply on your next booking
-            </Text>
-          </View>
-        </LinearGradient>
-
-        </Reveal>
-
-        <Reveal delay={270}>
-        {/* Menu Items */}
-        <View style={styles.menuContainer}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={item.id}
-              activeOpacity={1}
-              style={[
-                styles.menuItem,
-                { backgroundColor: colors.card, borderBottomColor: colors.border },
-                index === 0 && styles.menuItemFirst,
-                index === menuItems.length - 1 && styles.menuItemLast,
-                index !== menuItems.length - 1 && { borderBottomWidth: 1 }
-              ]}
-              onPress={() => handleMenuPress(item)}
-            >
-              <View style={[styles.menuIconContainer, { backgroundColor: colors.background }]}>
-                <Feather name={item.icon as any} size={20} color={colors.foreground} />
+            {/* Wallet balance */}
+            <Reveal delay={120}>
+              <View style={styles.section}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={styles.walletCard}
+                  onPress={() => handleMenuPress({ id: 'rewards', title: 'Wallet' })}
+                >
+                  <Text style={styles.walletLabel}>Wallet Balance</Text>
+                  <Text style={styles.walletValue} numberOfLines={1}>
+                    {formattedWallet}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <Text style={[styles.menuTitle, { color: colors.foreground }]}>{item.title}</Text>
-              <Feather name="chevron-right" size={20} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          ))}
-        </View>
-        </Reveal>
-        <View style={{ height: insets.bottom + 80 }} />
-      </ScrollView>
+            </Reveal>
+
+            {/* Account menu */}
+            <Reveal delay={180}>
+              <View style={styles.section}>
+                <MenuGroup
+                  items={accountItems}
+                  onPress={handleMenuPress}
+                  renderSubtitle={item =>
+                    item.id === 'sawari-cash' ? (
+                      <View style={styles.cashChip}>
+                        <Text style={styles.cashChipText}>{formattedCash} available</Text>
+                      </View>
+                    ) : undefined
+                  }
+                  renderRight={item =>
+                    item.type === 'toggle' ? (
+                      <SawariToggle value={useSawariCash} onChange={setUseSawariCash} />
+                    ) : undefined
+                  }
+                />
+              </View>
+            </Reveal>
+
+            {/* Info menu */}
+            <Reveal delay={240}>
+              <View style={styles.section}>
+                <MenuGroup items={infoItems} onPress={handleMenuPress} />
+              </View>
+            </Reveal>
+          </View>
+        </ScrollView>
+
+        {/* Options dropdown */}
+        {showOptions && (
+          <>
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowOptions(false)} />
+            <View style={[styles.dropdown, { top: insets.top + 4 }]}>
+              {[
+                { id: 'edit-profile', title: 'Edit Profile' },
+                { id: 'settings', title: 'Settings' },
+                { id: 'logout', title: 'Logout' },
+              ].map(opt => (
+                <TouchableOpacity
+                  key={opt.id}
+                  activeOpacity={0.6}
+                  style={styles.dropdownItem}
+                  onPress={() => handleMenuPress(opt)}
+                >
+                  <Text style={styles.dropdownText}>{opt.title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
+      </View>
     </Page>
   );
 }
 
+const shadow = Platform.select({
+  ios: { shadowColor: '#2F3E75', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 14 },
+  android: { elevation: 8 },
+});
+
 const styles = StyleSheet.create({
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  profileCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 3,
-      }
-    }),
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    marginRight: 16,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 24,
-  },
-  profileInfo: {
+  root: {
     flex: 1,
+    backgroundColor: T.white,
   },
-  name: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    marginBottom: 4,
-  },
-  mobile: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 14,
-  },
-  editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  walletCard: {
-    borderRadius: 24,
-    padding: 24,
-    marginBottom: 24,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 10 },
-      android: { elevation: 6 },
-    }),
-  },
-  walletHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  walletIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  walletTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 17,
-    letterSpacing: -0.3,
-  },
-  walletBalanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-  },
-  balanceColumn: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  balanceUnit: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  walletEquals: {
-    paddingHorizontal: 16,
-  },
-  walletBalance: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 28,
-    letterSpacing: -1,
-  },
-  walletCurrency: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 15,
-  },
-  walletFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  walletSubtitle: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 13,
-  },
-  loyaltyCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 24,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 3,
-      }
-    }),
+  gradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
   },
 
-  menuContainer: {
-    marginBottom: 24,
-    borderRadius: 20,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-      },
-      android: {
-        elevation: 3,
-      }
-    }),
+  // Header
+  header: {
+    paddingHorizontal: 16,
+    paddingBottom: 36,
+    gap: 32,
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  menuItemFirst: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  menuItemLast: {
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  menuIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  kebab: {
+    alignSelf: 'flex-end',
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+  },
+  userInfo: {
+    gap: 2,
+  },
+  name: {
+    fontFamily: FONT.bold,
+    fontSize: 19,
+    lineHeight: 28,
+    color: T.white,
+  },
+  contact: {
+    fontFamily: FONT.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    color: T.white,
+  },
+
+  // Dropdown
+  dropdown: {
+    position: 'absolute',
+    right: 44,
+    width: 92,
+    backgroundColor: T.white,
+    borderRadius: 8,
+    padding: 4,
+    gap: 2,
+    ...shadow,
+  },
+  dropdownItem: {
+    padding: 8,
+    borderRadius: 4,
+  },
+  dropdownText: {
+    fontFamily: FONT.medium,
+    fontSize: 11,
+    lineHeight: 16,
+    color: T.neutral800,
+  },
+
+  // Sheet
+  sheet: {
+    marginTop: -20,
+    backgroundColor: T.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: T.sheetBorder,
+    paddingTop: 4,
+    minHeight: 600,
+  },
+  section: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+
+  // Membership
+  membershipCard: {
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 12,
+    padding: 12,
+    gap: 2,
+  },
+  membershipTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 2,
+  },
+  membershipTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  tierRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  tierText: {
+    fontFamily: FONT.semibold,
+    fontSize: 15,
+    lineHeight: 22,
+    color: T.neutral800,
+  },
+  savingsPill: {
+    backgroundColor: T.green500,
+    borderRadius: 24,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  savingsPillText: {
+    fontFamily: FONT.bold,
+    fontSize: 8,
+    lineHeight: 12,
+    color: T.white,
+  },
+  upgradeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: T.violet,
+    borderRadius: 31,
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 5,
+  },
+  upgradeText: {
+    fontFamily: FONT.bold,
+    fontSize: 11,
+    lineHeight: 16,
+    color: T.white,
+  },
+  membershipSub: {
+    fontFamily: FONT.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    color: T.neutral500,
+  },
+
+  // Wallet
+  walletCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  walletLabel: {
+    flex: 1,
+    fontFamily: FONT.semibold,
+    fontSize: 17,
+    lineHeight: 26,
+    color: T.neutral800,
+  },
+  walletValue: {
+    fontFamily: FONT.bold,
+    fontSize: 17,
+    lineHeight: 26,
+    color: T.primary500,
+    textAlign: 'right',
+  },
+
+  // Menu
+  menuCard: {
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+  },
+  menuIconBox: {
+    backgroundColor: T.surface,
+    borderRadius: 8,
+    padding: 10,
+  },
+  menuTextCol: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   menuTitle: {
-    flex: 1,
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
+    fontFamily: FONT.semibold,
+    fontSize: 13,
+    lineHeight: 20,
+    color: T.neutral800,
+  },
+  menuSubtitle: {
+    fontFamily: FONT.medium,
+    fontSize: 11,
+    lineHeight: 16,
+    color: T.neutral500,
+  },
+  cashChip: {
+    backgroundColor: T.chipBg,
+    borderRadius: 2,
+    paddingHorizontal: 4,
+  },
+  cashChipText: {
+    fontFamily: FONT.medium,
+    fontSize: 11,
+    lineHeight: 16,
+    color: T.primary500,
+  },
+
+  // Dashed divider
+  dashedClip: {
+    height: 1,
+    overflow: 'hidden',
+  },
+  dashedLine: {
+    height: 2,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderStyle: 'dashed',
+    borderRadius: 1,
+  },
+
+  // Toggle
+  toggleTrack: {
+    width: 38,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  toggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: T.white,
   },
 });

@@ -1,165 +1,158 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Switch, AppState, Linking } from 'react-native';
-import { Header, CustomAlert } from '@/components';
-import { useColors } from '@/hooks/useColors';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Pressable } from 'react-native';
+import { CustomAlert } from '@/components';
 import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import * as Location from 'expo-location';
-import Notifications from '@/utils/notifications';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
-export default function SettingsScreen() {
-  const colors = useColors();
-  const { logout, isDarkMode, toggleDarkMode, isAuthenticated } = useSawari();
-  const router = useRouter();
+// ─── Design tokens (from Figma) ────────────────────────────────────────────────
+const T = {
+  white: '#FFFFFF',
+  neutral800: '#262626',
+  neutral500: '#737373',
+  neutral300: '#D4D4D4',
+  neutral100: '#F5F5F5',
+  surface: '#F9F9FB',
+  border: '#EAECF1',
+  primary500: '#2F3E75',
+  toggleOff: '#D4D7E0',
+  red600: '#DC2626',
+  red50: '#FEF2F2',
+  redSurface: '#FFFAFA',
+};
 
-  // Reflects the real OS permission — not a preference the app can silently flip, so it starts
-  // false and is filled in as soon as the actual status is read (see refreshPermissions below).
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [locationEnabled, setLocationEnabled] = useState(false);
+const FONT = {
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+};
 
-  const refreshPermissions = useCallback(async () => {
-    try {
-      const notif = await Notifications.getPermissionsAsync();
-      setNotificationsEnabled(notif.status === 'granted');
-    } catch {}
-    try {
-      const loc = await Location.getForegroundPermissionsAsync();
-      setLocationEnabled(loc.status === 'granted');
-    } catch {}
-  }, []);
+// ─── Building blocks ──────────────────────────────────────────────────────────
+function SawariToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
+  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
   useEffect(() => {
-    refreshPermissions();
-    // Re-check on return from the system Settings app, so toggling there is reflected here too.
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') refreshPermissions();
-    });
-    return () => sub.remove();
-  }, [refreshPermissions]);
+    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
+  }, [value]);
 
-  const promptOpenSettings = (title: string, message: string) => {
-    CustomAlert.alert(title, message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Open Settings', onPress: () => Linking.openSettings() },
-    ]);
-  };
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
+  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [T.toggleOff, T.primary500] });
 
-  const handleNotificationsToggle = async (val: boolean) => {
-    Haptics.selectionAsync();
-    if (val) {
-      const res = await Notifications.requestPermissionsAsync();
-      if (res.status === 'granted') setNotificationsEnabled(true);
-      // Already denied once — the OS won't prompt again, only Settings can grant it now.
-      else promptOpenSettings('Enable Notifications', 'MySawari needs permission in Settings to send you ride updates.');
-    } else {
-      promptOpenSettings('Turn Off Notifications', 'This opens system Settings, where you can turn off notifications for MySawari.');
+  return (
+    <Pressable
+      hitSlop={8}
+      onPress={() => {
+        Haptics.selectionAsync();
+        onChange(!value);
+      }}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+    >
+      <Animated.View style={[styles.toggleTrack, { backgroundColor: trackColor }]}>
+        <Animated.View style={[styles.toggleThumb, { transform: [{ translateX }] }]} />
+      </Animated.View>
+    </Pressable>
+  );
+}
+
+function DashedDivider() {
+  // Single-side dashed borders are unreliable on iOS; this clips a dashed box to 1px.
+  return (
+    <View style={styles.dashedClip}>
+      <View style={styles.dashedLine} />
+    </View>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+export default function SettingsScreen() {
+  const { logout, isAuthenticated } = useSawari();
+  const router = useRouter();
+  const params = useLocalSearchParams<{ action?: string }>();
+
+  const [smsEnabled, setSmsEnabled] = useState(true);
+  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
+
+  // Profile's "Logout" option opens this screen with ?action=logout
+  useEffect(() => {
+    if (params.action === 'logout' && isAuthenticated === true) {
+      router.setParams({ action: undefined } as any);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      CustomAlert.alert('Logout', 'Are you sure you want to log out?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            await logout();
+            router.replace('/');
+          },
+        },
+      ]);
     }
-  };
+  }, [params.action, isAuthenticated]);
 
-  const handleLocationToggle = async (val: boolean) => {
+  const handleBack = () => {
     Haptics.selectionAsync();
-    if (val) {
-      const res = await Location.requestForegroundPermissionsAsync();
-      if (res.status === 'granted') setLocationEnabled(true);
-      else promptOpenSettings('Enable Location', 'MySawari needs permission in Settings to detect your pickup location.');
-    } else {
-      promptOpenSettings('Turn Off Location', 'This opens system Settings, where you can turn off location access for MySawari.');
-    }
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
   };
 
-  const handleLogout = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    CustomAlert.alert('Logout', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Logout', 
-        style: 'destructive',
-        onPress: async () => {
-          await logout();
-          router.replace('/');
-        }
-      }
-    ]);
+  const handleDeleteAccount = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    CustomAlert.alert(
+      'Delete My Sawari account',
+      'This will permanently delete your account, booking history and SawariCash. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', style: 'destructive', onPress: () => router.push('/help') },
+      ]
+    );
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
-        <Header title="Settings" back={true} />
-        
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Preferences</Text>
-          
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {/* Push Notifications */}
-            <View style={[styles.settingRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingTitle, { color: colors.foreground }]}>Push Notifications</Text>
-                <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>Receive updates on your rides and offers</Text>
-              </View>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={handleNotificationsToggle}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
-            </View>
+    <View style={styles.container}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity activeOpacity={0.7} style={styles.backBtn} onPress={handleBack} accessibilityLabel="Go back">
+            <Feather name="chevron-left" size={22} color={T.neutral800} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Settings</Text>
+        </View>
 
-            {/* Location Services */}
-            <View style={[styles.settingRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingTitle, { color: colors.foreground }]}>Location Services</Text>
-                <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>Allow access to your precise location</Text>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Recommendations & Reminder */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Recommendations & Reminder</Text>
+            <View style={styles.noteCard}>
+              <Text style={styles.noteText}>
+                *Note: Keep this on to receive offers/coupons and timely reminders based on your interests
+              </Text>
+              <View style={styles.list}>
+                <View style={styles.row}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>SMS</Text>
+                  <SawariToggle value={smsEnabled} onChange={setSmsEnabled} />
+                </View>
+                <DashedDivider />
+                <View style={styles.row}>
+                  <Text style={styles.rowTitle} numberOfLines={1}>Whatsapp</Text>
+                  <SawariToggle value={whatsappEnabled} onChange={setWhatsappEnabled} />
+                </View>
               </View>
-              <Switch
-                value={locationEnabled}
-                onValueChange={handleLocationToggle}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
-            </View>
-
-            {/* Dark Mode */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <Text style={[styles.settingTitle, { color: colors.foreground }]}>Dark Mode</Text>
-                <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>Experience MySawari in dark theme</Text>
-              </View>
-              <Switch
-                value={isDarkMode}
-                onValueChange={(val) => {
-                  Haptics.selectionAsync();
-                  toggleDarkMode(val);
-                }}
-                trackColor={{ false: colors.border, true: colors.primary }}
-              />
             </View>
           </View>
 
-          {isAuthenticated === true && (
-            <>
-              <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 24 }]}>Account</Text>
-
-              {/* Action Buttons */}
-              <View style={styles.actionsContainer}>
-                <TouchableOpacity 
-                  style={[styles.actionButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={handleLogout}
-                >
-                  <Feather name="log-out" size={18} color={colors.foreground} style={styles.actionIcon} />
-                  <Text style={[styles.actionText, { color: colors.foreground }]}>Log Out</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-
-          {/* App Version */}
-          <View style={styles.versionContainer}>
-            <Text style={[styles.versionText, { color: colors.mutedForeground }]}>MySawari v1.0.0</Text>
+          {/* Account Deletion */}
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Account Deletion</Text>
+            <TouchableOpacity activeOpacity={0.7} style={styles.deleteCard} onPress={handleDeleteAccount}>
+              <Text style={styles.deleteText} numberOfLines={1}>
+                Delete My Sawari account
+              </Text>
+            </TouchableOpacity>
           </View>
-
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -169,69 +162,132 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: T.white,
   },
   safeArea: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  sectionTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 18,
-    marginBottom: 16,
-    marginLeft: 4,
-  },
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  settingRow: {
+
+  // Header
+  header: {
+    height: 64,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  settingInfo: {
-    flex: 1,
-    paddingRight: 16,
-  },
-  settingTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    marginBottom: 4,
-  },
-  settingSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-  },
-  actionsContainer: {
     gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: T.neutral300,
   },
-  actionButton: {
-    flexDirection: 'row',
+  backBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: T.neutral100,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
   },
-  actionIcon: {
-    marginRight: 8,
+  headerTitle: {
+    fontFamily: FONT.semibold,
+    fontSize: 17,
+    lineHeight: 26,
+    color: T.neutral800,
   },
-  actionText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
+
+  scrollContent: {
+    paddingTop: 8,
+    paddingBottom: 40,
   },
-  versionContainer: {
-    alignItems: 'center',
-    marginTop: 32,
-    marginBottom: 20,
+  section: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
   },
-  versionText: {
-    fontFamily: 'Inter_500Medium',
+  sectionLabel: {
+    fontFamily: FONT.medium,
     fontSize: 13,
-  }
+    lineHeight: 20,
+    color: T.neutral500,
+  },
+
+  // Note card
+  noteCard: {
+    backgroundColor: T.surface,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  noteText: {
+    fontFamily: FONT.medium,
+    fontSize: 13,
+    lineHeight: 20,
+    color: T.neutral500,
+  },
+
+  // Toggle list
+  list: {
+    backgroundColor: T.white,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 16,
+  },
+  rowTitle: {
+    flex: 1,
+    fontFamily: FONT.semibold,
+    fontSize: 13,
+    lineHeight: 20,
+    color: T.neutral800,
+  },
+
+  // Account deletion
+  deleteCard: {
+    backgroundColor: T.redSurface,
+    borderWidth: 1,
+    borderColor: T.red50,
+    borderRadius: 8,
+    padding: 12,
+  },
+  deleteText: {
+    fontFamily: FONT.semibold,
+    fontSize: 13,
+    lineHeight: 20,
+    color: T.red600,
+  },
+
+  // Dashed divider
+  dashedClip: {
+    height: 1,
+    overflow: 'hidden',
+  },
+  dashedLine: {
+    height: 2,
+    borderWidth: 1,
+    borderColor: T.border,
+    borderStyle: 'dashed',
+    borderRadius: 1,
+  },
+
+  // Toggle
+  toggleTrack: {
+    width: 38,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+  },
+  toggleThumb: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: T.white,
+  },
 });

@@ -1,696 +1,502 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, Linking } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
-import { Feather } from '@expo/vector-icons';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useColors } from '@/hooks/useColors';
+import { LoginBottomSheet } from '@/components';
 import { API, BookingSnapshot } from '@/services/backend/api';
-import { cars } from '@/utils/sawari';
+import { useSawari } from '@/context/SawariContext';
+import { useVehicles } from '@/hooks/useVehicles';
+import { bookingsQueryOptions } from '@/hooks/useHomeData';
+import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
+import { ManageBookingSheet } from '@/components/booking/ManageBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { RefundTrackingModal } from '@/components/booking/RefundTrackingModal';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
-// Removed MockRequests
-import { useQuery } from '@tanstack/react-query';
-import { useVehicles } from '@/hooks/useVehicles';
-import { bookingsQueryOptions } from '@/hooks/useHomeData';
-import { LoadingImage } from '@/components/common/LoadingImage';
+import {
+  ActionRow, BookingCard, FONT, PricingSummary, RefundTimeline, SectionTitle, TripTimeline, pickupMoment, rupees, shortDate,
+} from '@/components/booking/TripDetailParts';
 
-// Status config — colour + icon for each state
-const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: string; label: string }> = {
-  CONFIRMED: { color: '#2563EB', bg: '#2563EB18', icon: 'check-circle', label: 'Confirmed' },
-  PENDING:   { color: '#D97706', bg: '#D9770618', icon: 'clock',        label: 'Pending' },
-  ONGOING:   { color: '#059669', bg: '#05966918', icon: 'navigation',   label: 'On Trip' },
-  COMPLETED: { color: '#16A34A', bg: '#16A34A18', icon: 'check-circle', label: 'Completed' },
-  CANCELLED: { color: '#DC2626', bg: '#DC262618', icon: 'x-circle',     label: 'Cancelled' },
-  FAILED:    { color: '#DC2626', bg: '#DC262618', icon: 'alert-circle',  label: 'Failed' },
-};
+const SUPPORT_EMAIL = 'support@mysawari.in';
+
+const BEFORE_YOU_GO = [
+  { icon: 'credit-card', title: 'Keep your driving licence ready', body: 'Carry a valid licence accepted for your rental.' },
+  { icon: 'file-text', title: 'Bring your required ID', body: 'Keep the identification documents requested for your booking.' },
+  { icon: 'map-pin', title: 'Confirm your pickup location', body: 'Check the address and coordinate with the handover team if needed.' },
+  { icon: 'clock', title: 'Arrive on time', body: "Contact the team if you're delayed or need to change your pickup time." },
+] as const;
+
+const WHY_MYSAWARI = [
+  { title: 'Verify the vehicle', body: 'Check the car model, registration number, and visible condition.' },
+  { title: 'Record existing damage', body: "Take photos or videos of any scratches or damage and ensure they're documented with the team." },
+  { title: 'Check fuel and odometer', body: 'Verify and record the starting fuel level and kilometre reading with the team.' },
+  { title: 'Confirm the handover', body: 'Review the rental terms, included kilometres, emergency instructions, and key handover before leaving.' },
+];
 
 export default function BookingDetailScreen() {
-  const colors = useColors();
+  const c = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const { selectCar, isAuthenticated } = useSawari();
+  const [showLogin, setShowLogin] = useState(false);
   const { id } = useLocalSearchParams<{ id?: string }>();
 
   // From the shared bookings list (usually already loaded, so it opens instantly); refreshed on focus.
   const { data: allBookings, isLoading: listLoading, isFetching: listFetching, isError: listFailed, refetch: refetchBookings } = useQuery({
     ...bookingsQueryOptions,
-    enabled: !!id,
+    // A trip belongs to an account: nothing to fetch until the customer is signed in.
+    enabled: !!id && isAuthenticated === true,
   });
   // A cancel / extend answer from the sheets shows straight away, before the list catches up.
   const [updated, setUpdated] = useState<BookingSnapshot | null>(null);
-  // Once the refreshed list arrives it is the truth again (later status changes from the ops team show).
   useEffect(() => { setUpdated(null); }, [allBookings]);
   const snapshot: BookingSnapshot | null = updated && updated.id === id ? updated : (allBookings || []).find((b) => b.id === id) || null;
-  // A trip opened from a notification may be newer than the cached list: wait for the refresh
-  // instead of flashing "Booking not found".
-  const loading = !!id && !snapshot && (listLoading || listFetching);
-  const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); }; // a fresh request: one already running predates the change
-  useFocusEffect(React.useCallback(() => { if (id) refetchBookings({ cancelRefetch: false }); }, [id, refetchBookings]));
+  const loading = (!!id && !snapshot && (listLoading || listFetching)) || isAuthenticated === null;
+  const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); };
+  useFocusEffect(React.useCallback(() => { if (id && isAuthenticated) refetchBookings({ cancelRefetch: false }); }, [id, isAuthenticated, refetchBookings]));
+
+  const [showManage, setShowManage] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showRefundTrack, setShowRefundTrack] = useState(false);
-  const pendingRefund = snapshot?.pendingRefund;
-  const hasPendingExtension = snapshot?.extensions?.some((e: any) => e.status === 'pending');
-  const hasRejectedExtension = snapshot?.extensions?.some((e: any) => e.status === 'rejected');
 
-  const { data: myReviews } = useQuery({
-    queryKey: ['myReviews'],
-    queryFn: () => API.reviews.mine(),
-    staleTime: 60 * 1000,
-  });
-
+  const { data: myReviews } = useQuery({ queryKey: ['myReviews'], queryFn: () => API.reviews.mine(), staleTime: 60 * 1000, enabled: isAuthenticated === true });
   const { data: vehicles = [] } = useVehicles();
 
+  // "Pricing Summary >" scrolls down to the pricing card.
+  const scrollRef = useRef<ScrollView>(null);
+  const pricingY = useRef(0);
+  const toPricing = () => scrollRef.current?.scrollTo({ y: Math.max(0, pricingY.current - 12), animated: true });
+
+  const header = (
+    <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <Pressable onPress={() => { Haptics.selectionAsync(); router.back(); }} style={styles.back} accessibilityLabel="Back" hitSlop={8}>
+        <Feather name="chevron-left" size={24} color={c.foreground} />
+      </Pressable>
+      <Text style={[styles.headerTitle, { color: c.foreground }]}>Trip Details</Text>
+    </View>
+  );
 
   if (loading) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <View style={[styles.content, { paddingTop: insets.top + 16 }]}>
-          <View style={styles.topBar}>
-            <View style={[styles.circle, { borderColor: colors.border }]}>
-              <Feather name="chevron-left" size={20} color={colors.foreground} />
-            </View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Trip Details</Text>
-          </View>
-          <BookingDetailSkeleton />
-        </View>
+      <View style={[styles.screen, { backgroundColor: c.background }]}>
+        {header}
+        <View style={{ paddingHorizontal: 16 }}><BookingDetailSkeleton /></View>
       </View>
     );
   }
 
-  if (!snapshot && listFailed) {
-    // A network problem is not "booking not found": offer a retry.
+  // Signed out (e.g. opened from a notification after logging out): ask to log in; the trip loads right after.
+  if (isAuthenticated === false) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
-        <Feather name="wifi-off" size={40} color={colors.mutedForeground} />
-        <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginTop: 16 }}>Couldn't load this trip</Text>
-        <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', marginTop: 6, textAlign: 'center' }}>Check your internet connection and try again.</Text>
-        <Pressable onPress={() => refetchBookings()} style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 12 }}>
-          <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>Retry</Text>
-        </Pressable>
+      <View style={[styles.screen, { backgroundColor: c.background }]}>
+        {header}
+        <View style={styles.center}>
+          <Feather name="lock" size={36} color={c.mutedForeground} />
+          <Text style={[styles.centerTitle, { color: c.foreground }]}>Log in to see this trip</Text>
+          <Text style={[styles.body, { color: c.mutedForeground, textAlign: 'center' }]}>Your trip details, pickup steps and payments are kept in your account.</Text>
+          <Pressable onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }} style={[styles.smallCta, { backgroundColor: c.primary }]} accessibilityRole="button">
+            <Text style={{ color: c.primaryForeground, fontFamily: FONT.semibold }}>Log In</Text>
+          </Pressable>
+        </View>
+        <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
       </View>
     );
   }
 
   if (!snapshot) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
-        <Feather name="inbox" size={40} color={colors.mutedForeground} />
-        <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', marginTop: 16 }}>Booking not found</Text>
-        <Pressable onPress={() => router.back()} style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 12 }}>
-          <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>Go Back</Text>
-        </Pressable>
+      <View style={[styles.screen, { backgroundColor: c.background }]}>
+        {header}
+        <View style={styles.center}>
+          <Feather name={listFailed ? 'wifi-off' : 'inbox'} size={40} color={c.mutedForeground} />
+          <Text style={[styles.centerTitle, { color: c.foreground }]}>{listFailed ? "Couldn't load this trip" : 'Booking not found'}</Text>
+          {listFailed && <Text style={[styles.body, { color: c.mutedForeground, textAlign: 'center' }]}>Check your internet connection and try again.</Text>}
+          <Pressable onPress={() => (listFailed ? refetchBookings() : router.back())} style={[styles.smallCta, { backgroundColor: c.primary }]}>
+            <Text style={{ color: c.primaryForeground, fontFamily: FONT.semibold }}>{listFailed ? 'Retry' : 'Go back'}</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
 
   const s = snapshot;
-  const matchedCar = vehicles.find(c => c.id === s.vehicleId) || cars.find(c => c.id === s.vehicleId);
-  const carImage = matchedCar?.image;
-  const statusCfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.CONFIRMED;
+  const matchedCar = vehicles.find((v) => v.id === s.vehicleId);
+  const upcoming = s.status === 'CONFIRMED' || s.status === 'PENDING';
+  const ongoing = s.status === 'ONGOING';
+  const completed = s.status === 'COMPLETED';
+  const cancelled = s.status === 'CANCELLED' || s.status === 'FAILED';
+  const overdue = ongoing && !!s.rawEndDate && new Date() > new Date(s.rawEndDate);
+  const pendingExt = s.extensions?.some((e: any) => e.status === 'pending');
+  const rejectedExt = s.extensions?.some((e: any) => e.status === 'rejected');
+  const canExtend = (upcoming && s.status === 'CONFIRMED') || ongoing ? !pendingExt && !rejectedExt : false;
+  const reviewed = !!myReviews && (myReviews.bookingIds.includes(s.id) || myReviews.legacyCarIds.includes(String(s.vehicleId)));
+  const code = s.bookingCode || s.id.slice(-6).toUpperCase();
 
-  const formatDateSafe = (dateStr: string) => {
-    if (!dateStr) return '—';
-    if (dateStr.includes('T') || dateStr.includes('-')) {
-      const d = new Date(dateStr);
-      if (!isNaN(d.getTime())) return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    }
-    return dateStr;
+  const openSupport = () =>
+    Linking.openURL(`${SUPPORT_WHATSAPP_URL}?text=${encodeURIComponent(`Hi, I need help with my booking ${code}.`)}`)
+      .catch(() => Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {}));
+
+  const bookAgain = () => {
+    if (matchedCar) { selectCar(matchedCar); router.push('/car-details'); }
+    else router.push('/explore');
   };
 
+  // "Your trip starts in 2 days"
+  const startsIn = (() => {
+    const at = pickupMoment(s);
+    if (!at) return 'Your trip is coming up';
+    const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const n = Math.round((day(at) - day(new Date())) / 86400000);
+    if (n <= 0) return 'Your trip starts today';
+    if (n === 1) return 'Your trip starts tomorrow';
+    return `Your trip starts in ${n} days`;
+  })();
+
+  const bottomBar = (() => {
+    if (upcoming || ongoing) {
+      if (pendingExt) {
+        return (
+          <View style={[styles.note, { backgroundColor: c.warning + '14' }]}>
+            <Feather name="clock" size={16} color={c.warning} />
+            <Text style={[styles.noteText, { color: c.warning }]}>Extension requested · waiting for our team to approve.</Text>
+          </View>
+        );
+      }
+      if (!canExtend) return null;
+      return (
+        <>
+          <View style={styles.hintRow}>
+            <Feather name="info" size={14} color={c.mutedForeground} />
+            <Text style={[styles.hint, { color: c.mutedForeground }]}>Need more time? Request an extension for your trip.</Text>
+          </View>
+          <Cta label="Request Extension" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowExtend(true); }} />
+        </>
+      );
+    }
+    return <Cta label="Book again" onPress={bookAgain} />;
+  })();
+
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <Animated.ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16, paddingBottom: 140 }]}
-        entering={FadeIn.duration(300)}
-      >
-        {/* ── TOP BAR ── */}
-        <View style={styles.topBar}>
-          <Pressable
-            onPress={() => { Haptics.selectionAsync(); router.back(); }}
-            style={[styles.circle, { borderColor: colors.border, backgroundColor: colors.card }]}
-          >
-            <Feather name="chevron-left" size={20} color={colors.foreground} />
-          </Pressable>
-          <Text style={[styles.title, { color: colors.foreground }]}>Trip Details</Text>
-        </View>
+    <View style={[styles.screen, { backgroundColor: c.background }]}>
+      {header}
+      <Animated.View entering={FadeIn.duration(250)} style={{ flex: 1 }}>
+        <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomBar ? 24 : insets.bottom + 24 }]}>
+          {/* Ongoing: the status line comes first */}
+          {ongoing && (
+            <Banner
+              tone={overdue ? 'danger' : 'active'}
+              title={overdue ? 'Your trip is overdue' : 'Your trip is underway'}
+              body={overdue
+                ? 'Please return your car as soon as possible. Additional charges apply under your rental policy.'
+                : 'Return your car by the scheduled time to avoid additional charges under your rental policy.'}
+            />
+          )}
 
-        {/* ── BOOKING ID + STATUS ── */}
-        <Animated.View entering={FadeInDown.delay(60).springify()} style={[styles.referenceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.smallLabel, { color: colors.mutedForeground }]}>Booking Reference</Text>
-            <Text style={[styles.reference, { color: colors.foreground }]}>
-              {s.bookingCode || s.id.slice(0, 8).toUpperCase()}
-            </Text>
-          </View>
-          <View style={[styles.statusPill, { backgroundColor: statusCfg.bg }]}>
-            <Feather name={statusCfg.icon as any} size={13} color={statusCfg.color} />
-            <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
-          </View>
-        </Animated.View>
+          <BookingCard booking={s} image={matchedCar?.image} />
 
-        {/* ── VEHICLE ── */}
-        <Animated.View entering={FadeInDown.delay(120).springify()}>
-          <SectionLabel label="VEHICLE" colors={colors} />
-          <View style={[styles.vehicleCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.hero, { backgroundColor: colors.muted }]}>
-              {carImage ? (
-                <LoadingImage source={carImage} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
-              ) : (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                  <Feather name="truck" size={36} color={colors.mutedForeground} />
-                </View>
-              )}
-              {/* Gradient overlay for vehicle name */}
-              <View style={styles.heroOverlay}>
-                <Text style={styles.heroVehicleName} numberOfLines={1}>{s.vehicleName}</Text>
+          {upcoming && (
+            <Banner
+              tone={s.status === 'PENDING' ? 'pending' : 'info'}
+              title={s.status === 'PENDING' ? 'Waiting for confirmation' : startsIn}
+              body={s.status === 'PENDING'
+                ? 'We’re confirming your booking. You’ll get a notification as soon as it’s done.'
+                : 'Your car is booked. Review your pickup details and complete the steps below before you arrive.'}
+            />
+          )}
+
+          {ongoing && <ActionRow title="Need help during your trip?" subtitle="Call or WhatsApp our team any time." icon="phone" onPress={openSupport} />}
+
+          {ongoing && canExtend && (
+            <View style={[styles.box, styles.extendCard, { backgroundColor: c.card, borderColor: c.border }]}>
+              <View style={{ flex: 1, gap: 0 }}>
+                <Text style={[styles.rowTitle, { color: c.foreground }]}>Need more time?</Text>
+                <Text style={[styles.body, { color: c.mutedForeground }]}>Request an extension for your trip.</Text>
               </View>
+              <Pressable onPress={() => setShowExtend(true)} style={[styles.pillBtn, { backgroundColor: c.navy }]}>
+                <Text style={styles.pillBtnText}>Request Extension</Text>
+              </Pressable>
             </View>
-            <View style={[styles.vehicleBody, { borderTopColor: colors.border }]}>
-              <View style={{ flexDirection: 'row', gap: 20 }}>
-                <View style={styles.metaItem}>
-                  <Feather name="refresh-cw" size={13} color={colors.primaryText} />
-                  <Text style={[styles.metaText, { color: colors.foreground }]}>Unlimited km</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Feather name="calendar" size={13} color={colors.primaryText} />
-                  <Text style={[styles.metaText, { color: colors.foreground }]}>{s.rentalDays} day{s.rentalDays !== 1 ? 's' : ''}</Text>
-                </View>
-                {s.driverMode && (
-                  <View style={styles.metaItem}>
-                    <Feather name="user" size={13} color={colors.primaryText} />
-                    <Text style={[styles.metaText, { color: colors.foreground }]}>{s.driverMode}</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </View>
-        </Animated.View>
+          )}
 
-        {/* ── TRIP TIMELINE ── */}
-        <Animated.View entering={FadeInDown.delay(180).springify()}>
-          <SectionLabel label="TRIP" colors={colors} />
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-
-            {/* Pickup */}
-            <View style={styles.timelineRow}>
-              <View style={styles.timelineLeft}>
-                <View style={[styles.timelineDot, { backgroundColor: colors.primary }]} />
-                <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
-              </View>
-              <View style={styles.timelineContent}>
-                <Text style={[styles.timelineLabel, { color: colors.mutedForeground }]}>PICKUP</Text>
-                <Text style={[styles.timelineDate, { color: colors.foreground }]}>
-                  {s.pickupDate}{s.pickupTime ? ` · ${s.pickupTime}` : ''}
-                </Text>
-                <Text style={[styles.timelineLoc, { color: colors.mutedForeground }]} numberOfLines={2}>
-                  {(s.pickupCharge || 0) > 0 ? '🚗 Delivered to you' : '📍 Self Pickup'} · {s.pickupLocationName || 'Office'}
-                </Text>
-              </View>
-            </View>
-
-            {s.destination ? (
-              <View style={[styles.timelineRow, { marginTop: 0 }]}>
-                <View style={styles.timelineLeft}>
-                  <View style={[styles.timelineDot, { backgroundColor: colors.primary, opacity: 0.5 }]} />
-                  <View style={[styles.timelineLine, { backgroundColor: colors.border }]} />
-                </View>
-                <View style={[styles.timelineContent, { marginBottom: 0 }]}>
-                  <Text style={[styles.timelineLabel, { color: colors.mutedForeground }]}>DESTINATION</Text>
-                  <Text style={[styles.timelineLoc, { color: colors.foreground }]} numberOfLines={2}>
-                    {s.destination}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {/* Drop-off */}
-            <View style={[styles.timelineRow, { marginTop: 0 }]}>
-              <View style={styles.timelineLeft}>
-                <View style={[styles.timelineDot, { backgroundColor: colors.success }]} />
-              </View>
-              <View style={[styles.timelineContent, { marginBottom: 0 }]}>
-                <Text style={[styles.timelineLabel, { color: colors.mutedForeground }]}>DROP OFF</Text>
-                <Text style={[styles.timelineDate, { color: colors.foreground }]}>
-                  {s.returnDate}{s.dropTime ? ` · ${s.dropTime}` : ''}
-                </Text>
-                <Text style={[styles.timelineLoc, { color: colors.mutedForeground }]} numberOfLines={2}>
-                  {(s.dropCharge || 0) > 0 ? '🏠 Collected from you' : '📍 Self Drop'} · {s.dropoffLocationName || 'Office'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Navigate button */}
-            <Pressable
-              style={({ pressed }) => [styles.mapBtn, { backgroundColor: colors.tintLight, borderColor: colors.primary + '40', opacity: pressed ? 0.75 : 1, marginTop: 16 }]}
-              onPress={() => {
-                Haptics.selectionAsync();
-                Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(s.pickupLocationName && s.pickupLocationName !== 'Office' ? s.pickupLocationName : 'MySawari Kahilipara Guwahati')}`);
-              }}
-            >
-              <Feather name="navigation" size={14} color={colors.primaryText} />
-              <Text style={[styles.mapBtnText, { color: colors.primaryText }]}>Get Directions</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-
-        {/* ── EXTENSION HISTORY ── */}
-        {s.extensions && s.extensions.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(220).springify()}>
-            <SectionLabel label="EXTENSION HISTORY" colors={colors} />
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              {s.extensions.map((ext, idx) => (
-                <View key={ext.id} style={{ marginBottom: idx < s.extensions!.length - 1 ? 16 : 0 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>
-                      Extension #{idx + 1}
-                    </Text>
-                    <View style={{
-                      backgroundColor: ext.status === 'approved' ? colors.success + '20' : ext.status === 'rejected' ? colors.destructive + '20' : '#D9770618',
-                      paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20
-                    }}>
-                      <Text style={{
-                        color: ext.status === 'approved' ? colors.success : ext.status === 'rejected' ? colors.destructive : '#D97706',
-                        fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase'
-                      }}>
-                        {ext.status === 'pending' && ['COMPLETED', 'CANCELLED', 'FAILED'].includes(s.status) ? 'expired' : (ext.status || 'pending')}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={{ color: colors.mutedForeground, marginTop: 6, fontSize: 13 }}>
-                    Until {formatDateSafe(ext.newEndDate)} · +{ext.daysToAdd || (ext as any).additionalDays} days · ₹{(ext.additionalAmount || 0).toLocaleString('en-IN')}
-                  </Text>
-                  {idx < s.extensions!.length - 1 && (
-                    <View style={[styles.divider, { backgroundColor: colors.border, marginTop: 12, marginBottom: 0 }]} />
-                  )}
-                </View>
-              ))}
-            </View>
-          </Animated.View>
-        )}
-
-        {/* ── CUSTOMER ── */}
-        <Animated.View entering={FadeInDown.delay(260).springify()}>
-          <SectionLabel label="CUSTOMER" colors={colors} />
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, padding: 0 }]}>
-            <CustomerRow icon="user" label="Full name" value={s.customerName || '—'} border colors={colors} />
-            <CustomerRow icon="smartphone" label="Mobile" value={s.customerMobile || '—'} border colors={colors} />
-            <CustomerRow icon="mail" label="Email" value={s.customerEmail || 'Not provided'} colors={colors} />
-          </View>
-        </Animated.View>
-
-        {/* ── FUEL ESTIMATE ── */}
-        {!!s.estimatedFuelCost && (
-          <Animated.View entering={FadeInDown.delay(300).springify()}>
-            <SectionLabel label="ESTIMATED PETROL (Reference)" colors={colors} />
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <InfoRow label="Est. Travel" value={`${s.estimatedKm} KM`} colors={colors} />
-              <InfoRow label="Mileage / Fuel Price" value={`${s.vehicleMileageUsed} KM/L @ ₹${s.fuelPriceUsed}/L`} colors={colors} />
-              <View style={[styles.divider, { backgroundColor: colors.border }]} />
-              <InfoRow label="Estimated Fuel Expense" value={`₹${s.estimatedFuelCost.toLocaleString('en-IN')}`} bold colors={colors} />
-            </View>
-          </Animated.View>
-        )}
-
-        {/* ── PAYMENT ── */}
-        <Animated.View entering={FadeInDown.delay(320).springify()}>
-          <SectionLabel label="PAYMENT" colors={colors} />
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <PaymentRow label={`Car Rental (${s.rentalDays} days)`} value={`₹${s.rentalAmount.toLocaleString('en-IN')}`} colors={colors} />
-            {(s.membershipDiscount || 0) > 0 && (
-              <PaymentRow label="Membership Discount ★" value={`-₹${(s.membershipDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />
-            )}
-            {s.couponDiscount > 0 && (
-              <PaymentRow label={`Coupon Discount${s.couponCode ? ` (${s.couponCode})` : ''} 🏷️`} value={`-₹${s.couponDiscount.toLocaleString('en-IN')}`} accent colors={colors} />
-            )}
-            {(s.manualDiscount || 0) > 0 && (
-              <PaymentRow label="Special Discount ✂️" value={`-₹${(s.manualDiscount || 0).toLocaleString('en-IN')}`} accent colors={colors} />
-            )}
-            {(s.pickupCharge || 0) > 0 && <PaymentRow label={`Pickup Service (${s.pickupDistanceKm || 0} km)`} value={`₹${(s.pickupCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
-            {(s.dropCharge || 0) > 0 && <PaymentRow label={`Drop Service (${s.dropDistanceKm || 0} km)`} value={`₹${(s.dropCharge || 0).toLocaleString('en-IN')}`} colors={colors} />}
-            {(s.fastagAmount || 0) > 0 && <PaymentRow label="Fastag" value={`₹${(s.fastagAmount || 0).toLocaleString('en-IN')}`} colors={colors} />}
-            {(s.securityDeposit || 0) > 0 && <PaymentRow label="Security Deposit" value={`₹${(s.securityDeposit || 0).toLocaleString('en-IN')}`} colors={colors} />}
-            {s.sawariCashUsed > 0 && <PaymentRow label="SawariCash Applied 💰" value={`-₹${s.sawariCashUsed.toLocaleString('en-IN')}`} accent colors={colors} />}
-
-            {((s.couponDiscount || 0) > 0 || (s.membershipDiscount || 0) > 0 || (s.sawariCashUsed || 0) > 0 || (s.manualDiscount || 0) > 0) && (
-              <View style={{ backgroundColor: colors.success + '14', borderColor: colors.success + '35', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Feather name="check-circle" size={14} color={colors.success} />
-                <Text style={{ color: colors.success, fontSize: 12, fontFamily: 'Inter_600SemiBold', flex: 1 }}>
-                  Total Savings: ₹{(((s.couponDiscount || 0) + (s.membershipDiscount || 0) + (s.sawariCashUsed || 0) + (s.manualDiscount || 0))).toLocaleString('en-IN')}
-                </Text>
-              </View>
-            )}
-
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <PaymentRow label="Booking Amount Paid" value={`₹${s.onlinePayableNow.toLocaleString('en-IN')}`} strong colors={colors} />
-            {(s.totalCollected || 0) > s.onlinePayableNow && (
-              <PaymentRow label="Total Paid So Far" value={`₹${(s.totalCollected || 0).toLocaleString('en-IN')}`} strong colors={colors} />
-            )}
-            {!!s.razorpayPaymentId && (
-              <Text style={{ color: colors.mutedForeground, fontSize: 11, textAlign: 'right', marginTop: -6, marginBottom: 10 }}>
-                Txn: {s.razorpayPaymentId}
-              </Text>
-            )}
-            {s.status !== 'CANCELLED' && (
-              <View style={[styles.remainingBadge, { backgroundColor: s.remainingRentalAmount <= 0 ? colors.success + '18' : colors.destructive + '10' }]}>
-                <Text style={{ fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.mutedForeground }}>Remaining Balance</Text>
-                <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 15, color: s.remainingRentalAmount <= 0 ? colors.success : colors.destructive }}>
-                  {s.remainingRentalAmount <= 0 ? '✓ Fully Paid' : `₹${s.remainingRentalAmount.toLocaleString('en-IN')}`}
-                </Text>
-              </View>
-            )}
-
-            {s.totalRentalAmount && s.totalRentalAmount > s.rentalAmount ? (
-              <>
-                <View style={[styles.divider, { backgroundColor: colors.border, marginTop: 8 }]} />
-                <PaymentRow label="Additional Extensions" value={`₹${(s.totalRentalAmount - s.rentalAmount).toLocaleString('en-IN')}`} colors={colors} />
-                <PaymentRow label="Total Paid" value={`₹${s.totalRentalAmount.toLocaleString('en-IN')}`} strong colors={colors} />
-              </>
-            ) : null}
-          </View>
-        </Animated.View>
-
-        {/* ── CANCELLATION ── */}
-        {s.status === 'CANCELLED' && s.cancellationFee !== undefined && (
-          <Animated.View entering={FadeInDown.delay(360).springify()}>
-            <SectionLabel label="CANCELLATION" colors={colors} accent />
-            <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.destructive + '40' }]}>
-              <InfoRow label="Reason" value={s.cancellationReason || '—'} colors={colors} />
-              <InfoRow label="Cancellation Fee" value={`₹${(s.cancellationFee || 0).toLocaleString('en-IN')}`} colors={colors} destructive />
-              {s.refundAmount && s.refundAmount > 0 ? (
-                <Pressable
-                  onPress={() => setShowRefundTrack(true)}
-                  style={({ pressed }) => [
-                    styles.alertBox,
-                    {
-                      backgroundColor:
-                        pendingRefund?.status === 'refunded'
-                          ? '#10B98118'
-                          : pendingRefund?.status === 'approved'
-                          ? '#4F46E518'
-                          : pendingRefund?.status === 'rejected'
-                          ? '#EF444418'
-                          : '#F59E0B18',
-                      borderColor:
-                        pendingRefund?.status === 'refunded'
-                          ? '#10B98140'
-                          : pendingRefund?.status === 'approved'
-                          ? '#4F46E540'
-                          : pendingRefund?.status === 'rejected'
-                          ? '#EF444440'
-                          : '#F59E0B40',
-                      marginTop: 10,
-                      opacity: pressed ? 0.85 : 1,
-                    },
-                  ]}
-                >
-                  <Feather
-                    name={
-                      pendingRefund?.status === 'refunded'
-                        ? 'check-circle'
-                        : pendingRefund?.status === 'approved'
-                        ? 'check'
-                        : pendingRefund?.status === 'rejected'
-                        ? 'x-circle'
-                        : 'clock'
-                    }
-                    size={18}
-                    color={
-                      pendingRefund?.status === 'refunded'
-                        ? '#10B981'
-                        : pendingRefund?.status === 'approved'
-                        ? '#4F46E5'
-                        : pendingRefund?.status === 'rejected'
-                        ? '#EF4444'
-                        : '#B45309'
-                    }
-                  />
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text
-                        style={{
-                          fontFamily: 'Inter_600SemiBold',
-                          color:
-                            pendingRefund?.status === 'refunded'
-                              ? '#065F46'
-                              : pendingRefund?.status === 'approved'
-                              ? '#3730A3'
-                              : pendingRefund?.status === 'rejected'
-                              ? '#991B1B'
-                              : '#B45309',
-                          fontSize: 13,
-                        }}
-                      >
-                        {pendingRefund?.status === 'refunded'
-                          ? 'Refund Processed'
-                          : pendingRefund?.status === 'approved'
-                          ? 'Refund Approved'
-                          : pendingRefund?.status === 'rejected'
-                          ? 'Refund Rejected'
-                          : 'Refund Requested'}
-                      </Text>
-                      <Text
-                        style={{
-                          fontFamily: 'Inter_700Bold',
-                          color:
-                            pendingRefund?.status === 'refunded'
-                              ? '#065F46'
-                              : pendingRefund?.status === 'approved'
-                              ? '#3730A3'
-                              : pendingRefund?.status === 'rejected'
-                              ? '#991B1B'
-                              : '#B45309',
-                          fontSize: 14,
-                        }}
-                      >
-                        ₹{(s.refundAmount || 0).toLocaleString('en-IN')}
-                      </Text>
-                    </View>
-
-                    {pendingRefund?.refundType === 'bank_account' && pendingRefund?.accountDetails?.accountNumber ? (
-                      <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
-                        Bank A/C: ••••{pendingRefund.accountDetails.accountNumber.slice(-4)} ({pendingRefund.accountDetails.ifscCode})
-                      </Text>
-                    ) : pendingRefund?.upiId ? (
-                      <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
-                        UPI: {pendingRefund.upiId}
-                      </Text>
-                    ) : null}
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                      <Text style={{ fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#4F46E5' }}>
-                        Track refund progress & details
-                      </Text>
-                      <Feather name="chevron-right" size={12} color="#4F46E5" style={{ marginLeft: 2 }} />
-                    </View>
+          {/* Cancelled: refund progress */}
+          {cancelled && (
+            <View style={{ gap: 12 }}>
+              <SectionTitle title="Cancellation Request" />
+              {(s.refundAmount || 0) > 0 ? (
+                <Pressable onPress={() => setShowRefundTrack(true)} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+                  <RefundTimeline booking={s} />
+                  <View style={styles.linkRow}>
+                    <Text style={[styles.link, { color: c.blue }]}>Refund of {rupees(s.refundAmount)} · view payout details</Text>
+                    <Feather name="chevron-right" size={13} color={c.blue} />
                   </View>
                 </Pressable>
-              ) : null}
+              ) : (
+                <View style={[styles.note, { backgroundColor: c.destructive + '10' }]}>
+                  <Feather name="info" size={16} color={c.destructive} />
+                  <Text style={[styles.noteText, { color: c.destructive }]}>
+                    {s.cancellationReason ? `Cancelled: ${s.cancellationReason}. ` : ''}No refund applies to this cancellation.
+                  </Text>
+                </View>
+              )}
+              {(s.refundAmount || 0) > 0 && (
+                <View style={[styles.box, { backgroundColor: c.card, borderColor: c.border, gap: 4 }]}>
+                  <Text style={[styles.rowTitle, { color: c.foreground }]}>Need help with your refund?</Text>
+                  <Text style={[styles.body, { color: c.mutedForeground }]}>
+                    If you haven’t received your refund, email <Text selectable style={{ color: c.blue, fontFamily: FONT.medium }} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Refund for booking ${code}`)}`).catch(() => {})}>{SUPPORT_EMAIL}</Text>. We’ll verify and assist you.
+                  </Text>
+                </View>
+              )}
             </View>
-          </Animated.View>
-        )}
-
-        {/* ── INFO ── */}
-        <Animated.View entering={FadeInDown.delay(380).springify()} style={[styles.infoBox, { backgroundColor: colors.tintLight, borderColor: colors.primary + '30' }]}>
-          <Feather name="info" size={15} color={colors.primaryText} style={{ marginTop: 1 }} />
-          <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
-            Free cancellation until 24h before pickup. Unlimited kilometres. Carry your driving licence and a valid ID at pickup.
-          </Text>
-        </Animated.View>
-      </Animated.ScrollView>
-
-      {/* ── SHEETS ── */}
-      <RefundTrackingModal visible={showRefundTrack} onClose={() => setShowRefundTrack(false)} booking={s} onRefundUpdated={() => refetchBookings()} />
-      <CancelBookingSheet visible={showCancel} onClose={() => setShowCancel(false)} booking={s} onSuccess={setSnapshot} />
-      <ExtendBookingSheet visible={showExtend} onClose={() => setShowExtend(false)} booking={s} onSuccess={setSnapshot} />
-      <ReviewModal
-        trip={showReview ? { bookingId: s.id, carId: String(s.vehicleId), vehicleName: s.vehicleName } : null}
-        onClose={() => setShowReview(false)}
-      />
-
-      {/* ── COMPLETED ACTION BAR ── */}
-      {s.status === 'COMPLETED' && (
-        <Animated.View entering={FadeInDown.delay(300).springify()} style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
-          {myReviews && (myReviews.bookingIds.includes(s.id) || myReviews.legacyCarIds.includes(String(s.vehicleId))) ? (
-            <View style={[styles.actionBtn, { flexDirection: 'row', gap: 8, borderWidth: 1, borderColor: colors.border }]}>
-              <Feather name="check-circle" size={16} color={colors.success} />
-              <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.success }}>Reviewed — Thank you!</Text>
-            </View>
-          ) : (
-            <Pressable
-              style={({ pressed }) => [styles.actionBtn, { flexDirection: 'row', gap: 8, backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 }]}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowReview(true); }}
-            >
-              <Feather name="star" size={16} color={colors.primaryForeground} />
-              <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>Write a Review</Text>
-            </Pressable>
           )}
-        </Animated.View>
-      )}
 
-      {/* ── ACTIVE ACTION BAR ── */}
-      {(s.status === 'CONFIRMED' || s.status === 'ONGOING' || s.status === 'PENDING') && (
-        <Animated.View entering={FadeInDown.delay(300).springify()} style={[styles.actionBar, { backgroundColor: colors.background, borderColor: colors.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
-          {hasPendingExtension && (
-            <View style={[styles.alertBox, { backgroundColor: '#F59E0B18', borderColor: '#F59E0B40', marginBottom: 12 }]}>
-              <Feather name="clock" size={15} color="#B45309" />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#B45309', fontSize: 13 }}>Extension Requested</Text>
-                <Text style={{ fontFamily: 'Inter_400Regular', color: '#B45309', fontSize: 12 }}>Waiting for Operations to approve.</Text>
+          {/* Your trip */}
+          <View>
+            <SectionTitle title="Your trip" linkLabel="Pricing Summary" onLink={toPricing} />
+            <TripTimeline booking={s} />
+          </View>
+
+          {/* Completed: rate the trip */}
+          {completed && (
+            <RateTrip
+              reviewed={reviewed}
+              onAddPhotos={() => setShowReview(true)}
+              onSubmit={async (rating, text) => {
+                await API.reviews.submit(String(s.vehicleId), rating, text, { bookingId: s.id });
+                queryClient.invalidateQueries({ queryKey: ['myReviews'] });
+                queryClient.invalidateQueries({ queryKey: ['pendingReviews'] });
+              }}
+            />
+          )}
+
+          {upcoming && (
+            <ActionRow title="Need to change your plans or request refund?" subtitle="Modify your trip or manage your booking." onPress={() => setShowManage(true)} />
+          )}
+          {upcoming && <ActionRow title="Have a question about your booking?" subtitle="Call or WhatsApp our team." icon="phone" onPress={openSupport} />}
+
+          {/* Extensions already asked for */}
+          {!!s.extensions?.length && (
+            <View>
+              <SectionTitle title="Extensions" />
+              <View style={[styles.box, { backgroundColor: c.card, borderColor: c.border, gap: 10 }]}>
+                {s.extensions.map((e: any, i: number) => {
+                  const st = e.status === 'pending' && (completed || cancelled) ? 'expired' : (e.status || 'pending');
+                  const tone = st === 'approved' ? c.success : st === 'rejected' || st === 'expired' ? c.destructive : c.warning;
+                  return (
+                    <View key={e.id || i} style={styles.extRow}>
+                      <Text style={[styles.body, { color: c.foreground, flex: 1 }]}>
+                        +{e.daysToAdd || e.additionalDays} day{(e.daysToAdd || e.additionalDays) === 1 ? '' : 's'} · until {shortDate(e.newEndDate ? new Date(e.newEndDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '')} · {rupees(e.additionalAmount)}
+                      </Text>
+                      <Text style={[styles.extStatus, { color: tone }]}>{st}</Text>
+                    </View>
+                  );
+                })}
               </View>
             </View>
           )}
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            {(s.status === 'CONFIRMED' || s.status === 'PENDING') && (
-              <Pressable
-                style={({ pressed }) => [styles.actionBtn, { borderWidth: 1, borderColor: colors.border, flex: 1, opacity: pressed ? 0.75 : 1 }]}
-                onPress={() => { Haptics.selectionAsync(); setShowCancel(true); }}
-              >
-                <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.foreground }}>Cancel</Text>
-              </Pressable>
-            )}
-            {((s.status === 'CONFIRMED' || s.status === 'ONGOING') && (s.pickupCharge || 0) > 0) && (
-              <Pressable
-                style={({ pressed }) => [styles.actionBtn, { backgroundColor: '#047857', flex: 1, opacity: pressed ? 0.85 : 1 }]}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(s.pickupLocationName && s.pickupLocationName !== 'Office' ? s.pickupLocationName : 'Kahilipara, Guwahati')}`);
-                }}
-              >
-                <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' }}>Track Vehicle</Text>
-              </Pressable>
-            )}
-            {(s.status === 'CONFIRMED' || s.status === 'ONGOING') && !hasPendingExtension && !hasRejectedExtension && (
-              <Pressable
-                style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.primary, flex: 1, opacity: pressed ? 0.85 : 1 }]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowExtend(true); }}
-              >
-                <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>Extend Trip</Text>
-              </Pressable>
-            )}
+
+          {/* Before you go */}
+          {upcoming && (
+            <View style={{ gap: 8 }}>
+              <SectionTitle title="Before you go" />
+              <View style={{ gap: 8 }}>
+                {BEFORE_YOU_GO.map((item) => (
+                  <View key={item.title} style={styles.tipRow}>
+                    <View style={[styles.tipIcon, { backgroundColor: c.muted }]}>
+                      <Feather name={item.icon as any} size={18} color={c.foreground} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.tipTitle, { color: c.foreground }]}>{item.title}</Text>
+                      <Text style={[styles.body, { color: c.mutedForeground }]}>{item.body}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Why rent from MySawari? */}
+          {(upcoming || ongoing) && (
+            <View style={[styles.why, { backgroundColor: c.navy }]}>
+              <View style={[styles.whyGlow, { backgroundColor: c.lime }]} />
+              <Text style={styles.whyTitle}>Why rent from MySawari?</Text>
+              <View style={{ gap: 10 }}>
+                {WHY_MYSAWARI.map((w) => (
+                  <View key={w.title} style={styles.whyRow}>
+                    <Feather name="check-circle" size={20} color={c.lime} style={{ marginTop: 2 }} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.whyItem}>{w.title}</Text>
+                      <Text style={styles.whyBody}>{w.body}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Pricing Summary */}
+          <View onLayout={(e) => { pricingY.current = e.nativeEvent.layout.y; }}>
+            <SectionTitle title="Pricing Summary" />
+            <PricingSummary booking={s} />
           </View>
-        </Animated.View>
+
+          {ongoing && <ActionRow title="Need to change your plans?" subtitle="Modify your trip or manage your booking." onPress={openSupport} />}
+        </ScrollView>
+      </Animated.View>
+
+      {!!bottomBar && (
+        <View style={[styles.bottomBar, { backgroundColor: c.background, borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
+          {bottomBar}
+        </View>
       )}
+
+      {/* Sheets — the same components (and server calls) as before */}
+      <ManageBookingSheet visible={showManage} onClose={() => setShowManage(false)} booking={s} onCancelBooking={() => { setShowManage(false); setTimeout(() => setShowCancel(true), 250); }} />
+      <CancelBookingSheet visible={showCancel} onClose={() => setShowCancel(false)} booking={s} onSuccess={setSnapshot} />
+      <ExtendBookingSheet visible={showExtend} onClose={() => setShowExtend(false)} booking={s} onSuccess={setSnapshot} />
+      <RefundTrackingModal visible={showRefundTrack} onClose={() => setShowRefundTrack(false)} booking={s} onRefundUpdated={() => refetchBookings()} />
+      <ReviewModal
+        trip={showReview ? { bookingId: s.id, carId: String(s.vehicleId), vehicleName: s.vehicleName } : null}
+        onClose={() => { setShowReview(false); queryClient.invalidateQueries({ queryKey: ['myReviews'] }); }}
+      />
     </View>
   );
 }
 
-// ── Small helpers ──────────────────────────────────────────────────────────────
+// ── Pieces used only on this screen ──────────────────────────────────────────
 
-function SectionLabel({ label, colors, accent }: { label: string; colors: any; accent?: boolean }) {
+function Banner({ tone, title, body }: { tone: 'info' | 'active' | 'pending' | 'danger'; title: string; body: string }) {
+  const c = useColors();
+  const bg = { info: c.lightBlue, active: c.tintLight, pending: c.warning + '14', danger: c.destructive + '10' }[tone];
+  const fg = { info: c.blue, active: c.primaryText, pending: c.warning, danger: c.destructive }[tone];
   return (
-    <Text style={[styles.sectionLabel, { color: accent ? colors.destructive : colors.mutedForeground }]}>
-      {label}
-    </Text>
-  );
-}
-
-function CustomerRow({ icon, label, value, border, colors }: { icon: any; label: string; value: string; border?: boolean; colors: any }) {
-  return (
-    <View style={[styles.customerRow, border && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border }]}>
-      <Feather name={icon} size={15} color={colors.mutedForeground} />
-      <Text style={[styles.customerLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.customerValue, { color: colors.foreground }]} numberOfLines={1}>{value}</Text>
+    <View style={[styles.banner, { backgroundColor: bg }]}>
+      <Text style={[styles.rowTitle, { color: fg }]}>{title}</Text>
+      <Text style={[styles.body, { color: c.foreground }]}>{body}</Text>
     </View>
   );
 }
 
-function PaymentRow({ label, value, accent, strong, colors }: { label: string; value: string; accent?: boolean; strong?: boolean; colors: any }) {
+function Cta({ label, onPress }: { label: string; onPress: () => void }) {
+  const c = useColors();
   return (
-    <View style={styles.paymentRow}>
-      <Text style={[styles.paymentLabel, { color: strong ? colors.foreground : colors.mutedForeground, fontFamily: strong ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
-        {label}
-      </Text>
-      <Text style={[styles.paymentValue, { color: accent ? colors.success : colors.foreground, fontFamily: strong ? 'Inter_700Bold' : 'Inter_500Medium', fontSize: strong ? 15 : 14 }]}>
-        {value}
-      </Text>
-    </View>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, { backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 }]}>
+      <Text style={[styles.ctaText, { color: c.primaryForeground }]}>{label}</Text>
+    </Pressable>
   );
 }
 
-function InfoRow({ label, value, bold, colors, destructive, success }: { label: string; value: string; bold?: boolean; colors: any; destructive?: boolean; success?: boolean }) {
-  const valueColor = destructive ? colors.destructive : success ? colors.success : colors.foreground;
+function RateTrip({ reviewed, onSubmit, onAddPhotos }: {
+  reviewed: boolean;
+  onSubmit: (rating: number, text: string) => Promise<void>;
+  onAddPhotos: () => void;
+}) {
+  const c = useColors();
+  const [rating, setRating] = useState(0);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  if (reviewed || sent) {
+    return (
+      <View style={[styles.box, styles.rateDone, { backgroundColor: c.success + '12', borderColor: c.success + '40' }]}>
+        <Feather name="check-circle" size={18} color={c.success} />
+        <Text style={[styles.rowTitle, { color: c.success }]}>Thanks for rating your trip!</Text>
+      </View>
+    );
+  }
   return (
-    <View style={styles.paymentRow}>
-      <Text style={[styles.paymentLabel, { color: colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.paymentValue, { color: valueColor, fontFamily: bold ? 'Inter_700Bold' : 'Inter_500Medium' }]}>{value}</Text>
+    <View style={[styles.box, { backgroundColor: c.card, borderColor: c.border, paddingTop: 17, gap: 12 }]}>
+      <Text style={[styles.rateTitle, { color: c.foreground }]}>Rate the car and overall experience</Text>
+      <View style={styles.stars}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Pressable key={n} onPress={() => setRating(n)} hitSlop={4} accessibilityLabel={`${n} star${n === 1 ? '' : 's'}`}>
+            <FontAwesome name={n <= rating ? 'star' : 'star-o'} size={24} color={n <= rating ? '#F5B301' : c.mutedForeground} />
+          </Pressable>
+        ))}
+      </View>
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        placeholder="Share your feedbacks"
+        placeholderTextColor={c.mutedForeground}
+        multiline
+        style={[styles.feedback, { borderColor: c.border, color: c.foreground, backgroundColor: c.background }]}
+      />
+      {!!err && <Text style={[styles.body, { color: c.destructive }]}>{err}</Text>}
+      <Pressable
+        disabled={!rating || busy}
+        onPress={async () => {
+          setBusy(true); setErr(null);
+          try { await onSubmit(rating, text); setSent(true); } catch (e: any) { setErr(e?.message || 'Could not send your review. Please try again.'); } finally { setBusy(false); }
+        }}
+        style={[styles.rateCta, { backgroundColor: rating ? c.primary : c.disabledBg }]}
+      >
+        {busy ? <ActivityIndicator color={c.primaryForeground} /> : (
+          <Text style={[styles.ctaText, { fontSize: 15, color: rating ? c.primaryForeground : c.disabledText }]}>Submit review</Text>
+        )}
+      </Pressable>
+      <Pressable onPress={onAddPhotos} hitSlop={6} style={{ alignSelf: 'center' }}>
+        <Text style={[styles.link, { color: c.blue }]}>Add trip photos and the place you visited</Text>
+      </Pressable>
     </View>
   );
 }
-
-// ── Styles ─────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 16 },
+  back: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: FONT.bold, fontSize: 22, lineHeight: 29 },
+  content: { paddingHorizontal: 16, paddingTop: 4, gap: 16 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8, marginTop: -60 },
+  centerTitle: { fontFamily: FONT.semibold, fontSize: 17, marginTop: 8 },
+  smallCta: { marginTop: 12, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
 
-  topBar: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24 },
-  circle: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.3 },
+  box: { borderWidth: 1, borderRadius: 16, padding: 13 },
+  banner: { borderRadius: 14, paddingHorizontal: 9, paddingVertical: 7 },
+  rowTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 17 },
+  body: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17 },
+  link: { fontFamily: FONT.medium, fontSize: 13 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 8 },
+  note: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12 },
+  noteText: { flex: 1, fontFamily: FONT.medium, fontSize: 13, lineHeight: 18 },
 
-  // Booking ID row
-  referenceCard: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, padding: 16, marginBottom: 28 },
-  smallLabel: { fontFamily: 'Inter_400Regular', fontSize: 12, marginBottom: 4 },
-  reference: { fontFamily: 'Inter_700Bold', fontSize: 17, letterSpacing: 0.5 },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
-  statusText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  extendCard: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  pillBtn: { borderRadius: 10, paddingHorizontal: 10, height: 33, justifyContent: 'center' },
+  pillBtnText: { fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF' },
+  extRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  extStatus: { fontFamily: FONT.semibold, fontSize: 11, textTransform: 'uppercase' },
 
-  // Section label
-  sectionLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 11, letterSpacing: 1.2, marginBottom: 10, marginTop: 24, textTransform: 'uppercase' },
+  tipRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  tipIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  tipTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
 
-  // Generic card
-  card: { borderRadius: 16, borderWidth: 1, padding: 16, overflow: 'hidden' },
+  why: { borderRadius: 16, padding: 13, gap: 12, overflow: 'hidden' },
+  whyGlow: { position: 'absolute', width: 206, height: 205, borderRadius: 103, right: -150, top: -87, opacity: 0.18 },
+  whyTitle: { fontFamily: FONT.semibold, fontSize: 18, lineHeight: 23, color: '#FFFFFF' },
+  whyRow: { flexDirection: 'row', gap: 8 },
+  whyItem: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 17, color: '#FFFFFF' },
+  whyBody: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17, color: '#C9D2E3' },
 
-  // Vehicle card
-  vehicleCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  hero: { height: 170, width: '100%' },
-  heroOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 14, backgroundColor: 'rgba(0,0,0,0.35)' },
-  heroVehicleName: { fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', letterSpacing: -0.3 },
-  vehicleBody: { paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  rateTitle: { fontFamily: FONT.semibold, fontSize: 18, lineHeight: 23, textAlign: 'center' },
+  stars: { flexDirection: 'row', justifyContent: 'center', gap: 4 },
+  feedback: { borderWidth: 1, borderRadius: 12, minHeight: 46, paddingHorizontal: 13, paddingVertical: 13, fontFamily: FONT.regular, fontSize: 15, textAlignVertical: 'top' },
+  rateCta: { height: 43, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  rateDone: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
-  // Timeline
-  timelineRow: { flexDirection: 'row', gap: 14, marginBottom: 16 },
-  timelineLeft: { alignItems: 'center', width: 16 },
-  timelineDot: { width: 14, height: 14, borderRadius: 7, marginTop: 3 },
-  timelineLine: { flex: 1, width: 2, marginVertical: 4 },
-  timelineContent: { flex: 1, marginBottom: 4 },
-  timelineLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 3 },
-  timelineDate: { fontFamily: 'Inter_600SemiBold', fontSize: 14, marginBottom: 3 },
-  timelineLoc: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 18 },
-
-  // Map button
-  mapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 11 },
-  mapBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-
-  // Customer
-  customerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
-  customerLabel: { fontFamily: 'Inter_400Regular', fontSize: 13, width: 90 },
-  customerValue: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 13, textAlign: 'right' },
-
-  // Payment
-  paymentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 11 },
-  paymentLabel: { fontSize: 14, flex: 1, paddingRight: 12 },
-  paymentValue: { fontSize: 14 },
-  remainingBadge: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderRadius: 12, padding: 12, marginTop: 4 },
-
-  divider: { height: StyleSheet.hairlineWidth, marginBottom: 12, marginTop: 4, width: '100%' },
-
-  // Alert box
-  alertBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, borderWidth: 1, padding: 12, width: '100%' },
-
-  // Info
-  infoBox: { flexDirection: 'row', gap: 10, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 24 },
-  infoText: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 18, flex: 1 },
-
-  // Action bar
-  actionBar: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 14 },
-  actionBtn: { height: 48, borderRadius: 13, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 8 },
+  bottomBar: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 16, gap: 8 },
+  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
+  hint: { fontFamily: FONT.regular, fontSize: 14, lineHeight: 20 },
+  cta: { height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  ctaText: { fontFamily: FONT.semibold, fontSize: 16 },
 });

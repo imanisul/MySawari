@@ -131,6 +131,7 @@ function RootLayoutNav() {
       <Stack.Screen name="confirmation" />
       <Stack.Screen name="bookings" options={{ animation: 'none' }} />
       <Stack.Screen name="booking-detail" />
+      <Stack.Screen name="login" />
       <Stack.Screen name="profile" options={{ animation: 'none' }} />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="settings" />
@@ -335,7 +336,9 @@ function LocationTracker() {
     
     const sendLocation = async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
+        // Only checks: this runs every 5 minutes, and asking here re-opened the system location popup
+        // (Android keeps asking until "Don't ask again"). The one request is made at start-up.
+        const { status } = await Location.getForegroundPermissionsAsync();
         if (status !== 'granted') return;
         
         const location = await Location.getCurrentPositionAsync({

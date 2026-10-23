@@ -330,7 +330,8 @@ export function MembershipPicker({ tripRent }: { tripRent: number }) {
   const open = (key?: string) => {
     Haptics.selectionAsync();
     if (key) setSelected(key);
-    router.push('/membership');
+    // The Membership page opens with this plan picked.
+    router.push(key ? { pathname: '/membership', params: { plan: key } } : '/membership');
   };
 
   return (
@@ -409,7 +410,8 @@ export function MembershipUpgrade({ tripRent, currentPlan }: { tripRent: number;
   const open = (key?: string) => {
     Haptics.selectionAsync();
     if (key) setSelected(key);
-    router.push('/membership');
+    // The Membership page opens with this plan picked.
+    router.push(key ? { pathname: '/membership', params: { plan: key } } : '/membership');
   };
 
   return (

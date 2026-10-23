@@ -23,6 +23,12 @@ export const ExploreCarCard = React.memo(function ExploreCarCard({ car, dateRang
   const memberPrice = memberDayPrice(car.perDay, membership as any);
   const availability = car.availability ?? getAvailability(car);
   const available = car.isAvailable !== false && availability.available;
+  // startDate is 'Today' when no dates are chosen, so the line reads "Available today".
+  const availLabel = !available
+    ? ''
+    : availability.startDate === 'Today'
+      ? 'Available today'
+      : `Available on ${availability.startDate}`;
   const title = [car.manufacturer, car.model, car.variant].filter(Boolean).join(' ') || car.name;
   const meta = [car.transmission, car.fuel, car.type === 'Bike' ? null : (/seat/i.test(car.seats) ? car.seats : `${car.seats} Seater`)].filter(Boolean) as string[];
   // Figma's list repeats blue, green, green, blue for the tag colour.
@@ -53,7 +59,7 @@ export const ExploreCarCard = React.memo(function ExploreCarCard({ car, dateRang
             </View>
           )}
           <View style={styles.heart}>
-            <Feather name="heart" size={14} color="#737373" />
+            <Feather name="heart" size={16} color="#737373" />
           </View>
         </View>
         {images.length > 1 && (
@@ -70,14 +76,22 @@ export const ExploreCarCard = React.memo(function ExploreCarCard({ car, dateRang
         <View style={styles.titleRow}>
           <View style={styles.titleCol}>
             <Text numberOfLines={1} style={styles.title}>{title}</Text>
-            <Text numberOfLines={1} style={styles.meta}>{meta.join('  ·  ')}</Text>
+            {/* Figma Frame 132: each spec is its own node, 3px dots between them at gap 4. */}
+            <View style={styles.metaRow}>
+              {meta.map((m, i) => (
+                <React.Fragment key={m}>
+                  {i > 0 && <View style={styles.metaDot} />}
+                  <Text numberOfLines={1} style={styles.meta}>{m}</Text>
+                </React.Fragment>
+              ))}
+            </View>
           </View>
           {(car.rating != null || car.reviewCount != null) && (
             <View style={styles.ratingCol}>
               {car.rating != null && (
                 <View style={styles.ratingPill}>
-                  <FontAwesome5 name="star" size={11} color="#FBBC04" solid />
                   <Text style={styles.ratingText}>{car.rating.toFixed(1)}</Text>
+                  <FontAwesome5 name="star" size={14} color="#FBBC04" solid />
                 </View>
               )}
               {car.reviewCount != null && <Text style={styles.reviews}>({car.reviewCount} Reviews)</Text>}
@@ -91,12 +105,12 @@ export const ExploreCarCard = React.memo(function ExploreCarCard({ car, dateRang
             <Text style={styles.price}>{formatCurrency(memberPrice ?? car.perDay)}</Text>
             {memberPrice != null && <Text style={styles.strike}>{formatCurrency(car.perDay)}</Text>}
           </View>
-          <View style={styles.footer}>
-            {/* Figma: the link is always shown, whatever the car's availability. */}
-            <View style={styles.details}>
-              <Text style={styles.detailsText}>View Details</Text>
-              <Feather name="chevron-right" size={13} color="#737373" />
-            </View>
+          {/* Figma: free cars show the date they are available on; otherwise the View Details link. */}
+          <View style={styles.details}>
+            <Text numberOfLines={1} style={available ? styles.availText : styles.detailsText}>
+              {available ? availLabel : 'View Details'}
+            </Text>
+            <Feather name="chevron-right" size={13} color={available ? '#008758' : '#737373'} />
           </View>
         </View>
       </View>
@@ -112,7 +126,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     gap: 8,
-    height: 315, // Figma: 212 photo + 81 body + gaps and padding
     marginBottom: 12, // Figma: 12px between cards
     padding: 4,
     paddingBottom: 8,
@@ -126,21 +139,22 @@ const styles = StyleSheet.create({
   dot: { borderRadius: 20, height: 4 },
   dotOn: { backgroundColor: '#FFFFFF', width: 16 },
   dotOff: { backgroundColor: '#D4D4D4', width: 4 },
-  body: { gap: 6, height: 81 }, // Figma: 81px body, title row 50 + gap 6 + footer row 25
+  body: { gap: 6 },
   titleRow: { alignItems: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 4 },
   titleCol: { flex: 1, gap: 4 },
   title: { color: '#262626', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
-  meta: { color: '#737373', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
+  metaRow: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  metaDot: { backgroundColor: '#737373', borderRadius: 1.5, flexShrink: 0, height: 3, width: 3 },
+  meta: { color: '#737373', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, flexShrink: 1, lineHeight: 20 },
   ratingCol: { alignItems: 'center', gap: 4 },
-  ratingPill: { alignItems: 'center', backgroundColor: '#2F3E75', borderRadius: 20, flexDirection: 'row', gap: 2, paddingHorizontal: 10, paddingVertical: 1 },
+  ratingPill: { alignItems: 'center', backgroundColor: '#2F3E75', borderRadius: 20, flexDirection: 'row', gap: 2, paddingHorizontal: 10, paddingVertical: 4 },
   ratingText: { color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   reviews: { color: '#525252', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
-  bottomRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 4 },
-  priceRow: { alignItems: 'flex-end', flexDirection: 'row', gap: 4 },
+  bottomRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', padding: 4 },
+  priceRow: { alignItems: 'flex-end', flexDirection: 'row', gap: 2 },
   price: { color: '#262626', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
-  strike: { color: '#737373', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16, textDecorationLine: 'line-through' },
-  footer: { alignItems: 'center', flexDirection: 'row' },
-  unavailable: { color: '#D04646', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16 },
+  strike: { color: '#737373', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textDecorationLine: 'line-through' },
   details: { alignItems: 'center', flexDirection: 'row', gap: 4 },
+  availText: { color: '#339F79', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16 },
   detailsText: { color: '#737373', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16, textDecorationLine: 'underline' },
 });

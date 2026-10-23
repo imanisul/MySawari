@@ -1,47 +1,59 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ActivityIndicator,
-  TextInput,
-  Share,
-  ScrollView,
-  Modal,
-  Alert,
-  Dimensions,
+  View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput, Share, ScrollView, Modal, Alert,
+  Image, ImageSourcePropType, Linking, BackHandler, LayoutAnimation, Platform, UIManager,
+  KeyboardAvoidingView, useWindowDimensions,
 } from 'react-native';
-import { Page, Header, PrimaryButton, KeyboardAwareScrollViewCompat } from '@/components';
-import { useColors } from '@/hooks/useColors';
-import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Line, Path } from 'react-native-svg';
+
+import { Page, Header, PrimaryButton, KeyboardAwareScrollViewCompat } from '@/components';
+import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API, invalidateWalletCache } from '@/services/backend/api';
-import { useRouter } from 'expo-router';
-import Reanimated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
-import { rise } from '@/components/common/motion';
 import { ReferralSkeleton } from '@/components/loading/ScreenSkeletons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import QRCode from 'react-native-qrcode-svg';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const REFERRAL_BASE_URL = 'https://mysawari.com/refer';
 const DEVICE_REFERRALS_KEY = '@sawari_device_referrals';
-const WITHDRAWALS_KEY = '@sawari_withdrawals';
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// ── Types ────────────────────────────────────────────────────────────────────
-interface WithdrawalRecord {
-  id: string;
-  amount: number;
-  upiId: string;
-  status: 'PENDING' | 'PROCESSED' | 'REJECTED';
-  requestedAt: string;
-  processedAt?: string;
-}
+/** Hero portraits exported from Figma (Refer & Earn, node 257:24470), PNG @3x. */
+const AVATARS: { left: ImageSourcePropType; center: ImageSourcePropType; right: ImageSourcePropType } = {
+  left: require('@/assets/images/refer/avatar-left.png'),
+  center: require('@/assets/images/refer/avatar-center.png'),
+  right: require('@/assets/images/refer/avatar-right.png'),
+};
+
+/* ── Figma palette ─────────────────────────────────────────────────────── */
+const C = {
+  purple: '#6152D8',
+  purpleLight: '#9C90F3',
+  lavenderBorder: '#D1CCF9',
+  navy: '#2F3E75', // Primary/blue-500
+  title: '#262626', // Neutral/800
+  copy: '#737373', // Neutral/500
+  border: '#D4D4D4', // Neutral/300
+  soft: '#F9F9FB',
+  softBorder: '#EAECF1', // Primary/blue-50
+  panelBorder: '#E7EAF4',
+  green: '#008758',
+  greenTint: '#E6F3EE',
+  red: '#D04646',
+  amber: '#B7791F',
+  whatsapp: '#25D366',
+};
+const F = { med: 'PlusJakartaSans_500Medium', semi: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const formatDate = (iso: string) => {
@@ -50,29 +62,41 @@ const formatDate = (iso: string) => {
   } catch { return iso; }
 };
 
-const formatCurrency = (amount: number) => `₹${amount.toLocaleString('en-IN')}`;
+/** ₹1,23,456 — Indian grouping without relying on Intl in the JS engine. */
+function formatCurrency(amount: number) {
+  const s = String(Math.round(Math.abs(amount || 0)));
+  const last3 = s.slice(-3);
+  const rest = s.slice(0, -3);
+  return `₹${rest ? `${rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',')},${last3}` : last3}`;
+}
+
+type View_ = 'main' | 'history';
 
 export default function ReferScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { customer, isAuthenticated, isAuthLoading, sawariCash, updateCustomer } = useSawari();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { customer, isAuthenticated, isAuthLoading, updateCustomer, isDarkMode } = useSawari();
 
   // ── State ────────────────────────────────────────────────────────────────
+  const [view, setView] = useState<View_>('main');
   const [config, setConfig] = useState<any>(null);
   const [referrals, setReferrals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // Referrals or earnings couldn't be loaded: shown as a retry bar, not as "no referrals" / ₹0.
   const [dataFailed, setDataFailed] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [openFaq, setOpenFaq] = useState(-1);
+
+  // Add a friend
   const [friendName, setFriendName] = useState('');
   const [friendMobile, setFriendMobile] = useState('');
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState('');
   const [addedMessage, setAddedMessage] = useState('');
 
-  // Tabs
-  const [mainTab, setMainTab] = useState<'refer' | 'my_referrals'>('refer');
+  // History tabs
   const [activeTab, setActiveTab] = useState<'referrals' | 'earnings'>('referrals');
 
   // Withdraw
@@ -80,72 +104,68 @@ export default function ReferScreen() {
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [withdrawMethod, setWithdrawMethod] = useState<'upi' | 'bank'>('upi');
   const [withdrawUpi, setWithdrawUpi] = useState('');
-  const [bankDetails, setBankDetails] = useState({
-    accountNumber: '',
-    ifsc: '',
-    bankName: '',
-    accountHolderName: ''
-  });
+  const [bankDetails, setBankDetails] = useState({ accountNumber: '', ifsc: '', bankName: '', accountHolderName: '' });
   const [withdrawing, setWithdrawing] = useState(false);
   const [withdrawError, setWithdrawError] = useState('');
-  
+
   // Wallet
-  const [walletBalance, setWalletBalance] = useState(0);
   const [withdrawableBalance, setWithdrawableBalance] = useState(0);
   const [transactions, setTransactions] = useState<any[]>([]);
-
-  // QR
-  const [showQrPopup, setShowQrPopup] = useState(false);
 
   // ── Derived ──────────────────────────────────────────────────────────────
   // The code always comes from the account on the server; nothing is shared until it has loaded.
   const referralCode = customer.referralCode || '';
   const hasCode = referralCode.length > 0;
   const referralLink = `${REFERRAL_BASE_URL}?code=${referralCode}`;
+  const displayLink = referralLink.replace(/^https?:\/\//, '');
 
-  const totalEarned = useMemo(
-    () => referrals.reduce((sum: number, r: any) => sum + (r.commissionAmount || 0), 0),
-    [referrals],
-  );
-  const completedCount = useMemo(
-    () => referrals.filter((r: any) => r.status === 'REWARDED').length,
-    [referrals],
-  );
+  const totalEarned = useMemo(() => referrals.reduce((sum: number, r: any) => sum + (r.commissionAmount || 0), 0), [referrals]);
+  const completedCount = useMemo(() => referrals.filter((r: any) => r.status === 'REWARDED').length, [referrals]);
   const pendingWithdrawals = useMemo(
-    () => transactions.filter(t => t.type === 'withdrawal' && t.status === 'PENDING').reduce((s, t) => s + Math.abs(t.amount), 0),
+    () => transactions.filter((t) => t.type === 'withdrawal' && t.status === 'PENDING').reduce((s, t) => s + Math.abs(t.amount), 0),
     [transactions],
   );
-  // Real wallet balance from backend overrides local calculation
   const availableToWithdraw = withdrawableBalance;
 
-  // Earnings rows: combine referral rewards with actual wallet transactions
-  const earningsHistory = useMemo(() => {
-    // Only show transactions as earnings history
-    const rows = transactions.map(t => ({
-      id: t.id || t._id,
-      type: t.type as 'referral' | 'withdrawal',
-      label: t.label || t.description,
-      amount: t.amount,
-      date: t.date,
-      status: t.status,
-    }));
+  const earningsHistory = useMemo(
+    () => transactions
+      .map((t) => ({
+        id: t.id || t._id,
+        type: t.type as 'referral' | 'withdrawal',
+        label: t.label || t.description,
+        amount: t.amount,
+        date: t.date,
+        status: t.status,
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+    [transactions],
+  );
 
-    return rows.sort(
-      (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-    );
-  }, [transactions]);
+  // Reward copy comes from the app config. If the config couldn't load, fall back to the
+  // published offer (10% back for you, ₹100 off for your friend) rather than odd defaults.
+  const rewardShort = !config
+    ? '10%'
+    : config.referralRewardType === 'PERCENTAGE'
+      ? `${config.referralRewardAmount ?? 10}%`
+      : `₹${config.referralRewardAmount ?? 10}`;
+  const discountText = !config
+    ? '₹100 off'
+    : config.referralDiscountType === 'FLAT'
+      ? `₹${config.referralDiscountAmount ?? 100} off`
+      : `${config.referralDiscountAmount ?? 10}% off`;
 
-  // ── Data loading ─────────────────────────────────────────────────────────
+  // ── Data loading (unchanged API calls) ───────────────────────────────────
   const loadWallet = useCallback(async () => {
     if (!isAuthenticated || !customer.id) return;
     try {
       const w: any = await API.getWallet(true);
       // A failed request keeps the earnings already on screen and offers a retry (never shows ₹0).
       if (w?.failed) { setDataFailed(true); return; }
-      setWalletBalance(w.walletBalance || 0);
       setWithdrawableBalance(w.withdrawableBalance || 0);
       setTransactions(w.transactions || []);
-    } catch {}
+    } catch {
+      setDataFailed(true);
+    }
   }, [isAuthenticated, customer.id]);
 
   const refreshReferrals = useCallback(async () => {
@@ -190,24 +210,49 @@ export default function ReferScreen() {
     }
   }, [isAuthenticated, customer.id, loadWallet]);
 
+  // Light status bar over the purple hero; dark on the history view.
+  useFocusEffect(useCallback(() => {
+    setStatusBarStyle(view === 'main' ? 'light' : (isDarkMode ? 'light' : 'dark'));
+    return () => setStatusBarStyle(isDarkMode ? 'light' : 'dark');
+  }, [view, isDarkMode]));
+
+  // Android back closes the history view before leaving the screen.
+  useFocusEffect(useCallback(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (view === 'history') { setView('main'); return true; }
+      return false;
+    });
+    return () => sub.remove();
+  }, [view]));
+
   // ── Handlers ─────────────────────────────────────────────────────────────
-  const handleCopy = async () => {
+  const shareMessage = `🚗 Hey! Use my MySawari referral code *${referralCode}* when you sign up and get ${discountText} on your first ride!\n\nDownload now: ${referralLink}`;
+
+  const handleCopyLink = async () => {
     if (!hasCode) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await Clipboard.setStringAsync(referralCode);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    await Clipboard.setStringAsync(referralLink);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
   };
 
   const handleShare = async () => {
     if (!hasCode) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
-      await Share.share({
-        message: `🚗 Hey! Use my MySawari referral code *${referralCode}* to sign up and get ₹100 SawariCash for your first ride!\n\nDownload now: ${referralLink}`,
-        title: 'Share MySawari Referral',
-      });
+      await Share.share({ message: shareMessage, title: 'Share MySawari Referral' });
     } catch {}
+  };
+
+  const handleWhatsApp = async () => {
+    if (!hasCode) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    try {
+      await Linking.openURL(`whatsapp://send?text=${encodeURIComponent(shareMessage)}`);
+    } catch {
+      // WhatsApp isn't installed: fall back to the system share sheet.
+      handleShare();
+    }
   };
 
   const handleAddFriend = async () => {
@@ -224,7 +269,7 @@ export default function ReferScreen() {
       const deviceReferrals: string[] = stored ? JSON.parse(stored) : [];
       if (deviceReferrals.includes(mobile)) {
         setAddError('This number has already been referred from this device.');
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
         return;
       }
     } catch {}
@@ -233,22 +278,19 @@ export default function ReferScreen() {
     setAddError('');
     try {
       await API.addReferral(mobile, friendName);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      // Track on device
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       try {
         const stored = await AsyncStorage.getItem(DEVICE_REFERRALS_KEY);
         const deviceReferrals: string[] = stored ? JSON.parse(stored) : [];
         deviceReferrals.push(mobile);
         await AsyncStorage.setItem(DEVICE_REFERRALS_KEY, JSON.stringify(deviceReferrals));
       } catch {}
-
       setFriendName('');
       setFriendMobile('');
-      setAddedMessage('Added! You earn 10% once their first trip is completed.');
+      setAddedMessage(`Added! You earn ${rewardShort} once their first trip is completed.`);
       await refreshReferrals();
     } catch (e: any) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
       setAddError(e?.message || 'Could not add this number. Please try again.');
     } finally {
       setAdding(false);
@@ -257,57 +299,46 @@ export default function ReferScreen() {
 
   const handleWithdraw = async () => {
     const amount = parseInt(withdrawAmount, 10);
-    if (!amount || amount <= 0) {
-      setWithdrawError('Enter a valid amount');
-      return;
-    }
-    if (amount > availableToWithdraw) {
-      setWithdrawError(`Maximum available: ${formatCurrency(availableToWithdraw)}`);
-      return;
-    }
-    
+    if (!amount || amount <= 0) { setWithdrawError('Enter a valid amount'); return; }
+    if (amount > availableToWithdraw) { setWithdrawError(`Maximum available: ${formatCurrency(availableToWithdraw)}`); return; }
+
     let details: any = {};
     if (withdrawMethod === 'upi') {
-      if (!withdrawUpi.trim() || !withdrawUpi.includes('@')) {
-        setWithdrawError('Enter a valid UPI ID (e.g. name@upi)');
-        return;
-      }
+      if (!withdrawUpi.trim() || !withdrawUpi.includes('@')) { setWithdrawError('Enter a valid UPI ID (e.g. name@upi)'); return; }
       details = { upiId: withdrawUpi.trim() };
     } else {
-      if (!bankDetails.accountNumber.trim() || !bankDetails.ifsc.trim() || !bankDetails.bankName.trim() || !bankDetails.accountHolderName.trim()) {
+      const b = bankDetails;
+      if (!b.accountNumber.trim() || !b.ifsc.trim() || !b.bankName.trim() || !b.accountHolderName.trim()) {
         setWithdrawError('Please fill all bank details');
         return;
       }
-      details = { ...bankDetails };
+      details = { ...b };
     }
 
     setWithdrawing(true);
     setWithdrawError('');
-
     try {
       await API.requestWithdrawal(amount, withdrawMethod, details);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setWithdrawAmount('');
       setWithdrawUpi('');
       setBankDetails({ accountNumber: '', ifsc: '', bankName: '', accountHolderName: '' });
       setShowWithdraw(false);
-      
       await loadWallet();
-
       Alert.alert(
         'Withdrawal Requested',
         `Your withdrawal of ${formatCurrency(amount)} has been submitted to the operations team. It will be processed soon.`,
         [{ text: 'OK' }],
       );
     } catch (e: any) {
-      setWithdrawError(e.message || 'Failed to request withdrawal');
+      setWithdrawError(e?.message || 'Failed to request withdrawal');
     } finally {
       setWithdrawing(false);
     }
   };
 
-  // ── Auth loading / unauthenticated states ────────────────────────────────
-  if (isAuthLoading) {
+  // ── Auth loading / unauthenticated ───────────────────────────────────────
+  if (isAuthLoading || (isAuthenticated && loading)) {
     return (
       <Page scroll={false}>
         <Header title="Refer & Earn" back />
@@ -320,180 +351,105 @@ export default function ReferScreen() {
     return (
       <Page scroll={false}>
         <Header title="Refer & Earn" back />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Feather name="lock" size={64} color={colors.mutedForeground} style={{ marginBottom: 24 }} />
-          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 24, textAlign: 'center', marginBottom: 12, color: colors.foreground }}>
-            Login to Refer & Earn
+        <View style={styles.centerState}>
+          <Feather name="lock" size={48} color={colors.mutedForeground} style={{ marginBottom: 20 }} />
+          <Text style={[styles.stateTitle, { color: colors.foreground }]}>Login to Refer & Earn</Text>
+          <Text style={[styles.stateCopy, { color: colors.mutedForeground }]}>
+            Sign in to get your referral code and earn {rewardShort} of every friend's first booking.
           </Text>
-          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center', color: colors.mutedForeground, marginBottom: 32 }}>
-            Sign in to get your unique referral code and start earning 10% commission on every friend's first ride.
-          </Text>
-          <View style={{ width: '100%' }}>
-            <PrimaryButton
-              label="Go to Login"
-              onPress={() => router.push('/profile')}
-            />
+          <View style={{ width: '100%', marginTop: 28 }}>
+            <PrimaryButton label="Go to Login" onPress={() => router.push('/profile')} />
           </View>
         </View>
       </Page>
     );
   }
 
-  if (loading) {
+  const text = isDarkMode ? colors.foreground : C.title;
+  const muted = isDarkMode ? colors.mutedForeground : C.copy;
+  const surface = isDarkMode ? colors.background : '#FFFFFF';
+  const line = isDarkMode ? colors.border : C.softBorder;
+
+  /* ═══ History view ════════════════════════════════════════════════════ */
+  if (view === 'history') {
     return (
-      <Page scroll={false}>
-        <Header title="Refer & Earn" back />
-        <ReferralSkeleton />
-      </Page>
-    );
-  }
+      <View style={[styles.root, { backgroundColor: surface, paddingTop: insets.top }]}>
+        <View style={styles.historyHeader}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to Refer & Earn"
+            hitSlop={8}
+            onPress={() => setView('main')}
+            style={({ pressed }) => [styles.backLight, pressed && { opacity: 0.7 }]}
+          >
+            <Feather name="chevron-left" size={22} color={C.copy} />
+          </Pressable>
+          <Text style={[styles.historyTitle, { color: text }]}>Referral history</Text>
+          <View style={{ width: 32 }} />
+        </View>
 
-  const rewardAmountText = config?.referralRewardType === 'PERCENTAGE' ? `${config.referralRewardAmount}% commission` : `₹${config?.referralRewardAmount || 10}`;
-  const discountText = config?.referralDiscountType === 'FLAT' ? `₹${config.referralDiscountAmount} off` : `${config?.referralDiscountAmount || 100}% off`;
-
-  // ── Render ───────────────────────────────────────────────────────────────
-  return (
-    <Page scroll={false}>
-      <Header title="Refer & Earn" back />
-
-      <Reanimated.View entering={rise()} style={{ flex: 1 }}>
-        <KeyboardAwareScrollViewCompat  contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              MAIN TABS
-             ═══════════════════════════════════════════════════════════════ */}
-          <View style={[styles.mainTabBar, { borderBottomColor: colors.border }]}>
+        <KeyboardAwareScrollViewCompat
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 32, gap: 16 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {dataFailed && (
             <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: mainTab === 'refer' }}
-              onPress={() => setMainTab('refer')}
-              style={[styles.mainTab, mainTab === 'refer' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
+              accessibilityRole="button"
+              onPress={() => { Haptics.selectionAsync().catch(() => {}); refreshReferrals(); }}
+              style={({ pressed }) => [styles.retryBar, pressed && { opacity: 0.8 }]}
             >
-              <Text style={[styles.mainTabText, { color: mainTab === 'refer' ? colors.primary : colors.mutedForeground }]}>Refer & Earn</Text>
+              <Feather name="wifi-off" size={16} color={C.red} />
+              <Text style={[styles.retryText, { flex: 1 }]}>Couldn't load your latest referrals and earnings.</Text>
+              <Text style={[styles.retryText, { fontFamily: F.bold }]}>Retry</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: mainTab === 'my_referrals' }}
-              onPress={() => setMainTab('my_referrals')}
-              style={[styles.mainTab, mainTab === 'my_referrals' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-            >
-              <Text style={[styles.mainTabText, { color: mainTab === 'my_referrals' ? colors.primary : colors.mutedForeground }]}>Your Referrals</Text>
-            </Pressable>
-          </View>
+          )}
 
-          {mainTab === 'refer' ? (
-            <Reanimated.View entering={FadeIn.duration(250)}>
-              {/* ═══════════════════════════════════════════════════════════════
-                  HERO CARD
-                 ═══════════════════════════════════════════════════════════════ */}
-              <View style={[styles.heroCard, { backgroundColor: '#111827', borderColor: '#374151' }]}>
-                <Text style={[styles.heroTitle, { color: '#FFF' }]}>Refer a friend. Earn together.</Text>
-
-            <View style={styles.rewardsRow}>
-              <View style={[styles.rewardPill, { backgroundColor: colors.emerald + '20' }]}>
-                <Feather name="gift" size={14} color={colors.emerald} />
-                <Text style={[styles.rewardText, { color: colors.emerald }]}>You earn {rewardAmountText}</Text>
-              </View>
-              <View style={[styles.rewardPill, { backgroundColor: 'rgba(157,176,255,0.16)' }]}>
-                <Feather name="user-plus" size={14} color="#9DB0FF" />
-                <Text style={[styles.rewardText, { color: '#9DB0FF' }]}>Friend gets {discountText}</Text>
-              </View>
+          {/* Earnings */}
+          <LinearGradient colors={[C.purple, C.purpleLight]} style={styles.earnCard}>
+            <Text style={styles.earnLabel}>Available to withdraw</Text>
+            <Text style={styles.earnAmount}>{formatCurrency(availableToWithdraw)}</Text>
+            {pendingWithdrawals > 0 && (
+              <Text style={styles.earnPending}>{formatCurrency(pendingWithdrawals)} withdrawal pending</Text>
+            )}
+            <View style={styles.earnStats}>
+              <Stat value={String(referrals.length)} label="Friends added" />
+              <View style={styles.earnDivider} />
+              <Stat value={String(completedCount)} label="Trips done" />
+              <View style={styles.earnDivider} />
+              <Stat value={formatCurrency(totalEarned)} label="Total earned" />
             </View>
-
-            {/* How it works */}
-            <View style={[styles.stepsContainer, { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }]}>
-              <View style={[styles.stepRow, { flex: 1, flexDirection: 'column', gap: 6 }]}>
-                <View style={styles.stepCircle}><Text style={styles.stepNumber}>1</Text></View>
-                <Text style={[styles.stepText, { textAlign: 'center', fontSize: 11 }]}>Share code</Text>
-              </View>
-              <View style={[styles.stepRow, { flex: 1, flexDirection: 'column', gap: 6 }]}>
-                <View style={styles.stepCircle}><Text style={styles.stepNumber}>2</Text></View>
-                <Text style={[styles.stepText, { textAlign: 'center', fontSize: 11 }]}>Friend rides</Text>
-              </View>
-              <View style={[styles.stepRow, { flex: 1, flexDirection: 'column', gap: 6 }]}>
-                <View style={styles.stepCircle}><Text style={styles.stepNumber}>3</Text></View>
-                <Text style={[styles.stepText, { textAlign: 'center', fontSize: 11 }]}>You earn 10%</Text>
-              </View>
-            </View>
-
-            {/* Referral code */}
-            <View style={[styles.codeBox, { backgroundColor: '#1F2937', borderColor: '#4B5563' }]}>
-              <Text style={styles.codeLabel}>YOUR REFERRAL CODE</Text>
-              <Pressable style={styles.codeRow} onPress={handleCopy}>
-                <Text style={styles.codeText}>{hasCode ? referralCode : 'Loading…'}</Text>
-                <View style={styles.copyBtn}>
-                  {copySuccess ? (
-                    <Feather name="check" size={18} color={colors.emerald} />
-                  ) : (
-                    <Text style={styles.copyBtnText}>COPY</Text>
-                  )}
-                </View>
-              </Pressable>
-            </View>
-
-            {/* Generate QR + Share — two buttons side by side */}
-            <View style={styles.actionRow}>
+            {availableToWithdraw > 0 && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Generate QR code"
-                onPress={() => { if (!hasCode) return; Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowQrPopup(true); }}
-                disabled={!hasCode}
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  { backgroundColor: '#1F2937', borderColor: '#4B5563', borderWidth: 1, opacity: pressed ? 0.85 : 1 },
-                ]}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {}); setShowWithdraw(true); }}
+                style={({ pressed }) => [styles.withdrawBtn, pressed && { opacity: 0.9 }]}
               >
-                <Feather name="maximize" size={18} color="#D1D5DB" />
-                <Text style={[styles.actionBtnText, { color: '#D1D5DB' }]}>Generate QR</Text>
+                <Feather name="download" size={16} color={C.purple} />
+                <Text style={styles.withdrawBtnText}>Withdraw earnings</Text>
               </Pressable>
+            )}
+          </LinearGradient>
 
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Share referral link"
-                onPress={handleShare}
-                disabled={!hasCode}
-                style={({ pressed }) => [
-                  styles.actionBtn,
-                  { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
-                ]}
-              >
-                <Feather name="share-2" size={18} color="#101B2E" />
-                <Text style={[styles.actionBtnText, { color: '#101B2E' }]}>Share Link</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              ADD A FRIEND
-             ═══════════════════════════════════════════════════════════════ */}
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.primary + '40', borderWidth: 1.5, shadowColor: colors.primary, shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 4 }]}>
-            <View style={styles.cardHeader}>
-              <View style={[styles.cardIconWrap, { backgroundColor: colors.primary + '15' }]}>
-                <Feather name="user-plus" size={20} color={colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.cardTitle, { color: colors.foreground }]}>Refer a friend</Text>
-                <Text style={[styles.cardSubtitle, { color: colors.mutedForeground, fontSize: 12 }]}>
-                  Add their number before they book to track commission
-                </Text>
-              </View>
-            </View>
-
+          {/* Add a friend (keeps commission tracking for friends who book without the link) */}
+          <View style={[styles.box, { borderColor: line, backgroundColor: isDarkMode ? colors.card : C.soft }]}>
+            <Text style={[styles.sectionTitle, { color: text }]}>Add a friend's number</Text>
+            <Text style={[styles.small, { color: muted, marginTop: -6 }]}>Add them before they book so their first trip is tracked to you.</Text>
             <TextInput
-              style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
+              style={[styles.field, { color: text, borderColor: line, backgroundColor: surface }]}
               placeholder="Friend's name"
-              placeholderTextColor={colors.mutedForeground}
+              placeholderTextColor={muted}
               value={friendName}
               onChangeText={setFriendName}
               maxLength={60}
               autoCapitalize="words"
             />
-            <View style={[styles.mobileRow, { backgroundColor: colors.background, borderColor: addError ? colors.destructive : colors.border }]}>
-              <Text style={[styles.mobilePrefix, { color: colors.foreground }]}>+91</Text>
+            <View style={[styles.field, styles.mobileRow, { borderColor: addError ? C.red : line, backgroundColor: surface }]}>
+              <Text style={[styles.prefix, { color: muted }]}>+91</Text>
               <TextInput
-                style={[styles.mobileInput, { color: colors.foreground }]}
+                style={[styles.mobileInput, { color: text }]}
                 placeholder="10-digit mobile number"
-                placeholderTextColor={colors.mutedForeground}
+                placeholderTextColor={muted}
                 value={friendMobile}
                 onChangeText={(t) => { setFriendMobile(t.replace(/\D/g, '').slice(0, 10)); setAddError(''); setAddedMessage(''); }}
                 keyboardType="number-pad"
@@ -502,905 +458,573 @@ export default function ReferScreen() {
                 onSubmitEditing={handleAddFriend}
               />
             </View>
-            {!!addError && <Text style={[styles.addFeedback, { color: colors.destructive }]}>{addError}</Text>}
-            {!!addedMessage && <Text style={[styles.addFeedback, { color: colors.success }]}>{addedMessage}</Text>}
-
+            {!!addError && <Text style={[styles.small, { color: C.red }]}>{addError}</Text>}
+            {!!addedMessage && <Text style={[styles.small, { color: C.green }]}>{addedMessage}</Text>}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Add friend"
               disabled={adding}
               onPress={handleAddFriend}
-              style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary, opacity: adding ? 0.6 : pressed ? 0.85 : 1 }]}
+              style={({ pressed }) => [styles.navyBtn, { opacity: adding ? 0.6 : pressed ? 0.9 : 1 }]}
             >
-              {adding ? <ActivityIndicator color="#101B2E" /> : <Feather name="user-plus" size={18} color="#101B2E" />}
-              <Text style={styles.addBtnText}>{adding ? 'Adding...' : 'Add friend'}</Text>
+              {adding ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.navyBtnText}>Add friend</Text>}
             </Pressable>
-              </View>
-            </Reanimated.View>
-          ) : (
-            <Reanimated.View entering={FadeIn.duration(250)}>
-              {dataFailed && (
+          </View>
+
+          {/* Referrals / Earnings */}
+          <View>
+            <View style={[styles.tabs, { borderColor: line }]}>
+              {(['referrals', 'earnings'] as const).map((t) => (
                 <Pressable
-                  accessibilityRole="button"
-                  onPress={() => { Haptics.selectionAsync(); refreshReferrals(); }}
-                  style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, marginBottom: 12, backgroundColor: colors.destructive + '12' }, pressed && { opacity: 0.8 }]}
+                  key={t}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: activeTab === t }}
+                  onPress={() => setActiveTab(t)}
+                  style={[styles.tab, activeTab === t && { backgroundColor: C.navy }]}
                 >
-                  <Feather name="wifi-off" size={16} color={colors.destructive} />
-                  <Text style={{ flex: 1, fontFamily: 'Inter_500Medium', fontSize: 13, color: colors.destructive }}>Couldn't load your latest referrals and earnings.</Text>
-                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 13, color: colors.destructive }}>Retry</Text>
+                  <Text style={[styles.tabText, { color: activeTab === t ? '#FFFFFF' : muted }]}>
+                    {t === 'referrals' ? 'Referrals' : 'Earnings'}
+                  </Text>
                 </Pressable>
-              )}
-              {/* ═══════════════════════════════════════════════════════════════
-                  EARNINGS DASHBOARD
-                 ═══════════════════════════════════════════════════════════════ */}
-              <View style={[styles.dashboardCard, { backgroundColor: '#111827', borderColor: '#374151' }]}>
-                <View style={styles.dashboardHeader}>
-                  <Text style={[styles.dashboardTitle, { color: '#D1D5DB' }]}>Available to Withdraw</Text>
-                </View>
-
-                <Text style={[styles.dashboardAmount, { color: '#FFF' }]}>{formatCurrency(availableToWithdraw)}</Text>
-
-                <View style={[styles.dashboardStatsRow, { borderTopColor: '#374151' }]}>
-                  <View style={styles.dashboardStatBox}>
-                    <Text style={[styles.dashboardStatValue, { color: '#FFF' }]}>{referrals.length}</Text>
-                    <Text style={[styles.dashboardStatLabel, { color: '#9CA3AF' }]}>Friends Added</Text>
-                  </View>
-                  <View style={[styles.dashboardStatDivider, { backgroundColor: '#374151' }]} />
-                  <View style={styles.dashboardStatBox}>
-                    <Text style={[styles.dashboardStatValue, { color: '#FFF' }]}>{completedCount}</Text>
-                    <Text style={[styles.dashboardStatLabel, { color: '#9CA3AF' }]}>Rides Done</Text>
-                  </View>
-                  <View style={[styles.dashboardStatDivider, { backgroundColor: '#374151' }]} />
-                  <View style={styles.dashboardStatBox}>
-                    <Text style={[styles.dashboardStatValue, { color: colors.emerald }]}>{formatCurrency(totalEarned)}</Text>
-                    <Text style={[styles.dashboardStatLabel, { color: '#9CA3AF' }]}>Total Earned</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.dashboardInfoText}>
-                  Earn {rewardAmountText} on every friend's first ride. Withdraw anytime directly to your UPI.
-                </Text>
-
-                {availableToWithdraw > 0 && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Withdraw earnings"
-                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowWithdraw(true); }}
-                    style={({ pressed }) => [
-                      styles.dashboardWithdrawBtn,
-                      { backgroundColor: colors.emerald, opacity: pressed ? 0.85 : 1 },
-                    ]}
-                  >
-                    <Feather name="download" size={18} color="#111827" />
-                    <Text style={[styles.dashboardWithdrawBtnText, { color: '#111827' }]}>Withdraw Earnings</Text>
-                  </Pressable>
-                )}
-              </View>
-
-          {/* ═══════════════════════════════════════════════════════════════
-              TABBED SECTION: REFERRALS / EARNINGS
-             ═══════════════════════════════════════════════════════════════ */}
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: 8 }]}>
-            {/* Tabs */}
-            <View style={[styles.tabBar, { borderBottomColor: colors.border }]}>
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: activeTab === 'referrals' }}
-                onPress={() => setActiveTab('referrals')}
-                style={[styles.tab, activeTab === 'referrals' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-              >
-                <Feather name="users" size={15} color={activeTab === 'referrals' ? colors.primary : colors.mutedForeground} />
-                <Text style={[styles.tabText, { color: activeTab === 'referrals' ? colors.primary : colors.mutedForeground }]}>
-                  Referrals
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="tab"
-                accessibilityState={{ selected: activeTab === 'earnings' }}
-                onPress={() => setActiveTab('earnings')}
-                style={[styles.tab, activeTab === 'earnings' && { borderBottomColor: colors.primary, borderBottomWidth: 2 }]}
-              >
-                <Feather name="trending-up" size={15} color={activeTab === 'earnings' ? colors.primary : colors.mutedForeground} />
-                <Text style={[styles.tabText, { color: activeTab === 'earnings' ? colors.primary : colors.mutedForeground }]}>
-                  Earnings
-                </Text>
-              </Pressable>
+              ))}
             </View>
 
-            {/* Referrals tab */}
-            {activeTab === 'referrals' && (
-              <Reanimated.View entering={FadeIn.duration(250)}>
-                {referrals.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Feather name="users" size={36} color={colors.muted} style={{ marginBottom: 12 }} />
-                    <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                      No referrals yet.{'\n'}Add a friend's number above to get started.
-                    </Text>
-                  </View>
-                ) : (
-                  referrals.map((ref: any) => (
-                    <View key={ref.id || ref._id || ref.mobileNumber} style={[styles.referralItem, { borderTopColor: colors.border }]}>
-                      <View style={[styles.refAvatar, { backgroundColor: ref.status === 'REWARDED' ? colors.emerald + '15' : colors.tintLight }]}>
-                        <Feather
-                          name={ref.status === 'REWARDED' ? 'check' : ref.status === 'JOINED' ? 'user' : 'phone'}
-                          size={16}
-                          color={ref.status === 'REWARDED' ? colors.emerald : colors.primaryText}
-                        />
+            {activeTab === 'referrals' ? (
+              referrals.length === 0 ? (
+                <Empty icon="users" text={'No referrals yet.\nShare your link or add a friend\'s number to get started.'} muted={muted} />
+              ) : (
+                referrals.map((ref: any) => {
+                  const done = ref.status === 'REWARDED';
+                  const joined = ref.status === 'JOINED';
+                  return (
+                    <View key={ref.id || ref._id || ref.mobileNumber} style={[styles.row, { borderBottomColor: line }]}>
+                      <View style={[styles.rowIcon, { backgroundColor: done ? C.greenTint : C.soft }]}>
+                        <Feather name={done ? 'check' : joined ? 'user' : 'phone'} size={16} color={done ? C.green : C.navy} />
                       </View>
-                      <View style={styles.refInfo}>
-                        <Text style={[styles.refName, { color: colors.foreground }]}>{ref.referredName}</Text>
-                        <Text style={[styles.refDate, { color: colors.mutedForeground }]}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.rowTitle, { color: text }]} numberOfLines={1}>{ref.referredName || 'Friend'}</Text>
+                        <Text style={[styles.small, { color: muted }]} numberOfLines={1}>
                           {ref.mobileNumber ? `+91 ${ref.mobileNumber} · ` : ''}Added {formatDate(ref.signupAt)}
                         </Text>
                       </View>
-                      <View style={styles.refStatus}>
-                        {ref.status === 'REWARDED' ? (
-                          <View style={[styles.statusBadge, { backgroundColor: colors.emerald + '15' }]}>
-                            <Text style={[styles.statusText, { color: colors.emerald }]}>
-                              {ref.commissionAmount > 0 ? `+${formatCurrency(ref.commissionAmount)}` : 'Completed'}
-                            </Text>
-                          </View>
-                        ) : ref.status === 'JOINED' ? (
-                          <View style={[styles.statusBadge, { backgroundColor: colors.tintLight }]}>
-                            <Text style={[styles.statusText, { color: colors.primaryText }]}>Trip pending</Text>
-                          </View>
-                        ) : (
-                          <View style={[styles.statusBadge, { backgroundColor: colors.muted }]}>
-                            <Text style={[styles.statusText, { color: colors.mutedForeground }]}>Invited</Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  ))
-                )}
-              </Reanimated.View>
-            )}
-
-            {/* Earnings tab */}
-            {activeTab === 'earnings' && (
-              <Reanimated.View entering={FadeIn.duration(250)}>
-                {earningsHistory.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <Feather name="trending-up" size={36} color={colors.muted} style={{ marginBottom: 12 }} />
-                    <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-                      No earnings yet.{'\n'}Your referral rewards will appear here once friends complete trips.
-                    </Text>
-                  </View>
-                ) : (
-                  earningsHistory.map((item) => (
-                    <View key={item.id} style={[styles.referralItem, { borderTopColor: colors.border }]}>
-                      <View style={[styles.refAvatar, {
-                        backgroundColor: item.type === 'referral' ? colors.emerald + '15' : (item.status === 'PENDING' ? '#FFA50020' : colors.tintLight),
-                      }]}>
-                        <Feather
-                          name={item.type === 'referral' ? 'arrow-down-left' : 'arrow-up-right'}
-                          size={16}
-                          color={item.type === 'referral' ? colors.emerald : (item.status === 'PENDING' ? '#FFA500' : colors.primaryText)}
-                        />
-                      </View>
-                      <View style={styles.refInfo}>
-                        <Text style={[styles.refName, { color: colors.foreground }]}>{item.label}</Text>
-                        <Text style={[styles.refDate, { color: colors.mutedForeground }]}>
-                          {formatDate(item.date)}
-                          {item.type === 'withdrawal' && ` · ${item.status}`}
+                      <View style={[styles.badge, { backgroundColor: done ? C.greenTint : joined ? '#F0EFFD' : C.soft }]}>
+                        <Text style={[styles.badgeText, { color: done ? C.green : joined ? C.purple : muted }]}>
+                          {done ? (ref.commissionAmount > 0 ? `+${formatCurrency(ref.commissionAmount)}` : 'Completed') : joined ? 'Trip pending' : 'Invited'}
                         </Text>
                       </View>
-                      <Text style={[styles.earningsAmount, {
-                        color: item.amount >= 0 ? colors.emerald : colors.destructive,
-                      }]}>
-                        {item.amount >= 0 ? '+' : ''}{formatCurrency(Math.abs(item.amount))}
+                    </View>
+                  );
+                })
+              )
+            ) : earningsHistory.length === 0 ? (
+              <Empty icon="trending-up" text={'No earnings yet.\nRewards appear here once friends complete trips.'} muted={muted} />
+            ) : (
+              earningsHistory.map((item) => {
+                const isIn = item.type === 'referral';
+                const pending = item.status === 'PENDING';
+                return (
+                  <View key={item.id} style={[styles.row, { borderBottomColor: line }]}>
+                    <View style={[styles.rowIcon, { backgroundColor: isIn ? C.greenTint : pending ? '#FFF7E6' : C.soft }]}>
+                      <Feather name={isIn ? 'arrow-down-left' : 'arrow-up-right'} size={16} color={isIn ? C.green : pending ? C.amber : C.navy} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.rowTitle, { color: text }]} numberOfLines={1}>{item.label}</Text>
+                      <Text style={[styles.small, { color: muted }]}>
+                        {formatDate(item.date)}{item.type === 'withdrawal' ? ` · ${item.status}` : ''}
                       </Text>
                     </View>
-                  ))
-                )}
-              </Reanimated.View>
+                    <Text style={[styles.rowAmount, { color: item.amount >= 0 ? C.green : C.red }]}>
+                      {item.amount >= 0 ? '+' : '−'}{formatCurrency(item.amount)}
+                    </Text>
+                  </View>
+                );
+              })
             )}
           </View>
-        </Reanimated.View>
-      )}
-
-          <View style={{ height: insets.bottom + 80 }} />
         </KeyboardAwareScrollViewCompat>
-      </Reanimated.View>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          QR POPUP MODAL
-         ═══════════════════════════════════════════════════════════════════ */}
-      <Modal
-        visible={showQrPopup}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowQrPopup(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowQrPopup(false)}
-        >
-          <Reanimated.View entering={FadeInDown.springify().damping(20)} style={[styles.qrPopup, { backgroundColor: colors.card }]}>
-            <Text style={[styles.qrPopupTitle, { color: colors.foreground }]}>Scan to Refer</Text>
-            <Text style={[styles.qrPopupSubtitle, { color: colors.mutedForeground }]}>
-              Ask your friend to scan this QR code
-            </Text>
-            <View style={styles.qrPopupCode}>
-              <QRCode
-                value={referralLink}
-                size={SCREEN_WIDTH * 0.55}
-                backgroundColor="#FFFFFF"
-                color="#111827"
-                quietZone={20}
-              />
+        <WithdrawModal
+          visible={showWithdraw}
+          onClose={() => { if (!withdrawing) setShowWithdraw(false); }}
+          colors={colors}
+          available={availableToWithdraw}
+          pending={pendingWithdrawals}
+          amount={withdrawAmount}
+          setAmount={(v) => { setWithdrawAmount(v); setWithdrawError(''); }}
+          method={withdrawMethod}
+          setMethod={(m) => { setWithdrawMethod(m); setWithdrawError(''); }}
+          upi={withdrawUpi}
+          setUpi={(v) => { setWithdrawUpi(v); setWithdrawError(''); }}
+          bank={bankDetails}
+          setBank={(b) => { setBankDetails(b); setWithdrawError(''); }}
+          error={withdrawError}
+          busy={withdrawing}
+          onSubmit={handleWithdraw}
+        />
+      </View>
+    );
+  }
+
+  /* ═══ Main view (Figma 257:24470) ═════════════════════════════════════ */
+  const cardW = Math.min(327, width - 66);
+  const heroH = insets.top + 171; // Figma: 230 including the 59px status bar
+  const bottomBarH = 8 + 30 + 8 + 54 + 4 + insets.bottom;
+
+  const faqs = [
+    {
+      q: 'How does the Refer & Earn program work?',
+      a: `Share your code or invite link. When your friend signs up with it and completes their first trip, you get ${rewardShort} of their booking amount as wallet cash.`,
+    },
+    {
+      q: 'Who is eligible for the referral offer?',
+      a: `Friends who are new to MySawari and sign up using your code. They get ${discountText} on their first ride.`,
+    },
+    {
+      q: 'What if my friend books without using my referral link?',
+      a: 'Add their mobile number under "See your referral history" before they book, and their first trip will still be tracked to you.',
+    },
+    {
+      q: 'Where can I check my referral status?',
+      a: 'Tap "See your referral history" to see every friend you referred, their status, your earnings and withdrawals.',
+    },
+  ];
+
+  return (
+    <View style={[styles.root, { backgroundColor: surface }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: bottomBarH + 16 }}>
+        {/* Hero */}
+        <View style={{ height: heroH }}>
+          <LinearGradient colors={[C.purple, C.purpleLight]} style={styles.hero}>
+            <Rays width={width} height={heroH} />
+          </LinearGradient>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={8}
+            onPress={() => router.back()}
+            style={({ pressed }) => [styles.backOnPurple, { top: insets.top + 4 }, pressed && { opacity: 0.7 }]}
+          >
+            <Feather name="chevron-left" size={22} color="#FFFFFF" />
+          </Pressable>
+        </View>
+
+        {/* Invite card, overlapping the hero's bottom edge */}
+        <View style={[styles.inviteCard, { width: cardW, marginTop: -(heroH - insets.top - 80) }]}>
+          <Avatar source={AVATARS.left} size={56} style={{ left: cardW / 2 - 75.5, top: -35 }} />
+          <Avatar source={AVATARS.right} size={56} style={{ left: cardW / 2 + 20.5, top: -35 }} />
+          <Avatar source={AVATARS.center} size={64} style={{ left: cardW / 2 - 32, top: -46 }} center />
+          <Text style={styles.inviteTitle}>Invite Friends. Earn {rewardShort} Back.</Text>
+          <Text style={styles.inviteCopy}>
+            Get {rewardShort} of your friend’s booking amount as wallet cash when they complete their first trip.
+          </Text>
+        </View>
+
+        {/* How it works */}
+        <View style={styles.section}>
+          <View style={[styles.box, { borderColor: line, backgroundColor: isDarkMode ? colors.card : C.soft }]}>
+            <Text style={[styles.sectionTitle, { color: text }]}>How It Works</Text>
+            <View style={{ gap: 12 }}>
+              <View style={styles.stepRail} pointerEvents="none">
+                <Svg width={2} height="100%">
+                  <Line x1="1" y1="0" x2="1" y2="100%" stroke={C.border} strokeWidth={1} strokeDasharray="3,3" />
+                </Svg>
+              </View>
+              <Step title="Share Your Code or Link" copy="Send your personal link or code to your friends." text={text} muted={muted} />
+              <Step title="They book a Car or Bike" copy={`Your friend signs up with your code and gets ${discountText} at checkout on their first booking.`} text={text} muted={muted} />
+              <Step title={`You get ${rewardShort} back`} copy={`Once your friend completes their first ride, ${rewardShort} of their trip total is added to your wallet.`} text={text} muted={muted} />
             </View>
-            <Text style={[styles.qrPopupRef, { color: colors.mutedForeground }]}>
-              Code: {referralCode}
-            </Text>
-            <Pressable
-              onPress={() => setShowQrPopup(false)}
-              style={[styles.qrPopupClose, { backgroundColor: colors.primary }]}
-            >
-              <Text style={styles.qrPopupCloseText}>Done</Text>
-            </Pressable>
-          </Reanimated.View>
-        </Pressable>
-      </Modal>
+          </View>
+        </View>
 
-      {/* ═══════════════════════════════════════════════════════════════════
-          WITHDRAW MODAL
-         ═══════════════════════════════════════════════════════════════════ */}
-      <Modal
-        visible={showWithdraw}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowWithdraw(false)}
-      >
+        {/* Referral history */}
+        <View style={styles.section}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { Haptics.selectionAsync().catch(() => {}); setView('history'); refreshReferrals(); }}
+            style={({ pressed }) => [styles.historyRow, { borderColor: line, backgroundColor: surface }, pressed && { opacity: 0.85 }]}
+          >
+            <View style={styles.historyIcon}>
+              <MaterialCommunityIcons name="history" size={18} color={C.title} />
+            </View>
+            <Text style={[styles.historyText, { color: text }]} numberOfLines={1}>See your referral history</Text>
+            {referrals.length > 0 && (
+              <View style={styles.countPill}><Text style={styles.countPillText}>{referrals.length}</Text></View>
+            )}
+            <Feather name="chevron-right" size={16} color={muted} />
+          </Pressable>
+        </View>
+
+        {/* FAQs */}
+        <View style={[styles.section, { gap: 12 }]}>
+          <Text style={[styles.sectionTitle, { color: text }]}>FAQs</Text>
+          <View style={{ gap: 10 }}>
+            {faqs.map((f, i) => {
+              const open = openFaq === i;
+              return (
+                <Pressable
+                  key={f.q}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: open }}
+                  onPress={() => {
+                    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                    setOpenFaq(open ? -1 : i);
+                  }}
+                  style={[styles.faq, { borderColor: isDarkMode ? colors.border : C.border }]}
+                >
+                  <View style={styles.faqHead}>
+                    <Text style={[styles.faqQ, { color: text }]}>{f.q}</Text>
+                    <Feather name={open ? 'chevron-up' : 'chevron-down'} size={20} color={text} />
+                  </View>
+                  {open && <Text style={[styles.faqA, { color: muted }]}>{f.a}</Text>}
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Sticky share bar */}
+      <View style={[styles.bottomBar, { backgroundColor: surface, borderTopColor: isDarkMode ? colors.border : C.panelBorder, paddingBottom: insets.bottom + 4 }]}>
         <Pressable
-          style={styles.modalOverlay}
-          onPress={() => { if (!withdrawing) setShowWithdraw(false); }}
+          accessibilityRole="button"
+          accessibilityLabel="Copy invite link"
+          disabled={!hasCode}
+          onPress={handleCopyLink}
+          style={styles.linkRow}
         >
-          <Reanimated.View entering={FadeInDown.springify().damping(20)} style={[styles.withdrawPopup, { backgroundColor: colors.card }]}>
-            <Pressable onPress={() => {}} /* prevent dismiss on inner press */>
-              <View style={styles.withdrawHeader}>
-                <Text style={[styles.withdrawTitle, { color: colors.foreground }]}>Withdraw Earnings</Text>
-                <Pressable onPress={() => setShowWithdraw(false)} hitSlop={12}>
+          <Text style={styles.linkText} numberOfLines={1}>
+            <Text style={{ fontFamily: F.med, color: muted }}>Invite Link : </Text>
+            <Text style={styles.linkValue}>{hasCode ? displayLink : 'Loading…'}</Text>
+          </Text>
+          <Feather name={copySuccess ? 'check' : 'copy'} size={14} color={copySuccess ? C.green : muted} />
+        </Pressable>
+        <View style={styles.ctaRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share via WhatsApp"
+            disabled={!hasCode}
+            onPress={handleWhatsApp}
+            style={({ pressed }) => [styles.cta, { opacity: !hasCode ? 0.6 : pressed ? 0.9 : 1 }]}
+          >
+            <FontAwesome name="whatsapp" size={24} color={C.whatsapp} />
+            <Text style={styles.ctaText}>Share via WhatsApp</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="More ways to share"
+            disabled={!hasCode}
+            onPress={handleShare}
+            style={({ pressed }) => [styles.shareSquare, pressed && { opacity: 0.8 }]}
+          >
+            <Feather name="share" size={22} color={C.title} />
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* ═══ Pieces ══════════════════════════════════════════════════════════════ */
+function Rays({ width, height }: { width: number; height: number }) {
+  const cx = width / 2;
+  const cy = height * 0.62;
+  const r = Math.hypot(width, height) + 40;
+  const count = 36;
+  const step = (2 * Math.PI) / count;
+  const d: string[] = [];
+  for (let i = 0; i < count; i += 2) {
+    const a1 = i * step;
+    const a2 = a1 + step;
+    d.push(`M${cx},${cy} L${cx + r * Math.cos(a1)},${cy + r * Math.sin(a1)} L${cx + r * Math.cos(a2)},${cy + r * Math.sin(a2)} Z`);
+  }
+  return (
+    <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
+      <Path d={d.join(' ')} fill="rgba(255,255,255,0.07)" />
+    </Svg>
+  );
+}
+
+function Avatar({ source, size, style, center }: { source: ImageSourcePropType; size: number; style: any; center?: boolean }) {
+  return (
+    <View
+      style={[
+        { position: 'absolute', width: size, height: size, borderRadius: size / 2, overflow: 'hidden', backgroundColor: '#F0EFFD' },
+        center ? { borderWidth: 1.5, borderColor: '#FFFFFF' } : { borderWidth: 1, borderColor: C.lavenderBorder },
+        style,
+      ]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Image source={source} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+    </View>
+  );
+}
+
+function Step({ title, copy, text, muted }: { title: string; copy: string; text: string; muted: string }) {
+  return (
+    <View style={styles.step}>
+      <View style={styles.stepDot} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.stepTitle, { color: text }]}>{title}</Text>
+        <Text style={[styles.small, { color: muted }]}>{copy}</Text>
+      </View>
+    </View>
+  );
+}
+
+function Stat({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center' }}>
+      <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function Empty({ icon, text, muted }: { icon: 'users' | 'trending-up'; text: string; muted: string }) {
+  return (
+    <View style={styles.empty}>
+      <Feather name={icon} size={28} color={C.border} style={{ marginBottom: 10 }} />
+      <Text style={[styles.small, { color: muted, textAlign: 'center', fontSize: 13, lineHeight: 19.5 }]}>{text}</Text>
+    </View>
+  );
+}
+
+function WithdrawModal(p: {
+  visible: boolean; onClose: () => void; colors: ReturnType<typeof useColors>;
+  available: number; pending: number;
+  amount: string; setAmount: (v: string) => void;
+  method: 'upi' | 'bank'; setMethod: (m: 'upi' | 'bank') => void;
+  upi: string; setUpi: (v: string) => void;
+  bank: { accountNumber: string; ifsc: string; bankName: string; accountHolderName: string };
+  setBank: (b: { accountNumber: string; ifsc: string; bankName: string; accountHolderName: string }) => void;
+  error: string; busy: boolean; onSubmit: () => void;
+}) {
+  const { colors } = p;
+  const fieldStyle = [styles.field, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }];
+  const bankField = (key: keyof typeof p.bank, label: string, placeholder: string, extra: any = {}) => (
+    <View style={{ gap: 6 }}>
+      <Text style={[styles.fieldLabel, { color: colors.foreground }]}>{label}</Text>
+      <TextInput
+        style={fieldStyle}
+        placeholder={placeholder}
+        placeholderTextColor={colors.mutedForeground}
+        value={p.bank[key]}
+        onChangeText={(t) => p.setBank({ ...p.bank, [key]: key === 'ifsc' ? t.toUpperCase() : t })}
+        {...extra}
+      />
+    </View>
+  );
+
+  return (
+    <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onClose} statusBarTranslucent>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <Pressable style={styles.scrim} onPress={p.onClose}>
+          <Pressable onPress={() => {}} style={[styles.sheet, { backgroundColor: colors.card }]}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14 }}>
+              <View style={styles.sheetHead}>
+                <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Withdraw earnings</Text>
+                <Pressable onPress={p.onClose} hitSlop={12} accessibilityLabel="Close">
                   <Feather name="x" size={22} color={colors.mutedForeground} />
                 </Pressable>
               </View>
 
-              <View style={[styles.withdrawBalanceCard, { backgroundColor: colors.emerald + '10', borderColor: colors.emerald + '30' }]}>
-                <Text style={[styles.withdrawBalanceLabel, { color: colors.mutedForeground }]}>Available to Withdraw</Text>
-                <Text style={[styles.withdrawBalanceValue, { color: colors.emerald }]}>{formatCurrency(availableToWithdraw)}</Text>
-                {pendingWithdrawals > 0 && (
-                  <Text style={[styles.withdrawPendingNote, { color: '#FFA500' }]}>
-                    {formatCurrency(pendingWithdrawals)} pending
-                  </Text>
-                )}
+              <View style={styles.balanceBox}>
+                <Text style={[styles.small, { color: C.copy }]}>Available to withdraw</Text>
+                <Text style={styles.balanceValue}>{formatCurrency(p.available)}</Text>
+                {p.pending > 0 && <Text style={[styles.small, { color: C.amber }]}>{formatCurrency(p.pending)} pending</Text>}
               </View>
 
-              <Text style={[styles.withdrawInputLabel, { color: colors.foreground }]}>Amount</Text>
-              <View style={[styles.withdrawInputRow, { backgroundColor: colors.background, borderColor: withdrawError && !withdrawUpi ? colors.destructive : colors.border }]}>
-                <Text style={[styles.withdrawCurrency, { color: colors.foreground }]}>₹</Text>
-                <TextInput
-                  style={[styles.withdrawInput, { color: colors.foreground }]}
-                  placeholder="Enter amount"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={withdrawAmount}
-                  onChangeText={(t) => { setWithdrawAmount(t.replace(/\D/g, '')); setWithdrawError(''); }}
-                  keyboardType="number-pad"
-                  maxLength={7}
-                />
-                {availableToWithdraw > 0 && (
-                  <Pressable
-                    onPress={() => { setWithdrawAmount(String(availableToWithdraw)); setWithdrawError(''); }}
-                    style={[styles.withdrawMaxBtn, { backgroundColor: colors.primary + '20' }]}
-                  >
-                    <Text style={[styles.withdrawMaxText, { color: colors.primary }]}>MAX</Text>
-                  </Pressable>
-                )}
-              </View>
-
-              <View style={styles.methodToggleRow}>
-                <Pressable
-                  onPress={() => { setWithdrawMethod('upi'); setWithdrawError(''); }}
-                  style={[styles.methodToggleBtn, withdrawMethod === 'upi' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                >
-                  <Text style={[styles.methodToggleText, withdrawMethod === 'upi' && { color: '#111827' }]}>UPI</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => { setWithdrawMethod('bank'); setWithdrawError(''); }}
-                  style={[styles.methodToggleBtn, withdrawMethod === 'bank' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-                >
-                  <Text style={[styles.methodToggleText, withdrawMethod === 'bank' && { color: '#111827' }]}>Bank Transfer</Text>
-                </Pressable>
-              </View>
-
-              {withdrawMethod === 'upi' ? (
-                <>
-                  <Text style={[styles.withdrawInputLabel, { color: colors.foreground }]}>UPI ID</Text>
+              <View style={{ gap: 6 }}>
+                <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Amount</Text>
+                <View style={[styles.field, styles.mobileRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                  <Text style={[styles.prefix, { color: colors.foreground }]}>₹</Text>
                   <TextInput
-                    style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: withdrawError && !withdrawUpi ? colors.destructive : colors.border }]}
+                    style={[styles.mobileInput, { color: colors.foreground }]}
+                    placeholder="Enter amount"
+                    placeholderTextColor={colors.mutedForeground}
+                    value={p.amount}
+                    onChangeText={(t) => p.setAmount(t.replace(/\D/g, ''))}
+                    keyboardType="number-pad"
+                    maxLength={7}
+                  />
+                  {p.available > 0 && (
+                    <Pressable onPress={() => p.setAmount(String(p.available))} style={styles.maxBtn}>
+                      <Text style={styles.maxText}>MAX</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+
+              <View style={styles.methodRow}>
+                {(['upi', 'bank'] as const).map((m) => (
+                  <Pressable
+                    key={m}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: p.method === m }}
+                    onPress={() => p.setMethod(m)}
+                    style={[styles.methodBtn, { borderColor: p.method === m ? C.navy : colors.border }, p.method === m && { backgroundColor: C.navy }]}
+                  >
+                    <Text style={[styles.methodText, { color: p.method === m ? '#FFFFFF' : colors.mutedForeground }]}>
+                      {m === 'upi' ? 'UPI' : 'Bank transfer'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {p.method === 'upi' ? (
+                <View style={{ gap: 6 }}>
+                  <Text style={[styles.fieldLabel, { color: colors.foreground }]}>UPI ID</Text>
+                  <TextInput
+                    style={fieldStyle}
                     placeholder="yourname@upi"
                     placeholderTextColor={colors.mutedForeground}
-                    value={withdrawUpi}
-                    onChangeText={(t) => { setWithdrawUpi(t); setWithdrawError(''); }}
+                    value={p.upi}
+                    onChangeText={p.setUpi}
                     autoCapitalize="none"
+                    autoCorrect={false}
                     keyboardType="email-address"
                   />
-                </>
+                </View>
               ) : (
                 <>
-                  <Text style={[styles.withdrawInputLabel, { color: colors.foreground }]}>Account Number</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, marginBottom: 8 }]}
-                    placeholder="e.g. 1234567890"
-                    placeholderTextColor={colors.mutedForeground}
-                    value={bankDetails.accountNumber}
-                    onChangeText={(t) => { setBankDetails(p => ({ ...p, accountNumber: t })); setWithdrawError(''); }}
-                    keyboardType="number-pad"
-                  />
-                  <Text style={[styles.withdrawInputLabel, { color: colors.foreground }]}>IFSC Code</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, marginBottom: 8 }]}
-                    placeholder="e.g. SBIN0001234"
-                    placeholderTextColor={colors.mutedForeground}
-                    value={bankDetails.ifsc}
-                    onChangeText={(t) => { setBankDetails(p => ({ ...p, ifsc: t.toUpperCase() })); setWithdrawError(''); }}
-                    autoCapitalize="characters"
-                  />
-                  <Text style={[styles.withdrawInputLabel, { color: colors.foreground }]}>Bank Name</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, marginBottom: 8 }]}
-                    placeholder="e.g. State Bank of India"
-                    placeholderTextColor={colors.mutedForeground}
-                    value={bankDetails.bankName}
-                    onChangeText={(t) => { setBankDetails(p => ({ ...p, bankName: t })); setWithdrawError(''); }}
-                  />
-                  <Text style={[styles.withdrawInputLabel, { color: colors.foreground }]}>Account Holder Name</Text>
-                  <TextInput
-                    style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
-                    placeholder="e.g. John Doe"
-                    placeholderTextColor={colors.mutedForeground}
-                    value={bankDetails.accountHolderName}
-                    onChangeText={(t) => { setBankDetails(p => ({ ...p, accountHolderName: t })); setWithdrawError(''); }}
-                  />
+                  {bankField('accountNumber', 'Account number', 'e.g. 1234567890', { keyboardType: 'number-pad' })}
+                  {bankField('ifsc', 'IFSC code', 'e.g. SBIN0001234', { autoCapitalize: 'characters', autoCorrect: false })}
+                  {bankField('bankName', 'Bank name', 'e.g. State Bank of India')}
+                  {bankField('accountHolderName', 'Account holder name', 'As on your bank account', { autoCapitalize: 'words' })}
                 </>
               )}
 
-              {!!withdrawError && <Text style={[styles.addFeedback, { color: colors.destructive }]}>{withdrawError}</Text>}
+              {!!p.error && <Text style={[styles.small, { color: C.red, fontSize: 12.5 }]}>{p.error}</Text>}
 
               <Pressable
                 accessibilityRole="button"
-                disabled={withdrawing}
-                onPress={handleWithdraw}
-                style={({ pressed }) => [
-                  styles.addBtn,
-                  { backgroundColor: colors.emerald, opacity: withdrawing ? 0.6 : pressed ? 0.85 : 1, marginTop: 20 },
-                ]}
+                disabled={p.busy}
+                onPress={p.onSubmit}
+                style={({ pressed }) => [styles.navyBtn, { opacity: p.busy ? 0.6 : pressed ? 0.9 : 1 }]}
               >
-                {withdrawing ? <ActivityIndicator color="#FFF" /> : <Feather name="send" size={18} color="#FFF" />}
-                <Text style={[styles.addBtnText, { color: '#FFF' }]}>{withdrawing ? 'Processing...' : 'Request Withdrawal'}</Text>
+                {p.busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.navyBtnText}>Request withdrawal</Text>}
               </Pressable>
-            </Pressable>
-          </Reanimated.View>
+            </ScrollView>
+          </Pressable>
         </Pressable>
-      </Modal>
-    </Page>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────────────────────
+/* ═══ Styles ══════════════════════════════════════════════════════════════ */
 const styles = StyleSheet.create({
-  content: {
-    padding: 16,
+  root: { flex: 1 },
+
+  // Hero: purple gradient, 24px bottom corners, rays behind.
+  hero: {
+    ...StyleSheet.absoluteFill,
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24, overflow: 'hidden',
+    borderWidth: 1, borderTopWidth: 0, borderColor: C.panelBorder,
   },
-  heroCard: {
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    marginBottom: 20,
-    overflow: 'hidden',
+  backOnPurple: {
+    position: 'absolute', left: 16, width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center',
   },
-  heroTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    textAlign: 'center',
-    marginBottom: 12,
-    lineHeight: 26,
-  },
-  rewardsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  rewardPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  rewardText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-  },
-  stepsContainer: {
-    width: '100%',
-    marginBottom: 16,
-    paddingHorizontal: 4,
-  },
-  stepRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  stepCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#374151',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepNumber: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-    color: '#D1D5DB',
-  },
-  stepText: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    color: '#D1D5DB',
-    flex: 1,
-  },
-  stepConnector: {
-    width: 2,
-    height: 12,
-    marginLeft: 11,
-    borderRadius: 1,
-  },
-  codeBox: {
-    width: '100%',
-    padding: 12,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    marginBottom: 16,
-  },
-  codeLabel: {
-    color: '#9CA3AF',
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-    letterSpacing: 1,
-    marginBottom: 6,
-  },
-  codeRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  codeText: {
-    color: '#FFF',
-    fontFamily: 'Inter_700Bold',
-    fontSize: 18,
-    letterSpacing: 2,
-  },
-  copyBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    backgroundColor: '#374151',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minWidth: 50,
-  },
-  copyBtnText: {
-    color: '#D1D5DB',
-    fontFamily: 'Inter_700Bold',
-    fontSize: 10,
+  backLight: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: '#FAFAFA',
+    borderWidth: 1, borderColor: C.softBorder, alignItems: 'center', justifyContent: 'center',
   },
 
-  // Action row (Generate QR + Share side by side)
-  actionRow: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
+  // Invite card: white, 1px lavender border, radius 10, pt 32 / pb 16 / px 12, gap 12.
+  inviteCard: {
+    alignSelf: 'center', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: C.lavenderBorder, borderRadius: 10,
+    paddingTop: 32, paddingBottom: 16, paddingHorizontal: 12, gap: 12, alignItems: 'center', marginBottom: 8,
   },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 44,
-    borderRadius: 12,
-  },
-  actionBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 13,
-  },
+  inviteTitle: { fontFamily: F.bold, fontSize: 19, lineHeight: 28.5, color: C.purple, textAlign: 'center' },
+  inviteCopy: { fontFamily: F.med, fontSize: 11, lineHeight: 16.5, color: C.copy, textAlign: 'center' },
 
-  // QR (kept for popup)
-  qrWrapper: {
-    padding: 4,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
+  section: { paddingHorizontal: 16, paddingVertical: 8 },
+  sectionTitle: { fontFamily: F.semi, fontSize: 15, lineHeight: 22.5 },
+  box: { borderWidth: 1, borderRadius: 12, padding: 12, gap: 12 },
 
-  // Card
-  card: {
-    borderRadius: 20,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 20,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 20,
-  },
-  withdrawMaxBtn: {
-    paddingHorizontal: 12,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  withdrawMaxText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 12,
-  },
-  methodToggleRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
-    marginTop: 16,
-  },
-  methodToggleBtn: {
-    flex: 1,
-    height: 40,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#374151',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  methodToggleText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    color: '#9CA3AF',
-  },
-  cardIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 18,
-  },
-  cardSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 13,
-    marginTop: 2,
-  },
-  input: {
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 15,
-    marginBottom: 12,
-  },
-  mobileRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-  },
-  mobilePrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 10 },
-  mobileInput: { flex: 1, height: '100%', fontFamily: 'Inter_500Medium', fontSize: 15 },
-  addFeedback: { fontFamily: 'Inter_500Medium', fontSize: 12.5, marginTop: 10 },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 50,
-    borderRadius: 14,
-    marginTop: 16,
-  },
-  addBtnText: { fontFamily: 'Inter_700Bold', fontSize: 15, color: '#101B2E' },
+  // Steps: 11px dots on a dashed rail.
+  stepRail: { position: 'absolute', left: 4.5, top: 8, bottom: 24, width: 2 },
+  step: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  stepDot: { width: 11, height: 11, borderRadius: 5.5, backgroundColor: C.border },
+  stepTitle: { fontFamily: F.semi, fontSize: 11, lineHeight: 16.5 },
+  small: { fontFamily: F.med, fontSize: 11, lineHeight: 16.5, color: C.copy },
 
-  // Dashboard
-  dashboardCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 24,
-    marginBottom: 20,
-    overflow: 'hidden',
-  },
-  dashboardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  dashboardTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-  },
-  dashboardPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  dashboardPillText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 11,
-  },
-  dashboardAmount: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 28,
-    marginBottom: 20,
-  },
-  dashboardInfoText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  dashboardStatsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 20,
-    borderTopWidth: 1,
-    marginBottom: 24,
-  },
-  dashboardStatBox: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  dashboardStatValue: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    marginBottom: 4,
-  },
-  dashboardStatLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 11,
-  },
-  dashboardStatDivider: {
-    width: 1,
-    height: 24,
-    alignSelf: 'center',
-  },
-  dashboardWithdrawBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 50,
-    borderRadius: 14,
-  },
-  dashboardWithdrawBtnText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-  },
+  // Referral history row: radius 8, px 12 / py 10, icon tile on #F9F9FB.
+  historyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10 },
+  historyIcon: { padding: 9, borderRadius: 8, backgroundColor: C.soft },
+  historyText: { flex: 1, fontFamily: F.semi, fontSize: 15, lineHeight: 22.5 },
+  countPill: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: '#F0EFFD', alignItems: 'center', justifyContent: 'center' },
+  countPillText: { fontFamily: F.semi, fontSize: 11, color: C.purple },
 
-  // Main Tabs
-  mainTabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    marginBottom: 20,
-  },
-  mainTab: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-  mainTabText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-  },
+  faq: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, gap: 8 },
+  faqHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  faqQ: { flex: 1, fontFamily: F.semi, fontSize: 13, lineHeight: 19.5 },
+  faqA: { fontFamily: F.med, fontSize: 13, lineHeight: 19.5 },
 
-  // Tabs
-  tabBar: {
-    flexDirection: 'row',
-    borderBottomWidth: 1,
-    marginBottom: 4,
-    marginHorizontal: -20,
-    paddingHorizontal: 20,
+  // Bottom bar: 1px top border, soft upward shadow, pt 8 / pb 4.
+  bottomBar: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: 1, paddingTop: 8, paddingHorizontal: 16, gap: 8,
+    shadowColor: C.navy, shadowOffset: { width: 0, height: -20 }, shadowOpacity: 0.05, shadowRadius: 17, elevation: 12,
   },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-  },
-  tabText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-  },
+  linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 4, paddingHorizontal: 16 },
+  linkText: { fontSize: 11, lineHeight: 16.5, flexShrink: 1 },
+  linkValue: { fontFamily: F.semi, color: C.navy, textDecorationLine: 'underline' },
+  ctaRow: { flexDirection: 'row', gap: 12 },
+  cta: { flex: 1, height: 54, borderRadius: 12, backgroundColor: C.navy, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, padding: 12 },
+  ctaText: { fontFamily: F.semi, fontSize: 17, lineHeight: 25.5, color: '#FFFFFF' },
+  shareSquare: { width: 54, height: 54, borderRadius: 12, backgroundColor: C.soft, borderWidth: 1, borderColor: C.softBorder, alignItems: 'center', justifyContent: 'center' },
 
-  // Referral items
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 24,
-  },
-  emptyText: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  referralItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    gap: 12,
-  },
-  refAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  refInfo: {
-    flex: 1,
-  },
-  refName: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    marginBottom: 3,
-  },
-  refDate: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-  },
-  refStatus: {
-    marginLeft: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 11,
-  },
-  earningsAmount: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-    marginLeft: 8,
-  },
+  // History view
+  historyHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12 },
+  historyTitle: { fontFamily: F.semi, fontSize: 17, lineHeight: 25.5 },
+  retryBar: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, backgroundColor: '#FDECEC' },
+  retryText: { fontFamily: F.med, fontSize: 13, color: C.red },
 
-  // QR Popup
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  qrPopup: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: 24,
-    padding: 28,
-    alignItems: 'center',
-  },
-  qrPopupTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 22,
-    marginBottom: 6,
-  },
-  qrPopupSubtitle: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 14,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  qrPopupCode: {
-    padding: 4,
-    backgroundColor: '#FFF',
-    borderRadius: 20,
-    marginBottom: 16,
-  },
-  qrPopupRef: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 13,
-    letterSpacing: 1,
-    marginBottom: 20,
-  },
-  qrPopupClose: {
-    width: '100%',
-    height: 48,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qrPopupCloseText: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 15,
-    color: '#101B2E',
-  },
+  earnCard: { borderRadius: 16, padding: 16, gap: 4 },
+  earnLabel: { fontFamily: F.med, fontSize: 13, lineHeight: 19.5, color: 'rgba(255,255,255,0.85)' },
+  earnAmount: { fontFamily: F.bold, fontSize: 28, lineHeight: 38, color: '#FFFFFF' },
+  earnPending: { fontFamily: F.med, fontSize: 11, color: '#FFE7A3' },
+  earnStats: { flexDirection: 'row', alignItems: 'center', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.2)' },
+  earnDivider: { width: 1, height: 24, backgroundColor: 'rgba(255,255,255,0.2)' },
+  statValue: { fontFamily: F.bold, fontSize: 17, lineHeight: 25.5, color: '#FFFFFF' },
+  statLabel: { fontFamily: F.med, fontSize: 11, color: 'rgba(255,255,255,0.8)' },
+  withdrawBtn: { marginTop: 14, height: 44, borderRadius: 10, backgroundColor: '#FFFFFF', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  withdrawBtnText: { fontFamily: F.semi, fontSize: 15, color: C.purple },
 
-  // Withdraw Popup
-  withdrawPopup: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 24,
-    padding: 24,
-  },
-  withdrawHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  withdrawTitle: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-  },
-  withdrawBalanceCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  withdrawBalanceLabel: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    marginBottom: 4,
-  },
-  withdrawBalanceValue: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 28,
-  },
-  withdrawPendingNote: {
-    fontFamily: 'Inter_500Medium',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  withdrawInputLabel: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  withdrawInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-  },
-  withdrawCurrency: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 18,
-    marginRight: 8,
-  },
-  withdrawInput: {
-    flex: 1,
-    height: '100%',
-    fontFamily: 'Inter_500Medium',
-    fontSize: 16,
-  },
+  field: { height: 48, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, fontFamily: F.med, fontSize: 15 },
+  fieldLabel: { fontFamily: F.semi, fontSize: 13 },
+  mobileRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  prefix: { fontFamily: F.semi, fontSize: 15 },
+  mobileInput: { flex: 1, height: '100%', fontFamily: F.med, fontSize: 15, paddingVertical: 0 },
+  navyBtn: { height: 48, borderRadius: 12, backgroundColor: C.navy, alignItems: 'center', justifyContent: 'center' },
+  navyBtnText: { fontFamily: F.semi, fontSize: 15, color: '#FFFFFF' },
+
+  tabs: { flexDirection: 'row', borderWidth: 1, borderRadius: 10, padding: 3, marginBottom: 4 },
+  tab: { flex: 1, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  tabText: { fontFamily: F.semi, fontSize: 13 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1 },
+  rowIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { fontFamily: F.semi, fontSize: 13, lineHeight: 19.5 },
+  rowAmount: { fontFamily: F.semi, fontSize: 13 },
+  badge: { borderRadius: 24, paddingHorizontal: 8, paddingVertical: 4 },
+  badgeText: { fontFamily: F.semi, fontSize: 11 },
+  empty: { alignItems: 'center', paddingVertical: 28 },
+
+  centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  stateTitle: { fontFamily: F.semi, fontSize: 19, lineHeight: 28.5, textAlign: 'center' },
+  stateCopy: { fontFamily: F.med, fontSize: 13, lineHeight: 19.5, textAlign: 'center', marginTop: 6 },
+
+  // Withdraw sheet
+  scrim: { flex: 1, backgroundColor: 'rgba(38,38,38,0.32)', justifyContent: 'center', padding: 20 },
+  sheet: { borderRadius: 20, padding: 20, maxHeight: '90%' },
+  sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  sheetTitle: { fontFamily: F.semi, fontSize: 19, lineHeight: 28.5 },
+  balanceBox: { alignItems: 'center', padding: 14, borderRadius: 12, backgroundColor: C.greenTint, gap: 2 },
+  balanceValue: { fontFamily: F.bold, fontSize: 26, lineHeight: 36, color: C.green },
+  maxBtn: { paddingHorizontal: 10, height: 30, borderRadius: 8, backgroundColor: '#F0EFFD', alignItems: 'center', justifyContent: 'center' },
+  maxText: { fontFamily: F.bold, fontSize: 11, color: C.purple },
+  methodRow: { flexDirection: 'row', gap: 8 },
+  methodBtn: { flex: 1, height: 40, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  methodText: { fontFamily: F.semi, fontSize: 13 },
 });

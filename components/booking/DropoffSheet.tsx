@@ -1,195 +1,179 @@
-import React, { useState, useMemo } from 'react';
-import { StyleSheet, Text, View, Pressable, TextInput, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useColors } from '@/hooks/useColors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
+import { API } from '@/services/backend/api';
+import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 
-import { SheetFrame, SheetHeader } from '../common/SheetFrame';
+/**
+ * "Where are you going?" (design: Home → Select your Destination). A full page: the search field, then places.
+ * With nothing typed it lists the popular Northeast destinations; typing also searches real places (the same
+ * place search the delivery address uses, API.searchLocations) so any town or address can be the destination.
+ * Picking one continues to the date & time picker, exactly as before.
+ */
 
-const MAJOR_DESTINATIONS = [
-  { id: 'shillong', name: 'Shillong, Meghalaya', desc: 'Scotland of the East', type: 'hill' },
-  { id: 'cherrapunji', name: 'Cherrapunji, Meghalaya', desc: 'Living Root Bridges & Waterfalls', type: 'nature' },
-  { id: 'kaziranga', name: 'Kaziranga National Park', desc: 'Home of the One-Horned Rhino', type: 'nature' },
-  { id: 'tawang', name: 'Tawang, Arunachal Pradesh', desc: 'Monasteries and Snow Peaks', type: 'hill' },
-  { id: 'dirang', name: 'Dirang, Arunachal Pradesh', desc: 'Hot Water Springs & Orchards', type: 'hill' },
-  { id: 'bomdila', name: 'Bomdila, Arunachal Pradesh', desc: 'Buddhist Monasteries & Viewpoints', type: 'hill' },
-  { id: 'majuli', name: 'Majuli, Assam', desc: 'World\'s Largest River Island', type: 'nature' },
-  { id: 'kohima', name: 'Kohima, Nagaland', desc: 'Hornbill Festival & Heritage', type: 'hill' },
-  { id: 'dzukou', name: 'Dzukou Valley, Nagaland', desc: 'Lush Green Trekking Paradise', type: 'nature' },
-  { id: 'dawki', name: 'Dawki, Meghalaya', desc: 'Crystal Clear Umngot River', type: 'nature' },
-  { id: 'guwahati-local', name: 'Guwahati Local', desc: 'City Tour, Kamakhya Temple, Cruises', type: 'city' },
-  { id: 'kamakhya', name: 'Kamakhya Temple, Assam', desc: 'Guwahati · Nilachal Hill', type: 'city' },
-  { id: 'manas', name: 'Manas National Park, Assam', desc: 'Tigers, Elephants & Golden Langurs', type: 'nature' },
-  { id: 'ziro', name: 'Ziro Valley, Arunachal Pradesh', desc: 'Apatani Villages & Rice Fields', type: 'nature' },
-  { id: 'imphal', name: 'Imphal, Manipur', desc: 'Loktak Lake & Kangla Fort', type: 'city' },
-  { id: 'aizawl', name: 'Aizawl, Mizoram', desc: 'Hilltop City & Reiek Views', type: 'hill' },
-  { id: 'agartala', name: 'Agartala, Tripura', desc: 'Ujjayanta & Neermahal Palaces', type: 'city' },
-  { id: 'gangtok', name: 'Gangtok, Sikkim', desc: 'Tsomgo Lake & Nathula Pass', type: 'hill' },
-];
+type Place = { id: string; name: string; address: string; latitude: number; longitude: number; source: 'database' | 'osm' };
+
+const POPULAR: Place[] = [
+  ['airport-t2', 'Lokpriya Gopinath Bordoloi International Airport', 'Borjhar, Mirzapur, Guwahati, Assam 781015, India'],
+  ['railway', 'Guwahati Railway Station', 'Paltan Bazaar, Guwahati, Assam, India'],
+  ['shillong', 'Shillong, Meghalaya', 'Scotland of the East'],
+  ['cherrapunji', 'Cherrapunji, Meghalaya', 'Living Root Bridges & Waterfalls'],
+  ['dawki', 'Dawki, Meghalaya', 'Crystal Clear Umngot River'],
+  ['kaziranga', 'Kaziranga National Park, Assam', 'Home of the One-Horned Rhino'],
+  ['tawang', 'Tawang, Arunachal Pradesh', 'Monasteries and Snow Peaks'],
+  ['dirang', 'Dirang, Arunachal Pradesh', 'Hot Water Springs & Orchards'],
+  ['bomdila', 'Bomdila, Arunachal Pradesh', 'Buddhist Monasteries & Viewpoints'],
+  ['ziro', 'Ziro Valley, Arunachal Pradesh', 'Apatani Villages & Rice Fields'],
+  ['majuli', 'Majuli, Assam', "World's Largest River Island"],
+  ['manas', 'Manas National Park, Assam', 'Tigers, Elephants & Golden Langurs'],
+  ['kamakhya', 'Kamakhya Temple, Assam', 'Guwahati · Nilachal Hill'],
+  ['guwahati-local', 'Guwahati Local', 'City Tour, Kamakhya Temple, Cruises'],
+  ['kohima', 'Kohima, Nagaland', 'Hornbill Festival & Heritage'],
+  ['dzukou', 'Dzukou Valley, Nagaland', 'Lush Green Trekking Paradise'],
+  ['imphal', 'Imphal, Manipur', 'Loktak Lake & Kangla Fort'],
+  ['aizawl', 'Aizawl, Mizoram', 'Hilltop City & Reiek Views'],
+  ['agartala', 'Agartala, Tripura', 'Ujjayanta & Neermahal Palaces'],
+  ['gangtok', 'Gangtok, Sikkim', 'Tsomgo Lake & Nathula Pass'],
+].map(([id, name, address]) => ({ id, name, address, latitude: 0, longitude: 0, source: 'database' as const }));
 
 export function DropoffSheet() {
-  const colors = useColors();
+  const p = useDetailsPalette();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { setDropoff } = useSawari();
   // returnBack: opened from a screen that wants the customer back afterwards (booking page, trip sheet).
   // q: opened from a state on Home's "Explore Northeast", pre-filtered to it.
   const params = useLocalSearchParams<{ returnBack?: string; q?: string; forSpecificCar?: string }>();
-  const [searchQuery, setSearchQuery] = useState(typeof params.q === 'string' ? params.q : '');
+  const [query, setQuery] = useState(typeof params.q === 'string' ? params.q : '');
+  const [remote, setRemote] = useState<Place[]>([]);
+  const [searching, setSearching] = useState(false);
+  const abort = useRef<AbortController | null>(null);
 
-  // Combine static pickup locations and Major Destinations
-  const ALL_DESTINATIONS = useMemo(() => {
-    const dbLocs = [
-      { id: 'airport-t2', name: 'Guwahati Airport Terminal 2', address: 'Guwahati Airport', pickupCharge: 790, active: true },
-      { id: 'railway', name: 'Guwahati Railway Station', address: 'Paltan Bazaar', pickupCharge: 500, active: true }
-    ].map(loc => ({
-        id: loc.id,
-        name: loc.name,
-        desc: loc.address,
-        type: 'plane'
-      }));
-    return [...dbLocs, ...MAJOR_DESTINATIONS];
-  }, []);
+  // Real places for what is typed (debounced; an older, slower reply never overwrites a newer one).
+  useEffect(() => {
+    const q = query.trim();
+    abort.current?.abort();
+    if (q.length < 3) { setRemote([]); setSearching(false); return; }
+    const controller = new AbortController();
+    abort.current = controller;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await API.searchLocations(q, 'guwahati', true, controller.signal);
+        if (controller.signal.aborted) return;
+        setRemote((res || []).map((r: any) => ({
+          id: `osm-${r.id}`, name: r.name, address: r.address, latitude: r.latitude, longitude: r.longitude, source: 'osm' as const,
+        })));
+      } catch {
+        if (!controller.signal.aborted) setRemote([]);
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 300);
+    return () => { clearTimeout(t); controller.abort(); };
+  }, [query]);
 
-  const filteredDestinations = useMemo(() => {
-    if (!searchQuery) return ALL_DESTINATIONS;
-    const lowerQuery = searchQuery.toLowerCase();
-    return ALL_DESTINATIONS.filter(loc => 
-      loc.name.toLowerCase().includes(lowerQuery) || 
-      loc.desc.toLowerCase().includes(lowerQuery)
-    );
-  }, [searchQuery, ALL_DESTINATIONS]);
+  const places = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const popular = q ? POPULAR.filter((pl) => pl.name.toLowerCase().includes(q) || pl.address.toLowerCase().includes(q)) : POPULAR;
+    const seen = new Set(popular.map((pl) => pl.name.toLowerCase()));
+    return [...popular, ...remote.filter((r) => !seen.has(r.name.toLowerCase()))];
+  }, [query, remote]);
 
-  const handleSelect = (location: any) => {
+  const select = (pl: Place) => {
     Haptics.selectionAsync();
-    setDropoff({ id: location.id, name: location.name, address: location.desc, latitude: 0, longitude: 0, source: 'database' });
-    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: location.name }));
-    
+    setDropoff({ id: pl.id, name: pl.name, address: pl.address, latitude: pl.latitude, longitude: pl.longitude, source: pl.source });
+    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: pl.name }));
     if (params.forSpecificCar === 'true') {
       router.dismissAll();
-      setTimeout(() => {
-        router.push('/booking');
-      }, 100);
+      setTimeout(() => router.push('/booking'), 100);
     } else {
-      // Pushing instead of replacing because Expo Router sometimes dismisses the modal entirely on replace.
-      // The dates sheet uses dismissAll() when done, so stacking modals is perfectly fine here.
       router.push({ pathname: '/dates', params: { returnBack: params.returnBack === 'true' ? 'true' : 'false', fresh: 'true' } });
     }
   };
 
-  const getIcon = (type: string) => {
-    switch(type) {
-      case 'hill': return 'mountain';
-      case 'nature': return 'tree';
-      case 'city': return 'building';
-      case 'plane': return 'plane';
-      default: return 'map-pin';
-    }
-  };
+  const typed = query.trim();
+  const custom = typed.length >= 3 && !places.some((pl) => pl.name.toLowerCase() === typed.toLowerCase());
 
   return (
-    <SheetFrame fill>
-      <SheetHeader title="Where are you going?" subtitle="Select your drop-off destination." />
-      
-      <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
-        <Feather name="search" size={20} color={colors.mutedForeground} />
-        <TextInput 
-          style={[styles.searchInput, { color: colors.foreground }]}
-          placeholder="Search destinations..."
-          placeholderTextColor={colors.mutedForeground}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoFocus
-        />
-        {searchQuery.length > 0 && (
-          <Pressable onPress={() => setSearchQuery('')} style={{ padding: 4 }}>
-            <Feather name="x-circle" size={16} color={colors.mutedForeground} />
+    <View style={[styles.page, { backgroundColor: p.page, paddingTop: insets.top + 12 }]}>
+      <View style={[styles.search, { borderColor: p.border }]}>
+        {query ? (
+          <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
+            <Feather name="chevron-left" size={20} color={p.sub} />
+          </Pressable>
+        ) : (
+          <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
+            <Feather name="search" size={18} color={p.sub} />
           </Pressable>
         )}
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Where are you going?"
+          placeholderTextColor={p.muted}
+          autoFocus
+          returnKeyType="search"
+          autoCorrect={false}
+          style={[styles.searchInput, { color: p.fg }]}
+          accessibilityLabel="Where are you going?"
+        />
+        {searching && <ActivityIndicator size="small" color={p.muted} />}
       </View>
 
-      <ScrollView style={styles.results} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {filteredDestinations.map(loc => (
-          <Pressable 
-            key={loc.id} 
-            style={[styles.locationItem, { borderBottomColor: colors.border, backgroundColor: 'transparent' }]}
-            onPress={() => handleSelect(loc)}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: colors.blue + '15' }]}>
-              <FontAwesome5 name={getIcon(loc.type)} size={14} color={colors.blue} />
-            </View>
-            <View style={styles.locTextWrap}>
-              <Text style={[styles.locTitle, { color: colors.foreground }]}>{loc.name}</Text>
-              <Text style={[styles.locDesc, { color: colors.mutedForeground }]}>{loc.desc}</Text>
-            </View>
-          </Pressable>
-        ))}
-        {/* A place that isn't listed can still be the destination — never a dead end. */}
-        {searchQuery.trim().length >= 3 && !filteredDestinations.some((l) => l.name.toLowerCase() === searchQuery.trim().toLowerCase()) && (
-          <Pressable
-            style={[styles.locationItem, { borderBottomColor: colors.border, backgroundColor: 'transparent' }]}
-            onPress={() => handleSelect({ id: `custom-${searchQuery.trim().toLowerCase()}`, name: searchQuery.trim(), desc: 'Your destination', type: 'map' })}
-          >
-            <View style={[styles.iconWrap, { backgroundColor: colors.primary + '20' }]}>
-              <Feather name="plus" size={16} color={colors.primaryText} />
-            </View>
-            <View style={styles.locTextWrap}>
-              <Text style={[styles.locTitle, { color: colors.foreground }]}>Use “{searchQuery.trim()}”</Text>
-              <Text style={[styles.locDesc, { color: colors.mutedForeground }]}>Set as your destination</Text>
-            </View>
-          </Pressable>
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </SheetFrame>
+      <FlatList
+        data={places}
+        keyExtractor={(pl) => pl.id}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        renderItem={({ item }) => <Row p={p} title={item.name} sub={item.address} onPress={() => select(item)} />}
+        ListFooterComponent={custom ? (
+          // A place that isn't listed can still be the destination — never a dead end.
+          <Row
+            p={p}
+            title={`Use “${typed}”`}
+            sub="Set as your destination"
+            icon="plus"
+            onPress={() => select({ id: `custom-${typed.toLowerCase()}`, name: typed, address: 'Your destination', latitude: 0, longitude: 0, source: 'database' })}
+          />
+        ) : null}
+        ListEmptyComponent={!searching && typed.length >= 3 ? (
+          <Text style={[styles.empty, { color: p.muted }]}>No places found. Try a nearby town or landmark.</Text>
+        ) : null}
+      />
+    </View>
+  );
+}
+
+function Row({ p, title, sub, onPress, icon }: { p: ReturnType<typeof useDetailsPalette>; title: string; sub: string; onPress: () => void; icon?: 'plus' }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]} accessibilityRole="button" accessibilityLabel={`${title}, ${sub}`}>
+      <View style={[styles.pin, { backgroundColor: p.iconBg }]}>
+        {icon === 'plus' ? <Feather name="plus" size={16} color={p.sub} /> : <FontAwesome5 name="map-marker-alt" size={15} color={p.muted} />}
+      </View>
+      <View style={styles.rowText}>
+        <Text style={[styles.rowTitle, { color: p.fg }]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.rowSub, { color: p.muted }]} numberOfLines={1}>{sub}</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color={p.muted} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginTop: 10,
-    marginBottom: 16,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 10,
-    fontFamily: 'Inter_500Medium',
-    fontSize: 15,
-  },
-  results: {
-    flex: 1,
-  },
-  locationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  iconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  locTextWrap: {
-    marginLeft: 14,
-    flex: 1,
-  },
-  locTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 15,
-    marginBottom: 2,
-  },
-  locDesc: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 12,
-  },
+  page: { flex: 1, paddingHorizontal: 16 },
+  // Design: 361×48 field, 1px border, radius 8, icon + placeholder.
+  search: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, marginBottom: 12 },
+  searchInput: { flex: 1, height: '100%', padding: 0, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 15 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 },
+  pin: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  rowText: { flex: 1, minWidth: 0 },
+  rowTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, lineHeight: 20 },
+  rowSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, lineHeight: 17 },
+  empty: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, textAlign: 'center', marginTop: 24 },
 });

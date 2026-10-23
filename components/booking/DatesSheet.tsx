@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation, Alert, Linking, Modal } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
+import { Feather, FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,8 +32,6 @@ const generateTimes = () => {
   return times;
 };
 const ALL_TIMES = generateTimes();
-// A return after 9:00 AM is a late return: it adds one day (index 18 is 9:00 AM; 0 is 12:00 AM).
-const LATE_RETURN_AFTER = 18;
 // The design offers whole hours only; ALL_TIMES indices still drive the 8 AM rules below.
 const isWholeHour = (time: string) => time.includes(':00');
 const padTime = (time: string) => time.replace(/^(\d):/, '0$1:');
@@ -157,18 +155,12 @@ export function DatesSheet() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Labels like "2 Jan" carry no year. Trips are booked from today onwards, so a month earlier than
-  // the current one means next year (a range from late Dec into Jan keeps its January end).
-  const parseDateStr = (dateStr: string, notBefore?: Date | null) => {
+  const parseDateStr = (dateStr: string) => {
     if (!dateStr || dateStr === 'Select') return null;
     const [day, month] = dateStr.split(' ');
     const monthIndex = MONTHS.indexOf(month);
     if (monthIndex === -1) return null;
-    let year = today.getFullYear();
-    if (monthIndex < today.getMonth()) year += 1;
-    let d = new Date(year, monthIndex, parseInt(day));
-    // An end date can never fall before its start: if it does, it is in the following year.
-    if (notBefore && d < notBefore) d = new Date(year + 1, monthIndex, parseInt(day));
+    const d = new Date(today.getFullYear(), monthIndex, parseInt(day));
     d.setHours(0, 0, 0, 0);
     return d;
   };
@@ -180,7 +172,7 @@ export function DatesSheet() {
   }, []);
 
   const initialStart = freshPick ? null : parseDateStr(dateRange.split(' – ')[0]);
-  const initialEnd = freshPick ? null : parseDateStr(dateRange.split(' – ')[1], initialStart);
+  const initialEnd = freshPick ? null : parseDateStr(dateRange.split(' – ')[1]);
 
   const [start, setStart] = useState<Date | null>(initialStart && initialStart >= today ? initialStart : null);
   const [end, setEnd] = useState<Date | null>(initialEnd && initialStart && initialEnd >= initialStart ? initialEnd : null);
@@ -289,13 +281,13 @@ export function DatesSheet() {
     if (start && effectiveEnd) {
       const isSameDaySelection = start.getTime() === effectiveEnd.getTime();
       if (!isSameDaySelection) {
-        if (timeIndex > LATE_RETURN_AFTER && !hasAutoJumpedLate) {
+        if (timeIndex > 16 && !hasAutoJumpedLate) {
           const newEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate() + 1);
           newEnd.setHours(0, 0, 0, 0);
           setEnd(newEnd);
           setHasAutoJumpedLate(true);
           setShowLateReturnModal(true);
-        } else if (timeIndex <= LATE_RETURN_AFTER && hasAutoJumpedLate) {
+        } else if (timeIndex <= 16 && hasAutoJumpedLate) {
           const newEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate() - 1);
           newEnd.setHours(0, 0, 0, 0);
           setEnd(newEnd);
@@ -335,11 +327,9 @@ export function DatesSheet() {
     if (returnBack === 'true') {
       router.back();
     } else if (forSpecificCar === 'true') {
-      if (!dropoff?.name) {
-        router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
-      } else {
-        router.replace('/booking');
-      }
+      // Back to the car page, which now shows the trip price and Book Now.
+      if (router.canGoBack()) router.back();
+      else router.replace('/car-details');
     } else {
       router.dismissAll();
       setTimeout(() => {
@@ -488,71 +478,82 @@ export function DatesSheet() {
           style={({ pressed }) => [styles.cta, { backgroundColor: ui.navy }, !canApply && styles.ctaDisabled, pressed && { opacity: 0.9 }]}
         >
           <Text style={[styles.ctaText, { color: ui.onNavy }]} numberOfLines={1}>
-            {forSpecificCar === 'true' ? (!dropoff?.name ? "Next: Select Destination" : "Continue to Booking") : (returnBack === 'true' ? "Confirm Dates" : "Search Cars")}
+            {returnBack === 'true' ? 'Confirm Dates' : 'Search'}
           </Text>
         </Pressable>
       </View>
 
-      {/* Figma notice card: 357 wide, white, 12px radius, 20/12/12 padding, 24 gap. */}
-      <Modal visible={showEarlyPickupModal} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 }}>
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 12, width: 357, maxWidth: '100%', paddingTop: 20, paddingHorizontal: 12, paddingBottom: 12, gap: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.destructive + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <Feather name="clock" size={32} color={colors.destructive} />
+      {/* Figma "Early Pickup / Return": before 8 AM is arranged with the team. The round close button sits under the card. */}
+      <Modal visible={showEarlyPickupModal} transparent animationType="fade" onRequestClose={() => setShowEarlyPickupModal(false)}>
+        <View style={styles.popupOverlay}>
+          <View style={[styles.early, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
+            <View style={[styles.earlyBadge, { backgroundColor: ui.navy }]}>
+              <Text style={styles.earlyBadgeText}>!</Text>
             </View>
-            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Early Timing</Text>
-            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
-              For vehicle timings before 8:00 AM, please connect with our Customer Care to confirm availability.
+            <Text style={[styles.earlyTitle, { color: ui.text }]}>Early Pickup / Return</Text>
+            <Text style={[styles.earlyBody, { color: ui.muted }]}>
+              For pickup or return timings before 8:00 AM, please contact our team to confirm availability.
             </Text>
-            
-            <View style={{ width: '100%', gap: 12 }}>
-              <Pressable 
-                onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8 }}
+            <View style={styles.earlyActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="WhatsApp us"
+                onPress={() => Linking.openURL(SUPPORT_WHATSAPP_URL).catch(() => {})}
+                style={({ pressed }) => [styles.earlyBtn, styles.earlyWa, pressed && { opacity: 0.85 }]}
               >
-                <Feather name="phone-call" size={18} color={colors.primaryForeground} />
-                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.primaryForeground }}>Call Customer Care</Text>
+                <FontAwesome name="whatsapp" size={18} color="#25D366" />
+                <Text style={styles.earlyWaText}>WhatsApp Us</Text>
               </Pressable>
-              
-              <Pressable 
-                onPress={() => Linking.openURL(SUPPORT_WHATSAPP_URL)}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#25D366', paddingVertical: 14, borderRadius: 14, gap: 8 }}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Call us"
+                onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {})}
+                style={({ pressed }) => [styles.earlyBtn, styles.earlyCall, { backgroundColor: ui.navy }, pressed && { opacity: 0.85 }]}
               >
-                <Feather name="message-circle" size={18} color="#fff" />
-                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: "#fff" }}>WhatsApp Us</Text>
-              </Pressable>
-              
-              <Pressable 
-                onPress={() => setShowEarlyPickupModal(false)}
-                style={{ paddingVertical: 14, alignItems: 'center', marginTop: 4 }}
-              >
-                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.mutedForeground }}>Close</Text>
+                <FontAwesome name="phone" size={16} color="#FFFFFF" />
+                <Text style={styles.earlyCallText}>Call Us</Text>
               </Pressable>
             </View>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+            onPress={() => setShowEarlyPickupModal(false)}
+            style={({ pressed }) => [styles.earlyClose, { backgroundColor: isDarkMode ? colors.card : '#FAFAFA' }, pressed && { opacity: 0.7 }]}
+          >
+            <Feather name="x" size={18} color={ui.muted} />
+          </Pressable>
         </View>
       </Modal>
 
-      <Modal visible={showLateReturnModal} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24 }}>
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 12, width: 357, maxWidth: '100%', paddingTop: 20, paddingHorizontal: 12, paddingBottom: 12, gap: 24, alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12, elevation: 8 }}>
-            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-              <Feather name="info" size={32} color={colors.primary} />
-            </View>
-            <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 20, color: colors.foreground, marginBottom: 8, textAlign: 'center' }}>Late Return</Text>
-            <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 14, color: colors.mutedForeground, textAlign: 'center', marginBottom: 24, lineHeight: 22 }}>
-              Returns after 9:00 AM add 1 extra day to your rental.
+      {/* Figma "Late Return": returning after 8 AM adds a day. Same card as Early Pickup, round close button under it. */}
+      <Modal visible={showLateReturnModal} transparent animationType="fade" onRequestClose={() => setShowLateReturnModal(false)}>
+        <View style={styles.popupOverlay}>
+          <View style={[styles.early, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
+            <Ionicons name="warning" size={30} color="#FACC15" />
+            <Text style={[styles.earlyTitle, { color: ui.text }]}>Late Return</Text>
+            <Text style={[styles.earlyBody, styles.lateBody, { color: ui.muted }]}>
+              Our standard rental day ends at 8:00 AM. Returning after this time adds{' '}
+              <Text style={[styles.lateExtra, { color: ui.navy }]}>1 extra day</Text> to your rental.
             </Text>
-            
-            <View style={{ width: '100%', gap: 12 }}>
-              <Pressable 
-                onPress={() => setShowLateReturnModal(false)}
-                style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, paddingVertical: 14, borderRadius: 14, gap: 8 }}
-              >
-                <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 15, color: colors.primaryForeground }}>Understood</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setShowLateReturnModal(false)}
+              style={({ pressed }) => [styles.lateBtn, { backgroundColor: ui.navy }, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.lateBtnText}>Understood</Text>
+            </Pressable>
           </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+            onPress={() => setShowLateReturnModal(false)}
+            style={({ pressed }) => [styles.earlyClose, { backgroundColor: isDarkMode ? colors.card : '#FAFAFA' }, pressed && { opacity: 0.7 }]}
+          >
+            <Feather name="x" size={18} color={ui.muted} />
+          </Pressable>
         </View>
       </Modal>
 
@@ -620,4 +621,25 @@ const styles = StyleSheet.create({
   cta: { height: 54, padding: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaDisabled: { opacity: 0.5 },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, textAlign: 'center' },
+  // Figma popups: white card (radius 16) over a dimmed page, round close button underneath.
+  popupOverlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18, gap: 12 },
+  // Figma "Early Pickup / Return" (357 wide): badge 30, title 18, body 13/20, WhatsApp 44 tall + Call 47 tall
+  // side by side 12 apart, then the round 32 close button 12 under the card.
+  early: { width: '100%', maxWidth: 357, borderRadius: 16, paddingHorizontal: 12, paddingTop: 22, paddingBottom: 12, alignItems: 'center' },
+  earlyBadge: { width: 31, height: 31, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  earlyBadgeText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, lineHeight: 20, color: '#FFFFFF' },
+  earlyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 26, textAlign: 'center', marginTop: 16 },
+  earlyBody: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 20, textAlign: 'center', paddingHorizontal: 8, marginTop: 10 },
+  earlyActions: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, alignSelf: 'stretch', marginTop: 23 },
+  earlyBtn: { flex: 1, borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  earlyWa: { height: 44, backgroundColor: '#F0FDF4' },
+  earlyWaText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: '#25D366' },
+  earlyCall: { height: 47, gap: 10 },
+  earlyCallText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 16, lineHeight: 22, color: '#FFFFFF' },
+  earlyClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  // Figma "Late Return": warning 30, title 19, body 13/20 with "1 extra day" in navy, full-width 46 button.
+  lateBody: { marginTop: 9 },
+  lateExtra: { fontFamily: 'PlusJakartaSans_600SemiBold' },
+  lateBtn: { alignSelf: 'stretch', height: 46, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  lateBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#FFFFFF' },
 });

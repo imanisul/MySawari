@@ -36,10 +36,15 @@ export function SetLocationSheet({
   const slide = useRef(new Animated.Value(SHEET_FALLBACK_HEIGHT)).current;
   const fade = useRef(new Animated.Value(0)).current;
   const sheetHeight = useRef(SHEET_FALLBACK_HEIGHT);
+  // Nothing is drawn until the sheet is first opened, and it is removed again once it has slid away.
+  // (It used to stay mounted, pushed down by a 520 guess: when the real sheet was taller its top
+  // — "Set Location" and the search field — showed at the bottom of Home on launch.)
+  const [shown, setShown] = useState(visible);
 
   // Slide up on open, down on close. The scrim fades in step with the sheet.
   useEffect(() => {
     if (visible) {
+      setShown(true);
       slide.setValue(sheetHeight.current);
       Animated.parallel([
         Animated.timing(fade, { toValue: 1, duration: 220, easing: Easing.out(Easing.quad), useNativeDriver: true }),
@@ -50,9 +55,11 @@ export function SetLocationSheet({
       Animated.parallel([
         Animated.timing(fade, { toValue: 0, duration: 200, useNativeDriver: true }),
         Animated.timing(slide, { toValue: sheetHeight.current, duration: 240, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      ]).start();
+      ]).start(({ finished }) => { if (finished) setShown(false); });
     }
   }, [visible, fade, slide]);
+
+  if (!shown && !visible) return null;
 
   return (
     <View style={styles.root} pointerEvents={visible ? 'auto' : 'none'}>

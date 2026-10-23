@@ -1,522 +1,251 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
-import { useColors } from '@/hooks/useColors';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
-import { cars, getAvailability, splitDateRange } from '@/utils/sawari';
+import { useFocusEffect } from 'expo-router';
+import { Car, getAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
-import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
-import { Header, Page, FilterSheet, FilterState, defaultFilters } from '@/components';
-import { ExploreCarCard } from '@/components/vehicle/ExploreCarCard';
-import { SortSheet, SortKey } from '@/components/booking/SortSheet';
+import { CarListCard, Page } from '@/components';
+import {
+  ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, countActive, matchesFilters, sortCars,
+  QUICK_CHIPS, QuickChip, chipFor, useVehicleRatings,
+} from '@/components/explore/ExploreFilters';
 import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
-import { Car } from '@/utils/sawari';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
+import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { rise } from '@/components/common/motion';
 
-/** Explore's chips: All, then body type and fuel (the Figma chip row). */
-const CATEGORY_CHIPS: { label: string; filter: Partial<FilterState> }[] = [
-  { label: 'All', filter: {} },
-  { label: 'SUV', filter: { category: 'SUV' } },
-  { label: 'Diesel', filter: { fuel: 'Diesel' } },
-  { label: 'Petrol', filter: { fuel: 'Petrol' } },
-  { label: 'Sedan', filter: { category: 'Sedan' } },
+/**
+ * Explore (Figma "Explore"): title, "Search cars and bike" with the filter button, quick filter chips
+ * (Filter · All · SUV · Diesel · Petrol …) and the vehicle cards. Trip dates are picked on the car details page
+ * ("Check Availability"), so this list shows availability for today, as before.
+ */
+
+const CHIPS: QuickChip[] = [
+  ...QUICK_CHIPS,
+  { label: 'Cars', vehicle: 'Cars' },
+  { label: 'Bikes', vehicle: 'Bikes' },
 ];
 
-function isChipActive(chip: { label: string; filter: Partial<FilterState> }, filters: FilterState) {
-  if (chip.label === 'All') return filters.category === 'All' && filters.fuel === 'All';
-  if (chip.filter.category) return filters.category === chip.filter.category;
-  return filters.fuel === chip.filter.fuel;
-}
+const PAGE_SIZE = 3;
 
 export default function ExploreScreen() {
-  const colors = useColors();
-  const router = useRouter();
+  const p = useDetailsPalette();
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
-  const { vehicleType: globalVehicleType, setBookingSource, setSelectedDate: setGlobalSelectedDate, isAuthLoading, isDarkMode } = useSawari();
-  const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>(globalVehicleType === 'car' ? 'Cars' : 'Bikes');
+  const { setBookingSource } = useSawari();
 
-  // Fully local date state — completely independent from the Home/Index page
-  const [exploreDate, setExploreDate] = useState<string>('');
+  useFocusEffect(useCallback(() => { setBookingSource('explore'); }, [setBookingSource]));
 
-  useFocusEffect(
-    useCallback(() => {
-      setBookingSource('explore');
-    }, [setBookingSource])
-  );
-  
+  const [vehicleType, setVehicleType] = useState<'All' | 'Cars' | 'Bikes'>('All');
+  const [chip, setChip] = useState('All');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showSortSheet, setShowSortSheet] = useState(false);
-  const [sortBy, setSortBy] = useState<SortKey>('recommended');
-  const [filters, setFilters] = useState<FilterState>(defaultFilters);
-
-  
-  // Search state
+  const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
+  const [sort, setSort] = useState<SortKey>('recommended');
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-
-  // Pagination state
   const [page, setPage] = useState(1);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const PAGE_SIZE = 3;
 
-  // Debounce effect
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-      setPage(1); // Reset page on new search
-    }, 300);
-    return () => clearTimeout(handler);
+    const t = setTimeout(() => { setDebouncedQuery(searchQuery); setPage(1); }, 300);
+    return () => clearTimeout(t);
   }, [searchQuery]);
 
-  const [isFiltering, setIsFiltering] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-
-  const handleDateSelect = useCallback((date: string) => {
-    Haptics.selectionAsync();
-    
-    // 1. Immediately show skeleton and visually update the date chip
-    setIsFiltering(true);
-    
-    const newDate = date === exploreDate ? '' : date;
-    setExploreDate(newDate);
-    
-    // 2. Defer the heavy list filtering to the next JS tick
-    // This allows the skeleton to render immediately without dropping frames
-    setTimeout(() => {
-      setGlobalSelectedDate(newDate);
-      setPage(1);
-
-      // Keep skeleton up slightly longer so the list layout doesn't flash jarringly
-      setTimeout(() => {
-        setIsFiltering(false);
-      }, 150);
-    }, 0);
-  }, [exploreDate, setGlobalSelectedDate]);
-
-  const currentSelectedDateObj = useMemo(() => {
-    let d = new Date();
-    if (exploreDate && !exploreDate.includes('–')) {
-      const parts = exploreDate.trim().split(' ');
-      if (parts.length >= 2) {
-        const day = parseInt(parts[0], 10);
-        const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Sept'];
-        let month = MONTHS.indexOf(parts[1]);
-        if (month === 12) month = 8;
-        if (month !== -1 && !isNaN(day)) {
-          const currentYear = new Date().getFullYear();
-          d = new Date(currentYear, month, day);
-          if (d < new Date(new Date().setHours(0,0,0,0))) {
-            d.setFullYear(currentYear + 1);
-          }
-        }
-      }
-    }
-    return d;
-  }, [exploreDate]);
-
-  const onDateChange = (event: DateTimePickerEvent, selectedDateObj?: Date) => {
-    setShowDatePicker(false);
-    if (event.type === 'set' && selectedDateObj) {
-      const formattedDate = selectedDateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      handleDateSelect(formattedDate);
-    }
-  };
-
-  const default90Dates = useMemo(() => {
-    const dates: string[] = [];
-    const today = new Date();
-    
-    // Generate the next 90 days starting exactly from today
-    for (let i = 0; i < 90; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-      dates.push(d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }));
-    }
-    return dates;
-  }, []);
-
-  const availableDates = useMemo(() => {
-    // If it's a date range (e.g. "21 Sep – 25 Sep") or a date beyond 90 days, add it to the front
-    if (exploreDate && !default90Dates.includes(exploreDate)) {
-      return [exploreDate, ...default90Dates];
-    }
-    return default90Dates;
-  }, [exploreDate, default90Dates]);
-
-  // Availability for any date is derived from the same fetched data, so the date is not part of the key.
   const { data: fetchedCars = [], isLoading: isFetchingCars, isError: fetchError, refetch: fetchVehicles } = useVehicles();
 
+  // Vehicles of the chosen kind (All / Cars / Bikes), without workshop vehicles: the filter options and their
+  // counts are built from this list.
+  const baseCars = useMemo(() => (fetchedCars || []).filter((car: Car) => {
+    const st = car.dbStatus?.toLowerCase();
+    if (st === 'service' || st === 'maintenance') return false;
+    return vehicleType === 'All' || (vehicleType === 'Bikes' ? car.type === 'Bike' : car.type === 'Car');
+  }), [fetchedCars, vehicleType]);
+
+  // Ratings come from each vehicle's public reviews (same cache the cards use). They are only fetched for the
+  // whole list when a rating filter or rating sort needs them.
+  const needRatings = sort === 'rating' || !!filters.rating || showFilterSheet;
+  const ratingOf = useVehicleRatings(baseCars, needRatings);
+
   const filteredCars = useMemo(() => {
-    const isAllDates = false; // All Dates is removed
-    const [startStr, endStr] = isAllDates ? [undefined, undefined] : splitDateRange(exploreDate);
-
-    return (fetchedCars || []).reduce((acc: Car[], car: Car) => {
-      // Compute availability for the selected date
-      const availability = getAvailability(car, startStr, endStr);
-      const isAvailable = availability.available;
-
-      const matchType = vehicleType === 'All' || 
-                        (vehicleType === 'Bikes' && car.type === 'Bike') ||
-                        (vehicleType === 'Cars' && car.type === 'Car');
-      const query = debouncedQuery.toLowerCase();
-      const matchSearch = query === '' || 
-                          car.name.toLowerCase().includes(query) ||
-                          car.category.toLowerCase().includes(query) ||
-                          (car.manufacturer && car.manufacturer.toLowerCase().includes(query));
-      
-      // Budget is per day, so compare the day rate (the same number the card shows).
-      const carPriceNum = car.perDay ?? parseInt(car.price.replace(/[^0-9]/g, ''), 10);
-      const matchFilterCategory = filters.category === 'All' || car.category === filters.category;
-      const matchFilterPrice = filters.maxPrice === 10000 || carPriceNum <= filters.maxPrice;
-      const matchFilterTrans = filters.transmission === 'All' || 
-                               car.transmission === filters.transmission ||
-                               (filters.transmission === 'Gearless' && car.transmission === 'Automatic') ||
-                               (filters.transmission === 'Gear' && car.transmission === 'Manual');
-      const matchFilterFuel = filters.fuel === 'All' || car.fuel === filters.fuel;
-
-      // Allow all matching cars, even if unavailable/on rent, to show in the search results
-      const matchSearchAvailability = true;
-      
-      // Do not show vehicles that are in maintenance on the explore page
-      const isMaintenance = car.dbStatus?.toLowerCase() === 'service' || car.dbStatus?.toLowerCase() === 'maintenance';
-      if (isMaintenance) {
-        return acc;
-      }
-
-      if (matchType && matchSearch && matchSearchAvailability && matchFilterCategory && matchFilterPrice && matchFilterTrans && matchFilterFuel) {
-        acc.push({ ...car, isAvailable, availability });
+    const query = debouncedQuery.trim().toLowerCase();
+    const matched = baseCars.reduce((acc: Car[], car: Car) => {
+      const matchSearch = !query
+        || car.name.toLowerCase().includes(query)
+        || car.category.toLowerCase().includes(query)
+        || (car.manufacturer || '').toLowerCase().includes(query);
+      if (matchSearch && matchesFilters(car, filters, ratingOf)) {
+        const availability = getAvailability(car);
+        acc.push({ ...car, isAvailable: availability.available, availability });
       }
       return acc;
-    }, []).sort((a, b) => {
-      // Available vehicles always come first
-      if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
-      // Within the same availability group, sort by price
-      switch (sortBy) {
-        case 'price_asc': return (a.perDay ?? 0) - (b.perDay ?? 0);
-        case 'price_desc': return (b.perDay ?? 0) - (a.perDay ?? 0);
-        case 'rating': return (b.rating ?? 0) - (a.rating ?? 0);
-        default: {
-          const priceA = parseInt(a.price.replace(/[^0-9]/g, ''), 10) || 0;
-          const priceB = parseInt(b.price.replace(/[^0-9]/g, ''), 10) || 0;
-          return filters.maxPrice !== 10000 ? priceB - priceA : priceA - priceB;
-        }
-      }
-    });
-  }, [fetchedCars, exploreDate, vehicleType, debouncedQuery, filters, sortBy]);
+    }, []);
+    return sortCars(matched, sort, ratingOf);
+  }, [baseCars, debouncedQuery, filters, sort, ratingOf]);
 
-  // Pagination slice
-  const paginatedCars = useMemo(() => {
-    if (isFiltering) return [];
-    return filteredCars.slice(0, page * PAGE_SIZE);
-  }, [filteredCars, page, isFiltering]);
+  const paginatedCars = useMemo(() => filteredCars.slice(0, page * PAGE_SIZE), [filteredCars, page]);
 
+  const activeFilterCount = countActive(filters);
 
-  const handleLoadMore = () => {
-    if (paginatedCars.length < filteredCars.length && !isLoadingMore) {
-      // The next batch is already on the phone: show it immediately (no artificial wait).
-      setPage(prev => prev + 1);
-    }
+  const pickChip = (c: QuickChip) => {
+    Haptics.selectionAsync();
+    setChip(c.label);
+    setVehicleType(c.vehicle || 'All');
+    setFilters({ ...EMPTY_FILTERS, ...(c.apply || {}) });
+    setPage(1);
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchVehicles();
-    setIsRefreshing(false);
+  const clearAll = () => {
+    setSearchQuery(''); setDebouncedQuery('');
+    setChip('All'); setVehicleType('All'); setFilters(EMPTY_FILTERS); setSort('recommended'); setPage(1);
   };
 
-  const keyExtractor = useCallback((item: Car) => item.id, []);
+  const header = (
+    <Reanimated.View entering={rise()} style={{ paddingTop: insets.top + 8 }}>
+      <Text style={[styles.title, { color: p.fg }]}>Explore</Text>
 
-  // Explore uses its own Figma card; the shared CarListCard stays as it is for the other screens.
-  const renderCar = useCallback(({ item, index }: { item: typeof cars[0]; index: number }) => (
-    <ExploreCarCard car={item} dateRange={exploreDate} index={index} />
-  ), [exploreDate]);
-
-
-
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filters.category !== 'All') count++;
-    if (filters.maxPrice !== 10000) count++;
-    if (filters.transmission !== 'All') count++;
-    if (filters.fuel !== 'All') count++;
-    return count;
-  }, [filters]);
-
-  /* ─── ListHeaderComponent: Search + Filters + Dates ─── */
-  const listHeaderElement = useMemo(() => (
-    <Reanimated.View entering={rise()}>
-      {/* ── SCROLLABLE: Explore Header ── */}
-      {/* Figma: "Explore" is Semibold/xxl (24px) in black. */}
-      <Header
-        title="Explore"
-        hideLogo={true}
-        horizontalPadding={16}
-        titleStyle={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, lineHeight: 36, letterSpacing: 0, color: '#000000' }}
-      />
-
-      {/* Search Bar */}
-      {/* Figma: white 40px field, Primary/blue-50 border, search icon leading, "Search cars and bike",
-          and a 48px sliders button beside it (the same filter sheet as the chip row's Filter). */}
       <View style={styles.searchRow}>
-        {/* Light mode uses the Figma values (white, Primary/blue-50 border); dark mode keeps the app's tokens. */}
-        <View style={[styles.searchBar, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF', borderColor: isDarkMode ? colors.border : '#EAECF1' }]}>
-          <Feather name="search" size={20} color="#737373" />
+        <View style={[styles.search, { borderColor: p.border, backgroundColor: p.page }]}>
+          <Feather name="search" size={18} color={p.sub} />
           <TextInput
             placeholder="Search cars and bike"
-            placeholderTextColor="#737373"
+            placeholderTextColor={p.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            style={[styles.searchText, { color: colors.foreground }]}
+            style={[styles.searchText, { color: p.fg }]}
             returnKeyType="search"
           />
+          {!!searchQuery && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+              <Feather name="x" size={16} color={p.muted} />
+            </Pressable>
+          )}
         </View>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Sort and filter"
-          onPress={() => {
-            Haptics.selectionAsync();
-            setShowSortSheet(true);
-          }}
-          style={[styles.sliderButton, { backgroundColor: isDarkMode ? colors.card : '#F9F9FB', borderColor: isDarkMode ? colors.border : '#EAECF1' }]}
+          accessibilityLabel={`Sort${sort !== 'recommended' ? ' (changed)' : ''}`}
+          onPress={() => { Haptics.selectionAsync(); setShowSortSheet(true); }}
+          style={[styles.sortBtn, { borderColor: sort !== 'recommended' ? p.navy : p.border, backgroundColor: sort !== 'recommended' ? p.navy : p.page }]}
         >
-          <FilterLinesIcon color="#737373" />
+          <Feather name="sliders" size={16} color={sort !== 'recommended' ? p.onNavy : p.sub} style={{ transform: [{ rotate: '90deg' }] }} />
         </Pressable>
       </View>
 
-      {/* Vehicle Type Toggle & Filter */}
-      {/* Figma: one row that scrolls sideways: Filter first, then All / SUV / Diesel / Petrol / Sedan. */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Filters${activeFilterCount > 0 ? ` (${activeFilterCount} active)` : ''}`}
-          onPress={() => {
-            Haptics.selectionAsync();
-            setShowFilterSheet(true);
-          }}
-          style={[
-            styles.filterButton,
-            {
-              backgroundColor: activeFilterCount > 0 ? colors.primary : isDarkMode ? colors.card : '#F9F9FB',
-              borderColor: activeFilterCount > 0 ? colors.primary : isDarkMode ? colors.border : '#EAECF1',
-            },
-          ]}
+          accessibilityLabel={`Filter${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
+          onPress={() => { Haptics.selectionAsync(); setShowFilterSheet(true); }}
+          style={[styles.chip, styles.filterChip, { borderColor: p.border, backgroundColor: p.page }]}
         >
-          <Feather name="filter" size={16} color={activeFilterCount > 0 ? colors.primaryForeground : isDarkMode ? colors.foreground : '#737373'} />
-          <Text style={[styles.filterButtonText, { color: activeFilterCount > 0 ? colors.primaryForeground : isDarkMode ? colors.foreground : '#737373' }]}>
-            Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
-          </Text>
+          <Feather name="filter" size={13} color={p.sub} />
+          <Text style={[styles.chipText, { color: p.sub }]}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
         </Pressable>
-        {CATEGORY_CHIPS.map(chip => {
-          const active = isChipActive(chip, filters);
+        {CHIPS.map((c) => {
+          const on = chip === c.label;
           return (
             <Pressable
-              key={chip.label}
+              key={c.label}
               accessibilityRole="button"
-              accessibilityLabel={`Show ${chip.label}`}
-              accessibilityState={{ selected: active }}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setVehicleType('All');
-                setFilters({ ...defaultFilters, ...chip.filter });
-                setPage(1);
-              }}
-              style={[
-                styles.categoryChip,
-                active
-                  ? { backgroundColor: '#2F3E75', borderColor: '#2F3E75' }
-                  : { backgroundColor: '#FFFFFF', borderColor: '#EAECF1' },
-              ]}
+              accessibilityState={{ selected: on }}
+              onPress={() => pickChip(c)}
+              style={[styles.chip, { borderColor: on ? p.navy : p.border, backgroundColor: on ? p.navy : p.page }]}
             >
-              <Text style={[styles.categoryChipText, { color: active ? '#FFFFFF' : '#737373' }]}>{chip.label}</Text>
+              <Text style={[styles.chipText, { color: on ? p.onNavy : p.sub }]}>{c.label}</Text>
             </Pressable>
           );
         })}
       </ScrollView>
-
     </Reanimated.View>
-  ), [searchQuery, setSearchQuery, colors, vehicleType, setVehicleType, setFilters, setPage,
-      activeFilterCount, showFilterSheet, setShowFilterSheet, exploreDate, handleDateSelect,
-      availableDates, showDatePicker, setShowDatePicker, isDarkMode, currentSelectedDateObj,
-      onDateChange, defaultFilters, filters]);
+  );
 
-  /* ─── ListEmptyComponent ─── */
-  const listEmptyElement = useMemo(() => {
-    if (isFetchingCars || isFiltering) {
-      return (
-        <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 16 }}>
-          {[1, 2, 3].map(i => (
-            <CarCardSkeleton key={i} index={i} />
-          ))}
-        </Reanimated.View>
-      );
-    }
-    
-    if (fetchError) {
-      return (
-        <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-          <Feather name="alert-circle" size={28} color={colors.destructive} style={{ marginBottom: 12 }} />
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Connection Error</Text>
-          <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
-            Could not load vehicles. Check your connection and try again.
-          </Text>
-          <Pressable style={[styles.clearButton, { backgroundColor: colors.primary, marginTop: 16 }]} onPress={() => fetchVehicles()}>
-            <Text style={[styles.clearButtonText, { color: colors.primaryForeground }]}>Retry</Text>
-          </Pressable>
-        </View>
-      );
-    }
-
-    return (
-      <View style={[styles.emptyState, { backgroundColor: colors.card }]}>
-        <Feather name="search" size={28} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
-        <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
-          {vehicleType === 'Bikes' ? 'No bikes available' : 'No cars available'}
-        </Text>
-        <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>
-          {debouncedQuery !== ''
-            ? `No results matching "${debouncedQuery}". Try adjusting your search.`
-            : `No ${vehicleType === 'Bikes' ? 'bikes' : vehicleType === 'Cars' ? 'cars' : 'vehicles'} are available on ${exploreDate}. Try another date.`
-          }
-        </Text>
-      {(debouncedQuery !== '' || activeFilterCount > 0) && (
-        <Pressable
-          accessibilityRole="button"
-          style={[styles.clearButton, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            setSearchQuery('');
-            setDebouncedQuery('');
-            setExploreDate('');
-            setGlobalSelectedDate('');
-            setFilters(defaultFilters);
-            setPage(1);
-          }}
-        >
-          <Text style={[styles.clearButtonText, { color: colors.primaryForeground }]}>Clear All Filters</Text>
+  const empty = isFetchingCars ? (
+    <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 4 }}>
+      {[1, 2, 3].map((i) => <CarCardSkeleton key={i} index={i} />)}
+    </Reanimated.View>
+  ) : fetchError ? (
+    <View style={[styles.empty, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+      <Feather name="wifi-off" size={26} color={p.red} />
+      <Text style={[styles.emptyTitle, { color: p.fg }]}>Couldn't load vehicles</Text>
+      <Text style={[styles.emptyCopy, { color: p.sub }]}>Check your connection and try again.</Text>
+      <Pressable style={[styles.emptyBtn, { backgroundColor: p.navy }]} onPress={() => fetchVehicles()}>
+        <Text style={[styles.emptyBtnText, { color: p.onNavy }]}>Retry</Text>
+      </Pressable>
+    </View>
+  ) : (
+    <View style={[styles.empty, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+      <Feather name="search" size={26} color={p.muted} />
+      <Text style={[styles.emptyTitle, { color: p.fg }]}>No vehicles found</Text>
+      <Text style={[styles.emptyCopy, { color: p.sub }]}>
+        {debouncedQuery ? `Nothing matches "${debouncedQuery}". Try another search.` : 'Nothing matches these filters right now.'}
+      </Text>
+      {(!!debouncedQuery || chip !== 'All' || activeFilterCount > 0) && (
+        <Pressable style={[styles.emptyBtn, { backgroundColor: p.navy }]} onPress={clearAll}>
+          <Text style={[styles.emptyBtnText, { color: p.onNavy }]}>Clear all filters</Text>
         </Pressable>
       )}
-      </View>
-    );
-  }, [isFetchingCars, isFiltering, fetchError, colors, vehicleType, debouncedQuery,
-      exploreDate, activeFilterCount, setSearchQuery, setDebouncedQuery,
-      setExploreDate, setGlobalSelectedDate, setFilters, setPage, fetchVehicles]);
+    </View>
+  );
+
   return (
     <Page bottomNav scroll={false}>
       <FlatList
-        style={{ flex: 1 }}
+        style={{ flex: 1, backgroundColor: p.page }}
         data={paginatedCars}
-        keyExtractor={keyExtractor}
-        renderItem={renderCar}
-        ListHeaderComponent={listHeaderElement}
-        ListEmptyComponent={listEmptyElement}
+        keyExtractor={(c) => c.id}
+        renderItem={({ item }) => <CarListCard car={item} isExplore />}
+        ListHeaderComponent={header}
+        ListEmptyComponent={empty}
         showsVerticalScrollIndicator={false}
-        // Last card must clear the fixed tab bar (+ safe area) and the floating support button.
-        contentContainerStyle={[styles.listContent, { paddingBottom: bottomNavHeight + 88 }]}
+        // The last card must clear the fixed tab bar (+ safe area) and the floating help button.
+        contentContainerStyle={{ paddingBottom: bottomNavHeight + 88 }}
         {...scrollHandlers}
-        onEndReached={handleLoadMore}
+        onEndReached={() => { if (paginatedCars.length < filteredCars.length) setPage((n) => n + 1); }}
         onEndReachedThreshold={0.5}
-        initialNumToRender={6}
-        maxToRenderPerBatch={6}
+        initialNumToRender={4}
         windowSize={11}
         removeClippedSubviews={false}
         refreshing={isRefreshing}
-        onRefresh={handleRefresh}
-        ListFooterComponent={
-          isLoadingMore ? (
-            <View style={styles.loadingFooter}>
-              <ActivityIndicator size="small" color={colors.primaryText} />
-              <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading more...</Text>
-            </View>
-          ) : null
-        }
+        onRefresh={async () => { setIsRefreshing(true); try { await fetchVehicles(); } finally { setIsRefreshing(false); } }}
       />
 
-      <SortSheet
-        visible={showSortSheet}
-        onClose={() => setShowSortSheet(false)}
-        value={sortBy}
-        onApply={setSortBy}
+      <ExploreFilterSheet
+        visible={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        value={filters}
+        cars={baseCars}
+        ratingOf={ratingOf}
+        onApply={(f) => {
+          setFilters(f);
+          // The quick chip stays lit only while the filters are exactly that chip's.
+          setChip(chipFor(f));
+          setPage(1);
+        }}
       />
-      <FilterSheet 
-        visible={showFilterSheet} 
-        onClose={() => setShowFilterSheet(false)} 
-        filters={filters}
-        setFilters={setFilters}
-        vehicleType={vehicleType}
-      />
+      <SortSheet visible={showSortSheet} onClose={() => setShowSortSheet(false)} value={sort} onApply={(v) => { setSort(v); setPage(1); }} />
     </Page>
   );
 }
 
-/** Figma filter icon: three centred horizontal bars, longest on top. */
-function FilterLinesIcon({ color }: { color: string }) {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Path d="M3 6H21M6 12H18M9 18H15" stroke={color} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  );
-}
-
 const styles = StyleSheet.create({
-  // Figma: the search row sits on a 16px side gutter, 8px between the field and the sliders button.
-  // Figma: the search block starts 4px under the title (its own 4px top padding).
-  searchRow: { flexDirection: 'row', gap: 8, height: 40, marginTop: 4, marginHorizontal: 16 },
-  searchBar: { alignItems: 'center', borderRadius: 8, borderWidth: 1, flex: 1, flexDirection: 'row', gap: 9, height: 40, paddingHorizontal: 12 },
-  sliderButton: { alignItems: 'center', borderRadius: 8, borderWidth: 1, height: 40, justifyContent: 'center', width: 48 },
-  searchText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, flex: 1, paddingVertical: 0 },
-
-  // Figma: the chip row is 8px top and bottom padding around the 36px chips.
-  // Scrolling row: the chips and Filter are 8px apart and start on the 16px gutter.
-  categoryRow: { alignItems: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 8, marginTop: 8, marginBottom: 8 },
-  // Figma chips: 36px tall, 8px radius, 8px apart.
-  categoryPills: { flexDirection: 'row', gap: 8 },
-  categoryChip: { height: 36, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 8, borderWidth: 1 },
-  categoryChipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
-
-  // Figma Filter chip: 70x36, padding 6/8, gap 4, 8px radius (min width keeps a count like "(12)" from clipping).
-  filterButton: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 36, minWidth: 70, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1 },
-  filterButtonText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
-
-  dateChip: {
-    height: 38,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dateChipText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
-  dateChipContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  chipPressed: { opacity: 0.7 },
-
-  // Figma list: 16px side gutter; the cards are 361px wide.
-  listContent: { paddingBottom: 24, paddingHorizontal: 16 },
-
-  emptyState: { borderRadius: 18, marginTop: 18, marginHorizontal: 20, padding: 20, alignItems: 'center' },
-  emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
-  emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 7, textAlign: 'center' },
-  clearButton: { marginTop: 16, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
-  clearButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-
-  skeletonCard: {
-    height: 220,
-    width: '100%',
-    borderRadius: 24,
-    borderWidth: 1,
-    marginBottom: 24,
-    opacity: 0.5,
-  },
-
-  loadingFooter: { paddingVertical: 20, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  loadingText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
+  title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, lineHeight: 32, paddingHorizontal: 16 },
+  searchRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 12 },
+  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10 },
+  searchText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, paddingVertical: 0 },
+  sortBtn: { width: 40, height: 40, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  chips: { gap: 6, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
+  chip: { height: 30, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  filterChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 10 },
+  chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
+  empty: { borderWidth: 1, borderRadius: 12, marginHorizontal: 16, marginTop: 8, padding: 20, alignItems: 'center', gap: 6 },
+  emptyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, marginTop: 6 },
+  emptyCopy: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, textAlign: 'center' },
+  emptyBtn: { marginTop: 10, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  emptyBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14 },
 });

@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { BOTTOM_NAV_CONTENT_HEIGHT, BOTTOM_NAV_FADE_HEIGHT, BOTTOM_NAV_RADIUS, bottomNavOffset } from '@/hooks/useBottomNavHeight';
+import { BOTTOM_NAV_CONTENT_HEIGHT, BOTTOM_NAV_FADE_HEIGHT, BOTTOM_NAV_GAP, BOTTOM_NAV_RADIUS, bottomNavOffset } from '@/hooks/useBottomNavHeight';
 import { useSawari } from '@/context/SawariContext';
 import { useRegisterNavHelp } from '@/hooks/useSupportFab';
 import { shadows } from '@/constants/shadows';
@@ -17,8 +17,10 @@ import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 type IconProps = { color: string; fill: string; active: boolean };
 type Route = '/' | '/explore' | '/bookings' | '/profile';
 
-// Icons drawn on a 24-unit grid, rendered at 18px; strokes are 1px at that size.
-const STROKE = 24 / 18;
+// Icons render at 22pt (design). 24-unit icons use STROKE, 18-unit icons use STROKE_18: both come out ~1.5pt.
+const ICON = 22;
+const STROKE = 1.6;
+const STROKE_18 = 1.2;
 
 // Exact Figma path (18px frame, 1px stroke); the door is a notch in the outline.
 const HOME_PATH =
@@ -26,15 +28,15 @@ const HOME_PATH =
 
 function HomeIcon({ color, active }: IconProps) {
   return (
-    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-      <Path d={HOME_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={ICON} height={ICON} viewBox="0 0 18 18" fill="none">
+      <Path d={HOME_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
 function ExploreIcon({ color, fill, active }: IconProps) {
   return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
       <Circle cx={12} cy={12} r={10} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
       <Path
         d="m16.24 7.76-1.8 5.41a2 2 0 0 1-1.27 1.27L7.76 16.24l1.8-5.41a2 2 0 0 1 1.27-1.27z"
@@ -49,7 +51,7 @@ function ExploreIcon({ color, fill, active }: IconProps) {
 function ActivityIcon({ color, fill, active }: IconProps) {
   const line = active ? fill : color;
   return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
       <Rect x={3} y={3} width={18} height={18} rx={2.5} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
       <Path d="M7 8h8M7 12h10M7 16h6" stroke={line} strokeWidth={STROKE} strokeLinecap="round" />
     </Svg>
@@ -64,9 +66,9 @@ const PROFILE_PATHS = [
 
 function ProfileIcon({ color, active }: IconProps) {
   return (
-    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+    <Svg width={ICON} height={ICON} viewBox="0 0 18 18" fill="none">
       {PROFILE_PATHS.map((d) => (
-        <Path key={d} d={d} fill={active ? color : 'none'} stroke={color} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
+        <Path key={d} d={d} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
       ))}
     </Svg>
   );
@@ -82,10 +84,10 @@ const HEADSET_MIC = 'M15.75 12V13.5C15.75 14.296 15.434 15.059 14.871 15.621C14.
 
 function HeadsetIcon({ color }: { color: string }) {
   return (
-    <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
+    <Svg width={ICON} height={ICON} viewBox="0 0 18 18" fill="none">
       <Path d={HEADSET_FILL} fill={color} />
-      <Path d={HEADSET_OUTLINE} stroke={color} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d={HEADSET_MIC} stroke={color} strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={HEADSET_OUTLINE} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={HEADSET_MIC} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -130,7 +132,7 @@ function HelpButton() {
   };
 
   return (
-    <View>
+    <View style={styles.helpCol}>
       {open && (
         <Animated.View style={[styles.helpMenu, optionStyle]}>
           <Pressable
@@ -163,10 +165,10 @@ function HelpButton() {
         accessibilityState={{ expanded: open }}
         testID="tab-help"
         onPress={() => toggle()}
-        style={styles.help}
+        style={({ pressed }) => [styles.help, pressed && { opacity: 0.85 }]}
       >
         <HeadsetIcon color={HELP_GREEN} />
-        <Text style={[styles.navLabel, { color: HELP_GREEN }]}>Help</Text>
+        <Text style={[styles.navLabel, styles.navLabelActive, { color: HELP_GREEN }]} numberOfLines={1} maxFontSizeMultiplier={1.15}>Help</Text>
       </Pressable>
     </View>
   );
@@ -197,7 +199,7 @@ export function BottomNavigation() {
   const fadeHeight = BOTTOM_NAV_FADE_HEIGHT + offset - 4;
 
   return (
-    <View pointerEvents="box-none" style={[styles.container, { paddingBottom: offset }]}>
+    <View pointerEvents="box-none" style={[styles.container, { paddingBottom: offset }]} testID="bottom-nav">
       <View pointerEvents="none" style={[styles.fade, { height: fadeHeight }]}>
         {/* Figma: backdrop-filter blur(4px). Android's blur is experimental and costly, so it gets the fade only. */}
         {Platform.OS === 'ios' && <BlurView intensity={8} tint={isDarkMode ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />}
@@ -224,10 +226,20 @@ export function BottomNavigation() {
                   else if (pathname === '/') router.push(route);
                   else router.replace(route);
                 }}
-                style={styles.navItem}
+                hitSlop={{ top: 6, bottom: 6 }}
+                style={({ pressed }) => [styles.navItem, pressed && !active && { opacity: 0.7 }]}
               >
                 <Icon color={color} fill={colors.card} active={active} />
-                <Text style={[styles.navLabel, { color }]}>{label}</Text>
+                <Text
+                  style={[styles.navLabel, active && styles.navLabelActive, { color }]}
+                  numberOfLines={1}
+                  // Big system font sizes used to push the labels out of the pill.
+                  maxFontSizeMultiplier={1.15}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.85}
+                >
+                  {label}
+                </Text>
               </Pressable>
             );
           })}
@@ -238,66 +250,63 @@ export function BottomNavigation() {
   );
 }
 
-// Figma: inactive tabs are Neutral/500, the active tab is Primary/blue-500 with its icon filled.
-// Help is the green Figma button (Green/green-50 fill, Green/green-500 icon and label).
-const HELP_GREEN = '#008758';
-const NAV_ACTIVE = '#2F3E75';
-const NAV_INACTIVE = '#737373';
+const HELP_GREEN = '#008758'; // Green/green-500 (design Help button)
+const NAV_ACTIVE = '#2F3E75'; // Primary/blue-500 (Figma active tab)
+const NAV_INACTIVE = '#737373'; // Neutral/500
+// Figma's two-layer upward glow, drawn the same on iOS and Android.
+const NAV_SHADOW = '0px -60px 24px rgba(47, 62, 117, 0.01), 0px -34px 20px rgba(47, 62, 117, 0.05)';
 
 const styles = StyleSheet.create({
-  // Bar sits on the bottom edge; `paddingBottom` (bottomNavOffset) lifts it clear of the home indicator.
+  // Pinned to the screen bottom; the space under the bar comes from bottomNavOffset() only (the same number
+  // useBottomNavHeight() gives screens), so content padding always matches where the bar really is.
   container: { bottom: 0, left: 0, paddingHorizontal: 16, position: 'absolute', right: 0 },
   fade: { bottom: 0, left: 0, position: 'absolute', right: 0 },
-  row: { alignItems: 'center', flexDirection: 'row', gap: 12 },
-  // Figma: 56px pill, padding 6/8. Width stays fluid (flex: 1) so it fills wider phones.
+  // flex-end: opening the Help menu grows the Help column upward without lifting the tab pill.
+  row: { alignItems: 'flex-end', flexDirection: 'row', gap: BOTTOM_NAV_GAP },
+  // Design: 285×64 pill (fluid width here, so it fills wider phones), 1px #E7EAF4 border, soft upward glow.
   pill: {
     flex: 1,
+    minWidth: 0,
     alignItems: 'center',
-    justifyContent: 'space-evenly', // spreads the 63.75px tabs across the pill
     borderColor: '#E7EAF4',
     borderRadius: BOTTOM_NAV_RADIUS,
     borderWidth: 1,
     flexDirection: 'row',
     height: BOTTOM_NAV_CONTENT_HEIGHT,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    paddingHorizontal: 6,
+    boxShadow: NAV_SHADOW,
   },
+  helpCol: { alignItems: 'center' },
+  // Design: 64×64 circle, green-50 fill, green-100 border.
   help: {
     alignItems: 'center',
-    backgroundColor: '#E6F3EE', // Green/green-50
-    borderColor: '#DCEFE8',
-    borderRadius: 50, // Figma: a round button
-
+    backgroundColor: '#E6F3EE',
+    borderColor: '#CFE8DD',
+    borderRadius: BOTTOM_NAV_RADIUS,
     borderWidth: 1,
+    gap: 4,
     height: BOTTOM_NAV_CONTENT_HEIGHT,
     justifyContent: 'center',
-    padding: 8,
     width: BOTTOM_NAV_CONTENT_HEIGHT,
+    boxShadow: NAV_SHADOW,
   },
   helpMenu: { alignItems: 'center', gap: 12, marginBottom: 12 },
-  helpOption: {
-    alignItems: 'center',
-    borderRadius: 24,
-    height: 48,
-    justifyContent: 'center',
-    width: 48,
-  },
-  // Figma tab item: 46px tall, 2px padding, 2px between icon and label. Width is 63.75 on a 393px phone
-  // (flex-grow keeps it fluid so narrower phones don't overflow). The design's 18px side padding is left
-  // off: items share the width equally anyway, and it would clip "Activity".
+  helpOption: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
+  // Equal-width tabs; icon 22 + 4 + label 16 = 42 inside the 64 pill.
   navItem: {
     alignItems: 'center',
-    flexShrink: 1, // Figma: 63.75 wide; shrinks on narrower phones
-    gap: 2,
-    width: 63.75,
-    height: 46,
+    flexBasis: 0,
+    flexGrow: 1,
+    minWidth: 0,
+    gap: 4,
+    height: 52,
     justifyContent: 'center',
-    paddingVertical: 2,
   },
   navLabel: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 8,
-    lineHeight: 12,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    lineHeight: 16,
     textAlign: 'center',
   },
+  navLabelActive: { fontFamily: 'PlusJakartaSans_600SemiBold' },
 });

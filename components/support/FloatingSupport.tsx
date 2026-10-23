@@ -8,7 +8,7 @@ import { shadows } from '@/constants/shadows';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useNavHelpPresent, useSupportFabHidden } from '@/hooks/useSupportFab';
-import { SUPPORT_WHATSAPP_URL } from '@/constants/support';
+import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 const HIDDEN_ROUTES = [
   '/payment',
@@ -74,7 +74,7 @@ function FloatingSupportInner() {
 
   const handleCall = () => {
     Haptics.selectionAsync();
-    Linking.openURL('tel:+919355023248');
+    Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {});
     toggleMenu();
   };
 

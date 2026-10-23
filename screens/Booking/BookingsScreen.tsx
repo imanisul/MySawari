@@ -1,49 +1,47 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
+import { Feather, FontAwesome } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { useColors } from '@/hooks/useColors';
-import { BottomNavigation, PrimaryButton } from '@/components';
+import { BottomNavigation, LoginBottomSheet } from '@/components';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
-import { BookingSnapshot } from '@/services/backend/api';
+import { API, BookingSnapshot } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
-import { LoginBottomSheet } from '@/components';
-import { API } from '@/services/backend/api';
-import { CancelBookingSheet } from '@/components/booking/CancelBookingSheet';
-import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
+import { useVehicles } from '@/hooks/useVehicles';
 import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
 import { bookingsQueryOptions } from '@/hooks/useHomeData';
-import { ReviewModal, ReviewTrip } from '@/components/booking/ReviewModal';
 import { rise } from '@/components/common/motion';
-type BookingTab = 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
+import { LoadingImage } from '@/components/common/LoadingImage';
+import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
+import { ReviewModal, ReviewTrip } from '@/components/booking/ReviewModal';
+import { useDetailsPalette, DetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { FONT, shortDate } from '@/components/booking/TripDetailParts';
+
+/**
+ * Activity (design: "Activity" list). Underlined tabs, then one card per booking: photo, status tag, name,
+ * "13 Oct, 10:00 AM → 14 Oct, 10:00 AM", "Self Drive • 3 days", Rate us / View Details, and an action row
+ * (request an extension for upcoming and active trips, Book Again for finished ones).
+ */
+
+type BookingTab = 'All' | 'Upcoming' | 'Active' | 'Completed' | 'Cancelled';
+const TABS: BookingTab[] = ['All', 'Upcoming', 'Active', 'Completed', 'Cancelled'];
+const byRecent = (a: BookingSnapshot, b: BookingSnapshot) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 
 export default function BookingsScreen() {
-  const colors = useColors();
+  const p = useDetailsPalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isAuthenticated } = useSawari();
+  const { isAuthenticated, selectCar } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
-  
-  const [tab, setTab] = useState<BookingTab>('Upcoming');
+  const [tab, setTab] = useState<BookingTab>('All');
   const [initialTabSet, setInitialTabSet] = useState(false);
-  const tabs: BookingTab[] = ['Upcoming', 'Active', 'Completed', 'Cancelled'];
-  
-  const [actionBooking, setActionBooking] = useState<BookingSnapshot | null>(null);
-  const [actionType, setActionType] = useState<'cancel' | 'extend' | null>(null);
+  const [pulling, setPulling] = useState(false);
+  const [extendFor, setExtendFor] = useState<BookingSnapshot | null>(null);
   const [reviewTrip, setReviewTrip] = useState<ReviewTrip | null>(null);
+  const { data: vehicles = [] } = useVehicles();
 
-  // Which trips the customer has already reviewed, so every completed trip shows the right action.
-  const { data: myReviews } = useQuery({
-    queryKey: ['myReviews'],
-    queryFn: () => API.reviews.mine(),
-    enabled: isAuthenticated === true,
-    staleTime: 60 * 1000,
-  });
-  const hasReviewed = (b: BookingSnapshot) =>
-    !!myReviews && (myReviews.bookingIds.includes(b.id) || myReviews.legacyCarIds.includes(String(b.vehicleId)));
-  
   // The same bookings query as Home (already loaded at app start), so this list opens instantly.
   const { data: bookings = [], isLoading: loading, isError: fetchError, refetch } = useQuery({
     ...bookingsQueryOptions,
@@ -51,482 +49,351 @@ export default function BookingsScreen() {
     refetchInterval: 30 * 1000, // status changes (e.g. trip completed by the ops team) appear on their own
   });
 
+  // Which trips are already reviewed, so "Rate us" only shows where it is still wanted.
+  const { data: myReviews, refetch: refetchReviews } = useQuery({
+    queryKey: ['myReviews'],
+    queryFn: () => API.reviews.mine(),
+    enabled: isAuthenticated === true,
+    staleTime: 60 * 1000,
+  });
+  const reviewed = (b: BookingSnapshot) =>
+    !!myReviews && (myReviews.bookingIds.includes(b.id) || myReviews.legacyCarIds.includes(String(b.vehicleId)));
+
   useFocusEffect(
     useCallback(() => {
-      // Joins a request already running (e.g. the first load) instead of cancelling it and starting over.
       if (isAuthenticated) refetch({ cancelRefetch: false });
     }, [isAuthenticated, refetch])
   );
 
+  // Jump to Active when the ops team hands a vehicle over, and to Completed when a trip ends.
   const prevBookings = useRef<BookingSnapshot[]>([]);
-
   useEffect(() => {
-    if (!loading && bookings) {
-      const currentOngoing = bookings.filter(b => b.status === 'ONGOING');
-      const prevOngoing = prevBookings.current.filter(b => b.status === 'ONGOING');
-      
-      const currentCompleted = bookings.filter(b => b.status === 'COMPLETED');
-      const prevCompleted = prevBookings.current.filter(b => b.status === 'COMPLETED');
-
-      if (!initialTabSet) {
-        if (bookings.length > 0) {
-          if (currentOngoing.length > 0) setTab('Active');
-          else if (bookings.some(b => b.status === 'CONFIRMED' || b.status === 'PENDING')) setTab('Upcoming');
-          else if (currentCompleted.length > 0) setTab('Completed');
-        }
-        setInitialTabSet(true);
-      } else {
-        // Automatically switch to Active if a vehicle was just handed over
-        if (currentOngoing.length > prevOngoing.length) {
-          setTab('Active');
-        } 
-        // Automatically switch to Completed if an active trip was just completed
-        else if (currentCompleted.length > prevCompleted.length && currentOngoing.length === 0) {
-          setTab('Completed');
-        }
-      }
-      prevBookings.current = bookings;
-    }
+    if (loading || !bookings) return;
+    const ongoing = bookings.filter((b) => b.status === 'ONGOING').length;
+    const completed = bookings.filter((b) => b.status === 'COMPLETED').length;
+    const prevOngoing = prevBookings.current.filter((b) => b.status === 'ONGOING').length;
+    const prevCompleted = prevBookings.current.filter((b) => b.status === 'COMPLETED').length;
+    if (!initialTabSet) setInitialTabSet(true);
+    else if (ongoing > prevOngoing) setTab('Active');
+    else if (completed > prevCompleted && ongoing === 0) setTab('Completed');
+    prevBookings.current = bookings;
   }, [loading, bookings, initialTabSet]);
 
-  // A booking is Active only once the operations app has handed the vehicle to the customer
-  // (status vehicle_handover, mapped to ONGOING). Reaching the start date never moves it: until the
-  // handover it stays in Upcoming.
-  const filteredBookings = bookings.filter((b) => {
-    if (tab === 'Upcoming') return b.status === 'CONFIRMED' || b.status === 'PENDING';
-    if (tab === 'Active') return b.status === 'ONGOING';
-    if (tab === 'Completed') return b.status === 'COMPLETED';
-    if (tab === 'Cancelled') return b.status === 'CANCELLED' || b.status === 'FAILED';
-    return false;
-  });
+  // Active only once the operations app has handed the vehicle over (status mapped to ONGOING).
+  const filtered = bookings
+    .filter((b) => {
+      if (tab === 'All') return true;
+      if (tab === 'Upcoming') return b.status === 'CONFIRMED' || b.status === 'PENDING';
+      if (tab === 'Active') return b.status === 'ONGOING';
+      if (tab === 'Completed') return b.status === 'COMPLETED';
+      return b.status === 'CANCELLED' || b.status === 'FAILED';
+    })
+    .sort(byRecent);
 
+  const bookAgain = (b: BookingSnapshot) => {
+    Haptics.selectionAsync();
+    const car = vehicles.find((v) => v.id === b.vehicleId);
+    if (car) { selectCar(car); router.push('/car-details'); }
+    else router.push('/explore');
+  };
+
+  // Still checking the saved session: the header and placeholders, never a flash of "Log in".
+  if (isAuthenticated === null) {
+    return (
+      <View style={[styles.screen, { backgroundColor: p.page }]}>
+        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>Activity</Text>
+        <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
+          <BookingSkeleton index={0} />
+          <BookingSkeleton index={1} />
+        </View>
+        <BottomNavigation />
+      </View>
+    );
+  }
+
+  // Signed out: same "Activity" page, with one clear way in. After logging in the trips load by themselves
+  // (the bookings query switches on with isAuthenticated).
   if (!isAuthenticated) {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background }]}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Feather name="calendar" size={64} color={colors.mutedForeground} style={{ marginBottom: 24 }} />
-          <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 24, textAlign: 'center', marginBottom: 12, color: colors.foreground }}>
-            Start Your Journey
-          </Text>
-          <Text style={{ fontFamily: 'Inter_400Regular', fontSize: 15, textAlign: 'center', color: colors.mutedForeground, marginBottom: 32 }}>
-            Unlock seamless bookings. Log in to reserve your Sawari and track all your upcoming trips here.
-          </Text>
-          <View style={{ width: '100%' }}>
-            <PrimaryButton 
-              label="Log In to Book Sawari" 
-              icon="arrow-right"
-              onPress={() => setShowLogin(true)} 
-            />
+      <View style={[styles.screen, { backgroundColor: p.page }]}>
+        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>Activity</Text>
+        <View style={styles.signedOut}>
+          <View style={[styles.emptyCircle, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+            <Feather name="calendar" size={24} color={p.fg} />
           </View>
+          <Text style={[styles.emptyTitle, { color: p.fg }]}>Log in to see your trips</Text>
+          <Text style={[styles.emptyCopy, { color: p.sub }]}>
+            See your upcoming, active and past bookings here, and extend, manage or rate a trip.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}
+            style={({ pressed }) => [styles.loginBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={[styles.loginBtnText, { color: p.onNavy }]}>Log In</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { Haptics.selectionAsync(); router.push('/explore'); }}
+            style={({ pressed }) => [styles.exploreBtn, { borderColor: p.navy }, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={[styles.exploreBtnText, { color: p.navy }]}>Explore cars</Text>
+          </Pressable>
         </View>
-        <LoginBottomSheet visible={showLogin} required onClose={() => setShowLogin(false)} />
+        <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
         <BottomNavigation />
       </View>
     );
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.content, { paddingTop: Math.max(insets.top + 16, 16) }]}>
-        {/* Figma header: "Activity" in Semibold 24px black, on the 16px gutter. */}
-        <Text style={[styles.title, { color: '#000000', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, lineHeight: 36, letterSpacing: 0 }]}>Activity</Text>
-        
-        {loading ? (
-          <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingTop: 32, paddingBottom: insets.bottom + 100 }}>
-            <BookingSkeleton index={0} />
-            <BookingSkeleton index={1} />
-            <BookingSkeleton index={2} />
-          </Reanimated.View>
-        ) : fetchError && bookings.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <View style={[styles.emptyCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="alert-circle" size={24} color={colors.destructive} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Connection Error</Text>
-            <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>Could not load your bookings.</Text>
-            <Pressable onPress={() => refetch()} style={{ marginTop: 16, padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}>
-              <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium' }}>Retry</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <>
-            {/* Figma tab row: 8px top/bottom, 16px side gutter; the selected tab is blue with a 3px underline. */}
-            <View style={{ marginTop: 16, marginBottom: 8, marginHorizontal: -16 }}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 2, paddingHorizontal: 16 }}>
-                {tabs.map((item) => {
-                  const isSelected = tab === item;
-                  return (
-                    <Pressable
-                      key={item}
-                      accessibilityRole="tab"
-                      accessibilityState={{ selected: isSelected }}
-                      onPress={() => setTab(item)}
-                      style={{ alignItems: 'center', height: 22, paddingHorizontal: 12, justifyContent: 'center' }}
-                    >
-                      <Text style={{
-                        color: isSelected ? '#2F3E75' : '#737373',
-                        fontFamily: isSelected ? 'PlusJakartaSans_600SemiBold' : 'PlusJakartaSans_500Medium',
-                        fontSize: 13,
-                        lineHeight: 20,
-                      }}>
-                        {item}
-                      </Text>
-                      {isSelected && <View style={{ position: 'absolute', bottom: -4, left: 0, right: 0, height: 3, borderRadius: 1, backgroundColor: '#2F3E75' }} />}
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
-            
-            {filteredBookings.length > 0 ? (
-          <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 100, paddingTop: 8 }} showsVerticalScrollIndicator={false}>
-            {filteredBookings.map((booking) => {
-              const isActive = tab === 'Active';
-              const cardBg = isActive ? colors.surfaceStrong : colors.card;
-              const cardBorder = isActive ? colors.surfaceStrong : colors.border;
-              const textColor = isActive ? '#FFF' : colors.foreground;
-              const subtextColor = isActive ? '#A0AABF' : colors.mutedForeground;
-              const dividerColor = isActive ? '#2A364C' : colors.border;
+    <View style={[styles.screen, { backgroundColor: p.page }]}>
+      <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>Activity</Text>
 
-              const isOverdue = booking.status === 'ONGOING' && booking.rawEndDate && new Date() > new Date(booking.rawEndDate);
-              const displayStatus = isOverdue ? 'OVERDUE' : (booking.status === 'ONGOING' ? 'ON TRIP' : booking.status);
-              
-              return (
-              <Reanimated.View key={booking.id} entering={rise()}>
-                <Pressable
-                  onPress={() => router.push(`/booking-detail?id=${booking.id}` as any)}
-                  style={[
-                    styles.upcomingCard, 
-                    { 
-                      backgroundColor: cardBg, 
-                      borderColor: isOverdue ? colors.destructive : cardBorder, 
-                    borderWidth: 1 
-                  }
-                ]}
+      {/* Underlined tabs */}
+      <View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+          {TABS.map((item) => {
+            const on = tab === item;
+            return (
+              <Pressable
+                key={item}
+                onPress={() => { Haptics.selectionAsync(); setTab(item); }}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: on }}
+                style={styles.tab}
               >
-                <View style={styles.bookingRow}>
-                {/* Figma: 120 x 116 car photo, 6px corners, on the left of the card. */}
-                <View style={[styles.upcomingPhoto, { backgroundColor: colors.muted }]}>
-                  {booking.vehicleImage ? (
-                    <Image source={{ uri: booking.vehicleImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                  ) : null}
-                </View>
-                <View style={styles.upcomingCopy}>
-                  <View style={styles.upcomingTitleRow}>
-                    <Text style={[styles.upcomingName, { color: textColor, fontSize: 18, fontFamily: 'Inter_700Bold' }]}>{booking.vehicleName}</Text>
-                    <View style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        backgroundColor: 
-                            isOverdue ? colors.destructive + '15' :
-                            booking.status === 'ONGOING' ? colors.success + '15' :
-                            booking.status === 'CONFIRMED' ? '#04785715' : 
-                            booking.status === 'PENDING' ? '#3B82F615' : 
-                            (booking.status === 'CANCELLED' || booking.status === 'FAILED') ? colors.destructive + '15' : 
-                            colors.mutedForeground + '15',
-                        paddingHorizontal: 8,
-                        paddingVertical: 4,
-                        borderRadius: 6
-                    }}>
-                      <View style={[
-                        styles.statusDot, 
-                        { backgroundColor: 
-                            isOverdue ? colors.destructive :
-                            booking.status === 'ONGOING' ? colors.success :
-                            booking.status === 'CONFIRMED' ? '#047857' : 
-                            booking.status === 'PENDING' ? '#3B82F6' : 
-                            (booking.status === 'CANCELLED' || booking.status === 'FAILED') ? colors.destructive : 
-                            colors.mutedForeground 
-                        }
-                      ]} />
-                      <Text style={{ 
-                        fontFamily: 'Inter_600SemiBold', 
-                        fontSize: 11,
-                        color: 
-                            isOverdue ? (isActive ? '#FFF' : colors.destructive) :
-                            booking.status === 'ONGOING' ? (isActive ? textColor : colors.success) :
-                            booking.status === 'CONFIRMED' ? (isActive ? textColor : '#047857') : 
-                            booking.status === 'PENDING' ? (isActive ? textColor : '#3B82F6') : 
-                            (booking.status === 'CANCELLED' || booking.status === 'FAILED') ? (isActive ? textColor : colors.destructive) : 
-                            (isActive ? textColor : colors.mutedForeground)
-                      }}>{displayStatus}</Text>
-                    </View>
-                  </View>
-                  <View style={{ marginTop: 12, gap: 6 }}>
-                    <View style={styles.upcomingMetaRow}>
-                      <View style={{ width: 24, alignItems: 'center' }}><Feather name="calendar" size={14} color={subtextColor} /></View>
-                      <View>
-                        <Text style={[styles.upcomingMeta, { color: subtextColor, fontSize: 12 }]}>Pickup Date & Time</Text>
-                        <Text style={[styles.upcomingMeta, { color: textColor, fontFamily: 'Inter_500Medium', marginTop: 2 }]}>{booking.pickupDate} at {booking.pickupTime || '10:00 AM'}</Text>
-                      </View>
-                    </View>
-                    <View style={styles.upcomingMetaRow}>
-                      <View style={{ width: 24, alignItems: 'center' }}><Feather name="clock" size={14} color={subtextColor} /></View>
-                      <View>
-                        <Text style={[styles.upcomingMeta, { color: subtextColor, fontSize: 12 }]}>Drop Date & Time</Text>
-                        <Text style={[styles.upcomingMeta, { color: textColor, fontFamily: 'Inter_500Medium', marginTop: 2 }]}>{booking.returnDate} at {booking.dropTime || '10:00 AM'}</Text>
-                      </View>
-                    </View>
-                  </View>
-                  <View style={{ marginTop: 6, gap: 6 }}>
-                    {(!booking.pickupCharge && !booking.dropCharge) ? (
-                      <View style={styles.upcomingMetaRow}>
-                        <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
-                        <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
-                          {booking.destination || booking.dropoffLocationName || 'Office'}
-                        </Text>
-                      </View>
-                    ) : (
-                      <>
-                        {!!booking.pickupCharge && booking.pickupCharge > 0 && (
-                          <View style={styles.upcomingMetaRow}>
-                            <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
-                            <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
-                              Pickup: {booking.pickupLocationName}
-                            </Text>
-                          </View>
-                        )}
-                        {!!booking.dropCharge && booking.dropCharge > 0 && (
-                          <View style={styles.upcomingMetaRow}>
-                            <View style={{ width: 24, alignItems: 'center' }}><Feather name="map-pin" size={14} color={subtextColor} /></View>
-                            <Text style={[styles.upcomingMeta, { color: textColor, flex: 1 }]} numberOfLines={2}>
-                              Drop: {booking.dropLocationName}
-                            </Text>
-                          </View>
-                        )}
-                      </>
-                    )}
-                  </View>
-                  
-                  {((booking.couponDiscount || 0) > 0 || (booking.membershipDiscount || 0) > 0 || (booking.sawariCashUsed || 0) > 0 || (booking.manualDiscount || 0) > 0) && (
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
-                      {(booking.membershipDiscount || 0) > 0 && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary + '18', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                          <Feather name="award" size={11} color={colors.primary} />
-                          <Text style={{ color: colors.primaryText || colors.primary, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                            Membership: -₹{(booking.membershipDiscount || 0).toLocaleString('en-IN')}
-                          </Text>
-                        </View>
-                      )}
-                      {(booking.couponDiscount || 0) > 0 && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                          <Feather name="tag" size={11} color={colors.success} />
-                          <Text style={{ color: colors.success, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                            Coupon{booking.couponCode ? ` (${booking.couponCode})` : ''}: -₹{(booking.couponDiscount || 0).toLocaleString('en-IN')}
-                          </Text>
-                        </View>
-                      )}
-                      {(booking.manualDiscount || 0) > 0 && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEF3C7', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                          <Feather name="scissors" size={11} color="#D97706" />
-                          <Text style={{ color: '#B45309', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                            Special: -₹{(booking.manualDiscount || 0).toLocaleString('en-IN')}
-                          </Text>
-                        </View>
-                      )}
-                      {(booking.sawariCashUsed || 0) > 0 && (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success + '15', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }}>
-                          <Feather name="dollar-sign" size={11} color={colors.success} />
-                          <Text style={{ color: colors.success, fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>
-                            SawariCash: -₹{(booking.sawariCashUsed || 0).toLocaleString('en-IN')}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  )}
-
-                  <View style={{ height: 1, backgroundColor: dividerColor, marginVertical: 16 }} />
-                  
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View>
-                      <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Booking Amount</Text>
-                      <Text style={{ color: textColor, fontFamily: 'Inter_700Bold', fontSize: 16, marginTop: 2 }}>₹{booking.onlinePayableNow.toLocaleString('en-IN')}</Text>
-                    </View>
-                    {booking.remainingRentalAmount > 0 && booking.status !== 'CANCELLED' && (
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ color: subtextColor, fontSize: 12, fontFamily: 'Inter_500Medium' }}>Balance Due</Text>
-                        <Text style={{ color: textColor, fontFamily: 'Inter_700Bold', fontSize: 16, marginTop: 2 }}>₹{booking.remainingRentalAmount.toLocaleString('en-IN')}</Text>
-                      </View>
-                    )}
-                  </View>
-                  
-                  {booking.status === 'CANCELLED' && booking.refundAmount !== undefined && booking.refundAmount > 0 && (() => {
-                    const st = (booking.refundStatus || 'PROCESSING').toUpperCase();
-                    const isRef = st === 'REFUNDED';
-                    const isApp = st === 'APPROVED';
-                    const isRej = st === 'REJECTED';
-                    const bg = isRef ? '#D1FAE5' : isApp ? '#EEF2FF' : isRej ? '#FEE2E2' : colors.warning + '18';
-                    const fg = isRef ? '#065F46' : isApp ? '#3730A3' : isRej ? '#991B1B' : colors.warning;
-                    const label = isRef
-                      ? 'Refund Processed'
-                      : isApp
-                      ? 'Refund Approved'
-                      : isRej
-                      ? 'Refund Rejected'
-                      : 'Refund In Review';
-
-                    return (
-                      <View style={{ marginTop: 12, padding: 12, backgroundColor: bg, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ color: fg, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
-                          {label}: ₹{booking.refundAmount.toLocaleString('en-IN')}
-                        </Text>
-                        <Text style={{ color: fg, fontFamily: 'Inter_500Medium', fontSize: 11 }}>
-                          Track →
-                        </Text>
-                      </View>
-                    );
-                  })()}
-                  {booking.status === 'CANCELLED' && booking.refundAmount === 0 && (
-                    <View style={{ marginTop: 12, padding: 12, backgroundColor: colors.destructive + '15', borderRadius: 8 }}>
-                      <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>No Refund (Cancelled within 24 hours)</Text>
-                    </View>
-                  )}
-                </View>
-                </View>
-                <View style={styles.bookingBand}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
-                    {(tab === 'Upcoming' && (booking.status === 'CONFIRMED' || booking.status === 'PENDING')) && (
-                      <Pressable 
-                        onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('cancel'); }}
-                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: colors.destructive }}
-                      >
-                        <Text style={{ color: colors.destructive, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Cancel Trip</Text>
-                      </Pressable>
-                    )}
-                    
-                    {((booking.status === 'CONFIRMED' || booking.status === 'ONGOING') && (booking.pickupCharge || 0) > 0) && (
-                      <Pressable 
-                        onPress={(e) => { 
-                          e.stopPropagation();
-                          import('react-native').then(({ Linking }) => {
-                            Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(booking.pickupLocationName || 'Kahilipara, Guwahati')}`);
-                          });
-                        }}
-                        style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#047857', marginLeft: 12 }}
-                      >
-                        <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_500Medium', fontSize: 13 }}>Track Vehicle</Text>
-                      </Pressable>
-                    )}
-                    {tab === 'Completed' && booking.status === 'COMPLETED' && (
-                      hasReviewed(booking) ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
-                          <Feather name="check-circle" size={14} color={colors.success} />
-                          <Text style={{ color: colors.success, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Reviewed</Text>
-                        </View>
-                      ) : (
-                        <Pressable
-                          onPress={(e) => { e.stopPropagation(); setReviewTrip({ bookingId: booking.id, carId: String(booking.vehicleId), vehicleName: booking.vehicleName }); }}
-                          style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary }}
-                        >
-                          <Feather name="star" size={14} color={colors.primaryForeground} />
-                          <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Write a review</Text>
-                        </Pressable>
-                      )
-                    )}
-                    {(() => {
-                      const hasPendingExt = booking.extensions?.some((e: any) => e.status === 'pending');
-                      const hasRejectedExt = booking.extensions?.some((e: any) => e.status === 'rejected');
-                      if (hasPendingExt && booking.status !== 'COMPLETED' && booking.status !== 'CANCELLED') {
-                        return (
-                          <View style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: '#F59E0B20', marginLeft: 12 }}>
-                            <Text style={{ color: '#B45309', fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extension Pending</Text>
-                          </View>
-                        );
-                      }
-                      
-                      if (tab === 'Active' || (tab === 'Upcoming' && booking.status === 'CONFIRMED')) {
-                        return (
-                          <Pressable 
-                            onPress={(e) => { e.stopPropagation(); setActionBooking(booking); setActionType('extend'); }}
-                            style={{ paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, backgroundColor: colors.primary, marginLeft: 12 }}
-                          >
-                            <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>Extend Trip</Text>
-                          </Pressable>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </View>
-                </View>
+                <Text style={[styles.tabText, { color: on ? p.navy : p.muted, fontFamily: on ? FONT.semibold : FONT.regular }]}>{item}</Text>
+                <View style={[styles.underline, { backgroundColor: on ? p.navy : 'transparent' }]} />
               </Pressable>
-              </Reanimated.View>
-              );
-            })}
-          </ScrollView>
-        ) : (
-          <EmptyState title={`No ${tab.toLowerCase()} trips`} copy={`Your ${tab.toLowerCase()} rentals will appear here.`} colors={colors} />
-        )}
-        </>
-        )}
+            );
+          })}
+        </ScrollView>
       </View>
+
+      {loading ? (
+        <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+          <BookingSkeleton index={0} />
+          <BookingSkeleton index={1} />
+          <BookingSkeleton index={2} />
+        </Reanimated.View>
+      ) : fetchError && bookings.length === 0 ? (
+        <Empty p={p} icon="wifi-off" title="Couldn't load your trips" copy="Check your internet connection and try again." action="Retry" onAction={() => refetch()} />
+      ) : filtered.length === 0 ? (
+        <Empty
+          p={p}
+          icon="map"
+          title={tab === 'All' ? 'No trips yet' : `No ${tab.toLowerCase()} trips`}
+          copy={tab === 'All' ? 'Your bookings will appear here.' : `Your ${tab.toLowerCase()} rentals will appear here.`}
+          action={tab === 'All' ? 'Explore vehicles' : undefined}
+          onAction={() => router.push('/explore')}
+        />
+      ) : (
+        <ScrollView
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 110 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={pulling} onRefresh={async () => { setPulling(true); try { await Promise.all([refetch(), refetchReviews()]); } finally { setPulling(false); } }} />
+          }
+        >
+          {filtered.map((b) => (
+            <Reanimated.View key={b.id} entering={rise()}>
+              <TripCard
+                p={p}
+                booking={b}
+                image={vehicles.find((v) => v.id === b.vehicleId)?.image}
+                canRate={b.status === 'COMPLETED' && !reviewed(b)}
+                onOpen={() => router.push(`/booking-detail?id=${b.id}` as any)}
+                onRate={() => setReviewTrip({ bookingId: b.id, carId: String(b.vehicleId), vehicleName: b.vehicleName })}
+                onExtend={() => setExtendFor(b)}
+                onBookAgain={() => bookAgain(b)}
+              />
+            </Reanimated.View>
+          ))}
+        </ScrollView>
+      )}
+
       <BottomNavigation />
 
-      <ReviewModal trip={reviewTrip} onClose={() => setReviewTrip(null)} />
-      
-      {actionBooking && actionType === 'cancel' && (
-        <CancelBookingSheet
-          visible={true}
-          onClose={() => { setActionType(null); setActionBooking(null); }}
-          booking={actionBooking}
-          onSuccess={(updatedBooking) => {
-            refetch();
-            setActionType(null); setActionBooking(null);
-          }}
-        />
-      )}
-      {actionBooking && actionType === 'extend' && (
+      {/* Same sheets (and server calls) as Trip Details */}
+      <ReviewModal trip={reviewTrip} onClose={() => { setReviewTrip(null); refetchReviews(); }} />
+      {extendFor && (
         <ExtendBookingSheet
-          visible={true}
-          onClose={() => { setActionType(null); setActionBooking(null); }}
-          booking={actionBooking}
-          onSuccess={(updatedBooking) => {
-            refetch();
-            setActionType(null); setActionBooking(null);
-          }}
+          visible
+          booking={extendFor}
+          onClose={() => setExtendFor(null)}
+          onSuccess={() => { setExtendFor(null); refetch(); }}
         />
       )}
     </View>
   );
 }
 
-function EmptyState({ title, copy, colors }: { title: string; copy: string, colors: any }) {
+// ── Card ─────────────────────────────────────────────────────────────────────
+
+type Kind = 'upcoming' | 'pending' | 'active' | 'overdue' | 'completed' | 'cancelled';
+const kindOf = (b: BookingSnapshot): Kind => {
+  if (b.status === 'ONGOING') return b.rawEndDate && new Date() > new Date(b.rawEndDate) ? 'overdue' : 'active';
+  if (b.status === 'COMPLETED') return 'completed';
+  if (b.status === 'CANCELLED' || b.status === 'FAILED') return 'cancelled';
+  return b.status === 'PENDING' ? 'pending' : 'upcoming';
+};
+
+/** "Trip ends in 2 days" / "tomorrow" / "today", from the booking's return date. */
+function endsIn(b: BookingSnapshot) {
+  if (!b.rawEndDate) return 'Trip in progress';
+  const end = new Date(b.rawEndDate);
+  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const n = Math.round((Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()) - day(new Date())) / 86400000);
+  if (n <= 0) return 'Trip ends today';
+  if (n === 1) return 'Trip ends tomorrow';
+  return `Trip ends in ${n} days`;
+}
+
+function TripCard({ p, booking: b, image, canRate, onOpen, onRate, onExtend, onBookAgain }: {
+  p: DetailsPalette;
+  booking: BookingSnapshot;
+  image?: any;
+  canRate: boolean;
+  onOpen: () => void;
+  onRate: () => void;
+  onExtend: () => void;
+  onBookAgain: () => void;
+}) {
+  const kind = kindOf(b);
+  const days = b.rentalDays || 1;
+  const pendingExt = b.extensions?.some((e: any) => e.status === 'pending');
+  const rejectedExt = b.extensions?.some((e: any) => e.status === 'rejected');
+  const canExtend = (kind === 'upcoming' || kind === 'active' || kind === 'overdue') && !pendingExt && !rejectedExt;
+
+  const tag: Record<Kind, { label: string; bg: string; fg: string; border: string }> = {
+    active: { label: 'Active', bg: p.green, fg: '#FFFFFF', border: p.green },
+    overdue: { label: 'Overdue', bg: p.red, fg: '#FFFFFF', border: p.red },
+    upcoming: { label: 'Upcoming', bg: p.navy, fg: p.onNavy, border: p.navy },
+    pending: { label: 'Pending', bg: 'transparent', fg: p.amber, border: p.amber },
+    completed: { label: 'Completed', bg: 'transparent', fg: p.navy, border: p.navy },
+    cancelled: { label: 'Cancelled', bg: 'transparent', fg: p.muted, border: p.strongBorder },
+  };
+  const t = tag[kind];
+
   return (
-    <View style={styles.emptyContainer}>
-      <View style={[styles.emptyCircle, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Feather name="map" size={24} color={colors.foreground} />
+    <View style={[styles.card, { borderColor: p.border, backgroundColor: p.page }]}>
+      <Pressable onPress={onOpen} style={styles.top} accessibilityRole="button" accessibilityLabel={`${b.vehicleName}, ${t.label}. View details`}>
+        <View style={[styles.photo, { backgroundColor: p.iconBg }]}>
+          {image ? (
+            <LoadingImage source={image} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+          ) : (
+            <View style={styles.center}><Feather name="truck" size={26} color={p.muted} /></View>
+          )}
+        </View>
+        <View style={styles.info}>
+          <View style={[styles.tag, { backgroundColor: t.bg, borderColor: t.border }]}>
+            <Text style={[styles.tagText, { color: t.fg }]}>{t.label}</Text>
+          </View>
+          <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{b.vehicleName}</Text>
+          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1}>
+            {shortDate(b.pickupDate)}, {b.pickupTime || '10:00 AM'} → {shortDate(b.returnDate)}, {b.dropTime || '10:00 AM'}
+          </Text>
+          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1}>{b.driverMode || 'Self Drive'} • {days} day{days === 1 ? '' : 's'}</Text>
+          <View style={styles.linksRow}>
+            {canRate ? (
+              <Pressable onPress={onRate} hitSlop={6} style={[styles.rateBtn, { borderColor: p.navy }]} accessibilityRole="button">
+                <FontAwesome name="star-o" size={13} color={p.navy} />
+                <Text style={[styles.rateText, { color: p.navy }]}>Rate us</Text>
+              </Pressable>
+            ) : <View />}
+            <View style={styles.viewRow}>
+              <Text style={[styles.viewText, { color: p.sub }]}>View Details</Text>
+              <Feather name="chevron-right" size={13} color={p.sub} />
+            </View>
+          </View>
+        </View>
+      </Pressable>
+
+      {/* Action row */}
+      {(kind === 'completed' || kind === 'cancelled') ? (
+        <Pressable onPress={onBookAgain} style={({ pressed }) => [styles.bookAgain, { backgroundColor: p.summary, borderColor: p.deliveryBorder, opacity: pressed ? 0.85 : 1 }]}>
+          <Text style={[styles.bookAgainText, { color: p.navy }]}>Book Again</Text>
+          <Feather name="chevron-right" size={16} color={p.navy} />
+        </Pressable>
+      ) : pendingExt ? (
+        <View style={[styles.action, { backgroundColor: p.demandBg, borderColor: p.demandBorder }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.actionTitle, { color: p.amber }]}>Extension requested</Text>
+            <Text style={[styles.actionSub, { color: p.sub }]}>Waiting for our team to approve it</Text>
+          </View>
+          <Feather name="clock" size={16} color={p.amber} />
+        </View>
+      ) : canExtend ? (
+        <Pressable onPress={onExtend} style={({ pressed }) => [styles.action, { backgroundColor: p.summary, borderColor: p.deliveryBorder, opacity: pressed ? 0.85 : 1 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.actionTitle, { color: kind === 'overdue' ? p.red : p.fg }]}>
+              {kind === 'active' ? `${endsIn(b)}. Need more time?` : kind === 'overdue' ? 'Your return time has passed. Need more time?' : 'Need more time?'}
+            </Text>
+            <Text style={[styles.actionSub, { color: p.sub }]}>Request an extension for your trip</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={p.sub} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function Empty({ p, icon, title, copy, action, onAction }: { p: DetailsPalette; icon: any; title: string; copy: string; action?: string; onAction?: () => void }) {
+  return (
+    <View style={styles.empty}>
+      <View style={[styles.emptyCircle, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+        <Feather name={icon} size={24} color={p.fg} />
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.foreground }]}>{title}</Text>
-      <Text style={[styles.emptyCopy, { color: colors.mutedForeground }]}>{copy}</Text>
+      <Text style={[styles.emptyTitle, { color: p.fg }]}>{title}</Text>
+      <Text style={[styles.emptyCopy, { color: p.sub }]}>{copy}</Text>
+      {!!action && (
+        <Pressable onPress={onAction} style={[styles.emptyBtn, { backgroundColor: p.navy }]}>
+          <Text style={{ color: p.onNavy, fontFamily: FONT.semibold }}>{action}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { flex: 1, paddingHorizontal: 16 },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 24, letterSpacing: -0.5 },
-  tabs: { gap: 24, paddingBottom: 2 },
-  tab: { paddingVertical: 12, position: 'relative' },
-  tabText: { fontSize: 15 },
-  tabUnderline: { bottom: 0, height: 2, left: 0, position: 'absolute', right: 0 },
-  // Figma booking card: 8px padding, 12px corners, 1px Primary/blue-50 border.
-  // Figma booking card: column of [photo + text] then the action band; 8px padding, 12px gap, 12px corners.
-  upcomingCard: { borderRadius: 12, flexDirection: 'column', gap: 6, marginBottom: 16, overflow: 'hidden', padding: 8 },
-  bookingRow: { flexDirection: 'row', gap: 12 },
-  // Figma band: 48px tall; with the 116px photo row and 6px gap the card comes to 188px.
-  bookingBand: { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4', borderRadius: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', height: 48, paddingHorizontal: 8 },
-  upcomingCopy: { flex: 1, paddingHorizontal: 12, paddingVertical: 2 },
-  upcomingPhoto: { borderRadius: 6, height: 116, overflow: 'hidden', width: 120 },
-  upcomingTitleRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  upcomingName: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
-  upcomingStatus: { alignItems: 'center', flexDirection: 'row', gap: 6 },
-  statusDot: { borderRadius: 99, height: 6, width: 6 },
-  upcomingStatusText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
-  upcomingMetaRow: { alignItems: 'center', flexDirection: 'row', gap: 6, marginTop: 8 },
-  upcomingMeta: { fontFamily: 'Inter_400Regular', fontSize: 13 },
-  emptyContainer: { alignItems: 'center', flex: 1, justifyContent: 'center', marginTop: -60 },
+  title: { fontFamily: FONT.semibold, fontSize: 28, lineHeight: 36, paddingHorizontal: 16 },
+  tabs: { paddingHorizontal: 16, gap: 22, paddingTop: 12 },
+  tab: { alignItems: 'center' },
+  tabText: { fontSize: 14, lineHeight: 20, paddingHorizontal: 2 },
+  underline: { height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 6 },
+  list: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
+
+  card: { borderWidth: 1, borderRadius: 12, padding: 8, gap: 8 },
+  top: { flexDirection: 'row', gap: 12 },
+  photo: { width: 120, height: 116, borderRadius: 6, overflow: 'hidden' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  info: { flex: 1, minWidth: 0, gap: 3 },
+  tag: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, height: 18, justifyContent: 'center', marginBottom: 2 },
+  tagText: { fontFamily: FONT.medium, fontSize: 9 },
+  name: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20 },
+  meta: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18 },
+  linksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  rateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, height: 24 },
+  rateText: { fontFamily: FONT.medium, fontSize: 12 },
+  viewRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewText: { fontFamily: FONT.medium, fontSize: 8, textDecorationLine: 'underline' },
+
+  action: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8 },
+  actionTitle: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 17 },
+  actionSub: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 17 },
+  bookAgain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, borderWidth: 1, borderRadius: 8, height: 30 },
+  bookAgainText: { fontFamily: FONT.medium, fontSize: 12 },
+
+  signedOut: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, marginTop: -60 },
+  loginBtn: { alignSelf: 'stretch', height: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  loginBtnText: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 24 },
+  exploreBtn: { alignSelf: 'stretch', height: 46, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  exploreBtnText: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 22 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, marginTop: -60 },
   emptyCircle: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 64, justifyContent: 'center', width: 64 },
-  emptyTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 18, marginTop: 24 },
-  emptyCopy: { fontFamily: 'Inter_400Regular', fontSize: 15, marginTop: 8, textAlign: 'center' },
+  emptyTitle: { fontFamily: FONT.semibold, fontSize: 18, marginTop: 20, textAlign: 'center' },
+  emptyCopy: { fontFamily: FONT.regular, fontSize: 14, marginTop: 6, textAlign: 'center' },
+  emptyBtn: { marginTop: 16, paddingHorizontal: 22, paddingVertical: 12, borderRadius: 12 },
 });

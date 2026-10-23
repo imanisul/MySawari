@@ -13,6 +13,7 @@ export type BookingSnapshot = {
   status: string;
   vehicleId: string;
   vehicleName: string;
+  vehicleImage?: string;
   pickupDate: string;
   returnDate: string;
   rawEndDate?: string;
@@ -163,6 +164,27 @@ async function withInstallId(headers: Record<string, string> = {}): Promise<Reco
   } catch {
     return headers;
   }
+}
+
+/**
+ * POST to an auth endpoint (no token yet, so not fetchWithAuth), retrying Render/Cloudflare
+ * cold-start 502/503/504s. Those never reached the app — unlike a timeout, where an OTP may
+ * already have been issued or consumed, so only gateway errors are safe to repeat.
+ */
+async function postAuth(url: string, body: any) {
+  const makeOptions = async () => ({
+    method: 'POST',
+    headers: await withInstallId({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body),
+  });
+  let res = await timedFetch(url, await makeOptions());
+  let data = await res.json();
+  for (let attempt = 1; data?.isGatewayError && attempt <= 2; attempt++) {
+    await new Promise((r) => setTimeout(r, attempt * 2000));
+    res = await timedFetch(url, await makeOptions());
+    data = await res.json();
+  }
+  return { res, data };
 }
 
 /**

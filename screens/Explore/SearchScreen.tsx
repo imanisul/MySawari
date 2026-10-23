@@ -1,123 +1,76 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { ActivityIndicator, FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, TextInput, Dimensions } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
-import { useQuery } from '@tanstack/react-query';
-import {
-  Car,
-  dayNumToLabel,
-  getAvailability,
-  parseDayLabel,
-  splitDateRange,
-  todayDayNum,
-} from '@/utils/sawari';
+import { Car, dayNumToLabel, getAvailability, parseDayLabel, splitDateRange, todayDayNum } from '@/utils/sawari';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useSawari } from '@/context/SawariContext';
 import { saveRecentSearch } from '@/utils/recentSearches';
-import { Header, Page, CarListCard } from '@/components';
+import { CarListCard } from '@/components';
 import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
 import { SearchEmptyState, EmptyKind } from '@/components/search/SearchEmptyState';
-import { useBrandColors } from '@/components/search/useBrandColors';
 import { calculateRentalDays } from '@/services/backend/pricingEngine';
-import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
 import { rise } from '@/components/common/motion';
 import { ActivityAPI } from '@/services/api/activity';
-type SortOption = 'low-to-high' | 'high-to-low';
-type PriceRange = number;
-type TransmissionFilter = 'all' | 'Automatic' | 'Manual';
-type FuelFilter = 'all' | 'Petrol' | 'Diesel' | 'EV';
+import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import {
+  ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, QUICK_CHIPS, QuickChip,
+  chipFor, countActive, matchesFilters, sortCars, useVehicleRatings,
+} from '@/components/explore/ExploreFilters';
 
-const CAR_PRICE_RANGES: Array<{ label: string; value: PriceRange }> = [
-  { label: 'Any Price', value: 10000 },
-  { label: 'Under ₹2,000', value: 2000 },
-  { label: 'Under ₹3,000', value: 3000 },
-  { label: 'Under ₹4,000', value: 4000 },
-];
+/**
+ * Search results (design: Home → destination → date & time → results).
+ * Header: back, destination, "Showing N Cars available" and the trip's start / end (tap to change), then the
+ * Zero Security Deposit strip, search, sort, the same filters as Explore, and the vehicles free for the dates.
+ * Availability comes from the vehicles API (bookings / service blocks), as before.
+ */
 
-const BIKE_PRICE_RANGES: Array<{ label: string; value: PriceRange }> = [
-  { label: 'Any Price', value: 10000 },
-  { label: 'Under ₹500', value: 500 },
-  { label: 'Under ₹1,000', value: 1000 },
-  { label: 'Under ₹1,500', value: 1500 },
-];
-
-const CAR_TRANSMISSION: Array<{ label: string; value: TransmissionFilter }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Automatic', value: 'Automatic' },
-  { label: 'Manual', value: 'Manual' },
-];
-
-const BIKE_TRANSMISSION: Array<{ label: string; value: TransmissionFilter }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Gearless', value: 'Automatic' },
-  { label: 'Geared', value: 'Manual' },
-];
-
-const CAR_FUEL: Array<{ label: string; value: FuelFilter }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Petrol', value: 'Petrol' },
-  { label: 'Diesel', value: 'Diesel' },
-  { label: 'EV', value: 'EV' },
-];
-
-const BIKE_FUEL: Array<{ label: string; value: FuelFilter }> = [
-  { label: 'All', value: 'all' },
-  { label: 'Petrol', value: 'Petrol' },
-  { label: 'EV', value: 'EV' },
-];
-
-const SORT_OPTIONS: Array<{ label: string; value: SortOption; icon: React.ComponentProps<typeof Feather>['name'] }> = [
-  { label: 'Price: Low to High', value: 'low-to-high', icon: 'trending-up' },
-  { label: 'Price: High to Low', value: 'high-to-low', icon: 'trending-down' },
-];
-
-// Room kept under the last card for the floating support button (60px + gaps).
-const SUPPORT_BUTTON_CLEARANCE = 88;
+/** "12:00 PM" → "12 PM", "9:00 PM" → "09 PM", "9:30 AM" → "09:30 AM" (the design's compact time). */
+const shortTime = (t?: string) => {
+  const m = (t || '').match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return t || '';
+  const h = m[1].padStart(2, '0');
+  return m[2] === '00' ? `${h} ${m[3].toUpperCase()}` : `${h}:${m[2]} ${m[3].toUpperCase()}`;
+};
 
 export default function SearchResultsScreen() {
   useTrackTripProgress('results'); // Recent searches resume this trip on this page
-  const { colors, navy, onNavy } = useBrandColors();
+  const p = useDetailsPalette();
   const router = useRouter();
-  const bottomNavHeight = useBottomNavHeight();
+  const insets = useSafeAreaInsets();
   const scrollHandlers = useHideSupportWhileScrolling();
   const { dateRange, vehicleType, pickupTime, returnTime, setDates, dropoff, duration, customer } = useSawari();
-
   const vehicleWord = vehicleType === 'bike' ? 'bike' : 'car';
 
-  const [filterVisible, setFilterVisible] = useState(false);
-  const [isPullRefreshing, setIsPullRefreshing] = useState(false);
-  const [priceRange, setPriceRange] = useState<PriceRange>(10000);
-  const [transmission, setTransmission] = useState<TransmissionFilter>('all');
-  const [fuel, setFuel] = useState<FuelFilter>('all');
-  const [sort, setSort] = useState<SortOption>('low-to-high');
-
-  // Search state
+  const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
+  const [sort, setSort] = useState<SortKey>('recommended');
+  const [chip, setChip] = useState('All');
+  const [showFilter, setShowFilter] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
 
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedQuery(searchQuery);
-    }, 300);
-    return () => clearTimeout(handler);
+    const t = setTimeout(() => setDebouncedQuery(searchQuery), 300);
+    return () => clearTimeout(t);
   }, [searchQuery]);
 
-  // ── Data: the existing vehicles API. Availability for any date is derived from it. ──
-  // Real data only — no placeholder vehicles if the backend has none or is unreachable.
+  // ── Data: the vehicles API. Availability for any dates is derived from it. ──
   const { data: fetchedCars, isLoading, isError, isFetching, refetch } = useVehicles();
 
-  // ── Selected dates ──
+  // ── Chosen trip ──
   const [startLabel, endLabel] = splitDateRange(dateRange);
   const startDay = parseDayLabel(startLabel);
   const endDay = startDay !== null ? parseDayLabel(endLabel, startDay) : null;
   const hasRange = startDay !== null && endDay !== null && endDay > startDay;
-  const datesText = hasRange ? `${startLabel} – ${endLabel}` : startDay !== null ? startLabel! : null;
 
-  // Remember this trip search (destination + dates) so Home can offer it again with one tap.
+  // Remember this trip search so Home can offer it again with one tap.
   useEffect(() => {
     if (!dropoff?.name || startDay === null || endDay === null) return;
     saveRecentSearch(customer?.id, { dropoff, dateRange, duration, pickupTime, returnTime, vehicleType }).catch(() => {});
@@ -125,478 +78,245 @@ export default function SearchResultsScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dropoff?.name, dateRange, vehicleType]);
 
-  // Refresh vehicles from the API whenever the customer moves to different dates.
+  // New dates → fresh vehicle data (bookings may have changed).
   const lastDates = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (lastDates.current !== undefined && lastDates.current !== dateRange) {
-      refetch();
-    }
+    if (lastDates.current !== undefined && lastDates.current !== dateRange) refetch();
     lastDates.current = dateRange;
   }, [dateRange, refetch]);
 
-  // ── Filtering ──
-  const matchesStaticFilters = useCallback(
-    (c: Car) => {
-      const typeOk = vehicleType === 'bike' ? c.type === 'Bike' : c.type === 'Car' || !c.type;
-      return (
-        typeOk &&
-        (priceRange === 10000 || c.perDay <= priceRange) &&
-        (transmission === 'all' || c.transmission === transmission) &&
-        (fuel === 'all' || c.fuel === fuel)
-      );
-    },
-    [vehicleType, priceRange, transmission, fuel]
-  );
-
+  useEffect(() => { ActivityAPI.logActivity('view_screen', 'SearchScreen', { vehicleType }); }, [vehicleType]);
   useEffect(() => {
-    ActivityAPI.logActivity('view_screen', 'SearchScreen', { vehicleType });
-  }, [vehicleType]);
-
-  useEffect(() => {
-    if (debouncedQuery) {
-      ActivityAPI.logActivity('search_query', 'SearchScreen', { query: debouncedQuery, vehicleType });
-    }
+    if (debouncedQuery) ActivityAPI.logActivity('search_query', 'SearchScreen', { query: debouncedQuery, vehicleType });
   }, [debouncedQuery]);
 
-  const activeFilterCount = [priceRange !== 10000, transmission !== 'all', fuel !== 'all'].filter(Boolean).length;
+  // Vehicles of the searched kind that are free for the whole trip (workshop vehicles excluded).
+  const freeCars = useMemo(() => (fetchedCars || [])
+    .filter((c) => (vehicleType === 'bike' ? c.type === 'Bike' : c.type === 'Car' || !c.type))
+    .map((c) => ({ ...c, availability: getAvailability(c, startLabel, hasRange ? endLabel : undefined) }))
+    .filter((c) => c.availability.available)
+    .map((c) => ({ ...c, isAvailable: true })),
+  [fetchedCars, vehicleType, startLabel, endLabel, hasRange]);
+
+  const activeFilterCount = countActive(filters);
+  const ratingOf = useVehicleRatings(freeCars, sort === 'rating' || !!filters.rating || showFilter);
 
   useEffect(() => {
-    if (activeFilterCount > 0) {
-      ActivityAPI.logActivity('apply_filter', 'SearchScreen', { priceRange, transmission, fuel });
-    }
-  }, [priceRange, transmission, fuel, activeFilterCount]);
+    if (activeFilterCount > 0) ActivityAPI.logActivity('apply_filter', 'SearchScreen', { ...filters });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(filters)]);
 
   const filteredCars = useMemo(() => {
-    // Only vehicles free for the chosen dates (or today, if none chosen).
-    const result = (fetchedCars || [])
-      .filter(matchesStaticFilters)
-      .map((c) => ({ ...c, availability: getAvailability(c, startLabel, hasRange ? endLabel : undefined) }))
-      .filter((c) => c.availability.available)
-      .filter((c) => {
-        const query = debouncedQuery.toLowerCase();
-        return query === '' ||
-               c.name.toLowerCase().includes(query) ||
-               c.category.toLowerCase().includes(query) ||
-               (c.manufacturer && c.manufacturer.toLowerCase().includes(query));
-      })
-      .map((c) => ({ ...c, isAvailable: true }));
+    const q = debouncedQuery.trim().toLowerCase();
+    const list = freeCars.filter((c) =>
+      (!q || c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q) || (c.manufacturer || '').toLowerCase().includes(q))
+      && matchesFilters(c, filters, ratingOf));
+    return sortCars(list, sort, ratingOf);
+  }, [freeCars, debouncedQuery, filters, sort, ratingOf]);
 
-    result.sort((a, b) => (sort === 'low-to-high' ? a.perDay - b.perDay : b.perDay - a.perDay));
-    return result;
-  }, [fetchedCars, matchesStaticFilters, startLabel, endLabel, hasRange, sort, debouncedQuery]);
-
-  // Would anything be available for these dates if no price/transmission/fuel filter applied?
-  const availableIgnoringFilters = useMemo(() => {
-    if (filteredCars.length > 0 || activeFilterCount === 0) return filteredCars.length;
-    return (fetchedCars || []).filter((c) => {
-      const typeOk = vehicleType === 'bike' ? c.type === 'Bike' : c.type === 'Car' || !c.type;
-      return typeOk && getAvailability(c, startLabel, hasRange ? endLabel : undefined).available;
-    }).length;
-  }, [filteredCars, activeFilterCount, fetchedCars, vehicleType, startLabel, endLabel, hasRange]);
-
-  // Nearest real alternative: same trip length, closest start date with at least one free vehicle.
+  // Nearest real alternative when nothing is free: same trip length, closest start with a free vehicle.
   const nearby = useMemo(() => {
-    if (isLoading || isError || filteredCars.length > 0 || !hasRange || !fetchedCars?.length) return null;
+    if (isLoading || isError || freeCars.length > 0 || !hasRange || !fetchedCars?.length) return null;
     const today = todayDayNum();
     const length = endDay! - startDay!;
-    const pool = fetchedCars.filter(matchesStaticFilters);
+    const pool = fetchedCars.filter((c) => (vehicleType === 'bike' ? c.type === 'Bike' : c.type === 'Car' || !c.type));
     for (let offset = 1; offset <= 30; offset++) {
       for (const candidate of [startDay! + offset, startDay! - offset]) {
         if (candidate < today) continue;
         const s = dayNumToLabel(candidate);
         const e = dayNumToLabel(candidate + length);
-        if (pool.some((c) => getAvailability(c, s, e).available)) {
-          return { start: s, end: e, days: length };
-        }
+        if (pool.some((c) => getAvailability(c, s, e).available)) return { start: s, end: e };
       }
     }
     return null;
-  }, [isLoading, isError, filteredCars.length, hasRange, fetchedCars, startDay, endDay, matchesStaticFilters]);
+  }, [isLoading, isError, freeCars.length, hasRange, fetchedCars, startDay, endDay, vehicleType]);
 
   // ── Actions ──
-  const openDatePicker = useCallback(() => {
+  const openDates = useCallback(() => {
     Haptics.selectionAsync();
     router.push({ pathname: '/dates', params: { returnBack: 'true' } });
   }, [router]);
 
-  const applyRange = useCallback(
-    (s: string, e: string) => {
-      const days = calculateRentalDays(s, e, pickupTime, returnTime);
-      setDates(`${s} – ${e}`, `${days} Days`);
-    },
-    [pickupTime, returnTime, setDates]
-  );
+  const applyRange = useCallback((s: string, e: string) => {
+    const days = calculateRentalDays(s, e, pickupTime, returnTime);
+    setDates(`${s} – ${e}`, `${days} Days`);
+  }, [pickupTime, returnTime, setDates]);
 
-  const clearAllFilters = useCallback(() => {
-    setPriceRange(10000);
-    setTransmission('all');
-    setFuel('all');
-    setSort('low-to-high');
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  const clearFilters = useCallback(() => {
+    setFilters(EMPTY_FILTERS); setChip('All'); setSort('recommended'); setSearchQuery(''); setDebouncedQuery('');
   }, []);
 
-  const handlePullRefresh = useCallback(async () => {
-    setIsPullRefreshing(true);
-    try {
-      await refetch();
-    } finally {
-      setIsPullRefreshing(false);
-    }
-  }, [refetch]);
-
-  const renderCar = useCallback(
-    ({ item, index }: { item: Car; index: number }) => (
-      <Reanimated.View entering={rise(Math.min(index, 4) * 40)}>
-        <CarListCard car={item} isExplore={false} />
-      </Reanimated.View>
-    ),
-    []
-  );
-  const keyExtractor = useCallback((car: Car) => car.id, []);
-
-  // ── Header pieces ──
-  const emptyKind: EmptyKind = isError && !fetchedCars?.length
-    ? 'error'
-    : activeFilterCount > 0 && availableIgnoringFilters > 0
-    ? 'filters'
-    : 'dates';
+  const pickChip = (c: QuickChip) => {
+    Haptics.selectionAsync();
+    setChip(c.label);
+    setFilters({ ...EMPTY_FILTERS, ...(c.apply || {}) });
+  };
 
   const count = filteredCars.length;
-  const listHeader = (
-    <View>
-      {/* Search Bar */}
-      <View style={[styles.searchBar, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <TextInput
-          placeholder={`Search ${vehicleWord} by name or brand...`}
-          placeholderTextColor={colors.mutedForeground}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          style={[styles.searchText, { color: colors.foreground }]}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
-        <Feather name="search" size={20} color={colors.foreground} />
+  const emptyKind: EmptyKind = isError && !fetchedCars?.length ? 'error' : (activeFilterCount > 0 || !!debouncedQuery) && freeCars.length > 0 ? 'filters' : 'dates';
+  const plural = `${vehicleWord[0].toUpperCase()}${vehicleWord.slice(1)}${count === 1 ? '' : 's'}`;
+
+  const header = (
+    <View style={{ gap: 12, paddingBottom: 4 }}>
+      {/* Zero Security Deposit */}
+      <View style={[styles.strip, { backgroundColor: p.greenBg, borderColor: p.greenBorder }]}>
+        <Text style={[styles.stripText, { color: p.green }]}>👌 Zero Security Deposit</Text>
       </View>
 
-      {/* Filter + sort. Scrolls sideways so nothing is ever clipped; extra right padding keeps the last chip visible. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.controlsRow}
-        style={styles.sectionGap}
-      >
-        <Chip
-          testID="filter-button"
-          icon="sliders"
-          label={`Filter${activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}`}
-          selected={activeFilterCount > 0}
-          onPress={() => {
-            Haptics.selectionAsync();
-            setFilterVisible(true);
-          }}
-        />
-        {SORT_OPTIONS.map((opt) => (
-          <Chip
-            key={opt.value}
-            icon={opt.icon}
-            label={opt.label}
-            selected={sort === opt.value}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setSort(opt.value);
-            }}
+      {/* Search + sort */}
+      <View style={styles.searchRow}>
+        <View style={[styles.search, { borderColor: p.border }]}>
+          <Feather name="search" size={18} color={p.sub} />
+          <TextInput
+            placeholder="Search cars and bike"
+            placeholderTextColor={p.muted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            style={[styles.searchText, { color: p.fg }]}
           />
-        ))}
-      </ScrollView>
-
-      <View style={styles.resultsHeader}>
-        <View style={{ flex: 1 }}>
-          {isLoading ? (
-            <Text style={[styles.resultsTitle, { color: colors.foreground }]}>Finding available {vehicleWord}s…</Text>
-          ) : emptyKind === 'error' && count === 0 ? null : (
-            <>
-              <Text style={[styles.resultsTitle, { color: colors.foreground }]}>
-                {count} {vehicleWord}{count === 1 ? '' : 's'} available
-              </Text>
-              <Text style={[styles.resultsSub, { color: colors.mutedForeground }]}>
-                {datesText ? `Available for ${datesText}` : 'Available today'}
-              </Text>
-            </>
+          {!!searchQuery && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+              <Feather name="x" size={16} color={p.muted} />
+            </Pressable>
           )}
         </View>
-        {isFetching && !isLoading && <ActivityIndicator size="small" color={navy} style={{ marginRight: 12 }} />}
-        {!isLoading && (
-          <Pressable
-            accessibilityRole="button"
-            onPress={openDatePicker}
-            hitSlop={8}
-            style={({ pressed }) => [styles.changeDates, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={[styles.changeDatesText, { color: navy }]}>Change dates</Text>
-          </Pressable>
-        )}
+        <Pressable
+          onPress={() => { Haptics.selectionAsync(); setShowSort(true); }}
+          style={[styles.sortBtn, { borderColor: sort !== 'recommended' ? p.navy : p.border, backgroundColor: sort !== 'recommended' ? p.navy : p.page }]}
+          accessibilityRole="button"
+          accessibilityLabel="Sort"
+        >
+          <Feather name="sliders" size={16} color={sort !== 'recommended' ? p.onNavy : p.sub} style={{ transform: [{ rotate: '90deg' }] }} />
+        </Pressable>
       </View>
+
+      {/* Filter chips */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={{ marginHorizontal: -16 }}>
+        <Pressable
+          onPress={() => { Haptics.selectionAsync(); setShowFilter(true); }}
+          style={[styles.chip, styles.filterChip, { borderColor: activeFilterCount ? p.navy : p.border, backgroundColor: p.page }]}
+          accessibilityRole="button"
+          testID="filter-button"
+        >
+          <Feather name="filter" size={13} color={activeFilterCount ? p.navy : p.sub} />
+          <Text style={[styles.chipText, { color: activeFilterCount ? p.navy : p.sub }]}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
+        </Pressable>
+        {QUICK_CHIPS.map((c) => {
+          const on = chip === c.label;
+          return (
+            <Pressable
+              key={c.label}
+              onPress={() => pickChip(c)}
+              style={[styles.chip, { borderColor: on ? p.navy : p.border, backgroundColor: on ? p.navy : p.page }]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+            >
+              <Text style={[styles.chipText, { color: on ? p.onNavy : p.sub }]}>{c.label}</Text>
+            </Pressable>
+          );
+        })}
+      </ScrollView>
     </View>
   );
 
-  const listEmpty = isLoading ? (
-    <Reanimated.View entering={FadeIn.duration(200)}>
-      {[0, 1, 2].map((i) => (
-        <CarCardSkeleton key={i} index={i} />
-      ))}
-    </Reanimated.View>
-  ) : (
-    <SearchEmptyState
-      kind={emptyKind}
-      vehicle={vehicleWord}
-      nearby={nearby ? `${nearby.start} – ${nearby.end}` : null}
-      onNearby={() => nearby && applyRange(nearby.start, nearby.end)}
-      onChangeDates={openDatePicker}
-      onClearFilters={clearAllFilters}
-      onRetry={() => refetch()}
-      hasActiveFilters={activeFilterCount > 0}
-    />
-  );
-
   return (
-    <Page bottomNav scroll={false}>
-      <Header title={vehicleType === 'bike' ? 'Available Bikes' : 'Available Cars'} back />
+    <View style={[styles.screen, { backgroundColor: p.page }]}>
+      {/* Top bar: back · destination + count · trip dates */}
+      <View style={[styles.top, { paddingTop: insets.top + 10 }]}>
+        <Pressable onPress={() => router.back()} style={[styles.back, { backgroundColor: p.iconBg }]} accessibilityRole="button" accessibilityLabel="Back">
+          <Feather name="chevron-left" size={20} color={p.sub} />
+        </Pressable>
+        <View style={styles.topText}>
+          <Text style={[styles.dest, { color: p.fg }]} numberOfLines={1}>{dropoff?.name || `Available ${vehicleWord}s`}</Text>
+          <View style={styles.countRow}>
+            <Text style={[styles.count, { color: p.sub }]} numberOfLines={1}>
+              {isLoading ? `Finding available ${vehicleWord}s…` : `Showing ${count} ${plural} available`}
+            </Text>
+            {isFetching && !isLoading && <ActivityIndicator size="small" color={p.muted} style={{ transform: [{ scale: 0.7 }] }} />}
+          </View>
+        </View>
+        <Pressable onPress={openDates} style={[styles.dates, { backgroundColor: p.summary }]} accessibilityRole="button" accessibilityLabel={`Trip ${startLabel || ''} ${pickupTime} to ${endLabel || ''} ${returnTime}. Change dates`}>
+          <View style={styles.dateCol}>
+            <Text style={[styles.dateDay, { color: p.fg }]}>{startLabel || 'Start'}</Text>
+            <Text style={[styles.dateTime, { color: p.sub }]}>{startLabel ? shortTime(pickupTime) : 'Pick'}</Text>
+          </View>
+          <View style={[styles.dateDivider, { backgroundColor: p.border }]} />
+          <View style={styles.dateCol}>
+            <Text style={[styles.dateDay, { color: p.fg }]}>{(hasRange ? endLabel : startLabel) || 'End'}</Text>
+            <Text style={[styles.dateTime, { color: p.sub }]}>{startLabel ? shortTime(returnTime) : 'Pick'}</Text>
+          </View>
+        </Pressable>
+      </View>
+
       <FlatList
         data={isLoading ? [] : filteredCars}
-        keyExtractor={keyExtractor}
-        renderItem={renderCar}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmpty}
+        keyExtractor={(c: Car) => c.id}
+        renderItem={({ item, index }) => (
+          <Reanimated.View entering={rise(Math.min(index, 4) * 40)}>
+            <CarListCard car={item} isExplore={false} />
+          </Reanimated.View>
+        )}
+        ListHeaderComponent={<View style={{ paddingHorizontal: 16, marginBottom: 8 }}>{header}</View>}
+        ListEmptyComponent={isLoading ? (
+          <Reanimated.View entering={FadeIn.duration(200)}>
+            {[0, 1, 2].map((i) => <CarCardSkeleton key={i} index={i} />)}
+          </Reanimated.View>
+        ) : (
+          <SearchEmptyState
+            kind={emptyKind}
+            vehicle={vehicleWord}
+            nearby={nearby ? `${nearby.start} – ${nearby.end}` : null}
+            onNearby={() => nearby && applyRange(nearby.start, nearby.end)}
+            onChangeDates={openDates}
+            onClearFilters={clearFilters}
+            onRetry={() => refetch()}
+            hasActiveFilters={activeFilterCount > 0 || !!debouncedQuery}
+          />
+        )}
         showsVerticalScrollIndicator={false}
-        // Last card must clear the fixed tab bar (+ safe area) and the floating support button.
-        contentContainerStyle={{ paddingTop: 8, paddingBottom: bottomNavHeight + SUPPORT_BUTTON_CLEARANCE }}
-        refreshControl={<RefreshControl refreshing={isPullRefreshing} onRefresh={handlePullRefresh} tintColor={navy} />}
+        contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 96 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await refetch(); } finally { setRefreshing(false); } }} tintColor={p.navy} />}
         initialNumToRender={6}
-        maxToRenderPerBatch={6}
         windowSize={11}
         removeClippedSubviews={false}
         {...scrollHandlers}
       />
 
-      {/* Filter Modal */}
-      <Modal visible={filterVisible} animationType="slide" transparent onRequestClose={() => setFilterVisible(false)}>
-        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
-          <View style={[styles.filterSheet, { backgroundColor: colors.background }]}>
-            <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Filters</Text>
-              <Pressable
-                accessibilityRole="button"
-                testID="close-filter"
-                onPress={() => setFilterVisible(false)}
-                style={({ pressed }) => [styles.closeButton, { backgroundColor: colors.muted }, pressed && styles.pressed]}
-              >
-                <Feather name="x" size={18} color={colors.foreground} />
-              </Pressable>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-              <FilterSection title="Price Range" icon="tag">
-                <View style={styles.chipRow}>
-                  {(vehicleType === 'bike' ? BIKE_PRICE_RANGES : CAR_PRICE_RANGES).map((opt) => (
-                    <ChipButton
-                      key={opt.value}
-                      label={opt.label}
-                      active={priceRange === opt.value}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        setPriceRange(opt.value);
-                        if (opt.value !== 10000) {
-                          setSort('high-to-low');
-                        }
-                      }}
-                    />
-                  ))}
-                </View>
-              </FilterSection>
-
-              <FilterSection title="Transmission" icon="settings">
-                <View style={styles.chipRow}>
-                  {(vehicleType === 'bike' ? BIKE_TRANSMISSION : CAR_TRANSMISSION).map((opt) => (
-                    <ChipButton
-                      key={opt.value}
-                      label={opt.label}
-                      active={transmission === opt.value}
-                      onPress={() => { Haptics.selectionAsync(); setTransmission(opt.value); }}
-                    />
-                  ))}
-                </View>
-              </FilterSection>
-
-              <FilterSection title="Fuel Type" icon="droplet">
-                <View style={styles.chipRow}>
-                  {(vehicleType === 'bike' ? BIKE_FUEL : CAR_FUEL).map((opt) => (
-                    <ChipButton
-                      key={opt.value}
-                      label={opt.label}
-                      active={fuel === opt.value}
-                      onPress={() => { Haptics.selectionAsync(); setFuel(opt.value); }}
-                    />
-                  ))}
-                </View>
-              </FilterSection>
-            </ScrollView>
-
-            <View style={[styles.filterActions, { borderTopColor: colors.border }]}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={clearAllFilters}
-                style={({ pressed }) => [styles.resetButton, { borderColor: colors.border }, pressed && styles.pressed]}
-              >
-                <Feather name="refresh-ccw" size={14} color={colors.foreground} />
-                <Text style={[styles.resetText, { color: colors.foreground }]}>Reset</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                testID="apply-filters"
-                onPress={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  setFilterVisible(false);
-                }}
-                style={({ pressed }) => [styles.applyButton, { backgroundColor: navy }, pressed && styles.pressed]}
-              >
-                <Text style={[styles.applyText, { color: onNavy }]}>
-                  Show {filteredCars.length} {vehicleWord}{filteredCars.length === 1 ? '' : 's'}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
-    </Page>
-  );
-}
-
-/* ───── Filter / sort chip: navy + white when selected, light + subtle border otherwise (44px tall) ───── */
-function Chip({
-  label,
-  icon,
-  selected,
-  onPress,
-  testID,
-}: {
-  label: string;
-  icon: React.ComponentProps<typeof Feather>['name'];
-  selected: boolean;
-  onPress: () => void;
-  testID?: string;
-}) {
-  const { colors, navy, onNavy } = useBrandColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      testID={testID}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        { backgroundColor: selected ? navy : colors.card, borderColor: selected ? navy : colors.border },
-        pressed && styles.pressed,
-      ]}
-    >
-      <Feather name={icon} size={14} color={selected ? onNavy : colors.foreground} />
-      <Text numberOfLines={1} style={[styles.chipLabel, { color: selected ? onNavy : colors.foreground }]}>{label}</Text>
-    </Pressable>
-  );
-}
-
-/* ───── Filter Section ───── */
-function FilterSection({ title, icon, children }: { title: string; icon: React.ComponentProps<typeof Feather>['name']; children: React.ReactNode }) {
-  const { colors } = useBrandColors();
-  return (
-    <View style={styles.filterSection}>
-      <View style={styles.filterSectionHeader}>
-        <Feather name={icon} size={15} color={colors.mutedForeground} />
-        <Text style={[styles.filterSectionTitle, { color: colors.foreground }]}>{title}</Text>
-      </View>
-      {children}
+      <ExploreFilterSheet
+        visible={showFilter}
+        onClose={() => setShowFilter(false)}
+        value={filters}
+        cars={freeCars}
+        ratingOf={ratingOf}
+        onApply={(f) => { setFilters(f); setChip(chipFor(f)); }}
+      />
+      <SortSheet visible={showSort} onClose={() => setShowSort(false)} value={sort} onApply={setSort} />
     </View>
   );
 }
 
-/* ───── Chip Button (inside the filter sheet) ───── */
-function ChipButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  const { colors, navy, onNavy } = useBrandColors();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={[
-        styles.filterChip,
-        {
-          backgroundColor: active ? navy : colors.card,
-          borderColor: active ? navy : colors.border,
-        },
-      ]}
-    >
-      <Text style={[styles.filterChipText, { color: active ? onNavy : colors.foreground }]}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-/* ═══════════════ STYLES ═══════════════ */
 const styles = StyleSheet.create({
-  searchBar: { alignItems: 'center', borderRadius: 15, borderWidth: 1, flexDirection: 'row', marginTop: 12, marginHorizontal: 20, paddingHorizontal: 16, paddingVertical: 12 },
-  searchText: { fontFamily: 'Inter_400Regular', fontSize: 14, flex: 1, paddingVertical: 4 },
-  sectionGap: { marginTop: 16, marginBottom: 12 },
-
-  // Filter / sort row
-  controlsRow: { paddingLeft: 16, paddingRight: 24, gap: 8, marginTop: 12, alignItems: 'center' },
-  chip: {
-    minHeight: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: 16,
-    borderRadius: 22,
-    borderWidth: 1,
-  },
-  chipLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-
-  // Results header
-  resultsHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginTop: 8, marginBottom: 12 },
-  resultsTitle: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: -0.3 },
-  resultsSub: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 2 },
-  changeDates: { minHeight: 44, justifyContent: 'center' },
-  changeDatesText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-
-  // ─── Filter Modal ───
-  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  filterSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: '85%', paddingTop: 8 },
-  sheetHeader: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 24, paddingVertical: 16,
-  },
-  sheetTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, letterSpacing: -0.5 },
-  closeButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  filterContent: { paddingHorizontal: 24, paddingBottom: 16 },
-  filterSection: { marginBottom: 26 },
-  filterSectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  filterSectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  filterChip: {
-    minHeight: 44, justifyContent: 'center',
-    paddingHorizontal: 16, borderRadius: 12, borderWidth: 1,
-  },
-  filterChipText: { fontFamily: 'Inter_500Medium', fontSize: 13 },
-  filterActions: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 24, paddingVertical: 16, borderTopWidth: 1,
-  },
-  resetButton: {
-    minHeight: 48,
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    paddingHorizontal: 20, borderRadius: 14, borderWidth: 1,
-  },
-  resetText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
-  applyButton: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
-  applyText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
-
-  pressed: { opacity: 0.7 },
+  screen: { flex: 1 },
+  top: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 12 },
+  back: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  topText: { flex: 1, minWidth: 0 },
+  dest: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, lineHeight: 20 },
+  countRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  count: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16 },
+  dates: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4 },
+  dateCol: { alignItems: 'center', paddingHorizontal: 4 },
+  dateDay: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 15 },
+  dateTime: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, lineHeight: 14 },
+  dateDivider: { width: 1, alignSelf: 'stretch', marginVertical: 2 },
+  strip: { borderWidth: 1, borderRadius: 8, height: 39, alignItems: 'center', justifyContent: 'center' },
+  stripText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 },
+  searchRow: { flexDirection: 'row', gap: 8 },
+  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10 },
+  searchText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, paddingVertical: 0 },
+  sortBtn: { width: 40, height: 40, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  chips: { gap: 6, paddingHorizontal: 16 },
+  chip: { height: 30, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  filterChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 10 },
+  chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
 });

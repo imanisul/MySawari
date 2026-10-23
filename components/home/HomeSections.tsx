@@ -427,15 +427,13 @@ export function DestinationTile({ image, faded, title, blurb, onPress }: { image
 
 // ── Benefits ─────────────────────────────────────────────────────────────────
 
-/**
- * `size`: the icon inside the 37 circle (Figma: 20 for Lowest Price, 24 for the rest). The current pictures
- * still carry their own round background, so they fill the circle until the Figma icons are added.
- */
-const BENEFITS: { title: string; sub: string; image: ImageSourcePropType; size: number }[] = [
+// Design order and copy. Uses the pictures already in assets/images; `wide` takes the whole row (the fifth item).
+const BENEFITS: { title: string; sub: string; image: ImageSourcePropType; size: number; wide?: boolean }[] = [
   { title: 'Lowest Price', sub: 'Guaranteed', image: require('@/assets/images/benefit_exclusive_discounts.png'), size: 37 },
-  { title: 'Delivery', sub: 'Anywhere in Guwahati', image: require('@/assets/images/benefit_save_more.png'), size: 37 },
-  { title: 'Membership', sub: 'Exclusive Offers', image: require('@/assets/images/benefit_special_rewards.png'), size: 37 },
-  { title: 'Zero Deposit', sub: 'Zero Security Deposit', image: require('@/assets/images/benefit_special_rewards.png'), size: 37 },
+  { title: 'Unlimited KM', sub: 'Wide Variety of Cars', image: require('@/assets/images/benefit_save_more.png'), size: 37 },
+  { title: 'Well Maintained', sub: 'Wide Variety of Vehicles', image: require('@/assets/images/benefit_special_rewards.png'), size: 37 },
+  { title: 'Zero Cancellation', sub: 'Wide Variety of Vehicles', image: require('@/assets/images/benefit_special_rewards.png'), size: 37 },
+  { title: 'Zero Cancellation/ Rescheduling Fees', sub: 'Zero Security Deposit', image: require('@/assets/images/benefit_special_rewards.png'), size: 37, wide: true },
 ];
 
 export function BenefitsGrid() {
@@ -443,7 +441,7 @@ export function BenefitsGrid() {
   return (
     <View style={styles.benefits}>
       {BENEFITS.map((b) => (
-        <View key={b.title} style={styles.benefit} accessible accessibilityLabel={`${b.title}, ${b.sub}`}>
+        <View key={b.title} style={[styles.benefit, b.wide && { flexBasis: '100%' }]} accessible accessibilityLabel={`${b.title}, ${b.sub}`}>
           <View style={styles.benefitCircle}>
             <Image source={b.image} style={{ width: b.size, height: b.size }} resizeMode="contain" />
           </View>
@@ -520,7 +518,6 @@ const styles = StyleSheet.create({
   cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   city: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
   brandLine: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  // Figma: 72x42 pill, padding 14/12, radius 40, gap 4. Height and gap stay at the header row's own
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
   walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
   walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#2F3E75' },

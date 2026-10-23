@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, StyleSheet, View, RefreshControl, ImageSourcePropType } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, View, RefreshControl, ImageSourcePropType } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAvailability, splitDateRange, parseDayLabel, Car } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
@@ -49,22 +48,19 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const {
     vehicleType, setVehicleType, customer, selectCar, isAuthenticated, isAuthLoading, setBookingSource, dateRange,
-    membership, fetchWallet, syncNotifications, sawariCash, earnSawariCash, isDarkMode,
+    membership, fetchWallet, syncNotifications, sawariCash, unreadCount, earnSawariCash, isDarkMode,
     dropoff, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress,
   } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const [showPhoneSheet, setShowPhoneSheet] = useState(false);
-  const [otpSentTo, setOtpSentTo] = useState<{ mobile: string; isExistingUser: boolean } | null>(null);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [claiming, setClaiming] = useState(false);
-  // Set when an action needs a login (no skip or close then); cleared for the optional launch prompt.
-  const [loginRequired, setLoginRequired] = useState(false);
 
   /** Runs `go` now when signed in, or after logging in. */
   const requireLogin = useCallback((go: () => void) => {
     if (isAuthenticated) go();
-    else { setPendingAction(() => go); setLoginRequired(true); setShowLogin(true); }
+    else { setPendingAction(() => go); setShowLogin(true); }
   }, [isAuthenticated]);
 
   // The banner is purple: light status bar text while Home is on screen.
@@ -83,9 +79,8 @@ export default function HomeScreen() {
     }
   }, [isAuthLoading, isAuthenticated, setBookingSource, fetchWallet, syncNotifications]));
 
-  useEffect(() => {
-    Location.requestForegroundPermissionsAsync().catch(() => {});
-  }, []);
+  // No location-permission request here: the app asks once at start-up (SawariContext's GPS
+  // auto-detect). Asking again from Home put a second system popup on screen at launch.
 
   // A guest gets the phone-number sheet rising over Home, once — never for someone already signed in.
   const phoneSheetShown = useRef(false);
@@ -103,6 +98,9 @@ export default function HomeScreen() {
     // during the wait re-subscribes instead of cancelling the sheet for the whole session.
     return () => { off(); clearTimeout(timer); };
   }, [isAuthLoading, isAuthenticated]);
+
+  // No "Set Location" popup on opening the app: the customer picks a destination from the search card
+  // ("Select your Destination") when they want to.
 
   const { data: fetchedVehicles = [], refetch: refetchVehicles } = useVehicles();
 
@@ -206,7 +204,7 @@ export default function HomeScreen() {
     router.push({ pathname: '/dropoff', params: q ? { q, returnBack: 'false' } : { returnBack: 'false' } });
   }, [router, setBookingSource]);
 
-  const sections = useMemo(() => ['header', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect'], []);
+  const sections = useMemo(() => ['header', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
     let content: React.ReactNode = null;
@@ -298,14 +296,18 @@ export default function HomeScreen() {
       case 'connect':
         content = <ConnectCard />;
         break;
+      case 'footer':
+        // Full-width art, outside Reveal so it never fades in late at the very end of the page.
+        return <CraftedFooter dark={isDarkMode} />;
     }
     if (!content) return null;
     return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, insets.top, isAuthenticated, sawariCash, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, picks, openPick, milestone, journey, claimable, claiming, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, picks, openPick, milestone, journey, claimable, claiming, claim, isMember, membership]);
 
   return (
-    <Page bottomNav scroll={false}>
-      <FlatList
+    <View style={styles.screen}>
+      <Page bottomNav scroll={false}>
+        <FlatList
         data={sections}
         keyExtractor={(k) => k}
         renderItem={renderSection}
@@ -333,18 +335,12 @@ export default function HomeScreen() {
       <PhoneNumberSheet
         visible={showPhoneSheet}
         onClose={() => setShowPhoneSheet(false)}
-        onOtpSent={(mobile, isExistingUser) => {
-          setOtpSentTo({ mobile, isExistingUser });
-          setLoginRequired(false); // the optional launch prompt: the customer may still close it
-          setShowLogin(true);
-        }}
+        // The sheet signs the customer in by itself now (phone → code → profile); nothing else to open.
       />
 
       <LoginBottomSheet
         visible={showLogin}
-        required={loginRequired}
-        otpSentTo={otpSentTo}
-        onClose={() => { setShowLogin(false); setOtpSentTo(null); }}
+        onClose={() => setShowLogin(false)}
         onLoginSuccess={() => {
           if (pendingAction) {
             pendingAction();
@@ -353,13 +349,40 @@ export default function HomeScreen() {
         }}
       />
 
-    </Page>
+      </Page>
+    </View>
+  );
+}
+
+/**
+ * Home footer: "Crafted in Guwahati" over an Assam scene (Brahmaputra, Saraighat bridge, a dhol player,
+ * a country boat, a rhino and a MySawari car on the road). The art's sky is faded to white in the image itself,
+ * and so is the foliage at the bottom, so both ends melt into the page; in dark mode it is shown as a soft ghost behind the title.
+ */
+const FOOTER_ART = require('../../assets/images/home_footer_assam.jpg');
+const FOOTER_RATIO = 828 / 975;
+
+function CraftedFooter({ dark }: { dark: boolean }) {
+  return (
+    <View style={styles.footer} accessibilityRole="text" accessibilityLabel="Crafted in Guwahati">
+      <Image source={FOOTER_ART} resizeMode="cover" style={[styles.footerArt, dark && { opacity: 0.16 }]} accessibilityIgnoresInvertColors />
+      <View style={styles.footerTitle} pointerEvents="none">
+        <Text style={[styles.footerSmall, { color: dark ? '#7C879B' : '#A3A3A3' }]}>Crafted in</Text>
+        <Text style={[styles.footerBig, { color: dark ? '#3A4760' : '#D4D7DE' }]} maxFontSizeMultiplier={1.1}>GUWAHATI</Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  footer: { width: '100%', aspectRatio: FOOTER_RATIO, marginTop: 8 },
+  footerArt: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  // Sits in the faded sky, centred, like the hero's "LOWEST PRICE GUARANTEED" lettering.
+  footerTitle: { position: 'absolute', top: '16%', left: 16, right: 16, alignItems: 'center' },
+  footerSmall: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, letterSpacing: 0.5 },
+  footerBig: { fontFamily: 'Anton_400Regular', fontSize: 56, lineHeight: 66, letterSpacing: 2, marginTop: 2 },
   // The refer strip sits inside the banner (rays behind it); the white sheet's rounded top covers its foot.
-  // Figma: 1px #E7EAF4 border on the top and sides (no bottom edge).
-  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderColor: '#E7EAF4', borderLeftWidth: 1, borderRightWidth: 1, borderTopWidth: 1, paddingTop: 16 },
+  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 16 },
   row: { gap: 10, paddingHorizontal: 16 },
 });

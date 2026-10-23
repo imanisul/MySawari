@@ -1,6 +1,6 @@
 import React from 'react';
-import { DatesSheet } from '@/components';
+import DatesScreen from '@/screens/Home/DatesScreen';
 
-export default function DatesScreen() {
-  return <DatesSheet />;
+export default function Route() {
+  return <DatesScreen />;
 }

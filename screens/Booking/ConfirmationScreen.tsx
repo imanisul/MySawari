@@ -1,152 +1,170 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { LoadingImage } from '@/components/common/LoadingImage';
+import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors } from '@/hooks/useColors';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { LoadingImage } from '@/components/common/LoadingImage';
 import { useSawari } from '@/context/SawariContext';
+import { bookingsQueryOptions } from '@/hooks/useHomeData';
+import { formatCurrency } from '@/services/backend/pricingEngine';
+import { PricingSummary, tripTotal, shortDate } from '@/components/booking/TripDetailParts';
+import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 
-import { useQueryClient } from '@tanstack/react-query';
+const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
 
+const NEXT = [
+  'Host contact details are available in your booking.',
+  "We'll notify you about your booking and pickup instructions.",
+  'You can extend, manage or cancel your trip from My Trips.',
+];
+
+/**
+ * Figma "Your car is booked!": shown once the server has confirmed the booking (payment-processing). The
+ * booking itself (code, dates, prices) is the server's saved booking (`lastBooking`).
+ */
 export default function ConfirmationScreen() {
-  const colors = useColors();
+  const p = useDetailsPalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { selectedCar, mode, pickup, dropoff, isDeliveryRequested, deliveryMode, dateRange, duration, pickupTime, returnTime, pricingQuote, lastBooking } = useSawari();
-  
-  // Invalidate bookings cache so the next time Home or Bookings tab is visited, it fetches the fresh list.
+  const { selectedCar, mode, dateRange, duration, pickupTime, returnTime, pricingQuote, lastBooking } = useSawari();
+
+  // The new booking shows on Home and in My Trips straight away.
   React.useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
   }, [queryClient]);
 
-  // Use the backend-validated quote for display
-  const payToday = pricingQuote?.onlinePayableNow || 0;
+  const b = lastBooking;
+  const { data: allBookings } = useQuery(bookingsQueryOptions);
+  const matched = (allBookings || []).find((x) => (b?.id && x.id === b.id) || (b?.bookingCode && x.bookingCode === b.bookingCode));
+  const effective = matched ? { ...b, ...matched } : b;
+  const rawCode = (effective?.bookingCode || b?.bookingCode || (effective?.id || b?.id)?.slice(-6).toUpperCase() || '').replace(/^#/, '');
+  const displayId = rawCode ? `#${rawCode}` : '—';
+
+  const [startLabel, endLabel] = (dateRange || '').split(' – ');
+  const from = `${shortDate(effective?.pickupDate || b?.pickupDate || startLabel)}, ${(effective?.pickupTime || b?.pickupTime || pickupTime || '').replace(/^0/, '')}`;
+  const to = `${shortDate(effective?.returnDate || b?.returnDate || endLabel)}, ${(effective?.dropTime || b?.dropTime || returnTime || '').replace(/^0/, '')}`;
+  const days = effective?.rentalDays || b?.rentalDays || parseInt(String(duration), 10) || pricingQuote?.rentalDays || 1;
+  const driver = (effective as any)?.driverMode === 'with-driver' || (b as any)?.driverMode === 'with-driver' || mode === 'With Driver' ? 'With Driver' : 'Self Drive';
+  const total = effective ? tripTotal(effective) : (b ? tripTotal(b) : Math.max(0, (pricingQuote?.onlinePayableNow || 0) + (pricingQuote?.remainingRentalAmount || 0)));
+
+  // The tick pops in, then the rest of the page rises in under it.
+  const pop = React.useRef(new Animated.Value(0)).current;
+  const rise = React.useRef(new Animated.Value(0)).current;
+  React.useEffect(() => {
+    Animated.sequence([
+      Animated.spring(pop, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }),
+      Animated.timing(rise, { toValue: 1, duration: 360, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+  }, [pop, rise]);
+  const riseStyle = { opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] };
+
+  const openBooking = () => {
+    router.dismissAll();
+    setTimeout(() => {
+      const targetId = effective?.id || b?.id;
+      if (targetId) router.push(`/booking-detail?id=${targetId}` as any);
+      else router.push('/bookings');
+    }, 50);
+  };
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <View style={[styles.content, { paddingTop: insets.top + 16 }]}>
-        <View style={[styles.checkCircle, { backgroundColor: colors.primary }]}>
-          <Feather name="check" size={30} color={colors.primaryForeground} />
-        </View>
-        <Text style={[styles.title, { color: colors.foreground }]}>You're all set</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-          Your {selectedCar.name} is booked. Details sent to your phone.
-        </Text>
-        <View style={[styles.confirmationCard, { backgroundColor: colors.card }]}>
-          <View style={styles.referenceRow}>
-            <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>Booking reference</Text>
-            <Text style={[styles.reference, { color: colors.foreground }]}>{lastBooking?.bookingCode || '—'}</Text>
+    <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
+     <BlurTarget style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 62, paddingBottom: 130 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+        <Animated.View style={[styles.check, { backgroundColor: p.green, opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }] }]}>
+          <Feather name="check" size={46} color="#FFFFFF" />
+        </Animated.View>
+        <Animated.View style={riseStyle}>
+          <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header">Your car is booked!</Text>
+          <Text style={[styles.sub, { color: p.sub }]}>Your booking is confirmed. Get ready to hit the road!</Text>
+
+          <View style={[styles.idPill, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+            <Text style={[styles.idText, { color: p.navy }]} selectable>Booking ID: {displayId}</Text>
           </View>
-          <View style={[styles.carRow, { borderTopColor: colors.border }]}>
-            <View style={[styles.carImage, { overflow: 'hidden' }]}>
-              <LoadingImage source={selectedCar.image} contentFit="cover" style={StyleSheet.absoluteFill} />
+
+          <View style={[styles.card, { borderColor: p.deliveryBorder }]}>
+            <View style={styles.carRow}>
+              <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
+                <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                {!!selectedCar.manufacturer && <Text style={[styles.brand, { color: p.muted }]} numberOfLines={1}>{selectedCar.manufacturer}</Text>}
+                <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1}>{b?.vehicleName || selectedCar.name}</Text>
+                <Text style={[styles.meta, { color: p.muted }]} numberOfLines={2}>{from} → {to}</Text>
+                <Text style={[styles.meta, { color: p.muted }]}>{driver}  •  {days} day{days === 1 ? '' : 's'}</Text>
+                <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(total)}</Text>
+              </View>
             </View>
-            <View>
-              <Text style={[styles.carName, { color: colors.foreground }]}>{lastBooking?.vehicleName || selectedCar.name}</Text>
-              <Text style={[styles.carMode, { color: colors.mutedForeground }]}>{lastBooking?.driverMode === 'with-driver' ? 'With Driver' : 'Self Drive'}</Text>
+
+            <View style={[styles.next, { borderColor: p.deliveryBorder }]}>
+              <Text style={[styles.nextTitle, { color: p.fg }]}>What’s next</Text>
+              <View style={styles.dashes}>
+                {Array.from({ length: 70 }, (_, i) => <View key={i} style={[styles.dash, { backgroundColor: p.deliveryBorder }]} />)}
+              </View>
+              <View style={{ gap: 10 }}>
+                {NEXT.map((t) => (
+                  <View key={t} style={styles.nextRow}>
+                    <View style={[styles.tick, { backgroundColor: p.green }]}>
+                      <Feather name="check" size={8} color="#FFFFFF" />
+                    </View>
+                    <Text style={[styles.nextText, { color: p.sub }]}>{t}</Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
-          {!isDeliveryRequested ? (
-            <InfoRow icon="map-pin" value={lastBooking?.dropoffLocationName || 'Office'} />
-          ) : (
+
+          {b && (
             <>
-              {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
-                <InfoRow icon="map-pin" value={`Pickup: ${lastBooking?.pickupLocationName || 'Self Pickup'}`} />
-              )}
-              {(deliveryMode === 'both' || deliveryMode === 'return') && (
-                <InfoRow icon="map-pin" value={`Drop: ${lastBooking?.dropLocationName || 'Self Drop'}`} />
-              )}
+              <Text style={[styles.section, { color: p.fg }]}>Pricing Summary</Text>
+              <PricingSummary booking={b} />
             </>
           )}
-          <InfoRow icon="calendar" value={`${dateRange} · ${lastBooking?.rentalDays || duration} Days`} />
-          <InfoRow icon="clock" value={`${lastBooking?.pickupTime || pickupTime} – ${lastBooking?.dropTime || returnTime}`} />
+        </Animated.View>
+      </ScrollView>
+     </BlurTarget>
 
-          {((pricingQuote?.couponDiscount || 0) > 0 || (pricingQuote?.subscriptionDiscount || 0) > 0 || (pricingQuote?.sawariCashUsed || 0) > 0) && (
-            <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, paddingTop: 10, marginTop: 10, gap: 6 }}>
-              {pricingQuote && pricingQuote.couponDiscount > 0 && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_500Medium' }}>
-                    Coupon Discount{pricingQuote.couponCode ? ` (${pricingQuote.couponCode})` : ''} 🏷️
-                  </Text>
-                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
-                    -₹{pricingQuote.couponDiscount.toLocaleString('en-IN')}
-                  </Text>
-                </View>
-              )}
-              {pricingQuote && pricingQuote.subscriptionDiscount > 0 && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.primaryText || colors.primary, fontSize: 13, fontFamily: 'Inter_500Medium' }}>
-                    Membership Discount ★
-                  </Text>
-                  <Text style={{ color: colors.primaryText || colors.primary, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
-                    -₹{pricingQuote.subscriptionDiscount.toLocaleString('en-IN')}
-                  </Text>
-                </View>
-              )}
-              {pricingQuote && pricingQuote.sawariCashUsed > 0 && (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_500Medium' }}>
-                    SawariCash Applied 💰
-                  </Text>
-                  <Text style={{ color: colors.success, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
-                    -₹{pricingQuote.sawariCashUsed.toLocaleString('en-IN')}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          <View style={[styles.paidRow, { borderTopColor: colors.border }]}>
-            <Text style={[styles.paidLabel, { color: colors.foreground }]}>Paid today</Text>
-            <Text style={[styles.paidValue, { color: colors.foreground }]}>₹{payToday.toLocaleString('en-IN')}</Text>
-          </View>
+      <View pointerEvents="box-none" style={styles.footerWrap}>
+        <View pointerEvents="none" style={styles.fade}><BottomBlur height={64} fadeTo={p.page} /></View>
+        <View style={[styles.footer, { backgroundColor: p.page, borderTopColor: p.deliveryBorder, paddingBottom: Math.max(insets.bottom, 12) + 4 }]}>
+          <Pressable accessibilityRole="button" onPress={openBooking} style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+            <Text style={styles.ctaText}>View my booking</Text>
+          </Pressable>
         </View>
       </View>
-      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 40) }]}>
-        <Pressable onPress={() => router.replace('/')} style={[styles.homeButton, { borderColor: colors.border }]}>
-          <Text style={[styles.actionText, { color: colors.foreground }]}>Back to home</Text>
-        </Pressable>
-        <Pressable onPress={() => router.replace('/bookings')} style={[styles.bookingsButton, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.actionText, { color: colors.primaryForeground }]}>View my bookings</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-function InfoRow({ icon, value }: { icon: React.ComponentProps<typeof Feather>['name']; value: string }) {
-  const colors = useColors();
-  return (
-    <View style={styles.infoRow}>
-      <Feather name={icon} size={15} color={colors.mutedForeground} />
-      <Text style={[styles.infoText, { color: colors.foreground }]}>{value}</Text>
-    </View>
+    </BlurHost>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { alignItems: 'center', paddingHorizontal: 24, flex: 1 },
-  checkCircle: { alignItems: 'center', borderRadius: 99, height: 86, justifyContent: 'center', width: 86 },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 26, letterSpacing: -0.5, marginTop: 24 },
-  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 15, lineHeight: 22, marginTop: 12, textAlign: 'center', paddingHorizontal: 20 },
-  confirmationCard: { borderRadius: 24, marginTop: 32, paddingHorizontal: 20, paddingVertical: 20, width: '100%' },
-  referenceRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
-  cardLabel: { fontFamily: 'Inter_500Medium', fontSize: 13 },
-  reference: { fontFamily: 'Inter_700Bold', fontSize: 15 },
-  carRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', marginTop: 16, paddingTop: 16 },
-  carImage: { borderRadius: 12, height: 60, width: 72 },
-  carName: { fontFamily: 'Inter_600SemiBold', fontSize: 16, marginLeft: 16 },
-  carMode: { fontFamily: 'Inter_400Regular', fontSize: 13, marginLeft: 16, marginTop: 4 },
-  infoRow: { alignItems: 'center', flexDirection: 'row', gap: 12, marginTop: 16 },
-  infoText: { fontFamily: 'Inter_400Regular', fontSize: 14 },
-  paidRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, paddingTop: 20 },
-  paidLabel: { fontFamily: 'Inter_500Medium', fontSize: 15 },
-  paidValue: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: -0.5 },
-  actions: { flexDirection: 'row', gap: 16, paddingHorizontal: 24, paddingBottom: 40, width: '100%' },
-  homeButton: { alignItems: 'center', borderRadius: 16, borderWidth: 1, flex: 1, height: 56, justifyContent: 'center' },
-  bookingsButton: { alignItems: 'center', borderRadius: 16, flex: 1, height: 56, justifyContent: 'center' },
-  actionText: { fontFamily: 'Inter_500Medium', fontSize: 15 },
+  content: { paddingHorizontal: 16, alignItems: 'stretch' },
+  check: { alignSelf: 'center', width: 79, height: 79, borderRadius: 39.5, alignItems: 'center', justifyContent: 'center' },
+  title: { fontFamily: FONT.semibold, fontSize: 24, lineHeight: 32, textAlign: 'center', marginTop: 34, letterSpacing: -0.2 },
+  sub: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6 },
+  idPill: { borderWidth: 1, borderRadius: 8, height: 38, alignItems: 'center', justifyContent: 'center', marginTop: 26 },
+  idText: { fontFamily: FONT.medium, fontSize: 14 },
+  card: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12, gap: 12 },
+  carRow: { flexDirection: 'row', gap: 12 },
+  carImage: { width: 120, height: 99, borderRadius: 6, overflow: 'hidden' },
+  brand: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+  carName: { fontFamily: FONT.medium, fontSize: 14, lineHeight: 20, marginTop: 1 },
+  meta: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  price: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  next: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 14 },
+  nextTitle: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 19 },
+  dashes: { flexDirection: 'row', gap: 3, overflow: 'hidden', marginTop: 10, marginBottom: 14 },
+  dash: { width: 4, height: 1 },
+  nextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  tick: { width: 10, height: 10, borderRadius: 5, alignItems: 'center', justifyContent: 'center', marginTop: 3.5 },
+  nextText: { flex: 1, fontFamily: FONT.regular, fontSize: 11, lineHeight: 17 },
+  section: { fontFamily: FONT.medium, fontSize: 16, lineHeight: 22, marginTop: 24, marginBottom: 10 },
+  footerWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  fade: { height: 64 },
+  footer: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth, boxShadow: '0px -6px 18px rgba(47, 62, 117, 0.07)' },
+  cta: { height: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  ctaText: { fontFamily: FONT.medium, fontSize: 16, color: '#FFFFFF' },
 });

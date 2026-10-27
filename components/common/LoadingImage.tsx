@@ -3,18 +3,23 @@ import { StyleSheet, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { Image, ImageProps } from 'expo-image';
-import Reanimated, { FadeOut } from 'react-native-reanimated';
-import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
 
 // A photo that fails (server busy processing it, a network blip) is retried a few times on its own
 // before the "unavailable" placeholder is shown, instead of staying broken for the rest of the session.
 const RETRY_DELAYS_MS = [2000, 5000, 12000];
 
-/**
- * A photo that shows a shimmer placeholder until it has loaded, then fades the photo in.
- * The placeholder only appears if the photo takes a moment, so cached/local images never flash it.
- * Sizing and layout come from `style`, exactly like a normal Image.
- */
+// Keep track of URIs that loaded successfully in this session so cached images render immediately
+// on scroll without flashing a placeholder or triggering layout updates.
+const loadedUris = new Set<string>();
+
+function getSourceKey(source: any): string {
+  if (!source) return '';
+  if (typeof source === 'number') return `local_${source}`;
+  if (typeof source === 'string') return source;
+  if (typeof source === 'object' && typeof source.uri === 'string') return source.uri;
+  return '';
+}
+
 function optimizeCloudinaryUrl(source: any): any {
   if (!source) return source;
   
@@ -41,15 +46,16 @@ function optimizeCloudinaryUrl(source: any): any {
 
 export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageProps) {
   const colors = useColors();
-  const [ready, setReady] = useState(false);
+  const srcKey = getSourceKey(props.source);
+  const isLocal = typeof props.source === 'number';
+  const isAlreadyLoaded = isLocal || (srcKey ? loadedUris.has(srcKey) : false);
+
+  const [ready, setReady] = useState(isAlreadyLoaded);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   let optimizedSource = optimizeCloudinaryUrl(props.source);
-  // Keyed on the photo itself, not the retry URL below: keying on that reset `attempt` to 0 on every retry,
-  // so a failing photo re-requested forever every 2 s and never showed the "unavailable" placeholder.
-  const sourceKey = JSON.stringify(optimizedSource ?? null);
 
   // Cache busting: append a retry query string so expo-image refetches the file without destroying the view.
   if (attempt > 0 && typeof optimizedSource === 'string') {
@@ -59,10 +65,11 @@ export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageP
   }
 
   useEffect(() => {
-    setReady(false);
+    const isNowReady = typeof props.source === 'number' || (srcKey ? loadedUris.has(srcKey) : false);
+    setReady(isNowReady);
     setFailed(false);
     setAttempt(0);
-  }, [sourceKey]);
+  }, [srcKey]);
 
   useEffect(() => () => {
     if (retryTimer.current) clearTimeout(retryTimer.current);
@@ -75,7 +82,10 @@ export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageP
         recyclingKey={recyclingKey} // Let expo-image optimize recycling natively
         source={optimizedSource}
         cachePolicy="memory-disk"
+        allowDownscaling={true}
+        transition={props.transition ?? 150}
         onLoad={(e) => {
+          if (srcKey) loadedUris.add(srcKey);
           setReady(true);
           setFailed(false);
           onLoad?.(e);
@@ -97,11 +107,7 @@ export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageP
         </View>
       )}
       {!ready && !failed && (
-        <Reanimated.View exiting={FadeOut.duration(200)} style={StyleSheet.absoluteFill} pointerEvents="none">
-          <SkeletonGroup style={StyleSheet.absoluteFill}>
-            <Skeleton width="100%" height="100%" borderRadius={0} />
-          </SkeletonGroup>
-        </Reanimated.View>
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.muted }]} pointerEvents="none" />
       )}
     </>
   );

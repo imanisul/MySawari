@@ -5,7 +5,8 @@ LogBox.ignoreLogs([
   'ProgressBarAndroid has been extracted from react-native core',
   'SafeAreaView has been deprecated',
   'Clipboard has been extracted from react-native core',
-  'PushNotificationIOS has been extracted from react-native core'
+  'PushNotificationIOS has been extracted from react-native core',
+  'Unknown child element passed to Stack',
 ]);
 
 import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
@@ -110,41 +111,17 @@ function RootLayoutNav() {
     <ThemeProvider value={navTheme}>
     {/* contentStyle: the screen behind a transition is the app background, never a blank white frame. */}
     <Stack screenOptions={{ headerBackTitle: 'Back', headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-      {/* Bottom-tab screens swap instantly (no cross-fade), so no half-faded ghost of the old screen shows. */}
+      {/* Screens with custom transitions / presentation options (other routes are auto-discovered by Expo Router) */}
       <Stack.Screen name="index" options={{ animation: 'none' }} />
       <Stack.Screen name="explore" options={{ animation: 'none' }} />
-      <Stack.Screen name="wishlist" />
-      <Stack.Screen name="search" />
-      <Stack.Screen name="car-details" />
-      <Stack.Screen name="booking" />
       <Stack.Screen name="planner" options={{ presentation: 'modal' }} />
       <Stack.Screen name="location" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="dates" /> {/* full-page date & time picker */}
-      <Stack.Screen name="times" />
-      <Stack.Screen name="dropoff" /> {/* full-page destination search */}
       <Stack.Screen name="return-location" options={{ presentation: 'modal' }} />
       <Stack.Screen name="driver-option" options={{ presentation: 'modal' }} />
       <Stack.Screen name="driver-charges" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="payment" />
-      <Stack.Screen name="payment-processing" />
       <Stack.Screen name="payment-error" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="confirmation" />
       <Stack.Screen name="bookings" options={{ animation: 'none' }} />
-      <Stack.Screen name="booking-detail" />
-      <Stack.Screen name="login" />
       <Stack.Screen name="profile" options={{ animation: 'none' }} />
-      <Stack.Screen name="edit-profile" />
-      <Stack.Screen name="settings" />
-      <Stack.Screen name="notifications" />
-      <Stack.Screen name="payments" />
-      <Stack.Screen name="refer" />
-      <Stack.Screen name="rewards" />
-      <Stack.Screen name="help" />
-      <Stack.Screen name="faqs" />
-      <Stack.Screen name="policies" />
-      <Stack.Screen name="address-search" />
-      <Stack.Screen name="address-confirm" />
-      <Stack.Screen name="safety" />
     </Stack>
     </ThemeProvider>
   );

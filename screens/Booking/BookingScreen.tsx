@@ -1,380 +1,627 @@
-import React, { useState, useEffect } from 'react';
-import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { Pressable, StyleSheet, Text, TextInput, View, Alert, Switch, LayoutAnimation } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import React, { useEffect, useState } from 'react';
+import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
+import { Alert, LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform } from 'react-native';
+import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import Reanimated from 'react-native-reanimated';
-import { useColors } from '@/hooks/useColors';
+import { Image } from 'expo-image';
+import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { useSawari } from '@/context/SawariContext';
 import { checkCarAvailability } from '@/utils/sawari';
-import { KeyboardAwareScrollViewCompat } from '@/components';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import { StatusBarScrim } from '@/components/common/StatusBarScrim';
-import { rise } from '@/components/common/motion';
 import { API } from '@/services/backend/api';
 import { ActivityAPI } from '@/services/api/activity';
 import { useVehicles } from '@/hooks/useVehicles';
+import { calculateCouponDiscount, formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
+import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { useTripPrice } from '@/components/vehicle/details/useTripPrice';
+import { getAutoApplyCash } from '@/utils/cashPreference';
+import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
+import { MembershipSavedPopup, MembershipCelebration } from '@/components/vehicle/details/MembershipSavedPopup';
+import { DesignToggle } from '@/components/profile/ProfileParts';
+import { LoginBottomSheet } from '@/components';
+
+/**
+ * "Payment Option" (Figma): opened by Book Now on the car page. Review the car and trip, choose pickup /
+ * return, apply a coupon, use SawariCash, see membership savings, then "Pay ₹500 & Book" goes straight to
+ * the secure payment (payment-processing: vehicle hold → Razorpay → booking), as "Continue to payment" did.
+ * Every price is the shared pricing quote, the same one the server re-checks when the booking is saved.
+ */
+
+const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Same plans as the Membership page (rate, per-trip cap and annual cap as the server applies them).
+const PLANS = [
+  { key: 'starter', name: 'Starter', price: 999, pct: 0.05, pctLabel: '5%', perTripCap: 499, annual: '10K', icon: require('@/assets/images/plan_starter.png'), iconSize: 16 },
+  { key: 'plus', name: 'Plus', price: 1999, pct: 0.10, pctLabel: '10%', perTripCap: 799, annual: '15K', icon: require('@/assets/images/plan_plus.png'), iconSize: 17 },
+  { key: 'pro', name: 'Pro', price: 2999, pct: 0.125, pctLabel: '12.5%', perTripCap: 999, annual: '20K', icon: require('@/assets/images/plan_pro.png'), iconSize: 16 },
+] as const;
+
+/** "10 Aug" + "12:00 PM" → "Thu, 10 Aug '26, 12:00PM" (a month already behind us belongs to next year). */
+function longWhen(label?: string, time?: string) {
+  const [d, m] = (label || '').trim().split(' ');
+  const mi = MONTHS.indexOf((m || '').slice(0, 3));
+  if (!d || mi < 0) return label || '';
+  const now = new Date();
+  const year = now.getFullYear() + (mi < now.getMonth() ? 1 : 0);
+  const date = new Date(year, mi, parseInt(d, 10));
+  const t = (time || '').replace(/^0/, '').replace(' ', '');
+  return `${WEEKDAYS[date.getDay()]}, ${date.getDate()} ${MONTHS[mi]} '${String(year).slice(2)}${t ? `, ${t}` : ''}`;
+}
+/** "10 Aug", "10:00 AM" → "Fri, 10:00 AM". */
+function dayAndTime(label?: string, time?: string) {
+  const full = longWhen(label, '');
+  const day = full.split(',')[0];
+  return [day, (time || '').replace(/^0/, '')].filter(Boolean).join(', ');
+}
 
 export default function BookingScreen() {
   useTrackTripProgress('booking'); // Recent searches resume this trip on this page
-  const colors = useColors();
+  const p = useDetailsPalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { 
-    mode, 
-    setMode,
-    selectedCar, 
-    pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested, deliveryMode, setDeliveryMode, dateRange, duration, pickupTime, returnTime, customer, updateCustomer } = useSawari();
+  const {
+    mode, setMode, selectedCar, pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested,
+    deliveryMode, setDeliveryMode, dateRange, pickupTime, returnTime, customer, isAuthenticated,
+    pricingQuote, isQuoteLoading, applyCoupon, appliedCouponCode, sawariCash, sawariCashToApply, applySawariCash, membership,
+    refreshQuote, planToBuy, setPlanToBuy,
+  } = useSawari();
+  const [celebrate, setCelebrate] = useState<{ name: string; price: number; save: number; pctLabel: string } | null>(null);
+  const price = useTripPrice(!!dateRange && !dateRange.includes('Select'));
 
-  const [errors, setErrors] = useState<{name?: string; mobile?: string; email?: string}>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Profile → "My Sawari Cash" switched on: start this checkout with the cash applied (once; the switch
+  // below still turns it off for this trip).
+  const cashPrefDone = React.useRef(false);
+  useEffect(() => {
+    if (cashPrefDone.current || !isAuthenticated || sawariCash <= 0) return;
+    cashPrefDone.current = true;
+    getAutoApplyCash(customer?.id).then((on) => { if (on && sawariCashToApply === 0) applySawariCash(sawariCash); });
+  }, [isAuthenticated, sawariCash]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [couponInput, setCouponInput] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [coupons, setCoupons] = useState<{ code: string }[]>([]);
+  // Membership plans stay folded until the row is tapped (design).
+  const [showPlans, setShowPlans] = useState(() => !!planToBuy); // open when a plan was already picked on car details
 
   useEffect(() => {
     ActivityAPI.logActivity('initiate_checkout', 'BookingScreen', { carId: selectedCar?.id });
-  }, []);
+    API.getCoupons().then((list) => setCoupons(list || [])).catch(() => setCoupons([]));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    // Wait for a plausible full number (not every keystroke) and settle briefly before tracking,
-    // so typing a mobile number doesn't fire a request per digit.
+    // A plausible full number, settled briefly, so a lead isn't sent per keystroke.
     if (!selectedCar || !/^\d{10}$/.test(customer?.mobile || '')) return;
     const timer = setTimeout(() => {
-      API.trackLead({
-        mobileNumber: customer.mobile,
-        customerName: customer.name,
-        vehicleId: selectedCar.id,
-        vehicleName: selectedCar.name,
-        lastPageVisited: 'checkout'
-      });
+      API.trackLead({ mobileNumber: customer.mobile, customerName: customer.name, vehicleId: selectedCar.id, vehicleName: selectedCar.name, lastPageVisited: 'checkout' });
     }, 600);
     return () => clearTimeout(timer);
-  }, [customer?.mobile, selectedCar?.id]);
+  }, [customer?.mobile, selectedCar?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // The pricing quote is automatically managed in SawariContext now based on these details
-
-  // A pickup/drop address is only required when the customer actually asked for
-  // that service — Self Pickup / Self Drop (the default) never needs an address.
-  const needsPickupAddress = isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
-  const needsDropAddress = isDeliveryRequested && (deliveryMode === 'return' || deliveryMode === 'both');
-  const isMissingPickup = needsPickupAddress && !pickup?.name;
-  const isMissingDrop = needsDropAddress && !returnAddress?.name;
+  // A pickup/drop address is only needed when that service is chosen; picking up at the hub needs none.
+  const deliverPickup = isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
+  const collectReturn = isDeliveryRequested && (deliveryMode === 'return' || deliveryMode === 'both');
+  const isMissingPickup = deliverPickup && !pickup?.name;
+  const isMissingDrop = collectReturn && !returnAddress?.name;
   const isMissingDates = !dateRange || dateRange.includes('Select');
   const isMissingDestination = !dropoff?.name;
-  
+
   const [startStr, endStr] = (dateRange || '').split(' – ');
-  // Checked against the live fleet (refreshed every few minutes), not the copy of the car saved when it was
-  // tapped — that copy missed bookings made since, and the clash only surfaced after payment.
+  // Checked against the live fleet, not the copy saved when the car was tapped.
   const { data: liveVehicles } = useVehicles();
   const liveCar = liveVehicles?.find((v) => v.id === selectedCar.id) || selectedCar;
   const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr);
+  const highDemand = (liveCar?.bookedRanges?.length ?? 0) >= 2;
 
-  const validateAndProceed = () => {
-    if (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) {
-      Alert.alert('Missing Details', 'Please select your trip locations and travel dates before continuing.');
-      return;
-    }
-    
-    if (!isVehicleAvailable) {
-      Alert.alert('Not Available', 'Sorry, this vehicle is no longer available for your selected dates.');
-      return;
-    }
-
-    const newErrors: typeof errors = {};
-    if (!customer.name.trim()) newErrors.name = 'Name is required';
-    if (!customer.mobile.trim() || !/^\d{10}$/.test(customer.mobile)) newErrors.mobile = 'Enter a valid 10-digit mobile number';
-    if (customer.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customer.email)) newErrors.email = 'Enter a valid email';
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-    } else {
-      setErrors({});
-      setIsSubmitting(true);
-      router.push('/payment');
-      setTimeout(() => setIsSubmitting(false), 1000);
-    }
+  /** Pickup at the hub or delivered; return at the hub or collected — kept in the context's delivery mode. */
+  const setService = (pick: boolean, ret: boolean) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!pick && !ret) { setIsDeliveryRequested(false); return; }
+    setIsDeliveryRequested(true);
+    setDeliveryMode(pick && ret ? 'both' : pick ? 'delivery' : 'return');
+  };
+  const choosePickup = () => {
+    Haptics.selectionAsync();
+    Alert.alert('Pickup', 'Where would you like to get the car?', [
+      { text: `Pick up at ${MYSAWARI_HUB_NAME}`, onPress: () => setService(false, collectReturn) },
+      { text: 'Deliver to my location', onPress: () => { setService(true, collectReturn); router.push({ pathname: '/address-search', params: { kind: 'pickup' } }); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+  const chooseReturn = () => {
+    Haptics.selectionAsync();
+    Alert.alert('Return', 'Where will you return the car?', [
+      { text: `Return at ${MYSAWARI_HUB_NAME}`, onPress: () => setService(deliverPickup, false) },
+      { text: 'Collect from my location', onPress: () => { setService(deliverPickup, true); router.push({ pathname: '/address-search', params: { kind: 'return' } }); } },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+  const chooseDriver = () => {
+    Haptics.selectionAsync();
+    Alert.alert('Driving option', undefined, [
+      { text: 'Self Drive', onPress: () => setMode('Self Drive') },
+      { text: 'With Driver (₹1,400/day)', onPress: () => setMode('With Driver') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
+  // A code that gives nothing off is refused here, with the same rule the booking uses.
+  const handleApplyCoupon = async (raw: string) => {
+    const code = raw.trim().toUpperCase();
+    if (!code) return;
+    Haptics.selectionAsync();
+    setCouponError(null);
+    await API.getCoupons().catch(() => []);
+    if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code) <= 0) {
+      setCouponError(`${code} isn't valid for this booking.`);
+      return;
+    }
+    setCouponInput(code);
+    applyCoupon(code);
+  };
+  const removeCoupon = () => { applyCoupon(null); setCouponInput(''); setCouponError(null); };
+
+  const isMember = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
+  const tripRent = (pricingQuote?.rentalAmount || 0) + (pricingQuote?.driverCharge || 0);
+
+  // "Pay & Book" never does nothing silently: a guest gets the login sheet, and a price still loading is
+  // waited for (the payment opens by itself once it arrives).
+  const [showLogin, setShowLogin] = useState(false);
+  const [waitingForPrice, setWaitingForPrice] = useState(false);
+  useEffect(() => {
+    if (!waitingForPrice || isQuoteLoading || !pricingQuote) return;
+    setWaitingForPrice(false);
+    payAndBook();
+  }, [waitingForPrice, isQuoteLoading, pricingQuote]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const payAndBook = () => {
+    if (isMissingDates || isMissingDestination || isMissingPickup || isMissingDrop) {
+      Alert.alert('Missing Details', isMissingDates || isMissingDestination
+        ? 'Please select your destination and travel dates before continuing.'
+        : 'Please choose the address for delivery / collection, or pick up and return at the hub.');
+      return;
+    }
+    if (!isVehicleAvailable) {
+      Alert.alert('Not Available', 'Sorry, this vehicle is no longer available for your selected dates. Please change your dates.');
+      return;
+    }
+    if (isAuthenticated !== true) { setShowLogin(true); return; }
+    // "+91 98765 43210" or "919876543210" is a valid number too: only the last 10 digits matter.
+    const mobile10 = String(customer.mobile || '').replace(/\D/g, '').slice(-10);
+    if (!String(customer.name || '').trim() || mobile10.length !== 10) {
+      Alert.alert('Complete your profile', 'Add your name and mobile number so we can confirm the booking.', [
+        { text: 'Edit profile', onPress: () => router.push('/edit-profile') },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
+    if (!pricingQuote || isQuoteLoading) {
+      // Price still being worked out: wait for it, then continue to payment automatically.
+      setWaitingForPrice(true);
+      if (!isQuoteLoading) refreshQuote().catch(() => {
+        setWaitingForPrice(false);
+        Alert.alert("Couldn't get the price", 'Please check your connection and try again.');
+      });
+      return;
+    }
+    setIsSubmitting(true);
+    ActivityAPI.logActivity('payment_started', 'BookingScreen', { amount: pricingQuote.onlinePayableNow });
+    router.push('/payment-processing');
+    setTimeout(() => setIsSubmitting(false), 1000);
+  };
+
+  const ready = price.state === 'ready' ? price : null;
+  const days = ready?.days ?? pricingQuote?.rentalDays ?? 1;
+  const name = [selectedCar.model, selectedCar.variant].filter(Boolean).join(' ') || selectedCar.displayName || selectedCar.name;
+  const year = selectedCar.modelYear || selectedCar.registrationYear;
+  const title = year && !String(name).includes(String(year)) ? `${name} ${year}` : name;
+  const meta = [selectedCar.transmission, selectedCar.fuel, selectedCar.type === 'Bike' ? null : (/seat/i.test(String(selectedCar.seats)) ? selectedCar.seats : `${selectedCar.seats} seats`)].filter(Boolean) as string[];
+  const pickupWhere = deliverPickup ? (pickup?.name || 'Choose delivery address') : MYSAWARI_HUB_NAME;
+  const returnWhere = collectReturn ? (returnAddress?.name || 'Choose collection address') : MYSAWARI_HUB_NAME;
+  const destinationWhere = dropoff?.name || 'Select your destination';
+  const payable = ready?.payableNow ?? pricingQuote?.onlinePayableNow ?? 500;
+
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <KeyboardAwareScrollViewCompat
-        
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 16 }]}
-      >
-        <View style={styles.topBar}>
-          <Pressable accessibilityLabel="Back" onPress={() => router.back()} style={[styles.circle, { borderColor: colors.border }]}>
-            <Feather name="chevron-left" size={20} color={colors.foreground} />
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Review booking</Text>
-        </View>
-        <Reanimated.View entering={rise(0)} style={[styles.carSummary, { backgroundColor: colors.card }]}>
-          <View style={[styles.carThumb, { backgroundColor: colors.muted, overflow: 'hidden' }]}>
-            <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
+       <BlurTarget style={{ flex: 1 }}>
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: 260 + insets.bottom }]}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
+              <Feather name="chevron-left" size={18} color={p.sub} />
+            </Pressable>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.headerTitle, { color: p.fg }]}>Payment Option</Text>
+              <Text style={[styles.headerSub, { color: p.sub }]}>Secure & encrypted payment</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Booking policies" onPress={() => router.push('/policies')} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
+              <Feather name="info" size={16} color={p.sub} />
+            </Pressable>
           </View>
-          <View style={styles.carCopy}>
-            <Text style={[styles.carName, { color: colors.foreground }]}>{selectedCar.name}</Text>
-            <Text style={[styles.carMeta, { color: colors.mutedForeground }]}>{selectedCar.category} · {selectedCar.seats} · {selectedCar.transmission}</Text>
-            <Text style={[styles.carMode, { color: colors.foreground }]}>{mode}</Text>
-          </View>
-        </Reanimated.View>
-        <Reanimated.View entering={rise(100)}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Trip details</Text>
-        <View style={styles.tripDetails}>
-          <DetailRow
-            icon="map-pin"
-            label="Destination"
-            value={dropoff?.name || 'Select Destination'}
-            isMissing={!dropoff?.name}
-            onPress={() => router.push({ pathname: '/dropoff', params: { returnBack: 'true' } })}
-          />
-          <View style={{ marginTop: 8, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.border, marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDeliveryRequested ? 16 : 0 }}>
-              <View style={{ flex: 1, paddingRight: 16 }}>
-                <Text style={{ fontSize: 14, fontFamily: 'Inter_500Medium', color: colors.foreground }}>Get car delivered?</Text>
-                <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 2 }}>We will drop and pick up the car at your location</Text>
+
+          {highDemand && (
+            <View style={[styles.demand, { backgroundColor: p.demandBg, borderColor: p.demandBorder }]}>
+              <Text style={[styles.demandText, { color: p.amber }]}>🔥 High Demand for these dates</Text>
+            </View>
+          )}
+
+          {/* Car */}
+          <View style={[styles.carCard, { borderColor: p.deliveryBorder }]}>
+            <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
+              <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  {!!selectedCar.manufacturer && <Text style={[styles.brand, { color: p.muted }]}>{selectedCar.manufacturer}</Text>}
+                  <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1}>{title}</Text>
+                </View>
+                {!!selectedCar.rating && (
+                  <View style={[styles.rating, { backgroundColor: p.navy }]}>
+                    <Text style={styles.ratingText}>{Number(selectedCar.rating).toFixed(1)}</Text>
+                    <Ionicons name="star" size={12} color={p.star} />
+                  </View>
+                )}
               </View>
-              <Switch 
-                value={isDeliveryRequested} 
-                onValueChange={(val) => {
-                  Haptics.selectionAsync();
-                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                  setIsDeliveryRequested(val);
-                }}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={'#FFF'}
+              <Text style={[styles.carMeta, { color: p.muted }]} numberOfLines={1}>{meta.join('  •  ')}</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel={`${mode}, change driving option`} onPress={chooseDriver} hitSlop={6}>
+                <Text style={[styles.carMeta, { color: p.muted }]}>{mode}  •  {days} day{days === 1 ? '' : 's'}</Text>
+              </Pressable>
+              {ready && (
+                <View style={styles.priceRow}>
+                  <Text style={[styles.carPrice, { color: p.fg }]}>{formatCurrency(ready.final)}</Text>
+                  {ready.original > ready.final && <Text style={[styles.carStrike, { color: p.muted }]}>{formatCurrency(ready.original)}</Text>}
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Rental duration */}
+          <View style={[styles.duration, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
+              {!isMissingDates && (
+                <Text style={[styles.durationSub, { color: p.sub }]} numberOfLines={1}>
+                  {longWhen(startStr, pickupTime)}  →  {longWhen(endStr, returnTime)}
+                </Text>
+              )}
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Edit dates" onPress={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })} hitSlop={8} style={styles.edit}>
+              <Feather name="edit" size={14} color={p.navy} />
+              <Text style={[styles.editText, { color: p.navy }]}>Edit</Text>
+            </Pressable>
+          </View>
+
+          {!isVehicleAvailable && !isMissingDates && (
+            <View style={[styles.notice, { backgroundColor: p.redBg, borderColor: p.redBorder }]}>
+              <Text style={[styles.noticeTitle, { color: p.red }]}>Not available for these dates</Text>
+              <Text style={[styles.noticeText, { color: p.sub }]}>This vehicle was booked for part of your trip. Please change your dates.</Text>
+            </View>
+          )}
+
+          {/* Pickup & drop-off: Pickup -> Destination (in-between) -> Return, connected seamlessly */}
+          <Text style={[styles.section, { color: p.fg }]}>Pickup & drop-off</Text>
+          <View style={styles.journeyContainer}>
+            {/* Continuous vertical route line connecting Pickup, Destination and Return */}
+            <View style={[styles.journeyLine, { backgroundColor: p.deliveryBorder }]} pointerEvents="none" />
+
+            {/* 1. Pickup */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Pickup ${pickupWhere}. Change`}
+              onPress={choosePickup}
+              style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
+            >
+              <View style={[styles.ring, { borderColor: p.green, backgroundColor: p.page }]}>
+                <View style={[styles.innerDot, { backgroundColor: p.green }]} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.stopTitle, { color: p.fg }]}>Pickup{!isMissingDates ? ` · ${dayAndTime(startStr, pickupTime)}` : ''}</Text>
+                <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={1}>
+                  {deliverPickup ? `Doorstep delivery · ${pickupWhere}` : pickupWhere}
+                </Text>
+              </View>
+              <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
+            </Pressable>
+
+            {/* 2. Destination (In-between Pickup and Return) */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Destination ${destinationWhere}. Change`}
+              onPress={() => {
+                Haptics.selectionAsync();
+                router.push({ pathname: '/dropoff', params: { returnBack: 'true' } });
+              }}
+              style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
+            >
+              <View style={[styles.ring, { borderColor: isMissingDestination ? p.red : p.navy, backgroundColor: p.page }]}>
+                <View style={[styles.innerDot, { backgroundColor: isMissingDestination ? p.red : p.navy }]} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.stopTitle, { color: p.fg }]}>Destination</Text>
+                <Text style={[styles.stopSub, { color: isMissingDestination ? p.red : p.sub }]} numberOfLines={1}>
+                  {destinationWhere}
+                </Text>
+              </View>
+              <Text style={[styles.changeText, { color: isMissingDestination ? p.red : p.navy }]}>
+                {isMissingDestination ? 'Choose' : 'Change'}
+              </Text>
+            </Pressable>
+
+            {/* 3. Return */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Return ${returnWhere}. Change`}
+              onPress={chooseReturn}
+              style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
+            >
+              <View style={[styles.ring, { borderColor: p.red, backgroundColor: p.page }]}>
+                <View style={[styles.innerDot, { backgroundColor: p.red }]} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.stopTitle, { color: p.fg }]}>Return{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
+                <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1}>
+                  {collectReturn ? `Doorstep collection · ${returnWhere}` : returnWhere}
+                </Text>
+              </View>
+              <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
+            </Pressable>
+          </View>
+
+          {/* Offers & Coupon */}
+          <View style={styles.sectionRow}>
+            <Text style={[styles.section, { color: p.fg }]}>Offers & Coupon</Text>
+            <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/offers', params: { mode: 'apply' } } as any)} hitSlop={8}>
+              <Text style={[styles.viewAll, { color: p.navy }]}>View all</Text>
+            </Pressable>
+          </View>
+          {appliedCouponCode ? (
+            <View style={[styles.couponApplied, { backgroundColor: p.greenBg, borderColor: p.greenBorder }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.couponAppliedTitle, { color: p.green }]}>{appliedCouponCode} applied</Text>
+                {!!pricingQuote?.couponDiscount && <Text style={[styles.couponAppliedSub, { color: p.sub }]}>You save {formatCurrency(pricingQuote.couponDiscount)} on this trip</Text>}
+              </View>
+              <Pressable accessibilityRole="button" onPress={removeCoupon} hitSlop={8}>
+                <Text style={[styles.apply, { color: p.red }]}>Remove</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[styles.couponField, { borderColor: couponError ? p.red : p.deliveryBorder }]}>
+              <TextInput
+                value={couponInput}
+                onChangeText={(t) => { setCouponInput(t.toUpperCase()); setCouponError(null); }}
+                placeholder="Enter Coupon Code"
+                placeholderTextColor={p.muted}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={() => handleApplyCoupon(couponInput)}
+                style={[styles.couponInput, { color: p.fg }]}
+              />
+              <Pressable accessibilityRole="button" onPress={() => handleApplyCoupon(couponInput)} disabled={!couponInput.trim()} hitSlop={8}>
+                <Text style={[styles.apply, { color: couponInput.trim() ? p.navy : p.muted }]}>Apply</Text>
+              </Pressable>
+            </View>
+          )}
+          {!!couponError && <Text style={[styles.couponError, { color: p.red }]}>{couponError}</Text>}
+          {!appliedCouponCode && coupons.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+              {coupons.map((c) => (
+                <Pressable key={c.code} accessibilityRole="button" accessibilityLabel={`Apply ${c.code}`} onPress={() => handleApplyCoupon(c.code)} style={({ pressed }) => [styles.chip, { backgroundColor: p.summary, borderColor: p.deliveryBorder }, pressed && { opacity: 0.7 }]}>
+                  <Text style={[styles.chipText, { color: p.navy }]}>{c.code}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* Save on your booking */}
+          <Text style={[styles.section, { color: p.fg }]}>Save on your booking</Text>
+          <View style={[styles.saveCard, { borderColor: p.deliveryBorder }]}>
+            <View style={styles.saveRow}>
+              <View style={[styles.saveIcon, { backgroundColor: p.iconBg }]}>
+                <MaterialCommunityIcons name="cash" size={18} color={p.sub} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.saveTitle, { color: p.fg }]}>My Sawari Cash</Text>
+                <View style={[styles.cashChip, { backgroundColor: p.chipBg }]}>
+                  <Text style={[styles.cashChipText, { color: p.navy }]}>{formatCurrency(sawariCash)} available</Text>
+                </View>
+              </View>
+              <DesignToggle
+                accessibilityLabel="Use My Sawari Cash"
+                value={sawariCashToApply > 0}
+                disabled={sawariCash <= 0}
+                onValueChange={(on) => { Haptics.selectionAsync(); applySawariCash(on ? sawariCash : 0); }}
               />
             </View>
-            
-            {isDeliveryRequested && (
-              <View>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                  {(['delivery', 'return', 'both'] as const).map(m => {
-                    const label = m === 'delivery' ? 'Drop off' : m === 'return' ? 'Pick up' : 'Both';
-                    const isSelected = deliveryMode === m;
-                    return (
-                      <Pressable
-                        key={m}
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-                          setDeliveryMode(m);
-                        }}
-                        style={{
-                          flex: 1, paddingVertical: 10, alignItems: 'center',
-                          backgroundColor: isSelected ? colors.primary : 'transparent',
-                          borderRadius: 12, borderWidth: 1,
-                          borderColor: isSelected ? colors.primary : colors.border,
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium', color: isSelected ? colors.primaryForeground : colors.mutedForeground }}>
-                          {label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+            {sawariCashToApply > 0 && !!pricingQuote && (
+              <Text style={[styles.cashNote, { color: p.green }]}>
+                {pricingQuote.sawariCashUsed > 0 ? `${formatCurrency(pricingQuote.sawariCashUsed)} used on this trip (up to ₹50 or 10% of the rent).` : 'Not usable on this trip.'}
+              </Text>
+            )}
 
-                <View>
-                  {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
-                    <DetailRow
-                      icon="map-pin"
-                      label="Deliver To"
-                      value={pickup?.name || 'Select Location'}
-                      isMissing={isMissingPickup}
-                      onPress={() => router.push('/location')}
-                    />
-                  )}
-                  {(deliveryMode === 'both' || deliveryMode === 'return') && (
-                    <DetailRow
-                      icon="map-pin"
-                      label="Collect From"
-                      value={returnAddress?.name || 'Select Location'}
-                      isMissing={isMissingDrop}
-                      onPress={() => router.push('/return-location')}
-                    />
-                  )}
-                </View>
+            <View style={[styles.divider, { backgroundColor: p.divider }]} />
+
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlans }} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowPlans((v) => !v); }} style={styles.saveRow}>
+              <View style={[styles.saveIcon, { backgroundColor: p.iconBg }]}>
+                <MaterialCommunityIcons name="crown-outline" size={18} color={p.sub} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.saveTitle, { color: p.fg }]}>Membership</Text>
+                <Text style={[styles.saveSub, { color: p.sub }]}>
+                  {planToBuy
+                    ? `${PLANS.find((x) => x.key === planToBuy)?.name} membership added · ${formatCurrency(PLANS.find((x) => x.key === planToBuy)?.price || 0)} with this payment`
+                    : isMember
+                      ? `${PLANS.find((x) => x.key === membership!.plan)?.name ?? 'Member'} member${pricingQuote?.subscriptionDiscount ? ` · ${formatCurrency(pricingQuote.subscriptionDiscount)} off this trip` : ''}`
+                      : 'Explore plans and trip savings'}
+                </Text>
+              </View>
+              <Feather name={showPlans ? 'chevron-up' : 'chevron-down'} size={16} color={p.sub} />
+            </Pressable>
+
+            {showPlans && (
+              <View style={{ gap: 8, marginTop: 4 }}>
+                {PLANS.filter((pl) => !isMember || PLANS.findIndex((x) => x.key === pl.key) > PLANS.findIndex((x) => x.key === membership!.plan)).map((pl) => {
+                  const save = Math.min(pl.perTripCap, Math.round(tripRent * pl.pct));
+                  const purple = pl.key === 'plus';
+                  const bg = purple ? p.purple : pl.key === 'pro' ? p.greenBg : p.page;
+                  const border = purple ? p.purple : pl.key === 'pro' ? p.proBorder : p.memberBorder;
+                  const text = purple ? '#FFFFFF' : p.fg;
+                  const sub = purple ? 'rgba(255,255,255,0.85)' : p.sub;
+                  return (
+                    <Pressable
+                      key={pl.key}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${isMember ? 'Upgrade to' : 'Get'} ${pl.name}, ${formatCurrency(pl.price)} a year${save > 0 ? `, save ${formatCurrency(save)} on this trip` : ''}`}
+                      // Picking a plan adds it to this booking (one payment) with a celebration; tapping it again removes it.
+                      onPress={() => {
+                        if (planToBuy === pl.key) { Haptics.selectionAsync(); setPlanToBuy(null); return; }
+                        setPlanToBuy(pl.key);
+                        setCelebrate({ name: pl.name, price: pl.price, save, pctLabel: pl.pctLabel });
+                      }}
+                      style={({ pressed }) => [styles.plan, { backgroundColor: bg, borderColor: border }, pressed && { opacity: 0.9 }]}
+                    >
+                      <View style={[styles.radio, planToBuy === pl.key
+                        ? { borderColor: purple ? '#FFFFFF' : pl.key === 'pro' ? p.green : p.purple, backgroundColor: purple ? '#FFFFFF' : pl.key === 'pro' ? p.green : p.purple, alignItems: 'center', justifyContent: 'center' }
+                        : { borderColor: purple ? '#FFFFFF' : p.radioRing }]}>
+                        {planToBuy === pl.key && <View style={{ width: 5.5, height: 5.5, borderRadius: 3, backgroundColor: purple ? p.purple : '#FFFFFF' }} />}
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={styles.planNameRow}>
+                          <Image source={pl.icon} style={{ width: pl.iconSize, height: pl.iconSize }} contentFit="contain" />
+                          <Text style={[styles.planName, { color: text }]}>{pl.name}</Text>
+                          {save > 0 && (
+                            <View style={[styles.saveChip, { backgroundColor: p.green }]}>
+                              <Text style={styles.saveChipText}>{planToBuy === pl.key ? `${formatCurrency(save)} Saved` : `Save ${formatCurrency(save)} on this trip`}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={[styles.planSub, { color: sub }]} numberOfLines={1}>{pl.pctLabel} off every trip  •  Save up to ₹{pl.annual}/year</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.planPrice, { color: text }]}>{formatCurrency(pl.price)}</Text>
+                        <Text style={[styles.planSub, { color: sub }]}>/year</Text>
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
             )}
           </View>
-          <DetailRow
-            icon="calendar"
-            label="Dates & Time"
-            value={isMissingDates ? 'Select Dates' : `${dateRange} · ${duration}\n${pickupTime} – ${returnTime}`}
-            isMissing={isMissingDates}
-            onPress={() => router.push('/dates')}
-          />
-          <View style={{ paddingTop: 16, paddingBottom: 8 }}>
-            <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: colors.foreground, marginBottom: 12 }}>Driving option</Text>
-            <View style={{ gap: 12 }}>
-              {(['Self Drive', 'With Driver'] as const).map(m => {
-                const isSelected = mode === m;
-                return (
-                  <Pressable
-                    key={m}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setMode(m);
-                    }}
-                    style={({ pressed }) => [
-                      {
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        padding: 16,
-                        borderRadius: 16,
-                        borderWidth: 2,
-                        borderColor: isSelected ? colors.primary : colors.border,
-                        backgroundColor: isSelected ? colors.card : colors.background,
-                        opacity: pressed ? 0.9 : 1,
-                      }
-                    ]}
-                  >
-                    <View style={{
-                      width: 44, height: 44, borderRadius: 22, 
-                      backgroundColor: isSelected ? colors.primary : colors.tintLight,
-                      alignItems: 'center', justifyContent: 'center', marginRight: 14
-                    }}>
-                      <Feather name={m === 'Self Drive' ? 'key' : 'user'} size={20} color={isSelected ? colors.primaryForeground : colors.primaryText} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontFamily: isSelected ? 'Inter_600SemiBold' : 'Inter_500Medium', color: colors.foreground }}>
-                        {m}
-                      </Text>
-                      <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 4 }}>
-                        {m === 'Self Drive' ? 'Drive yourself, no extra charge' : 'Relax with a professional driver'}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
-                      <Text style={{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: isSelected ? colors.primaryText : colors.foreground }}>
-                        {m === 'Self Drive' ? '₹0' : '₹1400/d'}
-                      </Text>
-                      {isSelected ? (
-                        <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 6 }}>
-                          <Feather name="check" size={12} color={colors.primaryForeground} />
-                        </View>
-                      ) : (
-                        <View style={{ width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: colors.border, marginTop: 6 }} />
-                      )}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-        </View>
 
-        {!isVehicleAvailable && !isMissingDates && (
-          <View style={{ backgroundColor: colors.destructive + '12', borderColor: colors.destructive + '40', borderWidth: 1, padding: 16, borderRadius: 12, marginTop: 16 }}>
-            <Text style={{ color: colors.destructive, fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Not Available</Text>
-            <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4 }}>
-              Sorry, this vehicle is no longer available for your selected dates. Please change your dates.
-            </Text>
-          </View>
-        )}
-        </Reanimated.View>
-        <Reanimated.View entering={rise(200)}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Customer details</Text>
-        <Input label="Full name" value={customer.name} error={errors.name} onChangeText={(value) => updateCustomer('name', value)} />
-        <Input label="Mobile number" value={customer.mobile} placeholder="10-digit mobile number" keyboardType="phone-pad" error={errors.mobile} onChangeText={(value) => updateCustomer('mobile', value)} />
-        <Input label="Email (Optional)" value={customer.email} keyboardType="email-address" error={errors.email} onChangeText={(value) => updateCustomer('email', value)} />
-        <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 8, marginBottom: 16, fontStyle: 'italic', lineHeight: 16 }}>
-          Note: Original Driving Licence and Aadhar Card verification is mandatory at the time of vehicle handover.
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          testID="continue-to-payment"
-          onPress={validateAndProceed}
-          disabled={isSubmitting}
-          style={({ pressed }) => [
-            styles.paymentButton,
-            { backgroundColor: (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination || !isVehicleAvailable || isSubmitting) ? colors.muted : colors.primary },
-            pressed && !isSubmitting && styles.pressed
-          ]}
-        >
-          <Text style={[styles.paymentButtonText, { color: (isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination || !isVehicleAvailable || isSubmitting) ? colors.mutedForeground : colors.primaryForeground }]}>
-            {(isMissingPickup || isMissingDrop || isMissingDates || isMissingDestination) ? 'Missing Trip Details' : !isVehicleAvailable ? 'Vehicle Not Available' : 'Continue to payment'}
+          <Text style={[styles.note, { color: p.sub }]}>
+            *Note : Original Driving License and Aadhaar Card verification is Mandatory at the time of vehicle handover
           </Text>
-          {(!isMissingPickup && !isMissingDrop && !isMissingDates && !isMissingDestination && isVehicleAvailable) && (
-            <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
-          )}
-        </Pressable>
-        </Reanimated.View>
-      </KeyboardAwareScrollViewCompat>
-    </View>
+        </ScrollView>
+       </BlurTarget>
+
+        <StickyBookingBar
+          hasTrip={!isMissingDates}
+          isAvailable={isVehicleAvailable}
+          agreed={!isSubmitting && !waitingForPrice}
+          bookLabel={waitingForPrice ? 'Getting price…' : `Pay ${formatCurrency(payable)} & Book`}
+          onNeedLogin={() => setShowLogin(true)}
+          onBookNow={payAndBook}
+          onCheckAvailability={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
+        />
+        {/* "You're saving ₹X — <Plan> Membership Applied!": same trip key as the car page, so it shows once per trip. */}
+        <MembershipSavedPopup hasTrip={!isMissingDates} tripKey={`${selectedCar.id}|${dateRange}|${pickupTime}|${returnTime}`} />
+        {celebrate && (
+          <MembershipCelebration
+            visible
+            confetti
+            plan={celebrate.name}
+            amount={celebrate.save > 0 ? celebrate.save : null}
+            title={`${celebrate.name} Membership Applied!`}
+            note={celebrate.save > 0 ? `${formatCurrency(celebrate.price)} for 1 year, paid with your booking` : `${celebrate.pctLabel} off every trip · ${formatCurrency(celebrate.price)}/year with your booking`}
+            onClose={() => setCelebrate(null)}
+          />
+        )}
+        <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
+      </BlurHost>
+    </KeyboardAvoidingView>
   );
 }
-
-function DetailRow({ icon, label, value, last = false, isMissing = false, onPress }: { icon: React.ComponentProps<typeof Feather>['name']; label: string; value: string; last?: boolean; isMissing?: boolean; onPress?: () => void }) {
-  const colors = useColors();
-  const content = (
-    <View style={[styles.detailRow]}>
-      <Feather name={icon} size={16} color={isMissing ? colors.destructive : colors.mutedForeground} />
-      <Text style={[styles.detailLabel, { color: isMissing ? colors.destructive : colors.mutedForeground }]}>{label}</Text>
-      <Text style={[styles.detailValue, { color: isMissing ? colors.destructive : colors.foreground }]}>{value}</Text>
-      {onPress && <Feather name="chevron-right" size={16} color={isMissing ? colors.destructive : colors.mutedForeground} style={{ marginLeft: 4 }} />}
-    </View>
-  );
-  
-  if (onPress) {
-    return (
-      <Pressable onPress={onPress} style={({pressed}) => [pressed && {opacity: 0.7}]}>
-        {content}
-      </Pressable>
-    );
-  }
-  
-  return content;
-}
-
-function Input({ label, value, placeholder, keyboardType, error, onChangeText }: { label: string; value: string; placeholder?: string; keyboardType?: 'default' | 'phone-pad' | 'email-address'; error?: string; onChangeText: (value: string) => void }) {
-  const colors = useColors();
-  return (
-    <View style={styles.inputGroup}>
-      <Text style={[styles.inputLabel, { color: colors.foreground }]}>{label}</Text>
-      <TextInput
-        value={value}
-        placeholder={placeholder}
-        placeholderTextColor={colors.mutedForeground}
-        keyboardType={keyboardType}
-        onChangeText={onChangeText}
-        style={[styles.input, { backgroundColor: colors.card, borderColor: error ? colors.destructive : colors.border, color: colors.foreground }]}
-      />
-      {error && <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>}
-    </View>
-  );
-}
-
 
 const styles = StyleSheet.create({
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  viewAll: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, marginTop: 12 },
   screen: { flex: 1 },
-  content: { paddingBottom: 40, paddingHorizontal: 24 },
-  topBar: { alignItems: 'center', flexDirection: 'row', gap: 16 },
-  circle: { alignItems: 'center', borderRadius: 99, borderWidth: 1, height: 42, justifyContent: 'center', width: 42 },
-  headerTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
-  carSummary: { alignItems: 'center', borderRadius: 20, flexDirection: 'row', marginTop: 24, padding: 16 },
-  carThumb: { borderRadius: 12, height: 70, width: 90 },
-  carCopy: { marginLeft: 16, flex: 1 },
-  carName: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
-  carMeta: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 4 },
-  carMode: { fontFamily: 'Inter_600SemiBold', fontSize: 12, marginTop: 6 },
-  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 16, marginTop: 32 },
-  tripDetails: { marginTop: 12 },
-  detailRow: { alignItems: 'center', minHeight: 46, flexDirection: 'row', gap: 12 },
-  detailLabel: { fontFamily: 'Inter_400Regular', fontSize: 14, flex: 1 },
-  detailValue: { fontFamily: 'Inter_500Medium', fontSize: 14, maxWidth: '65%', textAlign: 'right' },
-  inputGroup: { marginTop: 16 },
-  inputLabel: { fontFamily: 'Inter_500Medium', fontSize: 13, marginBottom: 8 },
-  input: { borderRadius: 12, borderWidth: 1, fontFamily: 'Inter_400Regular', fontSize: 14, height: 52, paddingHorizontal: 16 },
-  priceSummary: { marginTop: 16 },
-  priceRow: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
-  priceLabel: { fontFamily: 'Inter_400Regular', fontSize: 14 },
-  priceText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
-  payRow: { alignItems: 'center', borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, paddingTop: 20 },
-  payLabel: { fontFamily: 'Inter_500Medium', fontSize: 15 },
-  payValue: { fontFamily: 'Inter_700Bold', fontSize: 24, letterSpacing: -0.5 },
-  paymentButton: { alignItems: 'center', borderRadius: 16, flexDirection: 'row', height: 56, justifyContent: 'center', marginTop: 24 },
-  paymentButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 8 },
-  pressed: { opacity: 0.7 },
-  errorText: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 6 },
+  content: { paddingHorizontal: 16 },
+
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
+  circle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 20 },
+  headerSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+
+  demand: { borderWidth: 1, borderRadius: 8, height: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  demandText: { fontFamily: FONT.medium, fontSize: 11 },
+
+  carCard: { flexDirection: 'row', gap: 12, borderWidth: 1, borderRadius: 12, padding: 8 },
+  carImage: { width: 120, minHeight: 100, alignSelf: 'stretch', borderRadius: 8, overflow: 'hidden' },
+  brand: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+  carName: { fontFamily: FONT.semibold, fontSize: 16, lineHeight: 22 },
+  rating: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 24, paddingHorizontal: 8, borderRadius: 12, marginTop: 6 },
+  ratingText: { fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF' },
+  carMeta: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 17, marginTop: 2 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
+  carPrice: { fontFamily: FONT.bold, fontSize: 18, lineHeight: 24 },
+  carStrike: { fontFamily: FONT.regular, fontSize: 12, textDecorationLine: 'line-through' },
+
+  duration: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 14, marginTop: 16 },
+  durationTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 19 },
+  durationSub: { fontFamily: FONT.regular, fontSize: 10.5, lineHeight: 16, marginTop: 2 },
+  edit: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 8 },
+  editText: { fontFamily: FONT.medium, fontSize: 12 },
+
+  notice: { borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 12 },
+  noticeTitle: { fontFamily: FONT.semibold, fontSize: 13 },
+  noticeText: { fontFamily: FONT.regular, fontSize: 12, marginTop: 2 },
+
+  section: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 22, marginTop: 22, marginBottom: 10 },
+  journeyContainer: { position: 'relative', gap: 10 },
+  journeyLine: { position: 'absolute', left: 5, top: 12, bottom: 12, width: 2, borderRadius: 1 },
+  stop: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  ring: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  innerDot: { width: 4, height: 4, borderRadius: 2 },
+  stopTitle: { fontFamily: FONT.medium, fontSize: 11.5, lineHeight: 17 },
+  stopSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+  changeText: { fontFamily: FONT.medium, fontSize: 12, paddingLeft: 8 },
+
+  couponField: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, height: 48, paddingHorizontal: 12 },
+  couponInput: { flex: 1, fontFamily: FONT.regular, fontSize: 13, padding: 0 },
+  apply: { fontFamily: FONT.medium, fontSize: 13 },
+  couponError: { fontFamily: FONT.medium, fontSize: 11, marginTop: 6 },
+  couponApplied: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, minHeight: 48, paddingHorizontal: 12, paddingVertical: 8 },
+  couponAppliedTitle: { fontFamily: FONT.semibold, fontSize: 13 },
+  couponAppliedSub: { fontFamily: FONT.regular, fontSize: 11, marginTop: 2 },
+  chips: { gap: 8, paddingTop: 8 },
+  chip: { borderWidth: 1, borderRadius: 6, height: 26, paddingHorizontal: 10, justifyContent: 'center' },
+  chipText: { fontFamily: FONT.medium, fontSize: 10.5 },
+
+  saveCard: { borderWidth: 1, borderRadius: 12, padding: 12 },
+  saveRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  saveIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  saveTitle: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 19 },
+  saveSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+  cashChip: { alignSelf: 'flex-start', borderRadius: 4, paddingHorizontal: 6, height: 18, justifyContent: 'center', marginTop: 2 },
+  cashChipText: { fontFamily: FONT.medium, fontSize: 10.5 },
+  cashNote: { fontFamily: FONT.medium, fontSize: 10.5, marginTop: 6, marginLeft: 48 },
+  divider: { height: 1, marginVertical: 12, marginHorizontal: -12 },
+
+  plan: { flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderRadius: 10, paddingVertical: 10, paddingLeft: 9, paddingRight: 9 },
+  radio: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, backgroundColor: '#FFFFFF' },
+  planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  planName: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
+  saveChip: { height: 19, paddingHorizontal: 8, borderRadius: 10, justifyContent: 'center' },
+  saveChipText: { fontFamily: FONT.semibold, fontSize: 8, color: '#FFFFFF' },
+  planSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
+  planPrice: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
+
+  note: { fontFamily: FONT.regular, fontSize: 10.5, lineHeight: 16, textAlign: 'center', marginTop: 18, paddingHorizontal: 8 },
 });

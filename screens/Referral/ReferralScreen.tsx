@@ -19,6 +19,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API, invalidateWalletCache } from '@/services/backend/api';
 import { ReferralSkeleton } from '@/components/loading/ScreenSkeletons';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -819,6 +820,7 @@ function WithdrawModal(p: {
     <Modal visible={p.visible} transparent animationType="fade" onRequestClose={p.onClose} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <Pressable style={styles.scrim} onPress={p.onClose}>
+          <ModalBlur />
           <Pressable onPress={() => {}} style={[styles.sheet, { backgroundColor: colors.card }]}>
             <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 14 }}>
               <View style={styles.sheetHead}>

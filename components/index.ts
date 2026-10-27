@@ -38,3 +38,6 @@ export * from './loading/CarCardSkeleton';
 export * from './loading/BookingSkeleton';
 export * from './loading/HomeCarSkeleton';
 export * from './loading/OfferCardSkeleton';
+export * from './booking/PaymentResult';
+export * from './booking/tripColors';
+export * from './common/FilterIcons';

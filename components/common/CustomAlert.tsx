@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -89,6 +90,7 @@ export function CustomAlertProvider() {
       onRequestClose={close}
     >
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+        <ModalBlur />
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           
           <View style={styles.iconContainer}>

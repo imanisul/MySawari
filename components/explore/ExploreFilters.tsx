@@ -4,9 +4,10 @@ import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Car, MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
+import { Car, MIN_PUBLIC_REVIEW_RATING, parseDayLabel } from '@/utils/sawari';
 import { API } from '@/services/backend/api';
 import { useDetailsPalette, DetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 /**
  * Explore filters and sorting (design: "Filter" sheet with Budget / Car Details / Fuel / Ratings / Brands /
@@ -48,11 +49,11 @@ const BUDGETS: { key: string; label: string; min: number; max: number }[] = [
 
 // Body types in the design's order; any other type the fleet has (Luxury, Bike …) is listed after them.
 const BODY_ORDER: { key: string; label: string; test: (c: string) => boolean }[] = [
-  { key: 'SUV', label: 'SUV', test: (c) => /^suv$/i.test(c) },
-  { key: 'Compact SUV', label: 'Compact SUV', test: (c) => /compact\s*suv/i.test(c) },
-  { key: 'Sedan', label: 'SEDAN', test: (c) => /sedan/i.test(c) },
-  { key: 'Hatchback', label: 'HATCH BACK', test: (c) => /hatch/i.test(c) },
-  { key: 'MUV', label: 'MUV / MPV', test: (c) => /muv|mpv/i.test(c) },
+  { key: 'SUV', label: 'SUV', test: (c) => /suv/i.test(c || '') },
+  { key: 'Compact SUV', label: 'Compact SUV', test: (c) => /compact\s*suv/i.test(c || '') },
+  { key: 'Sedan', label: 'SEDAN', test: (c) => /sedan/i.test(c || '') },
+  { key: 'Hatchback', label: 'HATCH BACK', test: (c) => /hatch/i.test(c || '') },
+  { key: 'MUV', label: 'MUV / MPV', test: (c) => /muv|mpv/i.test(c || '') },
 ];
 
 const TRANSMISSIONS: { key: string; label: string; test: (t: string) => boolean }[] = [
@@ -98,7 +99,8 @@ export function matchesFilters(car: Car, f: ExploreFilters, ratingOf: (c: Car) =
   }
   if (f.body) {
     const known = BODY_ORDER.find((x) => x.key === f.body);
-    if (known ? !known.test(car.category) : car.category !== f.body) return false;
+    const cat = String(car.category || car.type || '');
+    if (known ? !known.test(cat) : cat.toLowerCase() !== f.body.toLowerCase()) return false;
   }
   if (f.transmission) {
     const t = TRANSMISSIONS.find((x) => x.key === f.transmission);
@@ -121,14 +123,21 @@ export function matchesFilters(car: Car, f: ExploreFilters, ratingOf: (c: Car) =
 /** Sort as chosen. "Recommended": vehicles free today first, then the best rated, then the lowest price. */
 export function sortCars<T extends Car>(cars: T[], sort: SortKey, ratingOf: (c: Car) => number | null): T[] {
   const list = [...cars];
-  const avail = (c: Car) => (c.isAvailable === false ? 1 : 0);
   const rating = (c: Car) => ratingOf(c) ?? 0;
-  list.sort((a, b) => {
+  // Availability always comes first, whatever the sort: free vehicles at the top, then busy ones by the
+  // day they are free again (soonest first), and only then the chosen order (price / rating).
+  const busy = (c: Car) => (c.isAvailable === false || (c as any).availability?.available === false ? 1 : 0);
+  const freeFrom = (c: Car) => {
+    const label = (c as any).availability?.nextAvailableFrom;
+    return label ? parseDayLabel(label) ?? 9999 : 9999;
+  };
+  const chosen = (a: T, b: T) => {
     if (sort === 'price-asc') return a.perDay - b.perDay;
     if (sort === 'price-desc') return b.perDay - a.perDay;
     if (sort === 'rating') return rating(b) - rating(a) || a.perDay - b.perDay;
-    return avail(a) - avail(b) || rating(b) - rating(a) || a.perDay - b.perDay;
-  });
+    return rating(b) - rating(a) || a.perDay - b.perDay;
+  };
+  list.sort((a, b) => busy(a) - busy(b) || (busy(a) ? freeFrom(a) - freeFrom(b) : 0) || chosen(a, b));
   return list;
 }
 
@@ -192,6 +201,7 @@ function SheetFrame({ visible, onClose, title, onClear, children, footer }: {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.overlay}>
+        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={styles.closeRow}>
           <Pressable onPress={onClose} style={[styles.closeBtn, { backgroundColor: p.page }]} accessibilityRole="button" accessibilityLabel="Close">

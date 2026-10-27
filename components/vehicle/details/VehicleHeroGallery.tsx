@@ -76,6 +76,9 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
           showsHorizontalScrollIndicator={false}
           onMomentumScrollEnd={onScroll}
           scrollEventThrottle={16}
+          nestedScrollEnabled={true}
+          directionalLockEnabled={true}
+          decelerationRate="fast"
         >
           {images.map((img, i) => (
             <Pressable key={i} accessibilityLabel={`Photo ${i + 1} of ${images.length}`} onPress={openFullScreen} style={{ width: SLIDE_W, height: HEIGHT }}>

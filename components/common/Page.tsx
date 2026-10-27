@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { BottomNavigation } from '../navigation/BottomNavigation';
+import { BlurHost, BlurTarget } from './BottomBlur';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 
 export function Page({
@@ -34,16 +35,19 @@ export function Page({
   );
 
   return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {scroll ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {content}
-        </ScrollView>
-      ) : (
-        content
-      )}
+    // The tab bar blurs the page under it (BlurTarget = the page content, never the bar itself).
+    <BlurHost style={[styles.screen, { backgroundColor: colors.background }]}>
+      <BlurTarget style={styles.screen}>
+        {scroll ? (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+            {content}
+          </ScrollView>
+        ) : (
+          content
+        )}
+      </BlurTarget>
       {bottomNav && <BottomNavigation />}
-    </View>
+    </BlurHost>
   );
 }
 

@@ -9,6 +9,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import Notifications from '@/utils/notifications';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 /**
  * Sign-in sheet (design: "Get started with My Sawari" → "Verify your account" → "Let's complete your profile").
@@ -34,15 +35,16 @@ const LIGHT = {
   skip: '#D4D4D4',
   fieldBg: '#FAFAFA',
   fieldBorder: '#EAECF1',
+  field2: '#E5E5E5', // name and email boxes use Neutral/200
   fieldFocus: '#A3A3A3',
   navy: '#2F3E75',
   onNavy: '#FFFFFF',
   disabledBg: '#EAECF1',
   disabledText: '#A3A3A3',
   roundBtn: '#F5F5F5',
-  error: '#DC2626',
-  errorBg: '#FEF2F2',
-  errorBorder: '#FEE2E2',
+  error: '#EF4444',
+  errorBg: '#FFFAFA',
+  errorBorder: '#FEF2F2',
 };
 
 /** "7356356123" → "73563 56123" (the design's 5-5 grouping). */
@@ -70,7 +72,7 @@ export function LoginBottomSheet({
   const ui = isDarkMode
     ? {
         sheet: colors.card, title: colors.foreground, copy: colors.mutedForeground, faint: colors.mutedForeground,
-        skip: colors.disabledText, fieldBg: colors.muted, fieldBorder: colors.border, fieldFocus: colors.mutedForeground,
+        skip: colors.disabledText, fieldBg: colors.muted, fieldBorder: colors.border, field2: colors.border, fieldFocus: colors.mutedForeground,
         navy: '#3E509A', onNavy: '#FFFFFF', disabledBg: colors.disabledBg, disabledText: colors.disabledText,
         roundBtn: colors.secondary, error: colors.destructive, errorBg: colors.destructive + '14', errorBorder: colors.destructive + '40',
       }
@@ -212,22 +214,23 @@ export function LoginBottomSheet({
       ? { label: 'Verify & Continue', enabled: digitsOf(otp).length === OTP_LENGTH && !loading, onPress: () => verify() }
       : { label: 'Continue', enabled: canCreate, onPress: createAccount };
 
-  const field = (key: string) => [
+  const field = (key: string, border = ui.fieldBorder) => [
     styles.field,
-    { backgroundColor: ui.fieldBg, borderColor: focus === key ? ui.fieldFocus : ui.fieldBorder },
+    { backgroundColor: ui.fieldBg, borderColor: focus === key ? ui.fieldFocus : border },
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (step === 'otp' ? back() : !loading && onClose())} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (step === 'otp' ? back() : !loading && !required && onClose())} statusBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => (step === 'phone' && !loading ? onClose() : Keyboard.dismiss())} accessibilityLabel="Close" />
+        <ModalBlur />
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => (step === 'phone' && !loading && !required ? onClose() : Keyboard.dismiss())} accessibilityLabel="Close" />
         <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: Math.max(insets.bottom, 16) }]}>
 
           {step === 'phone' && (
             <>
               <View style={styles.headRow}>
                 <Text style={[styles.title, { color: ui.title, flex: 1 }]}>Get started with My Sawari</Text>
-                {showSkip && (
+                {showSkip && !required && (
                   <Pressable onPress={() => !loading && onClose()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Skip">
                     <Text style={[styles.skip, { color: ui.skip }]}>SKIP</Text>
                   </Pressable>
@@ -272,12 +275,13 @@ export function LoginBottomSheet({
             <>
               <View style={styles.otpHead}>
                 <Pressable onPress={back} style={[styles.round, { backgroundColor: ui.roundBtn }]} accessibilityRole="button" accessibilityLabel="Back">
-                  <Feather name="chevron-left" size={18} color={ui.copy} />
+                  <Feather name="chevron-left" size={24} color={ui.copy} />
                 </Pressable>
                 <Text style={[styles.title, styles.center, { color: ui.title, flex: 1 }]}>Verify your account</Text>
-                <Pressable onPress={() => !loading && onClose()} style={[styles.round, { backgroundColor: ui.roundBtn }]} accessibilityRole="button" accessibilityLabel="Close">
-                  <Feather name="x" size={18} color={ui.copy} />
-                </Pressable>
+                {required ? <View style={styles.round} /> : (
+                <Pressable onPress={() => !loading && onClose()} style={[styles.round, { backgroundColor: ui.fieldBg }]} accessibilityRole="button" accessibilityLabel="Close">
+                  <Feather name="x" size={20} color={ui.copy} />
+                </Pressable>)}
               </View>
               <Text style={[styles.small, styles.center, { color: ui.copy }]}>
                 Enter the 4-digit code sent to WhatsApp{'\n'}{masked(mobile)} ·{' '}
@@ -291,7 +295,7 @@ export function LoginBottomSheet({
                 ui={ui}
                 hasError={!!error}
               />
-              {!!error && <Text style={[styles.error, { color: ui.error }]}>{error}</Text>}
+              {!!error && <Text style={[styles.error, { color: ui.error, marginTop: 0 }]}>{error}</Text>}
               <Text style={[styles.small, styles.center, { color: ui.copy }]}>
                 Didn't receive the OTP?{' '}
                 {resendIn > 0 ? (
@@ -305,47 +309,51 @@ export function LoginBottomSheet({
 
           {step === 'profile' && (
             <>
-              <Text style={[styles.title, { color: ui.title }]}>Let's complete your profile</Text>
-              <Text style={[styles.copy, { color: ui.copy, marginTop: -6 }]}>Add your details to get started with MySawari.</Text>
-              <View style={{ gap: 6 }}>
-                <Text style={[styles.label, { color: ui.copy }]}>FULL NAME</Text>
-                <View style={field('name')}>
-                  <TextInput
-                    value={name}
-                    onChangeText={(t) => { setName(t.replace(/\s{2,}/g, ' ').slice(0, 60)); setError(null); }}
-                    onFocus={() => setFocus('name')}
-                    onBlur={() => setFocus(null)}
-                    placeholder="Enter your full name"
-                    placeholderTextColor={ui.faint}
-                    autoCapitalize="words"
-                    textContentType="name"
-                    autoComplete="name"
-                    autoFocus
-                    style={[styles.input, { color: ui.title }]}
-                  />
-                </View>
+              <View style={{ gap: 8, minHeight: 60, justifyContent: 'center' }}>
+                <Text style={[styles.title, { color: ui.title }]}>Let’s complete your profile</Text>
+                <Text style={[styles.copyPlain, { color: ui.copy }]}>Add your details to get started with MySawari.</Text>
               </View>
-              <View style={{ gap: 6 }}>
-                <Text style={[styles.label, { color: ui.copy }]}>EMAIL ADDRESS</Text>
-                <View style={field('email')}>
-                  <TextInput
-                    value={email}
-                    onChangeText={(t) => { setEmail(t.trim()); setError(null); }}
-                    onFocus={() => setFocus('email')}
-                    onBlur={() => setFocus(null)}
-                    placeholder="Enter your email address"
-                    placeholderTextColor={ui.faint}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    textContentType="emailAddress"
-                    autoComplete="email"
-                    style={[styles.input, { color: ui.title }]}
-                  />
+              <View style={{ gap: 12, minHeight: 190 }}>
+                <View style={{ gap: 4 }}>
+                  <Text style={[styles.label, { color: ui.copy }]}>FULL NAME</Text>
+                  <View style={field('name', ui.field2)}>
+                    <TextInput
+                      value={name}
+                      onChangeText={(t) => { setName(t.replace(/\s{2,}/g, ' ').slice(0, 60)); setError(null); }}
+                      onFocus={() => setFocus('name')}
+                      onBlur={() => setFocus(null)}
+                      placeholder="Enter your full name"
+                      placeholderTextColor={ui.copy}
+                      autoCapitalize="words"
+                      textContentType="name"
+                      autoComplete="name"
+                      autoFocus
+                      style={[styles.input, { color: ui.title }]}
+                    />
+                  </View>
                 </View>
-                <Text style={[styles.hint, { color: emailOk ? ui.copy : ui.error }]}>
-                  {emailOk ? "We'll use this for booking updates and receipts." : 'Please enter a valid email address.'}
-                </Text>
+                <View style={{ gap: 4 }}>
+                  <Text style={[styles.label, { color: ui.copy }]}>EMAIL ADDRESS</Text>
+                  <View style={field('email', ui.field2)}>
+                    <TextInput
+                      value={email}
+                      onChangeText={(t) => { setEmail(t.trim()); setError(null); }}
+                      onFocus={() => setFocus('email')}
+                      onBlur={() => setFocus(null)}
+                      placeholder="Enter your email address"
+                      placeholderTextColor={ui.copy}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      textContentType="emailAddress"
+                      autoComplete="email"
+                      style={[styles.input, { color: ui.title }]}
+                    />
+                  </View>
+                  <Text style={[styles.small, { color: emailOk ? ui.copy : ui.error }]}>
+                    {emailOk ? 'We’ll use this for booking updates and receipts.' : 'Please enter a valid email address.'}
+                  </Text>
+                </View>
               </View>
               <View style={field('ref')}>
                 <TextInput
@@ -355,7 +363,7 @@ export function LoginBottomSheet({
                   onFocus={() => setFocus('ref')}
                   onBlur={() => setFocus(null)}
                   placeholder="Referral Code(Optional)"
-                  placeholderTextColor={ui.faint}
+                  placeholderTextColor={ui.copy}
                   autoCapitalize="characters"
                   autoCorrect={false}
                   style={[styles.input, { color: ui.title }]}
@@ -366,8 +374,7 @@ export function LoginBottomSheet({
                   {confirmed && <Feather name="check" size={10} color="#FFFFFF" />}
                 </View>
                 <Text style={[styles.checkText, { color: ui.copy }]}>
-                  I confirm that my full name matches the name on my valid{' '}
-                  <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={() => Linking.openURL('https://mysawari.in/terms/').catch(() => {})}>government-issued ID</Text>.
+                  I confirm that my full name matches the name on my valid government-issued ID.
                 </Text>
               </Pressable>
               {!!error && <Text style={[styles.error, { color: ui.error, textAlign: 'left' }]}>{error}</Text>}
@@ -467,14 +474,15 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.45)' },
-  // Design: white sheet, 24 top corners, 16 side padding, 16 between blocks.
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 20, gap: 16 },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.32)' },
+  // Design: white sheet, 1px #E7EAF4 border (not on the bottom edge), 24 top corners, 16 side padding, 16 between blocks.
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: '#E7EAF4', paddingHorizontal: 16, paddingTop: 20, gap: 16 },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
   center: { textAlign: 'center' },
   skip: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   copy: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22, marginTop: -8 },
+  copyPlain: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22 },
   small: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   field: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 52, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
   cc: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 17 },
@@ -485,9 +493,8 @@ const styles = StyleSheet.create({
   otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
   otpBox: { width: 52, height: 52, borderWidth: 1, borderRadius: 8, textAlign: 'center', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, padding: 0 },
   error: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: -4 },
-  label: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, letterSpacing: 0.4 },
-  hint: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, lineHeight: 18 },
-  checkRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  label: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 17 },
+  checkRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
   check: { width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, marginTop: 2, alignItems: 'center', justifyContent: 'center' },
   checkText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

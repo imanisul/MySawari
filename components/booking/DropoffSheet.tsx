@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
+import { hasGoogleMaps } from '@/services/maps/google';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 
 /**
@@ -89,10 +90,17 @@ export function DropoffSheet() {
     setDropoff({ id: pl.id, name: pl.name, address: pl.address, latitude: pl.latitude, longitude: pl.longitude, source: pl.source });
     import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: pl.name }));
     if (params.forSpecificCar === 'true') {
-      router.dismissAll();
-      setTimeout(() => router.push('/booking'), 100);
+      // Car page → destination → booking: swap this page for the booking page (no jump through Home).
+      router.replace('/booking');
+    } else if (params.returnBack === 'true') {
+      // Changing the destination from the date picker, the booking page or the trip sheet: go straight
+      // back there with the dates already chosen. (It used to open a second, empty date picker whose
+      // "Confirm Dates" then returned to this page instead.)
+      router.back();
     } else {
-      router.push({ pathname: '/dates', params: { returnBack: params.returnBack === 'true' ? 'true' : 'false', fresh: 'true' } });
+      // Home → destination → dates: this page is swapped for the date picker, which is then swapped for
+      // the results, so Back from the results goes straight to Home.
+      router.replace({ pathname: '/dates', params: { returnBack: 'false', fresh: 'true' } });
     }
   };
 
@@ -132,16 +140,22 @@ export function DropoffSheet() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         renderItem={({ item }) => <Row p={p} title={item.name} sub={item.address} onPress={() => select(item)} />}
-        ListFooterComponent={custom ? (
-          // A place that isn't listed can still be the destination — never a dead end.
-          <Row
-            p={p}
-            title={`Use “${typed}”`}
-            sub="Set as your destination"
-            icon="plus"
-            onPress={() => select({ id: `custom-${typed.toLowerCase()}`, name: typed, address: 'Your destination', latitude: 0, longitude: 0, source: 'database' })}
-          />
-        ) : null}
+        ListFooterComponent={
+          <>
+            {custom && (
+              // A place that isn't listed can still be the destination — never a dead end.
+              <Row
+                p={p}
+                title={`Use “${typed}”`}
+                sub="Set as your destination"
+                icon="plus"
+                onPress={() => select({ id: `custom-${typed.toLowerCase()}`, name: typed, address: 'Your destination', latitude: 0, longitude: 0, source: 'database' })}
+              />
+            )}
+            {/* Google's terms: results shown without a Google map carry its credit. */}
+            {hasGoogleMaps && places.length > 0 && <Text style={[styles.powered, { color: p.muted }]}>powered by Google</Text>}
+          </>
+        }
         ListEmptyComponent={!searching && typed.length >= 3 ? (
           <Text style={[styles.empty, { color: p.muted }]}>No places found. Try a nearby town or landmark.</Text>
         ) : null}
@@ -166,6 +180,7 @@ function Row({ p, title, sub, onPress, icon }: { p: ReturnType<typeof useDetails
 }
 
 const styles = StyleSheet.create({
+  powered: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, textAlign: 'right', marginTop: 8, marginHorizontal: 16 },
   page: { flex: 1, paddingHorizontal: 16 },
   // Design: 361×48 field, 1px border, radius 8, icon + placeholder.
   search: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 48, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, marginBottom: 12 },

@@ -34,7 +34,12 @@ export type TripPrice =
       membershipDiscount: number;
       /** Only set for an active membership. */
       planName: string | null;
+      /** A plan being bought with this booking (its discount is in membershipDiscount, its price in payableNow). */
+      buyingPlan: string | null;
+      membershipFee: number;
       payableNow: number;
+      /** SawariCash taken off what's paid (quote's sawariCashUsed). */
+      sawariCashUsed: number;
       balance: number;
       kmText: string;
     };
@@ -92,9 +97,11 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     couponDiscount: q.couponDiscount,
     membershipDiscount,
     planName: activePlan,
+    buyingPlan: q.membershipPlanToBuy ? PLAN_NAMES[q.membershipPlanToBuy] ?? null : null,
+    membershipFee: q.membershipFee || 0,
     payableNow: q.onlinePayableNow ?? Math.min(BOOKING_ADVANCE_AMOUNT, final),
+    sawariCashUsed: q.sawariCashUsed || 0,
     balance: q.remainingRentalAmount,
     kmText: q.rentalDays >= 2 ? 'Unlimited km' : 'Incl. 300 km',
   };
 }
-

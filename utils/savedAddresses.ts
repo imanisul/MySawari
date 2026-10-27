@@ -9,6 +9,8 @@ import { LocationResult } from '@/utils/sawari';
 export type SavedAddress = LocationResult & {
   /** Short tag shown before the name, e.g. "Airport". */
   label?: string;
+  /** Contact number for the person at this address. */
+  phone?: string;
   savedAt: number;
 };
 
@@ -38,6 +40,43 @@ export async function saveAddress(userId: string | null | undefined, loc: Locati
   const next = [entry, ...list.filter((a) => !samePlace(a, loc))].slice(0, MAX_SAVED);
   try {
     await AsyncStorage.setItem(keyFor(userId), JSON.stringify(next));
-  } catch {}
+  } catch { }
+  return next;
+}
+
+/** Forgets one saved address (Profile → Saved Addresses). */
+export async function removeSavedAddress(userId: string | null | undefined, id: string): Promise<SavedAddress[]> {
+  const next = (await getSavedAddresses(userId)).filter((a) => a.id !== id);
+  try {
+    await AsyncStorage.setItem(keyFor(userId), JSON.stringify(next));
+  } catch { }
+  return next;
+}
+
+/** Patches fields on a saved address (e.g. phone number) without replacing the whole entry. */
+export async function updateSavedAddress(userId: string | null | undefined, id: string, patch: Partial<Pick<SavedAddress, 'label' | 'phone'>>): Promise<SavedAddress[]> {
+  const list = await getSavedAddresses(userId);
+  const next = list.map((a) => (a.id === id ? { ...a, ...patch } : a));
+  try {
+    await AsyncStorage.setItem(keyFor(userId), JSON.stringify(next));
+  } catch { }
+  return next;
+}
+
+/** Replaces an existing saved address when editing an address. */
+export async function replaceSavedAddress(userId: string | null | undefined, id: string, loc: LocationResult, label?: string): Promise<SavedAddress[]> {
+  const list = await getSavedAddresses(userId);
+  const existing = list.find((a) => a.id === id);
+  const updated: SavedAddress = {
+    ...loc,
+    id,
+    label: label ?? existing?.label,
+    phone: existing?.phone,
+    savedAt: Date.now(),
+  };
+  const next = list.map((a) => (a.id === id ? updated : a));
+  try {
+    await AsyncStorage.setItem(keyFor(userId), JSON.stringify(next));
+  } catch { }
   return next;
 }

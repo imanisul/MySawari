@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { BottomNavigation, LoginBottomSheet } from '@/components';
+import { BlurHost, BlurTarget } from '@/components/common/BottomBlur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { API, BookingSnapshot } from '@/services/backend/api';
@@ -17,7 +18,7 @@ import { LoadingImage } from '@/components/common/LoadingImage';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal, ReviewTrip } from '@/components/booking/ReviewModal';
 import { useDetailsPalette, DetailsPalette } from '@/components/vehicle/details/detailsPalette';
-import { FONT, shortDate } from '@/components/booking/TripDetailParts';
+import { FONT, shortDate, driverLabel } from '@/components/booking/TripDetailParts';
 
 /**
  * Activity (design: "Activity" list). Underlined tabs, then one card per booking: photo, status tag, name,
@@ -79,6 +80,11 @@ export default function BookingsScreen() {
     prevBookings.current = bookings;
   }, [loading, bookings, initialTabSet]);
 
+  // The Cancelled tab only appears when the customer actually has a cancelled trip.
+  const hasCancelled = bookings.some((b) => b.status === 'CANCELLED' || b.status === 'FAILED');
+  const tabs = hasCancelled ? TABS : TABS.filter((t) => t !== 'Cancelled');
+  useEffect(() => { if (!hasCancelled && tab === 'Cancelled') setTab('All'); }, [hasCancelled, tab]);
+
   // Active only once the operations app has handed the vehicle over (status mapped to ONGOING).
   const filtered = bookings
     .filter((b) => {
@@ -101,7 +107,7 @@ export default function BookingsScreen() {
   if (isAuthenticated === null) {
     return (
       <View style={[styles.screen, { backgroundColor: p.page }]}>
-        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>Activity</Text>
+        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>My Trips</Text>
         <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
           <BookingSkeleton index={0} />
           <BookingSkeleton index={1} />
@@ -116,7 +122,7 @@ export default function BookingsScreen() {
   if (!isAuthenticated) {
     return (
       <View style={[styles.screen, { backgroundColor: p.page }]}>
-        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>Activity</Text>
+        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>My Trips</Text>
         <View style={styles.signedOut}>
           <View style={[styles.emptyCircle, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
             <Feather name="calendar" size={24} color={p.fg} />
@@ -147,13 +153,14 @@ export default function BookingsScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: p.page }]}>
-      <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>Activity</Text>
+    <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
+     <BlurTarget style={{ flex: 1 }}>
+      <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>My Trips</Text>
 
       {/* Underlined tabs */}
       <View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {TABS.map((item) => {
+          {tabs.map((item) => {
             const on = tab === item;
             return (
               <Pressable
@@ -212,6 +219,7 @@ export default function BookingsScreen() {
           ))}
         </ScrollView>
       )}
+     </BlurTarget>
 
       <BottomNavigation />
 
@@ -225,7 +233,7 @@ export default function BookingsScreen() {
           onSuccess={() => { setExtendFor(null); refetch(); }}
         />
       )}
-    </View>
+    </BlurHost>
   );
 }
 
@@ -277,7 +285,7 @@ function TripCard({ p, booking: b, image, canRate, onOpen, onRate, onExtend, onB
   const t = tag[kind];
 
   return (
-    <View style={[styles.card, { borderColor: p.border, backgroundColor: p.page }]}>
+    <View style={[styles.card, (kind === 'completed' || kind === 'cancelled') && styles.cardDone, { borderColor: p.segBorder, backgroundColor: p.page }]}>
       <Pressable onPress={onOpen} style={styles.top} accessibilityRole="button" accessibilityLabel={`${b.vehicleName}, ${t.label}. View details`}>
         <View style={[styles.photo, { backgroundColor: p.iconBg }]}>
           {image ? (
@@ -294,7 +302,7 @@ function TripCard({ p, booking: b, image, canRate, onOpen, onRate, onExtend, onB
           <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1}>
             {shortDate(b.pickupDate)}, {b.pickupTime || '10:00 AM'} → {shortDate(b.returnDate)}, {b.dropTime || '10:00 AM'}
           </Text>
-          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1}>{b.driverMode || 'Self Drive'} • {days} day{days === 1 ? '' : 's'}</Text>
+          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1}>{driverLabel(b.driverMode)} • {days} day{days === 1 ? '' : 's'}</Text>
           <View style={styles.linksRow}>
             {canRate ? (
               <Pressable onPress={onRate} hitSlop={6} style={[styles.rateBtn, { borderColor: p.navy }]} accessibilityRole="button">
@@ -359,13 +367,15 @@ function Empty({ p, icon, title, copy, action, onAction }: { p: DetailsPalette; 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   title: { fontFamily: FONT.semibold, fontSize: 28, lineHeight: 36, paddingHorizontal: 16 },
-  tabs: { paddingHorizontal: 16, gap: 22, paddingTop: 12 },
-  tab: { alignItems: 'center' },
+  // Figma frame: 393×48 — 4 above, 8 below, a 36px strip of tabs between (text centred, underline on the bottom edge).
+  tabs: { paddingHorizontal: 16, gap: 22, paddingTop: 4, paddingBottom: 8 },
+  tab: { alignItems: 'center', justifyContent: 'flex-end', height: 36 },
   tabText: { fontSize: 14, lineHeight: 20, paddingHorizontal: 2 },
   underline: { height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 6 },
   list: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
 
-  card: { borderWidth: 1, borderRadius: 12, padding: 8, gap: 8 },
+  card: { borderWidth: 1, borderRadius: 12, padding: 8, gap: 6 },
+  cardDone: { gap: 12 }, // Figma 361×177 card (ends in the 30px Book Again button)
   top: { flexDirection: 'row', gap: 12 },
   photo: { width: 120, height: 116, borderRadius: 6, overflow: 'hidden' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },

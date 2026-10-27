@@ -3,8 +3,10 @@ import { Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, 
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import { useSawari } from '@/context/SawariContext';
 import { LocationResult } from '@/utils/sawari';
 import { LocationSearchBody } from './LocationSearchBody';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 /** Height of the sheet's own content — the slide distance is measured from this, not a fixed guess. */
 const SHEET_FALLBACK_HEIGHT = 520;
@@ -31,6 +33,7 @@ export function SetLocationSheet({
   onSelect: (loc: LocationResult) => void;
 }) {
   const colors = useColors();
+  const { isDarkMode } = useSawari();
   const insets = useSafeAreaInsets();
 
   const slide = useRef(new Animated.Value(SHEET_FALLBACK_HEIGHT)).current;
@@ -64,6 +67,7 @@ export function SetLocationSheet({
   return (
     <View style={styles.root} pointerEvents={visible ? 'auto' : 'none'}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.scrim, { opacity: fade }]}>
+        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close location search" />
       </Animated.View>
 
@@ -78,8 +82,8 @@ export function SetLocationSheet({
           style={[
             styles.sheet,
             {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
+              backgroundColor: isDarkMode ? colors.card : '#FFFFFF',
+              borderColor: isDarkMode ? colors.border : '#E7EAF4',
               paddingBottom: Math.max(insets.bottom, 16),
               transform: [{ translateY: slide }],
             },
@@ -87,8 +91,8 @@ export function SetLocationSheet({
         >
           <View style={styles.headerRow}>
             <View style={styles.headerCopy}>
-              <Text style={[styles.title, { color: colors.foreground }]}>Set Location</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
+              <Text style={[styles.title, { color: isDarkMode ? colors.foreground : '#262626' }]}>Set Location</Text>
+              <Text style={[styles.subtitle, { color: isDarkMode ? colors.mutedForeground : '#737373' }]}>
                 Where should we bring your ride? Search a place or use your current location.
               </Text>
             </View>
@@ -98,9 +102,9 @@ export function SetLocationSheet({
               testID="set-location-close"
               hitSlop={10}
               onPress={onClose}
-              style={[styles.closeButton, { backgroundColor: colors.secondary }]}
+              style={[styles.closeButton, { backgroundColor: isDarkMode ? colors.secondary : '#FAFAFA' }]}
             >
-              <Feather name="x" size={20} color={colors.foreground} />
+              <Feather name="x" size={20} color={isDarkMode ? colors.foreground : '#737373'} />
             </Pressable>
           </View>
 
@@ -114,7 +118,7 @@ export function SetLocationSheet({
 const styles = StyleSheet.create({
   root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end', zIndex: 40 },
   avoider: { width: '100%', justifyContent: 'flex-end', maxHeight: '92%' },
-  scrim: { backgroundColor: 'rgba(16,27,46,0.45)' },
+  scrim: { backgroundColor: 'rgba(38, 38, 38, 0.32)' },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -128,8 +132,8 @@ const styles = StyleSheet.create({
     }),
   },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
-  headerCopy: { flex: 1, gap: 8 },
-  title: { fontFamily: 'Inter_600SemiBold', fontSize: 19, lineHeight: 29 },
-  subtitle: { fontFamily: 'Inter_500Medium', fontSize: 15, lineHeight: 22 },
-  closeButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1, gap: 4 },
+  title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
+  subtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
+  closeButton: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

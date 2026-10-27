@@ -24,13 +24,13 @@ const light = {
   divider: '#EFEFEF',
   deliveryBorder: '#E7EAF4',
   // Gold/Bg = rgba(251,188,4,0.1); its border is the same wash at 0.21 alpha.
-  demandBg: 'rgba(251, 188, 4, 0.1)',
+  demandBg: 'rgba(251, 188, 4, 0.1)', // Figma "Gold/Bg" (urgency message, benefit circles)
   demandBorder: 'rgba(251, 188, 4, 0.21)',
   purple: '#6152D8',
   purpleCheck: '#6B5AED',
   purpleBg: '#F0EFFD',
   purpleBgEnd: '#E2DCFC',
-  purpleGlow: '#B3AAF5',
+  purpleGlow: '#9C90F3', // Figma "Ellipse 4" on the Why card
   purpleBorder: '#E0DDFB',
   memberBorder: '#D1CCF9',
   proBorder: '#B0DACB',

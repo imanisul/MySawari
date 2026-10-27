@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 export type SortKey = 'recommended' | 'price_asc' | 'price_desc' | 'rating';
 
@@ -33,6 +34,7 @@ export function SortSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <ModalBlur />
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close sort" />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.header}>

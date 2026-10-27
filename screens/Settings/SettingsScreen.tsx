@@ -1,293 +1,195 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Pressable } from 'react-native';
-import { CustomAlert } from '@/components';
-import { useSawari } from '@/context/SawariContext';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
+import { CustomAlert } from '@/components';
+import { useSawari } from '@/context/SawariContext';
+import Notifications from '@/utils/notifications';
+import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { getContactPrefs, setContactPrefs, ContactPrefs } from '@/utils/contactPreferences';
+import { ACCOUNT_EMAIL, SUPPORT_PHONE } from '@/constants/support';
+import { Dashes, DesignToggle } from '@/components/profile/ProfileParts';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
-// ─── Design tokens (from Figma) ────────────────────────────────────────────────
-const T = {
-  white: '#FFFFFF',
-  neutral800: '#262626',
-  neutral500: '#737373',
-  neutral300: '#D4D4D4',
-  neutral100: '#F5F5F5',
-  surface: '#F9F9FB',
-  border: '#EAECF1',
-  primary500: '#2F3E75',
-  toggleOff: '#D4D7E0',
-  red600: '#DC2626',
-  red50: '#FEF2F2',
-  redSurface: '#FFFAFA',
-};
+const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
 
-const FONT = {
-  medium: 'Inter_500Medium',
-  semibold: 'Inter_600SemiBold',
-};
+/**
+ * Figma "Settings": Recommendations & Reminder (SMS / WhatsApp switches with the note), Notifications &
+ * Location (the real phone permissions, in the same box style), and Account Deletion (a request goes
+ * through support — popup).
+ */
+export default function SettingsScreen() {
+  const p = useDetailsPalette();
+  const router = useRouter();
+  const { isAuthenticated, customer } = useSawari();
 
-// ─── Building blocks ──────────────────────────────────────────────────────────
-function SawariToggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
-  const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
+  const [prefs, setPrefs] = useState<ContactPrefs>({ sms: true, whatsapp: true });
+  const [showDelete, setShowDelete] = useState(false);
 
+  // Reflect the real OS permissions (re-read when coming back from the system Settings app).
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [locationEnabled, setLocationEnabled] = useState(false);
+  const refreshPermissions = useCallback(async () => {
+    try { setNotificationsEnabled((await Notifications.getPermissionsAsync()).status === 'granted'); } catch {}
+    try { setLocationEnabled((await Location.getForegroundPermissionsAsync()).status === 'granted'); } catch {}
+  }, []);
   useEffect(() => {
-    Animated.timing(anim, { toValue: value ? 1 : 0, duration: 160, useNativeDriver: false }).start();
-  }, [value]);
+    refreshPermissions();
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') refreshPermissions(); });
+    return () => sub.remove();
+  }, [refreshPermissions]);
 
-  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [2, 20] });
-  const trackColor = anim.interpolate({ inputRange: [0, 1], outputRange: [T.toggleOff, T.primary500] });
+  useEffect(() => { getContactPrefs(customer?.id).then(setPrefs); }, [customer?.id]);
 
-  return (
-    <Pressable
-      hitSlop={8}
-      onPress={() => {
-        Haptics.selectionAsync();
-        onChange(!value);
-      }}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-    >
-      <Animated.View style={[styles.toggleTrack, { backgroundColor: trackColor }]}>
-        <Animated.View style={[styles.toggleThumb, { transform: [{ translateX }] }]} />
-      </Animated.View>
-    </Pressable>
-  );
-}
+  const setPref = (key: keyof ContactPrefs, on: boolean) => {
+    Haptics.selectionAsync();
+    const next = { ...prefs, [key]: on };
+    setPrefs(next);
+    setContactPrefs(customer?.id, next);
+  };
 
-function DashedDivider() {
-  // Single-side dashed borders are unreliable on iOS; this clips a dashed box to 1px.
-  return (
-    <View style={styles.dashedClip}>
-      <View style={styles.dashedLine} />
+  const openSettings = (title: string, message: string) => {
+    CustomAlert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Open Settings', onPress: () => Linking.openSettings() },
+    ]);
+  };
+
+  const onNotifications = async (val: boolean) => {
+    Haptics.selectionAsync();
+    if (!val) return openSettings('Turn Off Notifications', 'This opens system Settings, where you can turn off notifications for MySawari.');
+    const res = await Notifications.requestPermissionsAsync();
+    if (res.status === 'granted') setNotificationsEnabled(true);
+    else openSettings('Enable Notifications', 'MySawari needs permission in Settings to send you trip updates.');
+  };
+
+  const onLocation = async (val: boolean) => {
+    Haptics.selectionAsync();
+    if (!val) return openSettings('Turn Off Location', 'This opens system Settings, where you can turn off location access for MySawari.');
+    const res = await Location.requestForegroundPermissionsAsync();
+    if (res.status === 'granted') setLocationEnabled(true);
+    else openSettings('Enable Location', 'MySawari needs permission in Settings to detect your pickup location.');
+  };
+
+  // Plain render functions (not nested components), so the switches keep their state between renders.
+  const switchRow = (label: string, value: boolean, onChange: (v: boolean) => void) => (
+    <View key={label} style={styles.switchRow}>
+      <Text style={[styles.switchLabel, { color: p.fg }]}>{label}</Text>
+      <DesignToggle value={value} onValueChange={onChange} accessibilityLabel={label} />
     </View>
   );
-}
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-export default function SettingsScreen() {
-  const { logout, isAuthenticated } = useSawari();
-  const router = useRouter();
-  const params = useLocalSearchParams<{ action?: string }>();
-
-  const [smsEnabled, setSmsEnabled] = useState(true);
-  const [whatsappEnabled, setWhatsappEnabled] = useState(true);
-
-  // Profile's "Logout" option opens this screen with ?action=logout
-  useEffect(() => {
-    if (params.action === 'logout' && isAuthenticated === true) {
-      router.setParams({ action: undefined } as any);
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      CustomAlert.alert('Logout', 'Are you sure you want to log out?', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/');
-          },
-        },
-      ]);
-    }
-  }, [params.action, isAuthenticated]);
-
-  const handleBack = () => {
-    Haptics.selectionAsync();
-    if (router.canGoBack()) router.back();
-    else router.replace('/');
-  };
-
-  const handleDeleteAccount = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-    CustomAlert.alert(
-      'Delete My Sawari account',
-      'This will permanently delete your account, booking history and SawariCash. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Continue', style: 'destructive', onPress: () => router.push('/help') },
-      ]
-    );
-  };
+  // Design box: grey card with the note on top, the switches in one white card with dashed lines between.
+  const group = (note: string, rows: React.ReactNode[]) => (
+    <View style={[styles.card, { backgroundColor: p.soft, borderColor: p.border }]}>
+      <Text style={[styles.note, { color: p.muted }]}>{note}</Text>
+      <View style={[styles.inner, { backgroundColor: p.page, borderColor: p.border }]}>
+        {rows.map((r, i) => (
+          <React.Fragment key={i}>
+            {i > 0 && <Dashes color={p.border} />}
+            {r}
+          </React.Fragment>
+        ))}
+      </View>
+    </View>
+  );
 
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity activeOpacity={0.7} style={styles.backBtn} onPress={handleBack} accessibilityLabel="Go back">
-            <Feather name="chevron-left" size={22} color={T.neutral800} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Settings</Text>
-        </View>
+    <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: p.page }]}>
+      <View style={[styles.header, { borderBottomColor: p.border }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
+          <Feather name="chevron-left" size={18} color={p.muted} />
+        </Pressable>
+        <Text style={[styles.title, { color: p.fg }]}>Settings</Text>
+      </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          {/* Recommendations & Reminder */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Recommendations & Reminder</Text>
-            <View style={styles.noteCard}>
-              <Text style={styles.noteText}>
-                *Note: Keep this on to receive offers/coupons and timely reminders based on your interests
+      <ScrollView contentContainerStyle={styles.content}>
+        {isAuthenticated === true && (
+          <>
+            <Text style={[styles.section, { color: p.muted }]}>Recommendations & Reminder</Text>
+            {group('*Note: Keep this on to receive offers/coupons and timely reminders based on your interests', [
+              switchRow('SMS', prefs.sms, (v) => setPref('sms', v)),
+              switchRow('WhatsApp', prefs.whatsapp, (v) => setPref('whatsapp', v)),
+            ])}
+          </>
+        )}
+
+        <Text style={[styles.section, { color: p.muted }]}>Notifications & Location</Text>
+        {group('*Note: Keep these on to get trip updates and to find your pickup location quickly', [
+          switchRow('Push notifications', notificationsEnabled, onNotifications),
+          switchRow('Location access', locationEnabled, onLocation),
+        ])}
+
+        {isAuthenticated === true && (
+          <>
+            <Text style={[styles.section, { color: p.muted }]}>Account Deletion</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => { Haptics.selectionAsync(); setShowDelete(true); }}
+              style={({ pressed }) => [styles.deleteRow, { backgroundColor: p.redBg, borderColor: p.redBorder }, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={[styles.deleteText, { color: p.red }]}>Delete My Sawari account</Text>
+            </Pressable>
+          </>
+        )}
+
+      </ScrollView>
+
+      {/* ── "Need to deactivate your account?" ── */}
+      <Modal visible={showDelete} transparent animationType="fade" onRequestClose={() => setShowDelete(false)}>
+        <View style={styles.overlay}>
+          <ModalBlur />
+          <View style={[styles.popup, { backgroundColor: p.page, borderColor: p.redBorder }]} accessibilityViewIsModal>
+            <Text style={[styles.popupTitle, { color: p.fg }]}>Need to deactivate your account?</Text>
+            <Text style={[styles.popupBody, { color: p.muted }]}>Account deactivation requests can only be made through our support team.</Text>
+            <View style={[styles.popupBox, { borderColor: p.border }]}>
+              <Text style={[styles.popupBoxText, { color: p.muted }]}>
+                Please{' '}
+                <Text accessibilityRole="link" accessibilityHint="Calls MySawari support" onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}>call us</Text>
+                {' '}or email{' '}
+                <Text
+                  accessibilityRole="link"
+                  onPress={() => Linking.openURL(`mailto:${ACCOUNT_EMAIL}?subject=${encodeURIComponent('Account deactivation request')}&body=${encodeURIComponent(`Please deactivate my MySawari account.\nRegistered mobile: ${customer?.mobile || ''}`)}`)}
+                  style={[styles.link, { color: p.navy }]}
+                >
+                  {ACCOUNT_EMAIL}
+                </Text>
+                {' '}to request account deactivation.
               </Text>
-              <View style={styles.list}>
-                <View style={styles.row}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>SMS</Text>
-                  <SawariToggle value={smsEnabled} onChange={setSmsEnabled} />
-                </View>
-                <DashedDivider />
-                <View style={styles.row}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>Whatsapp</Text>
-                  <SawariToggle value={whatsappEnabled} onChange={setWhatsappEnabled} />
-                </View>
-              </View>
             </View>
           </View>
-
-          {/* Account Deletion */}
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Account Deletion</Text>
-            <TouchableOpacity activeOpacity={0.7} style={styles.deleteCard} onPress={handleDeleteAccount}>
-              <Text style={styles.deleteText} numberOfLines={1}>
-                Delete My Sawari account
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowDelete(false)} hitSlop={8} style={[styles.close, { backgroundColor: p.iconBg }]}>
+            <Feather name="x" size={17} color={p.sub} />
+          </Pressable>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: T.white,
-  },
-  safeArea: {
-    flex: 1,
-  },
-
-  // Header
-  header: {
-    height: 64,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: T.neutral300,
-  },
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: T.neutral100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: 17,
-    lineHeight: 26,
-    color: T.neutral800,
-  },
-
-  scrollContent: {
-    paddingTop: 8,
-    paddingBottom: 40,
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  sectionLabel: {
-    fontFamily: FONT.medium,
-    fontSize: 13,
-    lineHeight: 20,
-    color: T.neutral500,
-  },
-
-  // Note card
-  noteCard: {
-    backgroundColor: T.surface,
-    borderWidth: 1,
-    borderColor: T.border,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  noteText: {
-    fontFamily: FONT.medium,
-    fontSize: 13,
-    lineHeight: 20,
-    color: T.neutral500,
-  },
-
-  // Toggle list
-  list: {
-    backgroundColor: T.white,
-    borderWidth: 1,
-    borderColor: T.border,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 16,
-  },
-  rowTitle: {
-    flex: 1,
-    fontFamily: FONT.semibold,
-    fontSize: 13,
-    lineHeight: 20,
-    color: T.neutral800,
-  },
-
-  // Account deletion
-  deleteCard: {
-    backgroundColor: T.redSurface,
-    borderWidth: 1,
-    borderColor: T.red50,
-    borderRadius: 8,
-    padding: 12,
-  },
-  deleteText: {
-    fontFamily: FONT.semibold,
-    fontSize: 13,
-    lineHeight: 20,
-    color: T.red600,
-  },
-
-  // Dashed divider
-  dashedClip: {
-    height: 1,
-    overflow: 'hidden',
-  },
-  dashedLine: {
-    height: 2,
-    borderWidth: 1,
-    borderColor: T.border,
-    borderStyle: 'dashed',
-    borderRadius: 1,
-  },
-
-  // Toggle
-  toggleTrack: {
-    width: 38,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-  },
-  toggleThumb: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: T.white,
-  },
+  screen: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1 },
+  back: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  title: { fontFamily: FONT.medium, fontSize: 17 },
+  content: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 40 },
+  section: { fontFamily: FONT.regular, fontSize: 13, marginTop: 22, marginBottom: 10 },
+  card: { borderWidth: 1, borderRadius: 12, padding: 12 },
+  inner: { borderWidth: 1, borderRadius: 8, overflow: 'hidden', marginTop: 10 },
+  note: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 20, paddingHorizontal: 1 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 53, paddingLeft: 12, paddingRight: 12 },
+  switchLabel: { fontFamily: FONT.medium, fontSize: 14 },
+  deleteRow: { height: 46, borderRadius: 8, borderWidth: 1, justifyContent: 'center', paddingHorizontal: 12 },
+  deleteText: { fontFamily: FONT.medium, fontSize: 14 },
+  overlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 36 },
+  popup: { alignSelf: 'stretch', borderRadius: 16, borderWidth: 1, paddingHorizontal: 13, paddingTop: 22, paddingBottom: 13 },
+  popupTitle: { fontFamily: FONT.medium, fontSize: 17.5, lineHeight: 25, textAlign: 'center' },
+  popupBody: { fontFamily: FONT.regular, fontSize: 12.5, lineHeight: 19, textAlign: 'center', marginTop: 10, paddingHorizontal: 10 },
+  popupBox: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 17, marginTop: 17 },
+  popupBoxText: { fontFamily: FONT.regular, fontSize: 12.5, lineHeight: 19, textAlign: 'center' },
+  link: { textDecorationLine: 'underline', fontFamily: FONT.regular },
+  close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
 });

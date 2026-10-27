@@ -128,9 +128,6 @@ export const SpecialDealCard = React.memo(function SpecialDealCard({ deal, onPre
           {/* Bottom: Price + Expiry */}
           <View style={styles.bottomRow}>
             <View style={styles.priceRow}>
-              {deal.originalPrice != null && deal.originalPrice > 0 && (
-                <Text style={styles.originalPrice}>₹{deal.originalPrice.toLocaleString('en-IN')}/day</Text>
-              )}
               {deal.dealPrice != null && deal.dealPrice > 0 && (
                 <Text style={styles.dealPrice}>₹{deal.dealPrice.toLocaleString('en-IN')}/day</Text>
               )}

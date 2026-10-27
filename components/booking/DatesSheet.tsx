@@ -11,6 +11,7 @@ import { useSawari } from '@/context/SawariContext';
 import { calculateRentalDays } from '@/services/backend/pricingEngine';
 import { checkCarAvailability } from '@/utils/sawari';
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -35,6 +36,10 @@ const ALL_TIMES = generateTimes();
 // The design offers whole hours only; ALL_TIMES indices still drive the 8 AM rules below.
 const isWholeHour = (time: string) => time.includes(':00');
 const padTime = (time: string) => time.replace(/^(\d):/, '0$1:');
+// One date picked = a same-day trip: pickup 8 AM, drop-off 8 PM by default (any hour after pickup can be chosen).
+// Picking a second date makes it a multi-day trip, 8 AM to 8 AM.
+const SAME_DAY_RETURN = '8:00 PM';
+const DAY_TIME = '8:00 AM';
 
 // Monday-first weeks for one month; null pads the days before the 1st.
 const monthWeeks = (year: number, month: number) => {
@@ -162,6 +167,8 @@ export function DatesSheet() {
     if (monthIndex === -1) return null;
     const d = new Date(today.getFullYear(), monthIndex, parseInt(day));
     d.setHours(0, 0, 0, 0);
+    // Labels have no year: a month already behind us this year ("5 Jan" in October) is next year's.
+    if (monthIndex < today.getMonth()) d.setFullYear(d.getFullYear() + 1);
     return d;
   };
 
@@ -197,7 +204,7 @@ export function DatesSheet() {
     if (start && end) {
       setStart(date);
       setEnd(null);
-      setTempReturnTime(null);
+      setTempReturnTime(SAME_DAY_RETURN);
       setHasAutoJumpedLate(false);
       return;
     }
@@ -208,17 +215,18 @@ export function DatesSheet() {
         // Picked a date before start, make it the new start
         setStart(date);
         setEnd(null);
-        setTempReturnTime(null);
+        setTempReturnTime(SAME_DAY_RETURN);
         setHasAutoJumpedLate(false);
       } else if (date.getTime() === start.getTime()) {
         // Tapping the same start date again → deselect it entirely
         setStart(null);
         setEnd(null);
-        setTempReturnTime(null);
+        setTempReturnTime(DAY_TIME);
         setHasAutoJumpedLate(false);
       } else {
-        // Picked a date after start, make it the end
+        // Picked a date after start, make it the end: a multi-day trip, back to 8 AM drop-off.
         setEnd(date);
+        setTempReturnTime(DAY_TIME);
         setHasAutoJumpedLate(false);
       }
       return;
@@ -227,7 +235,7 @@ export function DatesSheet() {
     // Default fallback (should never hit if initialized properly)
     setStart(date);
     setEnd(null);
-    setTempReturnTime(null);
+    setTempReturnTime(SAME_DAY_RETURN);
     setHasAutoJumpedLate(false);
   };
 
@@ -246,13 +254,20 @@ export function DatesSheet() {
     return `${date.getDate()} ${MONTHS[date.getMonth()]}`;
   };
 
+  // Only a start date picked: a same-day trip (counted as 1 day). Tapping another date sets the real end.
   const effectiveEnd = end || start;
   const isSameDay = !!(start && effectiveEnd && start.getTime() === effectiveEnd.getTime());
   const rentalDays = start ? calculateRentalDays(formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', tempReturnTime || '8:00 AM') : 0;
   const canApply = start !== null && effectiveEnd !== null && tempPickupTime !== null && tempReturnTime !== null;
 
+  // Today: hours that have already passed are hidden from the Pickup wheel (3:43 PM → 4 PM onwards).
+  const isToday = (d: Date | null) => !!d && d.getTime() === today.getTime();
+  const firstHourToday = new Date().getHours() + 1;
+  const hourOf = (time: string) => { const i = ALL_TIMES.indexOf(time); return i < 0 ? -1 : Math.floor(i / 2); };
+
   const isDisabledDay = (date: Date) => {
     if (date < today) return true;
+    if (isToday(date) && firstHourToday > 23) return true; // no pickup hour left today
     if (forSpecificCar === 'true' && selectedCar) {
       const dateStr = `${date.getDate()} ${MONTHS[date.getMonth()]}`;
       return !checkCarAvailability(selectedCar, dateStr, dateStr);
@@ -331,15 +346,44 @@ export function DatesSheet() {
       if (router.canGoBack()) router.back();
       else router.replace('/car-details');
     } else {
-      router.dismissAll();
-      setTimeout(() => {
-        router.push('/search');
-      }, 100);
+      // Swap this page for the results. (It used to close every page back to Home and then open the
+      // results, so Home flashed on screen in between.) Back from the results returns to Home.
+      router.replace('/search');
     }
   };
 
-  const pickupTimes = ALL_TIMES.filter(isWholeHour);
-  const returnTimes = (isSameDay ? ALL_TIMES.slice(17) : ALL_TIMES).filter(isWholeHour);
+  // Pickup: every whole hour (before 8 AM opens the Early Pickup popup); for today only the hours still ahead.
+  const pickupTimes = ALL_TIMES.filter(isWholeHour).filter((t) => !isToday(start) || hourOf(t) >= firstHourToday);
+  const startKey = start?.getTime();
+  // Today with a pickup hour that has passed → the first hour still ahead (8 AM if it's before 8).
+  // Moving to another date afterwards puts the pickup back to 8 AM.
+  const autoMovedPickup = useRef(false);
+  useEffect(() => {
+    if (isToday(start)) {
+      if (hourOf(tempPickupTime || DAY_TIME) >= firstHourToday) return;
+      autoMovedPickup.current = true;
+      setTempPickupTime(ALL_TIMES[Math.max(firstHourToday, 8) * 2]);
+    } else if (start && autoMovedPickup.current) {
+      autoMovedPickup.current = false;
+      setTempPickupTime(DAY_TIME);
+    }
+  }, [startKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Same day: drop-off any whole hour after pickup (pickup 8 AM → 9 AM … 11 PM). Multi-day: every hour.
+  const pickupHour = hourOf(tempPickupTime || DAY_TIME);
+  const returnTimes = ALL_TIMES.filter(isWholeHour).filter((t) => !isSameDay || hourOf(t) > pickupHour);
+  // Keep a same-day drop-off after the pickup: 8 PM by default, else the last hour of the day.
+  // A pickup at 11 PM leaves no same-day hour, so the trip becomes 8 AM the next day.
+  const endKey = effectiveEnd?.getTime();
+  useEffect(() => {
+    if (!start || !isSameDay) return;
+    if (hourOf(tempReturnTime || DAY_TIME) > pickupHour) return;
+    if (returnTimes.length === 0) {
+      setEnd(new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1));
+      setTempReturnTime(DAY_TIME);
+      return;
+    }
+    setTempReturnTime(hourOf(SAME_DAY_RETURN) > pickupHour ? SAME_DAY_RETURN : returnTimes[returnTimes.length - 1]);
+  }, [startKey, endKey, pickupHour]); // eslint-disable-line react-hooks/exhaustive-deps
   const wheel: WheelPalette = { card: isDarkMode ? colors.card : '#F9F9FB', box: ui.page, boxBorder: isDarkMode ? colors.border : '#EAECF1', selected: ui.chipText, idle: ui.muted };
 
   return (
@@ -411,9 +455,9 @@ export function DatesSheet() {
                       if (!date) return <View key={col} style={styles.dayCell} />;
                       const disabled = isDisabledDay(date);
                       const isStart = !!start && date.getTime() === start.getTime();
-                      const isEnd = !!end && date.getTime() === end.getTime();
+                      const isEnd = !!effectiveEnd && date.getTime() === effectiveEnd.getTime();
                       const selected = isStart || isEnd;
-                      const ranged = !!(start && end && start.getTime() !== end.getTime() && date >= start && date <= end);
+                      const ranged = !!(start && effectiveEnd && start.getTime() !== effectiveEnd.getTime() && date >= start && date <= effectiveEnd);
                       const nextDay = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
                       const rowStart = col === 0 || date.getDate() === 1;
                       const rowEnd = col === 6 || nextDay.getMonth() !== date.getMonth();
@@ -486,6 +530,7 @@ export function DatesSheet() {
       {/* Figma "Early Pickup / Return": before 8 AM is arranged with the team. The round close button sits under the card. */}
       <Modal visible={showEarlyPickupModal} transparent animationType="fade" onRequestClose={() => setShowEarlyPickupModal(false)}>
         <View style={styles.popupOverlay}>
+          <ModalBlur />
           <View style={[styles.early, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
             <View style={[styles.earlyBadge, { backgroundColor: ui.navy }]}>
               <Text style={styles.earlyBadgeText}>!</Text>
@@ -530,6 +575,7 @@ export function DatesSheet() {
       {/* Figma "Late Return": returning after 8 AM adds a day. Same card as Early Pickup, round close button under it. */}
       <Modal visible={showLateReturnModal} transparent animationType="fade" onRequestClose={() => setShowLateReturnModal(false)}>
         <View style={styles.popupOverlay}>
+          <ModalBlur />
           <View style={[styles.early, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
             <Ionicons name="warning" size={30} color="#FACC15" />
             <Text style={[styles.earlyTitle, { color: ui.text }]}>Late Return</Text>

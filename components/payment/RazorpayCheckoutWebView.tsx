@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Linking } from 'react-native';
 import { WebView } from 'react-native-webview';
 
 interface RazorpayCheckoutWebViewProps {
@@ -59,7 +59,7 @@ export function RazorpayCheckoutWebView({
         <script>
             var options = {
                 "key": ${jsString(razorpayKey)},
-                "amount": ${jsString(String(amount))},
+                "amount": ${Number(amount) || 0},
                 "currency": ${jsString(currency)},
                 "name": ${jsString(name)},
                 "description": ${jsString(description)},
@@ -120,11 +120,40 @@ export function RazorpayCheckoutWebView({
     }
   };
 
+  const handleShouldStartLoadWithRequest = (request: any) => {
+    const { url } = request;
+    if (!url) return true;
+
+    // Handle UPI and banking application schemes
+    if (
+      url.startsWith('upi://') ||
+      url.startsWith('phonepe://') ||
+      url.startsWith('tez://') ||
+      url.startsWith('paytmmp://') ||
+      url.startsWith('bhim://') ||
+      url.startsWith('credpay://') ||
+      url.startsWith('intent://')
+    ) {
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) {
+          Linking.openURL(url);
+        } else {
+          Linking.openURL(url).catch(() => {});
+        }
+      }).catch(() => {});
+      return false;
+    }
+
+    return true;
+  };
+
   return (
     <View style={styles.container}>
       <WebView
-        source={{ html: checkoutHtml }}
+        originWhitelist={['*']}
+        source={{ html: checkoutHtml, baseUrl: 'https://checkout.razorpay.com' }}
         onMessage={onMessage}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         startInLoadingState={true}

@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, Animated, ActivityIndicator, Alert, ScrollView, KeyboardAvoidingView, Platform, TextInput } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useColors } from '@/hooks/useColors';
+import { useTripColors } from '@/components/booking/tripColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API } from '@/services/backend/api';
 import { BookingSnapshot } from '@/services/backend/api';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { visible: boolean; onClose: () => void; booking: BookingSnapshot; onSuccess: (updatedSnapshot: BookingSnapshot) => void }) {
-  const colors = useColors();
+  const colors = useTripColors();
   const insets = useSafeAreaInsets();
   
   const [loading, setLoading] = useState(false);
@@ -115,6 +116,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
+        <ModalBlur />
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <Animated.View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: Math.max(insets.bottom, 24), transform: [{ translateY: slideAnim }] }]}>
                     <>

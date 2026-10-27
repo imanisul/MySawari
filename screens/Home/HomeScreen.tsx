@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAvailability, splitDateRange, parseDayLabel, Car } from '@/utils/sawari';
+import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet } from '@/components';
 import { PhoneNumberSheet } from '@/components/auth/PhoneNumberSheet';
@@ -85,6 +85,7 @@ export default function HomeScreen() {
   // A guest gets the phone-number sheet rising over Home, once — never for someone already signed in.
   const phoneSheetShown = useRef(false);
   useEffect(() => {
+    if (isAuthenticated) phoneSheetShown.current = false; // after sign-out the mandatory prompt returns
     if (isAuthLoading || phoneSheetShown.current || isAuthenticated) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     // Wait for the splash to actually clear. On a cold launch the data load outlasts any fixed
@@ -125,9 +126,13 @@ export default function HomeScreen() {
       .slice(0, 4) as any[];
 
     const fav = PICKS[typeName];
-    const rank = (v: Car) => { const i = fav.findIndex((n) => v.name.toLowerCase().includes(n)); return i === -1 ? fav.length : i; };
+    const rank = (v: Car) => {
+      const n = (v.displayName || v.name || '').toLowerCase();
+      const i = fav.findIndex((word) => n.includes(word));
+      return i === -1 ? fav.length + 10 : i;
+    };
     const curated = fetchedVehicles
-      .filter((v) => v?.name && v.type === typeName && rank(v) < fav.length && !viewed.some((w) => w.id === v.id))
+      .filter((v) => (v?.displayName || v?.name) && v.type === typeName && !viewed.some((w) => w.id === v.id))
       .map(withAvail)
       .sort((a, b) => {
         if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
@@ -139,7 +144,8 @@ export default function HomeScreen() {
         return rank(a) - rank(b);
       });
     const seen = new Set<string>();
-    return [...viewed, ...curated].filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true))).slice(0, 8);
+    // Free vehicles first (recently viewed before curated within each group), then by when they're free again.
+    return byAvailability([...viewed, ...curated].filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)))).slice(0, 8);
   }, [viewedIds, fetchedVehicles, dateRange, typeName]);
 
   const openPick = useCallback((item: any) => {
@@ -216,8 +222,7 @@ export default function HomeScreen() {
               topInset={insets.top}
               city="Guwahati"
               sawariCash={isAuthenticated ? sawariCash : 0}
-              onWallet={() => router.push('/rewards')}
-            >
+              onWallet={() => router.push('/rewards')}            >
               <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
             </HomeHero>
             <View style={[styles.sheet, { backgroundColor: p.page }]}>
@@ -235,7 +240,8 @@ export default function HomeScreen() {
               data={picks}
               horizontal
               keyExtractor={(v) => `pick-${v.id}`}
-              renderItem={({ item: v }) => <TopPickCard car={v} membership={membership as any} onPress={() => openPick(v)} />}
+              // The real day rate (vehicle pricePerDay), not a member price: no membership passed to the card.
+              renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.row, { gap: 8 }]}
               snapToInterval={254}
@@ -274,8 +280,8 @@ export default function HomeScreen() {
                 }} />
               )}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.row}
-              snapToInterval={226}
+              contentContainerStyle={[styles.row, { gap: 8 }]}
+              snapToInterval={224}
               decelerationRate="fast"
               removeClippedSubviews={false}
             />
@@ -383,6 +389,6 @@ const styles = StyleSheet.create({
   footerSmall: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, letterSpacing: 0.5 },
   footerBig: { fontFamily: 'Anton_400Regular', fontSize: 56, lineHeight: 66, letterSpacing: 2, marginTop: 2 },
   // The refer strip sits inside the banner (rays behind it); the white sheet's rounded top covers its foot.
-  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 16 },
+  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12 },
   row: { gap: 10, paddingHorizontal: 16 },
 });

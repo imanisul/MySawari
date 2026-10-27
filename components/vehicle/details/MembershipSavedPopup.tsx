@@ -1,92 +1,63 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing } from 'react-native';
-import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing, Image, useWindowDimensions } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import Svg, { Path, Defs, RadialGradient, Stop, Rect, Polygon } from 'react-native-svg';
+import ConfettiCannon from 'react-native-confetti-cannon';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useTripPrice } from './useTripPrice';
 
 // Trips (car + dates + plan) whose popup was already shown this session — it celebrates once, not on every visit.
 const shown = new Set<string>();
 
-const CARD_W = 263;
-const CARD_H = 194;
-// Light rays fanning out from behind the ribbon (Figma "membership applied").
-const RAYS = Array.from({ length: 12 }, (_, i) => {
-  const cx = CARD_W / 2, cy = 30, r = 260;
-  const a0 = Math.PI * (0.05 + i * 0.075), a1 = a0 + 0.035;
-  return `M${cx},${cy} L${cx + r * Math.cos(a0)},${cy + r * Math.sin(a0)} L${cx + r * Math.cos(a1)},${cy + r * Math.sin(a1)} Z`;
-});
+// Figma "membership applied": the plan's art (the same crown / shield / gem frames as the Membership page,
+// background removed) with a white card on it. Art files are 708 × 502.
+const ART_W = 264;
+const ART_H = Math.round((ART_W * 502) / 708);
 
-// Each plan's look (Figma): Starter — lilac card, blue ribbon with a crown; Plus — purple card, gold shield
-// with a star; Pro — mint card, green gem.
-type Theme = { card: string; ray: string; rayOpacity: number; border: string; innerBorder: string; dash: string; applied: string; badge: 'ribbon' | 'shield' | 'gem' };
+type Theme = { art: any; innerBorder: string; dash: string; applied: string; confetti: string[] };
 const THEMES: Record<string, Theme> = {
-  Starter: { card: '#EEEBFD', ray: '#FFFFFF', rayOpacity: 0.9, border: '#FFFFFF', innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#2F3E75', badge: 'ribbon' },
-  Plus: { card: '#6152D8', ray: '#8A7EF0', rayOpacity: 0.7, border: '#6152D8', innerBorder: '#FFFFFF', dash: '#C9C2F7', applied: '#6152D8', badge: 'shield' },
-  Pro: { card: '#E4F2EA', ray: '#FFFFFF', rayOpacity: 0.95, border: '#FFFFFF', innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', badge: 'gem' },
+  Starter: { art: require('@/assets/images/membership_popup_starter.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#2F3E75', confetti: ['#2F3E75', '#6152D8', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
+  Plus: { art: require('@/assets/images/membership_popup_plus.png'), innerBorder: '#FFFFFF', dash: '#C9C2F7', applied: '#6152D8', confetti: ['#6152D8', '#F59E0B', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
+  Pro: { art: require('@/assets/images/membership_popup_pro.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
 };
 
-/** Plus badge: a two-tone gold shield with a star. */
-function ShieldBadge() {
-  return (
-    <Svg width={132} height={96} viewBox="0 0 132 96">
-      <Path d="M8 8 Q66 -4 124 8 L124 46 Q124 78 66 94 Q8 78 8 46 Z" fill="#FFC93C" />
-      <Path d="M16 15 Q66 5 66 5 L66 85 Q16 71 16 45 Z" fill="#FFA41B" />
-      <Path d="M66 5 Q116 15 116 15 L116 45 Q116 71 66 85 Z" fill="#FF8A00" />
-      <Polygon points="66,22 74,40 93,41 78,53 83,72 66,61 49,72 54,53 39,41 58,40" fill="#FFC93C" stroke="#FFD866" strokeWidth={1.5} strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
-/** Pro badge: a faceted green gem. */
-function GemBadge() {
-  return (
-    <Svg width={100} height={92} viewBox="0 0 100 92">
-      <Polygon points="50,0 0,58 30,58" fill="#C8EC72" />
-      <Polygon points="50,0 30,58 70,58" fill="#A8DC40" />
-      <Polygon points="50,0 70,58 100,58" fill="#7DC22D" />
-      <Polygon points="0,58 30,58 50,92" fill="#9BD136" />
-      <Polygon points="30,58 70,58 50,92" fill="#86C52C" />
-      <Polygon points="70,58 100,58 50,92" fill="#62A822" />
-    </Svg>
-  );
-}
-
 /**
- * "You're saving ₹X on this booking — Starter Membership Applied!" over the car details page, the first
- * time a priced trip includes a membership discount. The amount is the quote's membership discount
- * (the same figure as in View breakup).
+ * The membership celebration card: plan art, "You're saving ₹X on this booking", "<Plan> Membership Applied!"
+ * and a round ✕ — with a confetti burst (react-native-confetti-cannon) when `confetti` is on.
+ * Used when a member's discount first applies to a trip, and when a plan is picked to buy with a booking.
  */
-export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; tripKey: string }) {
-  const price = useTripPrice(hasTrip);
-  const [visible, setVisible] = useState(false);
-  const [saving, setSaving] = useState<{ amount: number; plan: string } | null>(null);
+export function MembershipCelebration({ visible, plan, amount, title, note, confetti = false, onClose }: {
+  visible: boolean;
+  /** 'Starter' | 'Plus' | 'Pro' */
+  plan: string;
+  /** Saving on this booking; without one the card shows `note` in its place. */
+  amount: number | null;
+  /** Bottom line (default "<Plan> Membership Applied!"). */
+  title?: string;
+  /** Small line under the title (e.g. "₹1,999 for 1 year, paid with your booking"). */
+  note?: string;
+  confetti?: boolean;
+  onClose: () => void;
+}) {
+  const { width } = useWindowDimensions();
   const pop = useRef(new Animated.Value(0)).current;
-
-  const ready = price.state === 'ready' && price.membershipDiscount > 0 && !!price.planName;
-  const key = ready ? `${tripKey}|${price.planName}` : '';
+  const [burst, setBurst] = useState(0);
 
   useEffect(() => {
-    if (!ready || shown.has(key)) return;
-    const t = setTimeout(() => {
-      shown.add(key);
-      setSaving({ amount: price.membershipDiscount, plan: price.planName! });
-      setVisible(true);
-      pop.setValue(0);
-      Animated.spring(pop, { toValue: 1, useNativeDriver: true, friction: 6, tension: 80 }).start();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }, 450);
-    return () => clearTimeout(t);
-  }, [key]);
+    if (!visible) return;
+    pop.setValue(0);
+    // Rises in (no zoom): on some Android phones an image inside a zooming view was drawn far too large.
+    Animated.spring(pop, { toValue: 1, useNativeDriver: true, friction: 6, tension: 80 }).start();
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (confetti) setBurst((n) => n + 1);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const close = () => {
-    Animated.timing(pop, { toValue: 0, duration: 140, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => setVisible(false));
+    Animated.timing(pop, { toValue: 0, duration: 140, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => onClose());
   };
 
-  if (!saving) return null;
-  const t = THEMES[saving.plan] ?? THEMES.Starter;
+  const t = THEMES[plan] ?? THEMES.Starter;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
@@ -96,96 +67,104 @@ export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; t
 
       <View style={styles.center} pointerEvents="box-none">
         <Animated.View
-          style={{ alignItems: 'center', opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.85, 1] }) }] }}
+          style={{ alignItems: 'center', opacity: pop, transform: [{ translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }}
           accessible
           accessibilityRole="alert"
-          accessibilityLabel={`You're saving ${formatCurrency(saving.amount)} on this booking. ${saving.plan} Membership Applied!`}
+          accessibilityLabel={`${amount ? `You're saving ${formatCurrency(amount)} on this booking. ` : ''}${title || `${plan} Membership Applied!`}${note ? ` ${note}` : ''}`}
         >
-          <View style={[styles.card, { backgroundColor: t.card, borderColor: t.border }]}>
-            <Svg width={CARD_W} height={CARD_H} style={StyleSheet.absoluteFill}>
-              <Defs>
-                <RadialGradient id="glow" cx="50%" cy="15%" r="80%">
-                  <Stop offset="0" stopColor={t.ray} stopOpacity={t.rayOpacity} />
-                  <Stop offset="1" stopColor={t.ray} stopOpacity="0" />
-                </RadialGradient>
-              </Defs>
-              <Rect width={CARD_W} height={CARD_H} fill={t.card} />
-              {RAYS.map((d, i) => <Path key={i} d={d} fill="url(#glow)" />)}
-            </Svg>
-
+          <View style={{ width: ART_W, height: ART_H, overflow: 'hidden' }}>
+            <Image source={t.art} style={{ position: 'absolute', top: 0, left: 0, width: ART_W, height: ART_H }} resizeMode="stretch" fadeDuration={0} accessible={false} />
             <View style={[styles.inner, { borderColor: t.innerBorder }]}>
-              <Text style={styles.saving}>You're saving</Text>
-              <Text style={styles.amount}>{formatCurrency(saving.amount)}</Text>
-              <Text style={styles.onThis}>on this booking</Text>
-              <View style={[styles.dash, { borderColor: t.dash }]} />
-              <Text style={[styles.applied, { color: t.applied }]}>{saving.plan} Membership Applied!</Text>
+              {amount ? (
+                <>
+                  <Text style={styles.saving}>You're saving</Text>
+                  <Text style={styles.amount}>{formatCurrency(amount)}</Text>
+                  <Text style={styles.onThis}>on this booking</Text>
+                </>
+              ) : (
+                <Text style={[styles.onThis, { textAlign: 'center' }]}>{note}</Text>
+              )}
+              <View style={styles.dashes}>
+                {Array.from({ length: 40 }, (_, i) => <View key={i} style={[styles.dashBit, { backgroundColor: t.dash }]} />)}
+              </View>
+              <Text style={[styles.applied, { color: t.applied }]} numberOfLines={1} adjustsFontSizeToFit>{title || `${plan} Membership Applied!`}</Text>
+              {!!amount && !!note && <Text style={styles.note} numberOfLines={1} adjustsFontSizeToFit>{note}</Text>}
             </View>
           </View>
 
-          {/* Plan badge hanging over the card's top edge: ribbon with crown (Starter) or shield (Plus) or gem (Pro) */}
-          <View style={styles.ribbonWrap} pointerEvents="none">
-            {t.badge === 'ribbon' ? (
-              <>
-                <View style={styles.ribbonBar} />
-                <View style={styles.ribbon}>
-                  <View style={[styles.ribbonHalf, { backgroundColor: '#4560DB' }]} />
-                  <View style={[styles.ribbonHalf, { backgroundColor: '#3A52C6' }]} />
-                  <MaterialCommunityIcons name="crown" size={50} color="#FBC52C" style={styles.crown} />
-                </View>
-              </>
-            ) : t.badge === 'gem' ? (
-              <GemBadge />
-            ) : (
-              <ShieldBadge />
-            )}
-          </View>
-
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} hitSlop={10} style={styles.close}>
-            <Feather name="x" size={16} color="#404040" />
+            <Feather name="x" size={17} color="#404040" />
           </Pressable>
         </Animated.View>
       </View>
+
+      {/* Celebration: two bursts from the top corners, in the plan's colours. */}
+      {confetti && visible && burst > 0 && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          <ConfettiCannon key={`l${burst}`} count={70} origin={{ x: -10, y: 0 }} explosionSpeed={380} fallSpeed={2600} fadeOut colors={t.confetti} />
+          <ConfettiCannon key={`r${burst}`} count={70} origin={{ x: width + 10, y: 0 }} explosionSpeed={380} fallSpeed={2600} fadeOut colors={t.confetti} />
+        </View>
+      )}
     </Modal>
   );
+}
+
+/**
+ * "You're saving ₹X on this booking — Starter Membership Applied!" over the car details page, the first
+ * time a priced trip includes a member's discount. The amount is the quote's membership discount
+ * (the same figure as in View breakup). A plan being bought has its own popup when it is picked.
+ */
+export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; tripKey: string }) {
+  const price = useTripPrice(hasTrip);
+  const [visible, setVisible] = useState(false);
+  const [saving, setSaving] = useState<{ amount: number; plan: string } | null>(null);
+
+  const ready = price.state === 'ready' && price.membershipDiscount > 0 && !!price.planName && !price.buyingPlan;
+  const key = ready ? `${tripKey}|${price.planName}` : '';
+
+  useEffect(() => {
+    if (!ready || shown.has(key)) return;
+    const t = setTimeout(() => {
+      shown.add(key);
+      setSaving({ amount: price.membershipDiscount, plan: price.planName! });
+      setVisible(true);
+    }, 450);
+    return () => clearTimeout(t);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!saving) return null;
+  return <MembershipCelebration visible={visible} plan={saving.plan} amount={saving.amount} onClose={() => setVisible(false)} />;
 }
 
 const styles = StyleSheet.create({
   dim: { backgroundColor: 'rgba(0,0,0,0.27)' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  card: {
-    width: CARD_W,
-    height: CARD_H,
-    marginTop: 24,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    overflow: 'hidden',
-    justifyContent: 'flex-end',
-    padding: 12,
-  },
+  // The white card sits inside the art's frame (fractions of the 708 × 502 art), as in the design.
   inner: {
+    position: 'absolute',
+    left: '5%',
+    right: '5%',
+    top: '38.5%',
+    bottom: '6%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 10,
     borderWidth: 1,
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 13,
+    justifyContent: 'center',
     paddingHorizontal: 12,
   },
-  saving: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10.5, color: '#525252' },
-  amount: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 20, color: '#008758', marginTop: 3 },
-  onThis: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10.5, color: '#262626', marginTop: 3 },
-  dash: { alignSelf: 'stretch', borderTopWidth: 1, borderStyle: 'dashed', marginTop: 9, marginBottom: 10 },
-  applied: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 },
-  ribbonWrap: { position: 'absolute', top: 0, alignItems: 'center' },
-  ribbonBar: { width: 126, height: 8, backgroundColor: '#E6E2FB' },
-  ribbon: { width: 104, height: 78, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  ribbonHalf: { flex: 1, alignSelf: 'stretch' },
-  crown: { position: 'absolute', top: 18 },
+  saving: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9.5, lineHeight: 13, color: '#525252' },
+  amount: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 20, lineHeight: 26, color: '#008758', marginTop: 1 },
+  onThis: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9.5, lineHeight: 13, color: '#262626' },
+  dashes: { alignSelf: 'stretch', flexDirection: 'row', overflow: 'hidden', gap: 3, marginTop: 8, marginBottom: 9 },
+  dashBit: { width: 4, height: 1 },
+  applied: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, lineHeight: 15 },
+  note: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 8.5, lineHeight: 12, color: '#737373', marginTop: 2 },
   close: {
     marginTop: 14,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',

@@ -11,10 +11,12 @@ import {
   Alert,
 } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useColors } from '@/hooks/useColors';
+import { useTripColors } from '@/components/booking/tripColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API, BookingSnapshot } from '@/services/backend/api';
+import { useSawari } from '@/context/SawariContext';
 import * as Clipboard from 'expo-clipboard';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 interface RefundTrackingModalProps {
   visible: boolean;
@@ -29,8 +31,9 @@ export function RefundTrackingModal({
   booking,
   onRefundUpdated,
 }: RefundTrackingModalProps) {
-  const colors = useColors();
+  const colors = useTripColors();
   const insets = useSafeAreaInsets();
+  const { customer } = useSawari();
 
   const refund = booking?.pendingRefund;
   const status = (refund?.status || 'pending').toLowerCase();
@@ -128,8 +131,8 @@ export function RefundTrackingModal({
           bookingId: booking.id,
           amount: refundAmount,
           reason: 'Booking Cancelled',
-          customerId: booking.customerMobile || '',
-          customerMobile: booking.customerMobile || '',
+          customerId: customer?.id || '',
+          customerMobile: customer?.mobile || booking.customerMobile || '',
           refundType: editType,
           upiId: editType === 'upi' ? upiId.trim() : undefined,
           accountDetails: editType === 'bank_account' ? {
@@ -182,6 +185,7 @@ export function RefundTrackingModal({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <ModalBlur />
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <View
           style={[

@@ -13,7 +13,6 @@ export type BookingSnapshot = {
   status: string;
   vehicleId: string;
   vehicleName: string;
-  vehicleImage?: string;
   pickupDate: string;
   returnDate: string;
   rawEndDate?: string;
@@ -93,6 +92,22 @@ export type BookingSnapshot = {
  * The operations app and the customer app share one bookings collection but use more statuses than the
  * customer app creates. Every status must land in one of the app's tabs, otherwise the booking vanishes.
  */
+const HOLD_STATUSES = [
+  'hold', 'held', 'on_hold', 'soft_hold', 'locked', 'lock', 'reserved_hold', 'checkout',
+  'payment_pending', 'pending_payment', 'awaiting_payment', 'initiated', 'draft',
+  'expired', 'hold_expired', 'released', 'hold_released', 'abandoned',
+];
+
+/** True for a checkout hold the customer never paid for (it must not appear as a trip). */
+function isUnpaidHold(b: any): boolean {
+  if (normalizeBookingStatus(b?.status) === 'HOLD') return true;
+  if (b?.isHold === true || b?.hold === true) return true;
+  // A pending record that still carries a hold expiry and no payment id is an open/abandoned checkout.
+  const holdExpiry = b?.holdExpiresAt || b?.lockExpiresAt || b?.hold?.expiresAt;
+  const paymentId = b?.razorpayPaymentId || b?.payment?.razorpayPaymentId || b?.paymentDetails?.razorpayPaymentId;
+  return !!holdExpiry && !paymentId && String(b?.status || '').toLowerCase() === 'pending';
+}
+
 function normalizeBookingStatus(raw: any): string {
   const key = String(raw ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
   // Only a real handover status means the customer has the vehicle.
@@ -100,6 +115,8 @@ function normalizeBookingStatus(raw: any): string {
   if (['completed', 'complete', 'vehicle_returned', 'returned', 'vehicle_return', 'closed', 'settled'].includes(key)) return 'COMPLETED';
   if (['cancelled', 'canceled', 'no_show', 'rejected'].includes(key)) return 'CANCELLED';
   if (key === 'failed') return 'FAILED';
+  // A checkout that was opened but never paid is only a temporary lock on the car, not a booking.
+  if (HOLD_STATUSES.includes(key)) return 'HOLD';
   if (key === 'pending') return 'PENDING';
   if (key === 'confirmed' || key === 'booked' || key === 'reserved' || key === 'upcoming') return 'CONFIRMED';
 
@@ -125,9 +142,10 @@ function placeLabel(place: any): string | undefined {
   return undefined;
 }
 
-import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog } from './pricingEngine';
+import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
 import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { hasGoogleMaps, googleSearchPlaces, googleReverseLocation } from '../maps/google';
 
 // The backend is a separate project, deployed on Render. EXPO_PUBLIC_API_BASE_URL overrides it
 // (e.g. http://<your-computer's-LAN-IP>:5001 to test against a local backend on a real phone).
@@ -164,27 +182,6 @@ async function withInstallId(headers: Record<string, string> = {}): Promise<Reco
   } catch {
     return headers;
   }
-}
-
-/**
- * POST to an auth endpoint (no token yet, so not fetchWithAuth), retrying Render/Cloudflare
- * cold-start 502/503/504s. Those never reached the app — unlike a timeout, where an OTP may
- * already have been issued or consumed, so only gateway errors are safe to repeat.
- */
-async function postAuth(url: string, body: any) {
-  const makeOptions = async () => ({
-    method: 'POST',
-    headers: await withInstallId({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(body),
-  });
-  let res = await timedFetch(url, await makeOptions());
-  let data = await res.json();
-  for (let attempt = 1; data?.isGatewayError && attempt <= 2; attempt++) {
-    await new Promise((r) => setTimeout(r, attempt * 2000));
-    res = await timedFetch(url, await makeOptions());
-    data = await res.json();
-  }
-  return { res, data };
 }
 
 /**
@@ -858,11 +855,22 @@ export const API = {
       }
     }
     
+    // A plan bought with this booking counts as the customer's plan for this trip (a fresh year: nothing
+    // saved yet), and its price is paid now together with the booking amount.
+    const buyPlan = params.buyPlan && canBuyPlan(params.buyPlan, membership) ? params.buyPlan : null;
+    const effectiveMembership = buyPlan
+      ? { plan: buyPlan, totalSaved: 0, expiresAt: new Date(Date.now() + 365 * 86400000).toISOString() }
+      : membership;
+
     const quote = await calculateBookingPrice({
       ...params,
       availableSawariCash,
-      membership,
+      membership: effectiveMembership,
     });
+    const membershipFee = buyPlan ? MEMBERSHIP_PRICES[buyPlan] : 0;
+    quote.membershipPlanToBuy = buyPlan;
+    quote.membershipFee = membershipFee;
+    quote.onlinePayableNow = (quote.onlinePayableNow || 0) + membershipFee;
     
     if (quote.error) {
       throw new Error(quote.error);
@@ -936,6 +944,9 @@ export const API = {
     // BACKEND VALIDATION: Recalculate quote to prevent frontend manipulation
     const serverQuote = await this.quoteBooking(params);
     const quote = serverQuote;
+    // A plan bought together with this booking: its price is part of the one payment, but not of the booking.
+    const membershipFee = quote.membershipFee || 0;
+    const bookingPaidNow = Math.max(0, quote.onlinePayableNow - membershipFee);
     
     // 1. (Sawari Cash is now managed securely by the backend)
     // 2. Create snapshot
@@ -970,7 +981,7 @@ export const API = {
       sawariCashUsed: quote.sawariCashUsed,
       
       bookingAdvance: quote.bookingAdvance,
-      onlinePayableNow: quote.onlinePayableNow,
+      onlinePayableNow: bookingPaidNow,
       remainingRentalAmount: quote.remainingRentalAmount,
       
       ...fuelEstimateDetails,
@@ -1049,7 +1060,7 @@ export const API = {
           couponDiscount: quote.couponDiscount || 0,
           couponCode: quote.couponCode || '',
           sawariCashUsed: quote.sawariCashUsed || 0,
-          bookingAmountPaid: quote.onlinePayableNow,
+          bookingAmountPaid: bookingPaidNow,
           paymentMethod: quote.onlinePayableNow > 0 ? 'online' : 'wallet',
           balanceAmount: quote.remainingRentalAmount,
           paymentStatus: quote.onlinePayableNow > 0 ? 'paid' : 'pending'
@@ -1057,11 +1068,15 @@ export const API = {
         paymentBreakdown: {
           cash: 0,
           phonePe: 0,
+          // The Razorpay payment covers the booking amount plus any membership bought with it.
           razorpay: quote.onlinePayableNow > 0 ? quote.onlinePayableNow : 0,
           balanceAmount: quote.remainingRentalAmount,
-          totalCollected: quote.onlinePayableNow,
+          totalCollected: bookingPaidNow,
           paymentStatus: 'partial'
         },
+        // Membership bought in the same payment (server: apply this plan's discount to the booking, expect the
+        // payment to be bookingAmountPaid + price, and activate the plan when the booking is confirmed).
+        membershipPurchase: quote.membershipPlanToBuy ? { plan: quote.membershipPlanToBuy, price: membershipFee } : undefined,
         sawariCashUsed: quote.sawariCashUsed,
         subscriptionDiscount: quote.subscriptionDiscount,
         membershipDiscount: quote.subscriptionDiscount || 0,
@@ -1198,6 +1213,12 @@ export const API = {
       const response = await fetchWithAuth(`${BACKEND_URL}/customers/wallet`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to fetch wallet');
+      // The plan is compared as 'starter' | 'plus' | 'pro' everywhere: "Plus" / " PRO" from the server would
+      // otherwise read as "not a member" and the app would offer a member the plans again.
+      const m = data.data?.membership;
+      if (m && typeof m.plan === 'string') {
+        data.data.membership = { ...m, plan: m.plan.trim().toLowerCase(), totalSaved: Math.max(0, Number(m.totalSaved) || 0) };
+      }
       walletCache = { at: Date.now(), data: data.data };
       return data.data;
     } catch (e: any) {
@@ -1256,7 +1277,7 @@ export const API = {
       const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
       
       // Map backend booking model to frontend BookingSnapshot
-      return (data.data || []).map((b: any) => {
+      return (data.data || []).filter((b: any) => !isUnpaidHold(b)).map((b: any) => {
         const p = b.payment || {};
         const days = b.totalDays || 1;
         const totalAmount = asAmount(p.totalAmount);
@@ -1290,7 +1311,6 @@ export const API = {
           bookingCode: b.bookingCode,
           status: normalizeBookingStatus(b.status),
           vehicleId: b.vehicleId?._id || b.vehicleId,
-          vehicleImage: b.vehicleImage || null,
           vehicleName: ((b.vehicleId?.displayName && typeof b.vehicleId.displayName === 'string' && b.vehicleId.displayName.trim())
             ? b.vehicleId.displayName.trim()
             : (b.displayName || b.vehicleId?.vehicleName || b.vehicleName || 'Vehicle')).replace(/\s+\d{3,4}$/, '').trim() || 'Vehicle',
@@ -1355,11 +1375,19 @@ export const API = {
     }
   },
 
-  async cancelBooking(id: string, reason?: string, existing?: BookingSnapshot): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
+  async cancelBooking(
+    id: string,
+    reason?: string,
+    existing?: BookingSnapshot,
+    payoutDetails?: { refundType?: string; upiId?: string; accountDetails?: any }
+  ): Promise<{ success: boolean; snapshot: BookingSnapshot }> {
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${id}/cancel`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cancellationReason: reason || 'Customer cancelled' }),
+      body: JSON.stringify({
+        cancellationReason: reason || 'Customer cancelled',
+        ...(payoutDetails || {}),
+      }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Failed to cancel booking');
@@ -1629,7 +1657,8 @@ export const API = {
   },
 
   /**
-   * Photon Autocomplete (called directly; render backend has no /locations route)
+   * Place search for every location box (destination, pickup / delivery address): Google Places, with
+   * OpenStreetMap (Photon → Nominatim) as a backup. Same result shape either way.
    */
   async searchLocations(
     input: string,
@@ -1651,8 +1680,19 @@ export const API = {
       return results;
     };
 
+    // Primary: Google Places. OpenStreetMap (Photon, then Nominatim) below is only a backup for when Google
+    // can't answer (no key, quota, outage), so a search box never goes dead.
+    if (hasGoogleMaps) {
+      try {
+        return remember(dedupeLocations(await googleSearchPlaces(query, { restrict: options.restrictToServiceArea, signal })));
+      } catch (e: any) {
+        if (e?.name === 'AbortError' || (signal && signal.aborted)) throw e;
+        if (__DEV__) console.log(`Google place search failed: ${e?.message}. Using OpenStreetMap.`);
+      }
+    }
+
     try {
-      // Primary: Photon, biased to Guwahati — and, for delivery/collection addresses, limited to where we operate.
+      // Backup: Photon, biased to Guwahati — and, for delivery/collection addresses, limited to where we operate.
       const url = new URL(`${PHOTON_BASE_URL}/api/`);
       url.searchParams.set('q', query);
       url.searchParams.set('limit', '10');
@@ -1724,7 +1764,7 @@ export const API = {
   },
 
   /**
-   * Photon Reverse Geocode (called directly; render backend has no /locations route)
+   * Address / area at a point: Google Geocoding, with OpenStreetMap as a backup.
    */
   async reverseGeocode(latitude: number, longitude: number, options: { areaOnly?: boolean } = {}) {
     const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)},${options.areaOnly ? 'a' : 'p'}`;
@@ -1736,6 +1776,15 @@ export const API = {
   },
 
   async reverseGeocodeUncached(latitude: number, longitude: number, options: { areaOnly?: boolean } = {}) {
+    // Primary: Google Geocoding; OpenStreetMap below only if Google can't answer.
+    if (hasGoogleMaps) {
+      try {
+        const g = await googleReverseLocation(latitude, longitude, !!options.areaOnly);
+        if (g) return g;
+      } catch (e: any) {
+        if (__DEV__) console.log(`Google reverse geocode failed: ${e?.message}. Using OpenStreetMap.`);
+      }
+    }
     try {
       // Primary: Photon API (faster, less strict rate limits)
       const url = new URL(`${PHOTON_BASE_URL}/reverse`);
@@ -1834,15 +1883,6 @@ export const API = {
         if (response.ok) base = data.data;
       } catch (e) {}
 
-      // Add local mock reviews to avoid hitting the backend database for testing
-      try {
-        const str = await AsyncStorage.getItem('@mock_reviews');
-        if (str) {
-          const arr = JSON.parse(str);
-          base.bookingIds = [...base.bookingIds, ...arr];
-        }
-      } catch(e) {}
-      
       return base;
     },
 
@@ -1900,32 +1940,26 @@ export const API = {
       return { url: result.secure_url, publicId: result.public_id };
     },
 
+    /**
+     * POST /reviews. Throws with the server's message when it is not saved, so the customer is told instead
+     * of seeing "Feedback Submitted" for a review that never reached us. (It used to save a local "done"
+     * marker and ignore the server's answer — a testing shortcut.)
+     */
     async submit(
       carId: string,
       rating: number,
       text: string,
       extras: { bookingId?: string; placeVisited?: string; images?: { url: string; publicId: string }[] } = {}
     ): Promise<void> {
-      // Mock submit locally to prevent backend database changes
-      try {
-        if (extras.bookingId) {
-          const str = await AsyncStorage.getItem('@mock_reviews');
-          const arr = str ? JSON.parse(str) : [];
-          if (!arr.includes(extras.bookingId)) {
-            arr.push(extras.bookingId);
-            await AsyncStorage.setItem('@mock_reviews', JSON.stringify(arr));
-          }
-        }
-      } catch(e) {}
-
-      // Fire and forget to backend (ignore errors)
-      try {
-        await fetchWithAuth(`${BACKEND_URL}/reviews`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ carId, rating, text: text.trim(), ...extras }),
-        });
-      } catch(e) {}
+      const response = await fetchWithAuth(`${BACKEND_URL}/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carId, rating, text: text.trim(), ...extras }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.message || "Couldn't submit your feedback. Please try again.");
+      }
     }
   }
 };

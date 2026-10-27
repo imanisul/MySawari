@@ -6,7 +6,10 @@ import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
 import { Car, MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { API } from '@/services/backend/api';
-import { PICKUP_DROP_RATE_PER_KM } from '@/services/backend/pricingEngine';
+import { PICKUP_DROP_RATE_PER_KM, calculateDriverCharge } from '@/services/backend/pricingEngine';
+
+/** What a driver adds per day: the same rule the quote uses, so this copy can never drift from the price. */
+const DRIVER_CHARGE_PER_DAY = calculateDriverCharge('With Driver', 1);
 import { useSawari } from '@/context/SawariContext';
 import { useDetailsPalette } from './detailsPalette';
 import { AddressPickerSheet } from './AddressPickerSheet';
@@ -16,15 +19,15 @@ import { getSavedAddresses, saveAddress, SavedAddress } from '@/utils/savedAddre
  * Top of the car details page: the demand / availability strip, the name card with rating, and the
  * Delivery & Pickup switch (the same flag the booking flow prices from).
  */
-export function VehicleSummary({ car, isAvailable, unavailableNote, highDemand }: {
+export function VehicleSummary({ car, isAvailable, unavailableNote, highDemand, availableOn }: {
   car: Car;
   isAvailable: boolean;
   /** e.g. "Booked on these dates. Next available from 20 Nov." */
   unavailableNote?: string;
   highDemand?: boolean;
+  availableOn?: string;
 }) {
   const p = useDetailsPalette();
-  const { isDeliveryRequested, setIsDeliveryRequested } = useSawari();
 
   // Same query key as the reviews section, so this costs no extra request.
   const { data: dbReviews = [] } = useQuery({
@@ -37,8 +40,8 @@ export function VehicleSummary({ car, isAvailable, unavailableNote, highDemand }
   const displayRating = car.rating ?? averageRating;
   const displayCount = car.reviewCount ? car.reviewCount + dbReviews.length : allReviews.length;
 
-  const brand = car.manufacturer || car.name.split(' ')[0];
-  const modelName = [car.model, car.variant].filter(Boolean).join(' ') || car.displayName || car.name;
+  const brand = car.manufacturer || (car.displayName || car.name).split(' ')[0];
+  const modelName = car.displayName || car.name || [car.model, car.variant].filter(Boolean).join(' ');
   const seats = /seat/i.test(car.seats) ? car.seats : `${car.seats} seats`;
   const meta = [car.transmission, car.fuel, car.type === 'Bike' ? null : seats].filter(Boolean) as string[];
 
@@ -73,30 +76,63 @@ export function VehicleSummary({ car, isAvailable, unavailableNote, highDemand }
           <View style={styles.ratingCol}>
             <View style={[styles.ratingPill, { backgroundColor: p.navy }]}>
               <Text style={[styles.ratingText, { color: p.onNavy }]}>{displayRating.toFixed(1)}</Text>
-              <Ionicons name="star" size={11} color={p.star} />
+              <Ionicons name="star" size={14} color={p.star} />
             </View>
             <Text style={[styles.reviewCount, { color: p.sub }]}>({displayCount} {displayCount === 1 ? 'Review' : 'Reviews'})</Text>
           </View>
         )}
       </View>
 
-      <View style={[styles.deliveryCard, { borderColor: p.deliveryBorder, backgroundColor: p.page }]}>
-        <View style={styles.deliveryHead}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.deliveryTitle, { color: p.fg }]}>Delivery & Pickup</Text>
-            {/* The design shows "Base Price ₹200 + Additional ₹5k/km", which matches nothing we charge:
-                there is no base fee and the rate is ₹20/km (pricingEngine). Keep the real number. */}
-            <Text style={[styles.deliverySub, { color: p.muted }]}>No base fee • ₹{PICKUP_DROP_RATE_PER_KM}/km from our Kahilipara hub to your address</Text>
-          </View>
-          <Toggle
-            label="Delivery and pickup"
-            value={isDeliveryRequested}
-            onChange={(v) => { Haptics.selectionAsync(); setIsDeliveryRequested(v); }}
-            onColor={p.navy}
-          />
+      <DeliveryPickupCard />
+    </View>
+  );
+}
+
+/** Delivery & Pickup card (Figma: white card, third in the top block, above the photos). */
+function DeliveryPickupCard() {
+  const p = useDetailsPalette();
+  const { isDeliveryRequested, setIsDeliveryRequested } = useSawari();
+  return (
+    <View style={[styles.deliveryCard, { borderColor: p.deliveryBorder, backgroundColor: p.page }]}>
+      <View style={styles.deliveryHead}>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.deliveryTitle, { color: p.fg }]}>Delivery & Pickup</Text>
+          {/* The design shows "Base Price ₹200 + Additional ₹5k/km", which matches nothing we charge:
+              there is no base fee and the rate is ₹20/km (pricingEngine). Keep the real number. */}
+          <Text style={[styles.deliverySub, { color: p.muted }]}>No base fee • ₹{PICKUP_DROP_RATE_PER_KM}/km from our Kahilipara hub to your address</Text>
         </View>
-        {isDeliveryRequested && <DeliveryOptions />}
+        <Toggle
+          label="Delivery and pickup"
+          value={isDeliveryRequested}
+          onChange={(v) => { Haptics.selectionAsync(); setIsDeliveryRequested(v); }}
+          onColor={p.navy}
+        />
       </View>
+      {isDeliveryRequested && <DeliveryOptions />}
+    </View>
+  );
+}
+
+/**
+ * "Need a driver?" (Figma: grey card right after the photos). The switch is the same Self Drive / With Driver
+ * setting the booking flow and the price use, so turning it on adds the driver charge to the quote.
+ */
+export function DriverCard() {
+  const p = useDetailsPalette();
+  const { mode, setMode } = useSawari();
+  return (
+    <View style={[styles.driverCard, { borderColor: p.deliveryBorder, backgroundColor: p.summary }]}>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.deliveryTitle, { color: p.fg }]}>Need a driver?</Text>
+        <Text style={[styles.deliverySub, { color: p.muted }]}>₹{DRIVER_CHARGE_PER_DAY}/day added to your trip</Text>
+        <Text style={[styles.deliverySub, { color: p.muted }]}>Meals and accommodation included*</Text>
+      </View>
+      <Toggle
+        label="Need a driver"
+        value={mode === 'With Driver'}
+        onChange={(v) => { Haptics.selectionAsync(); setMode(v ? 'With Driver' : 'Self Drive'); }}
+        onColor={p.navy}
+      />
     </View>
   );
 }
@@ -268,9 +304,11 @@ const styles = StyleSheet.create({
   // Padding is 10px 0 only: no side inset, the row centres its items, gap 10 between them.
   banner: { borderWidth: 1, borderRadius: 8, alignSelf: 'center', width: 359, height: 39, paddingVertical: 10,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
-  bannerIcon: { fontSize: 12, lineHeight: 18 },
-  bannerText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  summaryCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingVertical: 11.5 },
+  // Medium/xs: 11px on a 16.5px line, "Gold/Text" #B58703.
+  bannerIcon: { fontSize: 11, lineHeight: 16.5 },
+  bannerText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, textAlign: 'center' },
+  // Figma "Car Detail + Rating": 361×82 border-box, padding 10/12/12, 8 between the details and the rating.
+  summaryCard: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 82, borderWidth: 1, borderRadius: 10, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12 },
   brand: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11 },
   // Semibold/lg in the design: weight 600 at 17px, on a 25px (150%) line like every role here, and
   // centred inside its box. numberOfLines={2} means one line sits at y=4 of this 25px row; a wrap fills
@@ -279,12 +317,16 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 4 },
   meta: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11 },
   metaDot: { width: 2.5, height: 2.5, borderRadius: 1.25, marginHorizontal: 7 },
-  ratingCol: { alignItems: 'center', marginLeft: 10 },
-  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 14, paddingHorizontal: 10.5, height: 27.5 },
-  ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  reviewCount: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 6 },
-  deliveryCard: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12.5, paddingVertical: 12 },
-  deliveryHead: { flexDirection: 'row', alignItems: 'center', paddingLeft: 0.5 },
+  // Rating: 28px navy pill (padding 4/9/4/10, 2 between the number and the 14px star), review count 4 below.
+  ratingCol: { alignItems: 'center', gap: 4 },
+  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, height: 28, paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 10 },
+  ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  reviewCount: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  // Figma "Delivery & Pickup": 361×63 border-box, padding 12, 12 between the text and the switch.
+  deliveryCard: { borderWidth: 1, borderRadius: 10, padding: 12 },
+  deliveryHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  // Figma "Need a driver?": 361×84 border-box, padding 12/10/12/12, 12 between the text and the switch.
+  driverCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, minHeight: 84, borderWidth: 1, borderRadius: 10, paddingTop: 12, paddingRight: 10, paddingBottom: 12, paddingLeft: 12 },
   segBox: { flexDirection: 'row', gap: 16, borderWidth: 1, borderRadius: 8, padding: 4, marginTop: 16 },
   seg: { flex: 1, height: 34, borderRadius: 6, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   segText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13.5 },
@@ -302,6 +344,6 @@ const styles = StyleSheet.create({
   keepText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12 },
   track: { width: 38, height: 20, borderRadius: 10, padding: 2, justifyContent: 'center' },
   thumb: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  deliveryTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  deliverySub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, marginTop: 5 },
+  deliveryTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  deliverySub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 });

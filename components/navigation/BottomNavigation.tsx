@@ -1,9 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Animated, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import { BottomBlur } from '@/components/common/BottomBlur';
+import Svg, { Circle, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,10 +16,10 @@ import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 type IconProps = { color: string; fill: string; active: boolean };
 type Route = '/' | '/explore' | '/bookings' | '/profile';
 
-// Icons render at 22pt (design). 24-unit icons use STROKE, 18-unit icons use STROKE_18: both come out ~1.5pt.
-const ICON = 22;
-const STROKE = 1.6;
-const STROKE_18 = 1.2;
+// Icons render at 24pt (design, 1pt strokes): 24-unit icons use STROKE, 18-unit icons are scaled up by 4/3 and use STROKE_18.
+const ICON = 24;
+const STROKE = 1;
+const STROKE_18 = 0.75;
 
 // Exact Figma path (18px frame, 1px stroke); the door is a notch in the outline.
 const HOME_PATH =
@@ -48,12 +47,16 @@ function ExploreIcon({ color, fill, active }: IconProps) {
   );
 }
 
+// Exact Figma "road" (24px frame, 1px stroke): the road outline, then the three centre dashes.
+const ROAD_PATH =
+  'M2.0774 18.449C1.99207 18.7467 1.97706 19.0602 2.03355 19.3648C2.09004 19.6693 2.21649 19.9566 2.40293 20.2039C2.58938 20.4512 2.83072 20.6519 3.10794 20.79C3.38515 20.9282 3.69067 21.0001 4.0004 21H20.0004C20.3101 21.0002 20.6156 20.9284 20.8929 20.7904C21.1701 20.6524 21.4115 20.4518 21.598 20.2046C21.7846 19.9574 21.9112 19.6702 21.9678 19.3657C22.0244 19.0612 22.0096 18.7478 21.9244 18.45L17.9244 4.45C17.8049 4.03205 17.5524 3.66443 17.2052 3.40279C16.8581 3.14116 16.4351 2.99976 16.0004 3H8.0004C7.56569 2.99976 7.14273 3.14116 6.79557 3.40279C6.44841 3.66443 6.19594 4.03205 6.0764 4.45L2.0774 18.449Z';
+
 function ActivityIcon({ color, fill, active }: IconProps) {
   const line = active ? fill : color;
   return (
     <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
-      <Rect x={3} y={3} width={18} height={18} rx={2.5} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
-      <Path d="M7 8h8M7 12h10M7 16h6" stroke={line} strokeWidth={STROKE} strokeLinecap="round" />
+      <Path d={ROAD_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M12 17V21M12 5V3M12 9V12" stroke={line} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -95,6 +98,9 @@ function HeadsetIcon({ color }: { color: string }) {
 /** Round Help button beside the tab pill; opens WhatsApp / Call options above it. */
 function HelpButton() {
   useRegisterNavHelp();
+  const colors = useColors();
+  const { isDarkMode } = useSawari();
+  const helpColor = isDarkMode ? colors.foreground : HELP_INK;
   const [open, setOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -165,10 +171,10 @@ function HelpButton() {
         accessibilityState={{ expanded: open }}
         testID="tab-help"
         onPress={() => toggle()}
-        style={({ pressed }) => [styles.help, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.help, isDarkMode && { backgroundColor: colors.card, borderColor: colors.border }, pressed && { opacity: 0.85 }]}
       >
-        <HeadsetIcon color={HELP_GREEN} />
-        <Text style={[styles.navLabel, styles.navLabelActive, { color: HELP_GREEN }]} numberOfLines={1} maxFontSizeMultiplier={1.15}>Help</Text>
+        <HeadsetIcon color={helpColor} />
+        <Text style={[styles.navLabel, { color: helpColor }]} numberOfLines={1} maxFontSizeMultiplier={1.15}>Help</Text>
       </Pressable>
     </View>
   );
@@ -182,7 +188,7 @@ const ALL_ITEMS: {
 }[] = [
   { id: 'home', label: 'Home', route: '/', Icon: HomeIcon },
   { id: 'explore', label: 'Explore', route: '/explore', Icon: ExploreIcon },
-  { id: 'bookings', label: 'Activity', route: '/bookings', Icon: ActivityIcon },
+  { id: 'bookings', label: 'My Trips', route: '/bookings', Icon: ActivityIcon },
   { id: 'profile', label: 'Profile', route: '/profile', Icon: ProfileIcon },
 ];
 
@@ -192,6 +198,8 @@ export function BottomNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   const { isDarkMode } = useSawari();
+  const activeInk = isDarkMode ? NAV_ACTIVE_DARK : NAV_ACTIVE;
+  const inactiveInk = isDarkMode ? colors.mutedForeground : NAV_INACTIVE;
 
   const offset = bottomNavOffset(insets.bottom);
   // Figma fades the page out to white under the bar; dark mode fades to its own background.
@@ -200,16 +208,13 @@ export function BottomNavigation() {
 
   return (
     <View pointerEvents="box-none" style={[styles.container, { paddingBottom: offset }]} testID="bottom-nav">
-      <View pointerEvents="none" style={[styles.fade, { height: fadeHeight }]}>
-        {/* Figma: backdrop-filter blur(4px). Android's blur is experimental and costly, so it gets the fade only. */}
-        {Platform.OS === 'ios' && <BlurView intensity={8} tint={isDarkMode ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />}
-        <LinearGradient colors={[`${fadeTo}00`, fadeTo]} style={StyleSheet.absoluteFill} />
-      </View>
+      {/* Figma: backdrop blur under the bar, fading to white (Android blurs the page's <BlurTarget>). */}
+      <BottomBlur height={fadeHeight} fadeTo={fadeTo} />
       <View pointerEvents="box-none" style={styles.row}>
-        <View style={[styles.pill, { backgroundColor: colors.card }]}>
+        <View style={[styles.pill, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
           {ALL_ITEMS.map(({ id, label, route, Icon }) => {
             const active = route === '/' ? pathname === '/' : pathname.startsWith(route);
-            const color = active ? NAV_ACTIVE : NAV_INACTIVE;
+            const color = active ? activeInk : inactiveInk;
             return (
               <Pressable
                 key={id}
@@ -229,7 +234,7 @@ export function BottomNavigation() {
                 hitSlop={{ top: 6, bottom: 6 }}
                 style={({ pressed }) => [styles.navItem, pressed && !active && { opacity: 0.7 }]}
               >
-                <Icon color={color} fill={colors.card} active={active} />
+                <Icon color={color} fill={isDarkMode ? colors.card : '#FFFFFF'} active={active} />
                 <Text
                   style={[styles.navLabel, active && styles.navLabelActive, { color }]}
                   numberOfLines={1}
@@ -250,8 +255,9 @@ export function BottomNavigation() {
   );
 }
 
-const HELP_GREEN = '#008758'; // Green/green-500 (design Help button)
-const NAV_ACTIVE = '#2F3E75'; // Primary/blue-500 (Figma active tab)
+const HELP_INK = '#008758'; // Green/green-500 (design Help button icon and label)
+const NAV_ACTIVE = '#2F3E75'; // Primary/blue-500 (Figma active tab: icon and label)
+const NAV_ACTIVE_DARK = '#A5B6FF';
 const NAV_INACTIVE = '#737373'; // Neutral/500
 // Figma's two-layer upward glow, drawn the same on iOS and Android.
 const NAV_SHADOW = '0px -60px 24px rgba(47, 62, 117, 0.01), 0px -34px 20px rgba(47, 62, 117, 0.05)';
@@ -263,7 +269,7 @@ const styles = StyleSheet.create({
   fade: { bottom: 0, left: 0, position: 'absolute', right: 0 },
   // flex-end: opening the Help menu grows the Help column upward without lifting the tab pill.
   row: { alignItems: 'flex-end', flexDirection: 'row', gap: BOTTOM_NAV_GAP },
-  // Design: 285×64 pill (fluid width here, so it fills wider phones), 1px #E7EAF4 border, soft upward glow.
+  // Design: 285×64 pill (fluid width here, so it fills wider phones), 1px #E7EAF4 border, 8px padding and 4 between tabs, soft upward glow.
   pill: {
     flex: 1,
     minWidth: 0,
@@ -273,18 +279,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     height: BOTTOM_NAV_CONTENT_HEIGHT,
-    paddingHorizontal: 6,
+    padding: 8,
+    gap: 4,
     boxShadow: NAV_SHADOW,
   },
   helpCol: { alignItems: 'center' },
-  // Design: 64×64 circle, green-50 fill, green-100 border.
+  // Design: 64×64 circle, Green/green-50 fill, #DCEFE8 border, 8px padding, 2 between icon and label.
   help: {
     alignItems: 'center',
     backgroundColor: '#E6F3EE',
-    borderColor: '#CFE8DD',
+    borderColor: '#DCEFE8',
     borderRadius: BOTTOM_NAV_RADIUS,
     borderWidth: 1,
-    gap: 4,
+    gap: 2,
+    padding: 8,
     height: BOTTOM_NAV_CONTENT_HEIGHT,
     justifyContent: 'center',
     width: BOTTOM_NAV_CONTENT_HEIGHT,
@@ -292,21 +300,23 @@ const styles = StyleSheet.create({
   },
   helpMenu: { alignItems: 'center', gap: 12, marginBottom: 12 },
   helpOption: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  // Equal-width tabs; icon 22 + 4 + label 16 = 42 inside the 64 pill.
+  // Equal-width tabs: padding 2 + icon 24 + gap 2 + label 12 + 2 = 42, in a 46px-high slot of the 64 pill.
   navItem: {
     alignItems: 'center',
     flexBasis: 0,
     flexGrow: 1,
     minWidth: 0,
-    gap: 4,
-    height: 52,
+    gap: 2,
+    height: 46,
+    paddingVertical: 2,
     justifyContent: 'center',
   },
+  // Design: Plus Jakarta Sans 600, 8px / 12px, in every state.
   navLabel: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12,
-    lineHeight: 16,
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 8,
+    lineHeight: 12,
     textAlign: 'center',
   },
-  navLabelActive: { fontFamily: 'PlusJakartaSans_600SemiBold' },
+  navLabelActive: {},
 });

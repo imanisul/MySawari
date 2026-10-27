@@ -17,6 +17,7 @@ import { calculateRentalDays } from '@/services/backend/pricingEngine';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
 import { rise } from '@/components/common/motion';
 import { ActivityAPI } from '@/services/api/activity';
+import { SortLinesIcon, FunnelIcon } from '@/components/common/FilterIcons';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
   ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, QUICK_CHIPS, QuickChip,
@@ -68,7 +69,7 @@ export default function SearchResultsScreen() {
   const [startLabel, endLabel] = splitDateRange(dateRange);
   const startDay = parseDayLabel(startLabel);
   const endDay = startDay !== null ? parseDayLabel(endLabel, startDay) : null;
-  const hasRange = startDay !== null && endDay !== null && endDay > startDay;
+  const hasRange = startDay !== null && endDay !== null && endDay >= startDay;
 
   // Remember this trip search so Home can offer it again with one tap.
   useEffect(() => {
@@ -99,7 +100,10 @@ export default function SearchResultsScreen() {
   [fetchedCars, vehicleType, startLabel, endLabel, hasRange]);
 
   const activeFilterCount = countActive(filters);
-  const ratingOf = useVehicleRatings(freeCars, sort === 'rating' || !!filters.rating || showFilter);
+  const reviewRating = useVehicleRatings(freeCars, sort === 'rating' || !!filters.rating || showFilter);
+  // "Recommended" uses only the vehicle's stored rating, so the list doesn't re-order itself while reviews load.
+  const storedRating = useCallback((c: Car) => (typeof c.rating === 'number' ? c.rating : null), []);
+  const ratingOf = sort === 'rating' || !!filters.rating ? reviewRating : storedRating;
 
   useEffect(() => {
     if (activeFilterCount > 0) ActivityAPI.logActivity('apply_filter', 'SearchScreen', { ...filters });
@@ -152,6 +156,24 @@ export default function SearchResultsScreen() {
     setFilters({ ...EMPTY_FILTERS, ...(c.apply || {}) });
   };
 
+  // The first cards rise in once, when results first appear. Cards re-mounted while scrolling (the list
+  // unmounts far-off rows and mounts them again) must not replay it — that replay was the "shaking".
+  const introDone = useRef(false);
+  useEffect(() => {
+    if (isLoading || filteredCars.length === 0 || introDone.current) return;
+    const t = setTimeout(() => { introDone.current = true; }, 600);
+    return () => clearTimeout(t);
+  }, [isLoading, filteredCars.length]);
+  const renderCar = useCallback(({ item, index }: { item: Car; index: number }) => (
+    introDone.current || index > 3 ? (
+      <CarListCard car={item} isExplore={false} />
+    ) : (
+      <Reanimated.View entering={rise(index * 40)}>
+        <CarListCard car={item} isExplore={false} />
+      </Reanimated.View>
+    )
+  ), []);
+
   const count = filteredCars.length;
   const emptyKind: EmptyKind = isError && !fetchedCars?.length ? 'error' : (activeFilterCount > 0 || !!debouncedQuery) && freeCars.length > 0 ? 'filters' : 'dates';
   const plural = `${vehicleWord[0].toUpperCase()}${vehicleWord.slice(1)}${count === 1 ? '' : 's'}`;
@@ -165,8 +187,8 @@ export default function SearchResultsScreen() {
 
       {/* Search + sort */}
       <View style={styles.searchRow}>
-        <View style={[styles.search, { borderColor: p.border }]}>
-          <Feather name="search" size={18} color={p.sub} />
+        <View style={[styles.search, { borderColor: p.segBorder, backgroundColor: p.page }]}>
+          <Feather name="search" size={20} color={p.muted} />
           <TextInput
             placeholder="Search cars and bike"
             placeholderTextColor={p.muted}
@@ -183,11 +205,11 @@ export default function SearchResultsScreen() {
         </View>
         <Pressable
           onPress={() => { Haptics.selectionAsync(); setShowSort(true); }}
-          style={[styles.sortBtn, { borderColor: sort !== 'recommended' ? p.navy : p.border, backgroundColor: sort !== 'recommended' ? p.navy : p.page }]}
+          style={[styles.sortBtn, { borderColor: sort !== 'recommended' ? p.navy : p.segBorder, backgroundColor: sort !== 'recommended' ? p.navy : p.segOn }]}
           accessibilityRole="button"
           accessibilityLabel="Sort"
         >
-          <Feather name="sliders" size={16} color={sort !== 'recommended' ? p.onNavy : p.sub} style={{ transform: [{ rotate: '90deg' }] }} />
+          <SortLinesIcon color={sort !== 'recommended' ? p.onNavy : p.muted} />
         </Pressable>
       </View>
 
@@ -199,7 +221,7 @@ export default function SearchResultsScreen() {
           accessibilityRole="button"
           testID="filter-button"
         >
-          <Feather name="filter" size={13} color={activeFilterCount ? p.navy : p.sub} />
+          <FunnelIcon color={activeFilterCount ? p.navy : p.muted} />
           <Text style={[styles.chipText, { color: activeFilterCount ? p.navy : p.sub }]}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
         </Pressable>
         {QUICK_CHIPS.map((c) => {
@@ -233,7 +255,10 @@ export default function SearchResultsScreen() {
             <Text style={[styles.count, { color: p.sub }]} numberOfLines={1}>
               {isLoading ? `Finding available ${vehicleWord}s…` : `Showing ${count} ${plural} available`}
             </Text>
-            {isFetching && !isLoading && <ActivityIndicator size="small" color={p.muted} style={{ transform: [{ scale: 0.7 }] }} />}
+            {/* Fixed-size slot: the background refresh spinner never nudges the header while scrolling. */}
+            <View style={styles.spinSlot}>
+              {isFetching && !isLoading && !refreshing && <ActivityIndicator size="small" color={p.muted} style={{ transform: [{ scale: 0.7 }] }} />}
+            </View>
           </View>
         </View>
         <Pressable onPress={openDates} style={[styles.dates, { backgroundColor: p.summary }]} accessibilityRole="button" accessibilityLabel={`Trip ${startLabel || ''} ${pickupTime} to ${endLabel || ''} ${returnTime}. Change dates`}>
@@ -252,11 +277,7 @@ export default function SearchResultsScreen() {
       <FlatList
         data={isLoading ? [] : filteredCars}
         keyExtractor={(c: Car) => c.id}
-        renderItem={({ item, index }) => (
-          <Reanimated.View entering={rise(Math.min(index, 4) * 40)}>
-            <CarListCard car={item} isExplore={false} />
-          </Reanimated.View>
-        )}
+        renderItem={renderCar}
         ListHeaderComponent={<View style={{ paddingHorizontal: 16, marginBottom: 8 }}>{header}</View>}
         ListEmptyComponent={isLoading ? (
           <Reanimated.View entering={FadeIn.duration(200)}>
@@ -277,9 +298,13 @@ export default function SearchResultsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: 8, paddingBottom: insets.bottom + 96 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); try { await refetch(); } finally { setRefreshing(false); } }} tintColor={p.navy} />}
-        initialNumToRender={6}
-        windowSize={11}
+        initialNumToRender={3}
+        maxToRenderPerBatch={4}
+        updateCellsBatchingPeriod={60}
+        windowSize={9}
         removeClippedSubviews={false}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
         {...scrollHandlers}
       />
 
@@ -288,7 +313,7 @@ export default function SearchResultsScreen() {
         onClose={() => setShowFilter(false)}
         value={filters}
         cars={freeCars}
-        ratingOf={ratingOf}
+        ratingOf={reviewRating}
         onApply={(f) => { setFilters(f); setChip(chipFor(f)); }}
       />
       <SortSheet visible={showSort} onClose={() => setShowSort(false)} value={sort} onApply={setSort} />
@@ -303,6 +328,7 @@ const styles = StyleSheet.create({
   topText: { flex: 1, minWidth: 0 },
   dest: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, lineHeight: 20 },
   countRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  spinSlot: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   count: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16 },
   dates: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4 },
   dateCol: { alignItems: 'center', paddingHorizontal: 4 },
@@ -312,9 +338,9 @@ const styles = StyleSheet.create({
   strip: { borderWidth: 1, borderRadius: 8, height: 39, alignItems: 'center', justifyContent: 'center' },
   stripText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 },
   searchRow: { flexDirection: 'row', gap: 8 },
-  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10 },
-  searchText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, paddingVertical: 0 },
-  sortBtn: { width: 40, height: 40, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
+  searchText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, paddingVertical: 0 },
+  sortBtn: { width: 48, height: 40, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   chips: { gap: 6, paddingHorizontal: 16 },
   chip: { height: 30, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 10 },

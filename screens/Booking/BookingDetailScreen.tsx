@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useColors } from '@/hooks/useColors';
+import { useTripColors } from '@/components/booking/tripColors';
 import { LoginBottomSheet } from '@/components';
 import { API, BookingSnapshot } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
@@ -20,10 +22,18 @@ import { ReviewModal } from '@/components/booking/ReviewModal';
 import { RefundTrackingModal } from '@/components/booking/RefundTrackingModal';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
 import {
-  ActionRow, BookingCard, FONT, PricingSummary, RefundTimeline, SectionTitle, TripTimeline, pickupMoment, rupees, shortDate,
+  ActionRow, BookingCard, FONT, HelpCard, PricingSummary, RefundTimeline, SectionTitle, TripTimeline, pickupMoment, refundStage, rupees, shortDate,
 } from '@/components/booking/TripDetailParts';
 
 const SUPPORT_EMAIL = 'support@mysawari.in';
+
+// Design icons for "Before you go" (the same pictures as the benefit rows).
+const TIP_IMAGES = [
+  require('@/assets/images/benefit_save_more.png'),
+  require('@/assets/images/benefit_exclusive_discounts.png'),
+  require('@/assets/images/benefit_special_rewards.png'),
+  require('@/assets/images/benefit_special_rewards.png'),
+];
 
 const BEFORE_YOU_GO = [
   { icon: 'credit-card', title: 'Keep your driving licence ready', body: 'Carry a valid licence accepted for your rental.' },
@@ -32,7 +42,7 @@ const BEFORE_YOU_GO = [
   { icon: 'clock', title: 'Arrive on time', body: "Contact the team if you're delayed or need to change your pickup time." },
 ] as const;
 
-const WHY_MYSAWARI = [
+const HANDOVER_STEPS = [
   { title: 'Verify the vehicle', body: 'Check the car model, registration number, and visible condition.' },
   { title: 'Record existing damage', body: "Take photos or videos of any scratches or damage and ensure they're documented with the team." },
   { title: 'Check fuel and odometer', body: 'Verify and record the starting fuel level and kilometre reading with the team.' },
@@ -40,7 +50,7 @@ const WHY_MYSAWARI = [
 ];
 
 export default function BookingDetailScreen() {
-  const c = useColors();
+  const c = useTripColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -77,9 +87,9 @@ export default function BookingDetailScreen() {
   const toPricing = () => scrollRef.current?.scrollTo({ y: Math.max(0, pricingY.current - 12), animated: true });
 
   const header = (
-    <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+    <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
       <Pressable onPress={() => { Haptics.selectionAsync(); router.back(); }} style={styles.back} accessibilityLabel="Back" hitSlop={8}>
-        <Feather name="chevron-left" size={24} color={c.foreground} />
+        <Feather name="chevron-left" size={24} color={c.mutedForeground} />
       </Pressable>
       <Text style={[styles.headerTitle, { color: c.foreground }]}>Trip Details</Text>
     </View>
@@ -174,10 +184,7 @@ export default function BookingDetailScreen() {
       if (!canExtend) return null;
       return (
         <>
-          <View style={styles.hintRow}>
-            <Feather name="info" size={14} color={c.mutedForeground} />
-            <Text style={[styles.hint, { color: c.mutedForeground }]}>Need more time? Request an extension for your trip.</Text>
-          </View>
+          <Text style={[styles.hint, { color: c.foreground }]}>Need more time? Request an extension for your trip.</Text>
           <Cta label="Request Extension" onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowExtend(true); }} />
         </>
       );
@@ -213,10 +220,10 @@ export default function BookingDetailScreen() {
             />
           )}
 
-          {ongoing && <ActionRow title="Need help during your trip?" subtitle="Call or WhatsApp our team any time." icon="phone" onPress={openSupport} />}
+          {ongoing && <HelpCard onWhatsApp={() => Linking.openURL(SUPPORT_WHATSAPP_URL).catch(() => {})} />}
 
           {ongoing && canExtend && (
-            <View style={[styles.box, styles.extendCard, { backgroundColor: c.card, borderColor: c.border }]}>
+            <View style={[styles.box, styles.extendCard, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4' }]}>
               <View style={{ flex: 1, gap: 0 }}>
                 <Text style={[styles.rowTitle, { color: c.foreground }]}>Need more time?</Text>
                 <Text style={[styles.body, { color: c.mutedForeground }]}>Request an extension for your trip.</Text>
@@ -227,36 +234,36 @@ export default function BookingDetailScreen() {
             </View>
           )}
 
-          {/* Cancelled: refund progress */}
-          {cancelled && (
-            <View style={{ gap: 12 }}>
-              <SectionTitle title="Cancellation Request" />
-              {(s.refundAmount || 0) > 0 ? (
-                <Pressable onPress={() => setShowRefundTrack(true)} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
-                  <RefundTimeline booking={s} />
-                  <View style={styles.linkRow}>
-                    <Text style={[styles.link, { color: c.blue }]}>Refund of {rupees(s.refundAmount)} · view payout details</Text>
+          {/* Cancelled only: where the cancellation and refund stand (never shown for other trips) */}
+          {cancelled && (() => {
+            const stage = refundStage(s);
+            const finished = stage === 'refunded' || stage === 'rejected';
+            return (
+              <View style={{ gap: 12 }}>
+                <View style={{ gap: 4 }}>
+                <SectionTitle title="Cancellation Request" />
+                <RefundTimeline booking={s} />
+                {/* While the refund is on its way, the payout details (UPI / bank) can still be checked or changed. */}
+                {(stage === 'received' || stage === 'approved') && (
+                  <Pressable onPress={() => setShowRefundTrack(true)} hitSlop={6} style={styles.linkRow} accessibilityRole="button">
+                    <Text style={[styles.link, { color: c.blue }]}>Refund of {rupees(s.refundAmount)} · payout details</Text>
                     <Feather name="chevron-right" size={13} color={c.blue} />
+                  </Pressable>
+                )}
+                </View>
+                {finished && (
+                  <View style={[styles.box, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4', gap: 2, borderRadius: 8 }]}>
+                    <Text style={[styles.helpTitle, { color: c.foreground }]}>Need help with your refund?</Text>
+                    <Text style={[styles.helpBody, { color: c.mutedForeground }]}>
+                      If you haven’t received your refund, email{' '}
+                      <Text selectable style={{ color: c.navy, textDecorationLine: 'underline' }} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Refund for booking ${code}`)}`).catch(() => {})}>{SUPPORT_EMAIL}.</Text>
+                      {' '}We’ll verify and assist you.
+                    </Text>
                   </View>
-                </Pressable>
-              ) : (
-                <View style={[styles.note, { backgroundColor: c.destructive + '10' }]}>
-                  <Feather name="info" size={16} color={c.destructive} />
-                  <Text style={[styles.noteText, { color: c.destructive }]}>
-                    {s.cancellationReason ? `Cancelled: ${s.cancellationReason}. ` : ''}No refund applies to this cancellation.
-                  </Text>
-                </View>
-              )}
-              {(s.refundAmount || 0) > 0 && (
-                <View style={[styles.box, { backgroundColor: c.card, borderColor: c.border, gap: 4 }]}>
-                  <Text style={[styles.rowTitle, { color: c.foreground }]}>Need help with your refund?</Text>
-                  <Text style={[styles.body, { color: c.mutedForeground }]}>
-                    If you haven’t received your refund, email <Text selectable style={{ color: c.blue, fontFamily: FONT.medium }} onPress={() => Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Refund for booking ${code}`)}`).catch(() => {})}>{SUPPORT_EMAIL}</Text>. We’ll verify and assist you.
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
+                )}
+              </View>
+            );
+          })()}
 
           {/* Your trip */}
           <View>
@@ -273,6 +280,7 @@ export default function BookingDetailScreen() {
                 await API.reviews.submit(String(s.vehicleId), rating, text, { bookingId: s.id });
                 queryClient.invalidateQueries({ queryKey: ['myReviews'] });
                 queryClient.invalidateQueries({ queryKey: ['pendingReviews'] });
+                queryClient.invalidateQueries({ queryKey: ['carReviews'] });
               }}
             />
           )}
@@ -280,7 +288,7 @@ export default function BookingDetailScreen() {
           {upcoming && (
             <ActionRow title="Need to change your plans or request refund?" subtitle="Modify your trip or manage your booking." onPress={() => setShowManage(true)} />
           )}
-          {upcoming && <ActionRow title="Have a question about your booking?" subtitle="Call or WhatsApp our team." icon="phone" onPress={openSupport} />}
+          {upcoming && <HelpCard onWhatsApp={() => Linking.openURL(SUPPORT_WHATSAPP_URL).catch(() => {})} />}
 
           {/* Extensions already asked for */}
           {!!s.extensions?.length && (
@@ -308,14 +316,14 @@ export default function BookingDetailScreen() {
             <View style={{ gap: 8 }}>
               <SectionTitle title="Before you go" />
               <View style={{ gap: 8 }}>
-                {BEFORE_YOU_GO.map((item) => (
+                {BEFORE_YOU_GO.map((item, i) => (
                   <View key={item.title} style={styles.tipRow}>
-                    <View style={[styles.tipIcon, { backgroundColor: c.muted }]}>
-                      <Feather name={item.icon as any} size={18} color={c.foreground} />
+                    <View style={[styles.tipIcon, { backgroundColor: 'rgba(251, 188, 4, 0.1)' }]}>
+                      <Image source={TIP_IMAGES[i]} style={{ width: i === 1 ? 20 : 24, height: i === 1 ? 20 : 24 }} resizeMode="contain" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.tipTitle, { color: c.foreground }]}>{item.title}</Text>
-                      <Text style={[styles.body, { color: c.mutedForeground }]}>{item.body}</Text>
+                      <Text style={[styles.body, { color: c.mutedForeground }]} numberOfLines={1}>{item.body}</Text>
                     </View>
                   </View>
                 ))}
@@ -323,23 +331,42 @@ export default function BookingDetailScreen() {
             </View>
           )}
 
-          {/* Why rent from MySawari? */}
+          {/* Pickup & handover (Figma: lavender card, purple ticks) */}
           {(upcoming || ongoing) && (
-            <View style={[styles.why, { backgroundColor: c.navy }]}>
-              <View style={[styles.whyGlow, { backgroundColor: c.lime }]} />
-              <Text style={styles.whyTitle}>Why rent from MySawari?</Text>
+            <LinearGradient
+              colors={['#D7D2FA', '#F0EFFD', '#F0EFFD']}
+              locations={[0, 0.6782, 1]}
+              start={{ x: 1.042, y: 0.075 }}
+              end={{ x: -0.042, y: 0.925 }}
+              style={[styles.why, { borderColor: '#D1CCF9' }]}
+            >
+              {/* Figma "Ellipse 4": the blurred #9C90F3 blob top-right, drawn as a radial wash (same as the car page). */}
+              <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
+                <Defs>
+                  <RadialGradient id="tripGlow" cx="84%" cy="-4%" rx="42%" ry="48%" fx="84%" fy="-4%">
+                    <Stop offset="0" stopColor="#9C90F3" stopOpacity="0.6" />
+                    <Stop offset="1" stopColor="#9C90F3" stopOpacity="0" />
+                  </RadialGradient>
+                </Defs>
+                <Rect x="0" y="0" width="100%" height="100%" fill="url(#tripGlow)" />
+              </Svg>
+              <Text style={[styles.whyTitle, { color: c.foreground }]}>Why rent from MySawari?</Text>
               <View style={{ gap: 10 }}>
-                {WHY_MYSAWARI.map((w) => (
+                {HANDOVER_STEPS.map((w) => (
                   <View key={w.title} style={styles.whyRow}>
-                    <Feather name="check-circle" size={20} color={c.lime} style={{ marginTop: 2 }} />
+                    <View style={styles.whyTickBox}>
+                      <View style={styles.whyTick}>
+                        <Feather name="check" size={12} color="#FFFFFF" />
+                      </View>
+                    </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.whyItem}>{w.title}</Text>
-                      <Text style={styles.whyBody}>{w.body}</Text>
+                      <Text style={[styles.whyItem, { color: c.foreground }]}>{w.title}</Text>
+                      <Text style={[styles.whyBody, { color: c.mutedForeground }]}>{w.body}</Text>
                     </View>
                   </View>
                 ))}
               </View>
-            </View>
+            </LinearGradient>
           )}
 
           {/* Pricing Summary */}
@@ -353,7 +380,7 @@ export default function BookingDetailScreen() {
       </Animated.View>
 
       {!!bottomBar && (
-        <View style={[styles.bottomBar, { backgroundColor: c.background, borderTopColor: c.border, paddingBottom: Math.max(insets.bottom, 16) }]}>
+        <View style={[styles.bottomBar, { backgroundColor: c.background, borderTopColor: '#E7EAF4', paddingBottom: insets.bottom + 8 }]}>
           {bottomBar}
         </View>
       )}
@@ -374,19 +401,28 @@ export default function BookingDetailScreen() {
 // ── Pieces used only on this screen ──────────────────────────────────────────
 
 function Banner({ tone, title, body }: { tone: 'info' | 'active' | 'pending' | 'danger'; title: string; body: string }) {
-  const c = useColors();
-  const bg = { info: c.lightBlue, active: c.tintLight, pending: c.warning + '14', danger: c.destructive + '10' }[tone];
-  const fg = { info: c.blue, active: c.primaryText, pending: c.warning, danger: c.destructive }[tone];
+  const c = useTripColors();
+  const quiet = tone === 'info' || tone === 'active';
+  const bg = { info: c.lightBlue, active: c.lightBlue, pending: c.warning + '14', danger: c.destructive + '10' }[tone];
+  const fg = { info: c.foreground, active: c.foreground, pending: c.warning, danger: c.destructive }[tone];
+  // Figma: a confirmed upcoming trip gets one centred line (343×31, #F4F6FA, radius 6) instead of a text block.
+  if (tone === 'info') {
+    return (
+      <View style={[styles.banner, styles.bannerLine, { backgroundColor: '#F4F6FA' }]}>
+        <Text style={[styles.rowTitle, { color: fg }]} numberOfLines={1}>{title}</Text>
+      </View>
+    );
+  }
   return (
     <View style={[styles.banner, { backgroundColor: bg }]}>
       <Text style={[styles.rowTitle, { color: fg }]}>{title}</Text>
-      <Text style={[styles.body, { color: c.foreground }]}>{body}</Text>
+      <Text style={[styles.body, { color: quiet ? c.mutedForeground : c.foreground }]}>{body}</Text>
     </View>
   );
 }
 
 function Cta({ label, onPress }: { label: string; onPress: () => void }) {
-  const c = useColors();
+  const c = useTripColors();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, { backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 }]}>
       <Text style={[styles.ctaText, { color: c.primaryForeground }]}>{label}</Text>
@@ -399,7 +435,7 @@ function RateTrip({ reviewed, onSubmit, onAddPhotos }: {
   onSubmit: (rating: number, text: string) => Promise<void>;
   onAddPhotos: () => void;
 }) {
-  const c = useColors();
+  const c = useTripColors();
   const [rating, setRating] = useState(0);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -442,7 +478,7 @@ function RateTrip({ reviewed, onSubmit, onAddPhotos }: {
         style={[styles.rateCta, { backgroundColor: rating ? c.primary : c.disabledBg }]}
       >
         {busy ? <ActivityIndicator color={c.primaryForeground} /> : (
-          <Text style={[styles.ctaText, { fontSize: 15, color: rating ? c.primaryForeground : c.disabledText }]}>Submit review</Text>
+          <Text style={[styles.ctaText, { fontSize: 15, color: rating ? c.primaryForeground : c.disabledText }]}>Submit</Text>
         )}
       </Pressable>
       <Pressable onPress={onAddPhotos} hitSlop={6} style={{ alignSelf: 'center' }}>
@@ -454,49 +490,52 @@ function RateTrip({ reviewed, onSubmit, onAddPhotos }: {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 16 },
-  back: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: FONT.bold, fontSize: 22, lineHeight: 29 },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
+  back: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: FONT.semibold, fontSize: 19, lineHeight: 28 },
   content: { paddingHorizontal: 16, paddingTop: 4, gap: 16 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 8, marginTop: -60 },
   centerTitle: { fontFamily: FONT.semibold, fontSize: 17, marginTop: 8 },
   smallCta: { marginTop: 12, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
 
   box: { borderWidth: 1, borderRadius: 16, padding: 13 },
-  banner: { borderRadius: 14, paddingHorizontal: 9, paddingVertical: 7 },
-  rowTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 17 },
-  body: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17 },
+  banner: { borderRadius: 8, borderWidth: 1, borderColor: '#E7EAF4', paddingHorizontal: 8, paddingVertical: 6 },
+  bannerLine: { borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  rowTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
+  helpTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
+  helpBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
+  body: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
   link: { fontFamily: FONT.medium, fontSize: 13 },
   linkRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 8 },
   note: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12 },
   noteText: { flex: 1, fontFamily: FONT.medium, fontSize: 13, lineHeight: 18 },
 
-  extendCard: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  pillBtn: { borderRadius: 10, paddingHorizontal: 10, height: 33, justifyContent: 'center' },
-  pillBtnText: { fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF' },
+  extendCard: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8 },
+  pillBtn: { borderRadius: 6, paddingHorizontal: 10, height: 33, justifyContent: 'center' },
+  pillBtnText: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17, color: '#FFFFFF' },
   extRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   extStatus: { fontFamily: FONT.semibold, fontSize: 11, textTransform: 'uppercase' },
 
-  tipRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  tipIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  tipTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
+  tipRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
+  tipIcon: { width: 36, height: 36, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  tipTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
 
-  why: { borderRadius: 16, padding: 13, gap: 12, overflow: 'hidden' },
-  whyGlow: { position: 'absolute', width: 206, height: 205, borderRadius: 103, right: -150, top: -87, opacity: 0.18 },
-  whyTitle: { fontFamily: FONT.semibold, fontSize: 18, lineHeight: 23, color: '#FFFFFF' },
+  why: { borderRadius: 10, borderWidth: 1, paddingTop: 12, paddingRight: 16, paddingBottom: 12, paddingLeft: 12, gap: 12, overflow: 'hidden' },
+  whyTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
   whyRow: { flexDirection: 'row', gap: 8 },
-  whyItem: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 17, color: '#FFFFFF' },
-  whyBody: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 17, color: '#C9D2E3' },
+  whyTickBox: { width: 24, paddingTop: 4 },
+  whyTick: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center' },
+  whyItem: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
+  whyBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
 
-  rateTitle: { fontFamily: FONT.semibold, fontSize: 18, lineHeight: 23, textAlign: 'center' },
+  rateTitle: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   stars: { flexDirection: 'row', justifyContent: 'center', gap: 4 },
-  feedback: { borderWidth: 1, borderRadius: 12, minHeight: 46, paddingHorizontal: 13, paddingVertical: 13, fontFamily: FONT.regular, fontSize: 15, textAlignVertical: 'top' },
-  rateCta: { height: 43, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  feedback: { borderWidth: 1, borderRadius: 8, minHeight: 40, paddingHorizontal: 12, paddingVertical: 10, fontFamily: FONT.regular, fontSize: 12, textAlignVertical: 'top' },
+  rateCta: { height: 38, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   rateDone: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
-  bottomBar: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 16, gap: 8 },
-  hintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'center' },
-  hint: { fontFamily: FONT.regular, fontSize: 14, lineHeight: 20 },
-  cta: { height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  ctaText: { fontFamily: FONT.semibold, fontSize: 16 },
+  bottomBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 16, gap: 8, boxShadow: '0px -52px 21px rgba(47, 62, 117, 0.01), 0px -29px 17px rgba(47, 62, 117, 0.05)' },
+  hint: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  ctaText: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
 });

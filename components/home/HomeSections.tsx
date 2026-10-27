@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, ImageSourcePropType, ScrollView, useWindowDimensions, Linking, Alert } from 'react-native';
-import { Feather, Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, Text as SvgText, TextPath, G, RadialGradient, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { formatCurrency, memberDayPrice, type QuoteParams } from '@/services/backend/pricingEngine';
-import { Car, getAvailability, getCarHighlights } from '@/utils/sawari';
+import { Car, carTitle, getAvailability, getCarHighlights } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
 
 // Home page (Figma "Home"): purple banner, refer strip, Cars / Bikes search card, then the sections below.
@@ -48,7 +48,8 @@ function Sunburst({ width, height, cy }: { width: number; height: number; cy: nu
 // Headline lettering (Figma): plain white condensed caps on a gentle upward arch, each letter fanning
 // with the curve, and a soft blurred shadow falling down-right. The blur is built from faint stacked
 // copies (SVG filters on text are unreliable on Android). Widths are fixed to the design's.
-const ARC_W = 320;
+const ARC_W = 337.86;
+const ARC_H = 128.95;
 const ARC_LINES = [
   { y: 62, rise: 10, width: 236, size: 44 },
   { y: 110, rise: 7, width: 164, size: 31 },
@@ -68,7 +69,7 @@ const SHADOW_TAPS = [
 
 function ArcHeadline({ lines }: { lines: [string, string] }) {
   return (
-    <Svg width={ARC_W} height={132} accessibilityLabel={lines.join(' ')}>
+    <Svg width={ARC_W} height={ARC_H} accessibilityLabel={lines.join(' ')}>
       <Defs>
         {ARC_LINES.map((l, i) => {
           const x0 = (ARC_W - l.width) / 2 - 12, x1 = (ARC_W + l.width) / 2 + 12;
@@ -136,7 +137,7 @@ export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
             <Text style={styles.city}>{city}</Text>
             <Feather name="chevron-right" size={15} color="#FFFFFF" />
           </View>
-          <Text style={styles.brandLine} numberOfLines={1}>MySawari - Self Drive Car Rental Guwahati</Text>
+          <Text style={styles.brandLine} numberOfLines={1}>MySawari - Self Drive Car Rental Guwahati, Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -146,7 +147,7 @@ export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
           style={({ pressed }) => [styles.walletPill, pressed && { opacity: 0.85 }]}
         >
           <Text style={styles.walletText}>{cash}</Text>
-          <FontAwesome5 name="coins" size={12} color="#F5A524" />
+          <Image source={require('@/assets/images/wallet_coins.png')} style={styles.walletCoin} />
         </Pressable>
       </View>
 
@@ -195,14 +196,18 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={({ pressed }) => [styles.refer, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.9 }]}
     >
-      <Image source={require('@/assets/images/refer_hand_coin.png')} style={styles.referIcon} />
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={[styles.referTitle, { color: p.fg }]}>Refer & Earn {earnText}</Text>
-        <Text style={[styles.referSub, { color: p.sub }]} numberOfLines={1}>Get 10% of your friend’s booking payment.</Text>
+      <View style={[styles.referIconWrap, { backgroundColor: p.iconBg }]}>
+        <Image source={require('@/assets/images/refer_hand_coin.png')} style={styles.referIcon} />
       </View>
-      <View style={[styles.referBtn, { backgroundColor: p.navy }]}>
-        <Text style={styles.referBtnText}>Refer</Text>
-        <Feather name="arrow-right" size={10} color="#FFFFFF" />
+      <View style={{ flex: 1 }}>
+        <View style={styles.referTop}>
+          <Text style={[styles.referTitle, { color: p.fg }]}>Refer & Earn {earnText}</Text>
+          <View style={[styles.referBtn, { backgroundColor: p.navy }]}>
+            <Text style={styles.referBtnText}>Refer</Text>
+            <Feather name="arrow-right" size={8} color="#FFFFFF" />
+          </View>
+        </View>
+        <Text style={[styles.referSub, { color: p.muted }]} numberOfLines={1}>Get 10% of your friend’s booking payment.</Text>
       </View>
     </Pressable>
   );
@@ -216,9 +221,11 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
   onDestination: () => void;
 }) {
   const p = useDetailsPalette();
-  const tabs: { key: 'car' | 'bike'; label: string; image: ImageSourcePropType; size: { width: number; height: number } }[] = [
-    { key: 'car', label: 'Cars', image: require('@/assets/images/home_tab_car.png'), size: { width: 35, height: 26 } },
-    { key: 'bike', label: 'Bikes', image: require('@/assets/images/home_tab_bike.png'), size: { width: 28, height: 23.5 } },
+  // `slot` is the Figma image frame (45 wide, no gap before the label); `art` is where the exported
+  // picture sits inside it (read from the SVG's pattern matrix), clipped to the slot like the SVG is.
+  const tabs: { key: 'car' | 'bike'; label: string; image: ImageSourcePropType; art: { left: number; top: number; width: number; height: number }; slot: { width: number; height: number } }[] = [
+    { key: 'car', label: 'Cars', image: require('@/assets/images/home_tab_car.png'), art: { left: -0.78, top: -2.25, width: 46.5, height: 31 }, slot: { width: 45, height: 26 } },
+    { key: 'bike', label: 'Bikes', image: require('@/assets/images/home_tab_bike.png'), art: { left: 5.14, top: 3.18, width: 35.9, height: 23.94 }, slot: { width: 45, height: 30 } },
   ];
   return (
     <View style={[styles.searchCard, { backgroundColor: p.page, borderColor: p.segBorder }]}>
@@ -233,7 +240,9 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
               onPress={() => { Haptics.selectionAsync(); onType(t.key); }}
               style={[styles.tab, on && { backgroundColor: p.segOn, borderColor: p.radioRing }]}
             >
-              <Image source={t.image} style={t.size} resizeMode="contain" />
+              <View style={[t.slot, { overflow: 'hidden' }]}>
+                <Image source={t.image} style={[{ position: 'absolute' }, t.art]} resizeMode="stretch" />
+              </View>
               <Text style={[styles.tabText, { color: on ? p.navy : p.muted }]}>{t.label}</Text>
             </Pressable>
           );
@@ -243,7 +252,7 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
         accessibilityRole="button"
         accessibilityLabel="Select your destination"
         onPress={() => { Haptics.selectionAsync(); onDestination(); }}
-        style={({ pressed }) => [styles.destRing, { borderColor: p.deliveryBorder }, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.destRing, { borderColor: p.strongBorder }, pressed && { opacity: 0.85 }]}
       >
         <View style={[styles.destField, { backgroundColor: p.page }]}>
           <Image source={require('@/assets/images/search_icon.png')} style={[styles.destIcon, { tintColor: p.muted }]} />
@@ -276,10 +285,8 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
   const availability = car.availability ?? getAvailability(car);
   const available = car.isAvailable !== false && availability.available;
   const tag = getCarHighlights(car)[0];
-  const brand = car.manufacturer;
-  const name = [car.model, car.variant].filter(Boolean).join(' ') || car.displayName || car.name;
   const year = car.modelYear || car.registrationYear;
-  const title = brand ? `${brand} ${name}` : name;
+  const title = carTitle(car);
   // Members see their price with the day rate struck through; everyone else sees the day rate.
   const memberPrice = memberDayPrice(car.perDay, membership);
   const meta = [car.transmission, car.fuel, car.type === 'Bike' ? null : (/seat/i.test(car.seats) ? car.seats : `${car.seats} Seater`)].filter(Boolean) as string[];
@@ -327,12 +334,6 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
         <View style={styles.pickPriceRow}>
           <View style={styles.pickPrices}>
             <Text style={[styles.pickPrice, { color: p.fg }]}>{formatCurrency(memberPrice ?? car.perDay)}</Text>
-            {memberPrice != null && (
-              <View>
-                <Text style={[styles.pickStrike, { color: p.muted }]}>{formatCurrency(car.perDay)}</Text>
-                <View style={[styles.pickStrikeLine, { backgroundColor: p.muted }]} />
-              </View>
-            )}
           </View>
           <Text style={[styles.pickAvail, { color: available || availability.nextAvailableFrom ? AVAILABLE_GREEN : p.red }]} numberOfLines={1}>
             {available ? 'Available now' : availability.nextAvailableFrom ? `Available on ${cardDate(availability.nextAvailableFrom)}` : availability.headline}
@@ -392,7 +393,9 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
             </View>
           );
         })}
-        <Image source={require('@/assets/images/milestone_coin.png')} style={[styles.coin, { left: '100%' }]} />
+        <View style={[styles.coin, { left: '100%' }]}>
+          <Image source={require('@/assets/images/milestone_coin.png')} style={styles.coinImage} />
+        </View>
       </View>
 
       <View style={styles.milestoneFoot}>
@@ -416,7 +419,8 @@ export function DestinationTile({ image, faded, title, blurb, onPress }: { image
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${title}. ${blurb}`} onPress={() => { Haptics.selectionAsync(); onPress(); }} style={({ pressed }) => [styles.destTile, pressed && { opacity: 0.9 }]}>
       <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      {!faded && <LinearGradient colors={['transparent', 'rgba(0,0,0,0.7)']} locations={[0.35, 1]} style={StyleSheet.absoluteFill} />}
+      {/* Figma: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 70%, #000 100%) */}
+      {!faded && <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)', '#000000']} locations={[0.4, 0.7, 1]} style={StyleSheet.absoluteFill} />}
       <View style={styles.destTileBody}>
         <Text style={styles.destTileTitle}>{title}</Text>
         <Text style={styles.destTileBlurb} numberOfLines={2}>{blurb}</Text>
@@ -428,12 +432,13 @@ export function DestinationTile({ image, faded, title, blurb, onPress }: { image
 // ── Benefits ─────────────────────────────────────────────────────────────────
 
 // Design order and copy. Uses the pictures already in assets/images; `wide` takes the whole row (the fifth item).
+// Design order and copy (five rows of the grid; `wide` takes the whole row).
 const BENEFITS: { title: string; sub: string; image: ImageSourcePropType; size: number; wide?: boolean }[] = [
-  { title: 'Lowest Price', sub: 'Guaranteed', image: require('@/assets/images/benefit_exclusive_discounts.png'), size: 37 },
-  { title: 'Unlimited KM', sub: 'Wide Variety of Cars', image: require('@/assets/images/benefit_save_more.png'), size: 37 },
-  { title: 'Well Maintained', sub: 'Wide Variety of Vehicles', image: require('@/assets/images/benefit_special_rewards.png'), size: 37 },
-  { title: 'Zero Cancellation', sub: 'Wide Variety of Vehicles', image: require('@/assets/images/benefit_special_rewards.png'), size: 37 },
-  { title: 'Zero Cancellation/ Rescheduling Fees', sub: 'Zero Security Deposit', image: require('@/assets/images/benefit_special_rewards.png'), size: 37, wide: true },
+  { title: 'Lowest Price', sub: 'Guaranteed low rates', image: require('@/assets/images/benefit_lowest_price.png'), size: 20 },
+  { title: 'Unlimited KM', sub: 'Unlimited on 1+ day trips', image: require('@/assets/images/benefit_unlimited_km.png'), size: 24 },
+  { title: 'Well Maintained', sub: 'Regularly serviced', image: require('@/assets/images/benefit_well_maintained.png'), size: 24 },
+  { title: 'Zero Deposit', sub: 'No security deposit', image: require('@/assets/images/benefit_zero_deposit.png'), size: 24 },
+  { title: 'Zero cancellation/rescheduling fees', sub: '100% refund up to 24 hours before your trip', image: require('@/assets/images/benefit_zero_cancellation.png'), size: 24, wide: true },
 ];
 
 export function BenefitsGrid() {
@@ -514,51 +519,62 @@ export function ConnectCard() {
 
 const styles = StyleSheet.create({
   // Banner
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 8 },
-  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 8 },  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   city: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
   brandLine: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
+  // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
   walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
+  walletCoin: { width: 12, height: 12 },
   walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#2F3E75' },
   headlineBlock: { alignItems: 'center', marginTop: 12 },
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, paddingHorizontal: 8 },
+  // Figma: the promises start 117 below the headline block's top, i.e. 12 up into its 128.95 height.
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -12, paddingHorizontal: 8 },
   subDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#FFFFFF' },
   // The design's three promises: Semibold/xs in Neutral/50 (#F9F9FB), 6px apart.
   sub: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#F9F9FB' },
-  pager: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.45)', marginTop: 16, marginBottom: 12 },
-  thumb: { position: 'absolute', top: 0, width: 12, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF' },
+  // Figma: 36×4 track rgba(234,236,241,0.4) with a 12×4 Primary/blue-50 thumb.
+  pager: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(234,236,241,0.4)', marginTop: 12, marginBottom: 10 },
+  thumb: { position: 'absolute', top: 0, width: 12, height: 4, borderRadius: 20, backgroundColor: '#EAECF1' },
 
   // Refer
   refer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 31, paddingLeft: 8, paddingRight: 8, paddingTop: 8, paddingBottom: 24, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  // Figma: 40px circle (Neutral/50) around a 24px icon; title and the "Refer" pill share a row, the sub line sits under them.
+  referIconWrap: { width: 40, height: 40, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
   referIcon: { width: 24, height: 24 },
-  // The two lines sit 2 apart (the row's gap); the strip's own 8 padding does the rest.
-  referTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5 },
+  referTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  referTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5, flexShrink: 1 },
   referSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
-  referBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 19, paddingHorizontal: 8, borderRadius: 10, alignSelf: 'flex-start', marginTop: 8 },
+  referBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 20, paddingHorizontal: 8, borderRadius: 31 },
   referBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
 
   // Search
-  searchCard: { marginHorizontal: 16, padding: 6, borderWidth: 1, borderRadius: 16, shadowColor: '#2F3E75', shadowOpacity: 0.08, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  // Figma: 361px card, 6 padding, 8 between the tabs and the destination box, shadow 0 2 15 4 rgba(47,62,117,.08).
+  searchCard: { marginHorizontal: 16, padding: 6, borderWidth: 1, borderRadius: 16, shadowColor: '#2F3E75', shadowOpacity: 0.08, shadowRadius: 15, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   tabs: { flexDirection: 'row', gap: 12 },
-  tab: { flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, borderWidth: 1, borderColor: 'transparent' },
+  tab: { flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
   tabText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
-  destRing: { marginTop: 10, borderWidth: 3, borderRadius: 12 },
-  destField: { height: 47, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 9, paddingHorizontal: 12 },
+  // Figma search box: 361×49, 1px Neutral/300 (#D4D4D4) border, radius 8, 12px padding, 9 between icon and text.
+  destRing: { marginTop: 8, borderWidth: 1, borderRadius: 8 },
+  destField: { height: 47, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 7, paddingHorizontal: 12 },
   destIcon: { width: 20, height: 20 },
   destText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22.5 },
 
-  sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: 28, marginBottom: 12, paddingHorizontal: 16 },
+  // Figma sections each pad 8 top and bottom, so blocks sit 16 apart; title to content is 12.
+  sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: 16, marginBottom: 12, paddingHorizontal: 16 },
 
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },
-  pickImageWrap: { height: 144, borderRadius: 10, overflow: 'hidden' },
-  pickTag: { position: 'absolute', top: 4, left: 4, height: 20, justifyContent: 'center', paddingHorizontal: 8.5, borderRadius: 10 },
-  pickTagText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 8, color: '#FFFFFF' },
-  pickDots: { position: 'absolute', bottom: 4.5, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5 },
-  pickDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.8)' },
-  pickDotOn: { width: 12, height: 3.5, backgroundColor: '#FFFFFF' },
-  pickBody: { paddingHorizontal: 4, paddingTop: 6, paddingBottom: 6 },
+  // Figma: 240×144 photo, radius 8, 4px inset for the tag (top) and the dots (bottom).
+  pickImageWrap: { height: 144, borderRadius: 8, overflow: 'hidden' },
+  pickTag: { position: 'absolute', top: 4, left: 4, height: 20, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 20 },
+  pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
+  // Dots: the current one is a 12×4 white pill, the others 4×4 Neutral/300, 5 apart.
+  pickDots: { position: 'absolute', bottom: 4, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5 },
+  pickDot: { width: 4, height: 4, borderRadius: 20, backgroundColor: '#D4D4D4' },
+  pickDotOn: { width: 12, height: 4, backgroundColor: '#FFFFFF' },
+  // 4 below the photo, then 6 between the title row and the price row (Figma gaps).
+  pickBody: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 6 },
   pickTitleRow: { flexDirection: 'row', alignItems: 'center', height: 37 },
   pickName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5 },
   pickMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -566,7 +582,7 @@ const styles = StyleSheet.create({
   pickMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, flexShrink: 1 },
   ratingPill: { flexDirection: 'row', alignItems: 'center', paddingTop: 1, paddingRight: 4, paddingBottom: 2, paddingLeft: 5, height: 20, borderRadius: 20 },
   ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#FFFFFF' },
-  pickPriceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: 4, marginHorizontal: -4, marginTop: 4 },
+  pickPriceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: 4, marginHorizontal: -4, marginTop: 6 },
   // Figma trims both prices to cap height (leading-trim: cap), so their bottoms are the baseline.
   pickPrices: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   // Cap-height trim from Plus Jakarta Sans metrics (ascent 1.038em, descent 0.222em, cap 0.745em): 22.5 box → 11.2.
@@ -576,7 +592,7 @@ const styles = StyleSheet.create({
   pickAvail: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8, lineHeight: 12, letterSpacing: 0.16, flexShrink: 1 },
 
   // Milestone
-  milestone: { marginHorizontal: 16, marginTop: 24, borderWidth: 1, borderRadius: 11, paddingHorizontal: 13, paddingTop: 9, paddingBottom: 8.5 },
+  milestone: { marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingTop: 9, paddingBottom: 8.5 },
   // The logo's artwork fills 360 × 316 of its 470 × 480 file; this shows that part at 32 × 27.
   milestoneLogo: { position: 'absolute', top: 11.5, right: 2, width: 42, height: 43, opacity: 0.32 },
   milestoneTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
@@ -587,8 +603,9 @@ const styles = StyleSheet.create({
   trackLine: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
   mark: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowColor: '#6152D8', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
   markText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 7.5, lineHeight: 10, includeFontPadding: false },
-  // 22 × 22 including its glow; the coin itself is 16, the same as the marks.
-  coin: { position: 'absolute', width: 22, height: 22, marginLeft: -11 },
+  // Figma: a 16px mark like the others, gold-tinted (rgba(251,188,4,.1) over white) with a soft gold glow, holding the 12px star coin.
+  coin: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF8E5', shadowColor: '#FBBC04', shadowOpacity: 0.28, shadowRadius: 2, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
+  coinImage: { width: 12, height: 12 },
   milestoneFoot: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   milestoneCount: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5 },
   milestoneRight: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5 },
@@ -608,7 +625,7 @@ const styles = StyleSheet.create({
   benefitSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Membership
-  member: { marginHorizontal: 16, marginTop: 20, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8 },
+  member: { marginHorizontal: 16, marginTop: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8 },
   memberHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 3 },
   memberTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, flexShrink: 1 },
   memberBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 22, paddingHorizontal: 10, borderRadius: 31 },
@@ -616,7 +633,7 @@ const styles = StyleSheet.create({
   memberSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 3 },
 
   // Connect
-  connect: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginHorizontal: 16, marginTop: 20, borderWidth: 1, borderRadius: 12, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 },
+  connect: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginHorizontal: 16, marginTop: 16, minHeight: 77, borderWidth: 1, borderRadius: 12, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 },
   connectLeft: { flex: 1, gap: 6 },
   connectTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
   // Slots as in Figma: LinkedIn 21.12 wide, the others 18, X 17.92 × 16 inside 1 padding.

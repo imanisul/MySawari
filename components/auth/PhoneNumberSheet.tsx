@@ -19,5 +19,5 @@ export function PhoneNumberSheet({
   onClose: () => void;
   onLoginSuccess?: () => void;
 }) {
-  return <LoginBottomSheet visible={visible} onClose={onClose} onLoginSuccess={onLoginSuccess} showSkip />;
+  return <LoginBottomSheet visible={visible} onClose={onClose} onLoginSuccess={onLoginSuccess} required />;
 }

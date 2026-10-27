@@ -7,6 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { LocationResult } from '@/utils/sawari';
 import { API } from '@/services/backend/api';
+import { hasGoogleMaps } from '@/services/maps/google';
 import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
 import Svg, { Circle, Path } from 'react-native-svg';
 
@@ -103,8 +104,8 @@ export function LocationSearchBody({
   const { deliveryMode, isDarkMode } = useSawari();
   // Figma neutrals in light mode; dark mode keeps the theme's own tokens.
   const ui = isDarkMode
-    ? { border: colors.border, muted: colors.mutedForeground, title: colors.foreground, iconBg: colors.secondary, pin: colors.mutedForeground, hole: colors.secondary, active: colors.mutedForeground, topHit: colors.tintLight }
-    : { border: '#D4D4D4', muted: '#737373', title: '#262626', iconBg: '#F5F5F5', pin: '#A3A3A3', hole: '#FFFFFF', active: '#A3A3A3', topHit: '#FAFAFA' };
+    ? { border: colors.border, muted: colors.mutedForeground, title: colors.foreground, iconBg: colors.secondary, pin: colors.mutedForeground, hole: colors.secondary, active: colors.mutedForeground, topHit: colors.tintLight, accent: '#A5B6FF', focusBorder: '#A5B6FF', cardBg: colors.secondary, cardBorder: colors.border, accentIcon: '#101B2E' }
+    : { border: '#D4D4D4', muted: '#737373', title: '#262626', iconBg: '#F5F5F5', pin: '#A3A3A3', hole: '#FFFFFF', active: '#A3A3A3', topHit: '#FAFAFA', accent: '#2F3E75', focusBorder: '#9FA6C0', cardBg: '#F4F6FA', cardBorder: '#E7EAF4', accentIcon: '#FFFFFF' };
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
@@ -261,10 +262,10 @@ export function LocationSearchBody({
       <View
         style={[
           styles.searchBox,
-          { borderColor: focused ? colors.primaryText : ui.border, backgroundColor: colors.background },
+          { borderColor: focused ? ui.focusBorder : ui.border, backgroundColor: isDarkMode ? colors.background : '#FFFFFF' },
         ]}
       >
-        <SearchIcon color={focused ? colors.primaryText : ui.muted} />
+        <SearchIcon color={focused ? ui.accent : ui.muted} />
         <TextInput
           style={[styles.searchInput, { color: ui.title }]}
           placeholder={mode === 'destination' ? "Where are you going?" : (mode === 'pickup' ? "Search delivery address..." : "Search collection address...")}
@@ -277,7 +278,7 @@ export function LocationSearchBody({
           autoCorrect={false}
           autoFocus={autoFocus}
         />
-        {loading && <ActivityIndicator size="small" color={colors.primaryText} />}
+        {loading && <ActivityIndicator size="small" color={ui.accent} />}
         {hasQuery && !loading && (
           <Pressable onPress={() => setSearchQuery('')} hitSlop={10} accessibilityLabel="Clear search">
             <Ionicons name="close-circle" size={20} color={colors.mutedForeground} />
@@ -297,20 +298,20 @@ export function LocationSearchBody({
           <Pressable
             // Same as the rows below: a tap either starts geolocating or doesn't, so it needs no
             // press-time dimming. The explicit background keeps Android's ripple tint off the card.
-            style={[styles.currentCard, { backgroundColor: colors.primary + '1F', borderColor: colors.primary + '66' }]}
+            style={[styles.currentCard, { backgroundColor: ui.cardBg, borderColor: ui.cardBorder }]}
             onPress={handleUseCurrentLocation}
             disabled={loading}
           >
-            <View style={[styles.currentIcon, { backgroundColor: colors.primary }]}>
-              <Feather name="navigation" size={18} color="#101B2E" />
+            <View style={[styles.currentIcon, { backgroundColor: ui.accent }]}>
+              <Feather name="navigation" size={18} color={ui.accentIcon} />
             </View>
-            <View style={styles.resultTextContainer}>
-              <Text style={[styles.mainText, { color: colors.foreground, marginBottom: 2 }]}>Use current location</Text>
-              <Text style={[styles.subText, { color: colors.mutedForeground }]} numberOfLines={1}>
+            <View style={[styles.resultTextContainer, styles.resultText]}>
+              <Text style={[styles.resultTitle, { color: ui.title }]}>Use current location</Text>
+              <Text style={[styles.resultSub, { color: ui.muted }]} numberOfLines={1}>
                 {loading ? 'Finding you...' : 'Fetch location using GPS'}
               </Text>
             </View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            <ChevronIcon color={ui.muted} />
           </Pressable>
         )}
 
@@ -384,7 +385,7 @@ export function LocationSearchBody({
           </View>
         )}
 
-        <Text style={[styles.attribution, { color: colors.mutedForeground }]}>Data © OpenStreetMap contributors</Text>
+        <Text style={[styles.attribution, { color: colors.mutedForeground }]}>{hasGoogleMaps ? 'powered by Google' : 'Data © OpenStreetMap contributors'}</Text>
       </ScrollView>
     </>
   );
@@ -420,18 +421,19 @@ const styles = StyleSheet.create({
   currentCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 16,
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
     borderWidth: 1,
     marginBottom: 12,
   },
   currentIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 39,
+    height: 39,
+    borderRadius: 70,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 14,
   },
   emptyState: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 24 },
   emptyIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },

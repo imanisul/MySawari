@@ -21,6 +21,7 @@ export type Car = {
   category: Exclude<Category, 'All'>;
   price: string;
   perDay: number;
+  pricePerDay?: number;
   image: ImageSourcePropType;
   seats: string;
   transmission: string;
@@ -559,6 +560,16 @@ function buildBlocks(car: Car, today: number): Block[] {
 const overlaps = (b: Block, start: number, end: number) => b.start <= end && b.end >= start;
 
 /**
+ * Real display title from the database record (e.g. "Alto 800 Red", "Ertiga White", "Hunter 350").
+ */
+export function carTitle(car: Pick<Car, 'displayName' | 'name' | 'manufacturer' | 'variant' | 'color'>): string {
+  if (car.displayName?.trim()) return car.displayName.trim();
+  if (car.name?.trim()) return car.name.trim();
+  const make = car.manufacturer?.replace(/^Maruti Suzuki$/i, 'Maruti') || '';
+  return [make, car.variant].filter(Boolean).join(' ') || 'Vehicle';
+}
+
+/**
  * Is this vehicle free for the chosen dates, and if so for how long / if not,
  * when is it next free? With no dates chosen it answers for today.
  */
@@ -715,4 +726,22 @@ export async function fetchCars(): Promise<Car[]> {
 export async function fetchResultCars(): Promise<Car[]> {
   await delay(1200);
   return resultCars;
+}
+
+
+/**
+ * List order used everywhere vehicles are listed: free vehicles first, then busy ones by the day they are
+ * free again (soonest first). Stable, so the existing order is kept within each group. Each item needs
+ * `isAvailable` / `availability` from getAvailability.
+ */
+export function byAvailability<T extends { isAvailable?: boolean; availability?: { available?: boolean; nextAvailableFrom?: string } }>(list: T[]): T[] {
+  const busy = (c: T) => (c.isAvailable === false || c.availability?.available === false ? 1 : 0);
+  const freeFrom = (c: T) => {
+    const label = c.availability?.nextAvailableFrom;
+    return label ? parseDayLabel(label) ?? 9999 : 9999;
+  };
+  return list
+    .map((c, i) => ({ c, i }))
+    .sort((a, b) => busy(a.c) - busy(b.c) || (busy(a.c) ? freeFrom(a.c) - freeFrom(b.c) : 0) || a.i - b.i)
+    .map((x) => x.c);
 }

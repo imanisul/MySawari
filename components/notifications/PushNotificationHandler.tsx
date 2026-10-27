@@ -54,7 +54,7 @@ export function PushNotificationHandler() {
       // Only in-app routes; a push must never be able to send the app to an outside address.
       router.push(link as any);
     } else {
-      router.push('/notifications');
+      router.push('/'); // no in-app inbox: a push without a target just opens the app
     }
   };
 

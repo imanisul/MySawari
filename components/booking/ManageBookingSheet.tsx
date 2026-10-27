@@ -2,10 +2,11 @@ import React from 'react';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors } from '@/hooks/useColors';
+import { useTripColors } from '@/components/booking/tripColors';
 import { BookingSnapshot } from '@/services/backend/api';
 import { SUPPORT_WHATSAPP_URL } from '@/constants/support';
-import { ActionRow, FONT, refundQuote } from '@/components/booking/TripDetailParts';
+import { FONT, HelpCard, refundQuote } from '@/components/booking/TripDetailParts';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 /**
  * "Need to cancel your trip?" bottom sheet (Figma: Trip Details → "Need to change your plans or request refund?").
@@ -20,19 +21,20 @@ export function ManageBookingSheet({
   booking: BookingSnapshot;
   onCancelBooking: () => void;
 }) {
-  const c = useColors();
+  const c = useTripColors();
   const insets = useSafeAreaInsets();
   const { eligible } = refundQuote(booking);
   const code = booking.bookingCode || booking.id.slice(-6).toUpperCase();
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.overlay, { backgroundColor: c.overlay }]}>
+      <View style={[styles.overlay, { backgroundColor: 'rgba(38, 38, 38, 0.32)' }]}>
+        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={styles.wrap}>
           <View style={styles.closeRow}>
             <Pressable onPress={onClose} style={[styles.close, { backgroundColor: c.card }]} accessibilityLabel="Close">
-              <Feather name="x" size={20} color={c.foreground} />
+              <Feather name="x" size={20} color={c.mutedForeground} />
             </Pressable>
           </View>
           <View style={[styles.sheet, { backgroundColor: c.background, paddingBottom: Math.max(insets.bottom, 16) + 12 }]}>
@@ -41,11 +43,11 @@ export function ManageBookingSheet({
               <Text style={[styles.sub, { color: c.mutedForeground }]}>Your {booking.vehicleName} booking</Text>
             </View>
 
-            <View style={[styles.notice, { backgroundColor: eligible ? c.success + '12' : c.destructive + '10', borderColor: eligible ? c.success + '40' : c.destructive + '35' }]}>
-              <Text style={[styles.noticeTitle, { color: eligible ? c.success : c.destructive }]}>
+            <View style={[styles.notice, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4' }]}>
+              <Text style={[styles.noticeTitle, { color: eligible ? c.foreground : c.destructive }]}>
                 {eligible ? 'Eligible for refund' : 'Not eligible for refund'}
               </Text>
-              <Text style={[styles.noticeBody, { color: c.foreground }]}>
+              <Text style={[styles.noticeBody, { color: c.mutedForeground }]}>
                 {eligible
                   ? 'You’re cancelling more than 24 hours before your trip. Your booking amount is refundable under the applicable cancellation policy.'
                   : 'You’re cancelling less than 24 hours before your trip. As per our cancellation policy, the booking amount is non-refundable.'}
@@ -54,19 +56,14 @@ export function ManageBookingSheet({
 
             <View style={{ gap: 8 }}>
               <Text style={[styles.subhead, { color: c.foreground }]}>Update your dates or choose a different vehicle.</Text>
-              <ActionRow
-                title="Talk to our team"
-                subtitle={`We’ll change booking ${code} for you on WhatsApp.`}
-                icon="message-circle"
-                onPress={() => Linking.openURL(`${SUPPORT_WHATSAPP_URL}?text=${encodeURIComponent(`Hi, I'd like to change my booking ${code}.`)}`).catch(() => { })}
-              />
+              <HelpCard compact onWhatsApp={() => Linking.openURL(`${SUPPORT_WHATSAPP_URL}?text=${encodeURIComponent(`Hi, I'd like to change my booking ${code}.`)}`).catch(() => {})} />
             </View>
 
             <Pressable
               onPress={onCancelBooking}
               style={({ pressed }) => [styles.cta, { backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 }]}
             >
-              <Text style={[styles.ctaText, { color: c.primaryForeground }]}>Cancel booking</Text>
+              <Text style={[styles.ctaText, { color: c.primaryForeground }]}>Next</Text>
             </Pressable>
           </View>
         </View>
@@ -80,13 +77,13 @@ const styles = StyleSheet.create({
   wrap: { gap: 8 },
   closeRow: { alignItems: 'flex-end', paddingHorizontal: 12 },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 20, gap: 16 },
-  title: { fontFamily: FONT.bold, fontSize: 22, lineHeight: 29 },
-  sub: { fontFamily: FONT.regular, fontSize: 15, lineHeight: 20 },
-  notice: { borderWidth: 1, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 9, gap: 4 },
-  noticeTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 17 },
-  noticeBody: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 18 },
-  subhead: { fontFamily: FONT.semibold, fontSize: 16, lineHeight: 23 },
-  cta: { height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  ctaText: { fontFamily: FONT.semibold, fontSize: 16 },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: '#E7EAF4', paddingHorizontal: 16, paddingTop: 20, gap: 16 },
+  title: { fontFamily: FONT.semibold, fontSize: 19, lineHeight: 28, textAlign: 'center' },
+  sub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20, textAlign: 'center' },
+  notice: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, gap: 2 },
+  noticeTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
+  noticeBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
+  subhead: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
+  cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  ctaText: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
 });

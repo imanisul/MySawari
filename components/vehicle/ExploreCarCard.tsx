@@ -4,7 +4,7 @@ import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import { Car, getAvailability, getCarHighlights } from '@/utils/sawari';
+import { Car, carTitle, getAvailability, getCarHighlights } from '@/utils/sawari';
 import { formatCurrency, memberDayPrice } from '@/services/backend/pricingEngine';
 import { useSawari } from '@/context/SawariContext';
 import { ActivityAPI } from '@/services/api/activity';
@@ -29,7 +29,7 @@ export const ExploreCarCard = React.memo(function ExploreCarCard({ car, dateRang
     : availability.startDate === 'Today'
       ? 'Available today'
       : `Available on ${availability.startDate}`;
-  const title = [car.manufacturer, car.model, car.variant].filter(Boolean).join(' ') || car.name;
+  const title = carTitle(car);
   const meta = [car.transmission, car.fuel, car.type === 'Bike' ? null : (/seat/i.test(car.seats) ? car.seats : `${car.seats} Seater`)].filter(Boolean) as string[];
   // Figma's list repeats blue, green, green, blue for the tag colour.
   const tagGreen = [1, 2].includes(index % 4);
@@ -103,7 +103,6 @@ export const ExploreCarCard = React.memo(function ExploreCarCard({ car, dateRang
         <View style={styles.bottomRow}>
           <View style={styles.priceRow}>
             <Text style={styles.price}>{formatCurrency(memberPrice ?? car.perDay)}</Text>
-            {memberPrice != null && <Text style={styles.strike}>{formatCurrency(car.perDay)}</Text>}
           </View>
           {/* Figma: free cars show the date they are available on; otherwise the View Details link. */}
           <View style={styles.details}>

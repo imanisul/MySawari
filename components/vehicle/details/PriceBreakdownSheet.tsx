@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import type { TripPrice } from './useTripPrice';
 import { formatCurrency } from '@/services/backend/pricingEngine';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 type ReadyPrice = Extract<TripPrice, { state: 'ready' }>;
 
@@ -37,6 +38,7 @@ export function PriceBreakdownSheet({ visible, onClose, price }: { visible: bool
     <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
+          <ModalBlur />
           <TouchableWithoutFeedback>
             <Animated.View style={[styles.sheet, { backgroundColor: colors.card, transform: [{ translateY: slideAnim }] }]}>
               <View style={styles.header}>

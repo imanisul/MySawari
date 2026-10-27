@@ -12,6 +12,7 @@ import { Reveal } from '@/components/common/Reveal';
 import { PaymentsSkeleton } from '@/components/loading/ScreenSkeletons';
 import { API } from '@/services/backend/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 type PaymentMethodItem = { id: string; title: string; subtitle?: string; icon: string };
 
@@ -292,6 +293,7 @@ export default function PaymentsScreen() {
       <Modal visible={showAddModal} transparent animationType="slide">
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalOverlayBg}>
+            <ModalBlur />
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowAddModal(false)} />
           </View>
           

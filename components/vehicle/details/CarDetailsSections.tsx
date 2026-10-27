@@ -1,10 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Linking, LayoutAnimation, Animated } from 'react-native';
-import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import Svg, { Defs, RadialGradient, Stop, Rect, Path } from 'react-native-svg';
 import { Image } from 'expo-image';
+import type { ImageSourcePropType } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
@@ -14,6 +15,8 @@ import { BOOKING_ADVANCE_AMOUNT, formatCurrency } from '@/services/backend/prici
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 import { Car, Review, MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { useDetailsPalette, DetailsPalette } from './detailsPalette';
+import { useSawari } from '@/context/SawariContext';
+import { MembershipCelebration } from './MembershipSavedPopup';
 
 // Every section of the car details page below the photos, laid out as in the Figma "Car Detail Page" frame.
 
@@ -49,11 +52,11 @@ function SectionTitle({ children, action, onAction, actionIcon = 'chevron-right'
 
 function Bullets({ items, p }: { items: string[]; p: DetailsPalette }) {
   return (
-    <View style={{ gap: 6 }}>
+    <View>
       {items.map((t) => (
         <View key={t} style={styles.bulletRow}>
           <View style={[styles.bulletDot, { backgroundColor: p.muted }]} />
-          <Text style={[styles.bulletText, { color: p.sub }]}>{t}</Text>
+          <Text style={[styles.bulletText, { color: p.muted }]}>{t}</Text>
         </View>
       ))}
     </View>
@@ -67,7 +70,7 @@ function mix(a: string, b: string, t: number) {
   return '#' + [0, 1, 2].map((i) => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t).toString(16).padStart(2, '0')).join('');
 }
 
-const TL_GAP = 14;
+const TL_GAP = 10; // Figma: 10 between the cancellation steps
 
 /**
  * Two-step vertical timeline (cancellation policy, payment schedule): each dot is centred on its row,
@@ -121,15 +124,11 @@ function Timeline({ steps, activeColor, p, gap = TL_GAP, railWidth = 22.5, descS
 
 // ── Mileage limits + "Add 1 day" ──────────────────────────────────────────────
 
-function CalendarIcon({ day, p }: { day: string; p: DetailsPalette }) {
+/** The round icon on a mileage row: the design's artwork (calendar "1" at 18px, road at 20px) centred in the circle. */
+function MileageIcon({ source, size, p }: { source: ImageSourcePropType; size: number; p: DetailsPalette }) {
   return (
     <View style={[styles.calCircle, { backgroundColor: p.iconBg }]}>
-      <View style={styles.calBody}>
-        <View style={styles.calTop}>
-          {[0, 1, 2].map((r) => <View key={r} style={styles.calRing} />)}
-        </View>
-        <Text style={styles.calDay}>{day}</Text>
-      </View>
+      <Image source={source} style={{ width: size, height: size }} contentFit="contain" />
     </View>
   );
 }
@@ -144,11 +143,12 @@ export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; t
   const oneDayOn = hasTrip && tripDays === 1;
   const multiDayOn = hasTrip && (tripDays as number) >= 2;
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16/12, 12 between the title and the card.
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 12 }]}>
       <SectionTitle>Mileage limits</SectionTitle>
       <View style={[styles.card, styles.mileCard, { backgroundColor: p.soft, borderColor: p.strongBorder }]}>
         <View style={styles.mileRow}>
-          <CalendarIcon day="1" p={p} />
+          <MileageIcon source={require('@/assets/images/mileage_calendar.png')} size={18} p={p} />
           <View style={{ flex: 1 }}>
             <View style={styles.mileHead}>
               <Text style={[styles.mileTitle, { color: p.fg }]}>1-Day Booking</Text>
@@ -158,7 +158,7 @@ export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; t
           </View>
         </View>
         <View style={styles.mileRow}>
-          <CalendarIcon day="3" p={p} />
+          <MileageIcon source={require('@/assets/images/mileage_road.png')} size={20} p={p} />
           <View style={{ flex: 1 }}>
             <View style={styles.mileHead}>
               <Text style={[styles.mileTitle, { color: p.fg }]}>2+ Day Booking</Text>
@@ -238,7 +238,8 @@ export function MainSpecification({ car }: { car: Car }) {
   const shown = rows.filter((r) => !!r.value);
 
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 12/16/8, 12 between the title and the table (7 rows × 36 + 2 border = 254; 309 in all).
+    <View style={[styles.block, { paddingTop: 12, paddingBottom: 8 }]}>
       <SectionTitle>Main Specification</SectionTitle>
       <View style={[styles.table, { borderColor: p.border, backgroundColor: p.soft }]}>
         {shown.map((r, i) => (
@@ -269,27 +270,24 @@ export function Benefits() {
   const p = useDetailsPalette();
   const router = useRouter();
   const items = [
-    { emoji: '🪙', image: require('@/assets/images/benefit_save_more.png'), title: 'Save more', sub: 'Save up to ₹25,000 a year on rentals.' },
-    { emoji: '🎁', image: require('@/assets/images/benefit_exclusive_discounts.png'), title: 'Exclusive discounts', sub: 'Get up to 12.5% off car and bike rentals.', route: '/membership' },
-    { emoji: '🎫', image: require('@/assets/images/benefit_special_rewards.png'), title: 'Special rewards', sub: 'Up to 15% off standard tariffs across all fleets.', route: '/membership' },
+    { size: 24, image: require('@/assets/images/benefit_save_more.png'), title: 'Save more', sub: 'Save up to ₹25,000 a year on rentals.' },
+    { size: 20, image: require('@/assets/images/benefit_exclusive_discounts.png'), title: 'Exclusive discounts', sub: 'Get up to 12.5% off car and bike rentals.', route: '/membership' },
+    { size: 24, image: require('@/assets/images/benefit_special_rewards.png'), title: 'Special rewards', sub: 'Up to 15% off standard tariffs across all fleets.', route: '/membership' },
   ];
   return (
-    <View style={styles.block}>
+    <View style={[styles.block, { paddingTop: 8 }]}>
       <SectionTitle>More benefits with every journey</SectionTitle>
-      <View style={{ gap: 12.5 }}>
+      <View style={{ gap: 12 }}>
         {items.map((it) => {
           const content = (
             <>
-              {'image' in it && it.image ? (
-                <Image source={it.image} style={styles.benefitIcon} contentFit="contain" />
-              ) : (
-                <View style={[styles.benefitIcon, { backgroundColor: p.demandBg }]}>
-                  <Text style={{ fontSize: 20 }}>{it.emoji}</Text>
-                </View>
-              )}
+              {/* Figma: 37px circle in Gold/Bg around the artwork (24px, the discount one 20px). */}
+              <View style={[styles.benefitIcon, { backgroundColor: p.demandBg }]}>
+                <Image source={it.image} style={{ width: it.size, height: it.size }} contentFit="contain" />
+              </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.itemTitle, { color: p.fg }]}>{it.title}</Text>
-                <Text style={[styles.itemSub, { color: p.muted, marginTop: 4 }]}>{it.sub}</Text>
+                <Text style={[styles.itemSub, { color: p.muted }]}>{it.sub}</Text>
               </View>
               {'route' in it && it.route ? (
                 <Feather name="chevron-right" size={15} color={p.muted} />
@@ -321,58 +319,69 @@ export function Benefits() {
   );
 }
 
-/** Plan picker. `tripRent` (vehicle rent for the chosen days) only drives the "Save ₹X on this trip" chips. */
-export function MembershipPicker({ tripRent }: { tripRent: number }) {
+/**
+ * Plan picker on car details (design "Choose your membership" / "Upgrade your membership"). Picking a plan does
+ * not leave the page: it is added to this booking (its discount applies to the trip price straight away and its
+ * yearly price is paid together with the booking amount), with a celebration popup. Tapping it again removes it.
+ * "Learn More" opens the Membership page. `tripRent` (rent for the chosen days) drives the "Save ₹X" chips.
+ */
+function PlanOptions({ title, plans, tripRent }: { title: string; plans: typeof PLANS; tripRent: number }) {
   const p = useDetailsPalette();
   const router = useRouter();
-  const [selected, setSelected] = useState('plus');
+  const { planToBuy, setPlanToBuy } = useSawari();
+  const [celebrate, setCelebrate] = useState<{ plan: (typeof PLANS)[number]; save: number } | null>(null);
 
-  const open = (key?: string) => {
-    Haptics.selectionAsync();
-    if (key) setSelected(key);
-    // The Membership page opens with this plan picked.
-    router.push(key ? { pathname: '/membership', params: { plan: key } } : '/membership');
+  const pick = (plan: (typeof PLANS)[number]) => {
+    if (planToBuy === plan.key) {
+      Haptics.selectionAsync();
+      setPlanToBuy(null);
+      return;
+    }
+    setPlanToBuy(plan.key as 'starter' | 'plus' | 'pro');
+    setCelebrate({ plan, save: Math.min(plan.perTripCap, Math.round(tripRent * plan.pct)) });
   };
+  const chosen = plans.find((pl) => pl.key === planToBuy);
 
   return (
     <View style={[styles.block, { paddingTop: 15.5 }]}>
       <View style={[styles.memberWrap, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }]}>
         <View style={[styles.titleRow, { paddingRight: 3, marginBottom: 10 }]}>
-          <Text style={[styles.sectionTitle, { color: p.fg }]}>Choose your membership</Text>
-          <Pressable accessibilityRole="button" onPress={() => open()} hitSlop={8} style={styles.linkRow}>
+          <Text style={[styles.sectionTitle, { color: p.fg }]}>{title}</Text>
+          <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }} hitSlop={8} style={styles.linkRow}>
             <Text style={[styles.link, { color: p.muted }]}>Learn More</Text>
             <Feather name="chevron-right" size={12} color={p.muted} />
           </Pressable>
         </View>
-        <View style={{ gap: 8 }}>
-          {PLANS.map((plan) => {
-            const on = plan.key === selected;
+        <View style={{ gap: 8 }} accessibilityRole="radiogroup">
+          {plans.map((plan) => {
+            const on = plan.key === planToBuy;
             const save = Math.min(plan.perTripCap, Math.round(tripRent * plan.pct));
-            const bg = on ? p.purple : plan.key === 'pro' ? p.greenBg : p.page;
-            const border = on ? p.purple : plan.key === 'pro' ? p.proBorder : p.memberBorder;
-            const text = on ? '#FFFFFF' : p.fg;
-            const sub = on ? 'rgba(255,255,255,0.85)' : p.muted;
+            // Each plan keeps its own colours (Starter white, Plus purple, Pro mint); the radio shows the pick.
+            const purple = plan.key === 'plus';
+            const bg = purple ? p.purple : plan.key === 'pro' ? p.greenBg : p.page;
+            const border = purple ? p.purple : plan.key === 'pro' ? p.proBorder : p.memberBorder;
+            const text = purple ? '#FFFFFF' : p.fg;
+            const sub = purple ? 'rgba(255,255,255,0.85)' : p.muted;
+            const ring = purple ? '#FFFFFF' : plan.key === 'pro' ? p.green : p.purple;
             return (
               <Pressable
                 key={plan.key}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: on }}
-                accessibilityLabel={`${plan.name} membership, ${formatCurrency(plan.price)} a year`}
-                onPress={() => open(plan.key)}
-                style={({ pressed }) => [styles.planCard, { backgroundColor: bg, borderColor: border }, pressed && { opacity: 0.9 }]}
+                accessibilityLabel={`${plan.name} membership, ${formatCurrency(plan.price)} a year${save > 0 ? `, save ${formatCurrency(save)} on this trip` : ''}${on ? ', added to this booking' : ''}`}
+                onPress={() => pick(plan)}
+                style={({ pressed }) => [styles.planCard, { backgroundColor: bg, borderColor: border }, on && styles.planOn, pressed && { opacity: 0.9 }]}
               >
-                <View style={[styles.radio, on ? styles.radioOn : { borderColor: plan.key === 'pro' ? p.radioRing : border }]} />
+                <View style={[styles.planRadio, { borderColor: on ? ring : purple ? '#FFFFFF' : p.radioRing, backgroundColor: on ? ring : '#FFFFFF' }]}>
+                  {on && <View style={[styles.planRadioDot, { backgroundColor: purple ? p.purple : '#FFFFFF' }]} />}
+                </View>
                 <View style={{ flex: 1 }}>
                   <View style={styles.planNameRow}>
-                    {'image' in plan && plan.image ? (
-                      <Image source={plan.image} style={{ width: plan.imageSize, height: plan.imageSize }} contentFit="contain" />
-                    ) : (
-                      <MaterialCommunityIcons name={plan.icon} size={plan.iconSize} color={plan.iconColor} />
-                    )}
+                    <Image source={plan.image} style={{ width: plan.imageSize, height: plan.imageSize }} contentFit="contain" />
                     <Text style={[styles.planName, { color: text }]}>{plan.name}</Text>
                     {save > 0 && (
                       <View style={[styles.saveChip, { backgroundColor: p.green }]}>
-                        <Text style={styles.saveChipText}>Save {formatCurrency(save)} on this trip</Text>
+                        <Text style={styles.saveChipText}>{on ? `${formatCurrency(save)} Saved` : `Save ${formatCurrency(save)} on this trip`}</Text>
                       </View>
                     )}
                   </View>
@@ -388,89 +397,42 @@ export function MembershipPicker({ tripRent }: { tripRent: number }) {
             );
           })}
         </View>
+        {!!chosen && (
+          <View style={styles.addedRow}>
+            <Ionicons name="checkmark-circle" size={14} color={p.green} />
+            <Text style={[styles.addedText, { color: p.sub }]}>
+              {chosen.name} membership ({formatCurrency(chosen.price)}/year) is added to your payment. Tap it again to remove.
+            </Text>
+          </View>
+        )}
       </View>
+
+      {celebrate && (
+        <MembershipCelebration
+          visible
+          confetti
+          plan={celebrate.plan.name}
+          amount={celebrate.save > 0 ? celebrate.save : null}
+          title={`${celebrate.plan.name} Membership Applied!`}
+          note={celebrate.save > 0
+            ? `${formatCurrency(celebrate.plan.price)} for 1 year, paid with your booking`
+            : `${celebrate.plan.pctLabel} off every trip · ${formatCurrency(celebrate.plan.price)}/year with your booking`}
+          onClose={() => setCelebrate(null)}
+        />
+      )}
     </View>
   );
 }
 
-/**
- * Shown instead of MembershipPicker when the user is already a Starter member.
- * Displays only Plus and Pro upgrade options with "Upgrade your membership" header
- * matching the Figma reference.
- */
+/** For customers without a membership: all three plans. */
+export function MembershipPicker({ tripRent }: { tripRent: number }) {
+  return <PlanOptions title="Choose your membership" plans={PLANS} tripRent={tripRent} />;
+}
+
+/** For a Starter or Plus member: only the higher plans ("Upgrade your membership"). */
 export function MembershipUpgrade({ tripRent, currentPlan }: { tripRent: number; currentPlan: 'starter' | 'plus' }) {
-  const p = useDetailsPalette();
-  const router = useRouter();
-  const [selected, setSelected] = useState(currentPlan === 'plus' ? 'pro' : 'plus');
-
-  const tierOrder = ['starter', 'plus', 'pro'];
-  const currentIdx = tierOrder.indexOf(currentPlan);
-  const upgradePlans = PLANS.filter((pl) => tierOrder.indexOf(pl.key) > currentIdx);
-
-  const open = (key?: string) => {
-    Haptics.selectionAsync();
-    if (key) setSelected(key);
-    // The Membership page opens with this plan picked.
-    router.push(key ? { pathname: '/membership', params: { plan: key } } : '/membership');
-  };
-
-  return (
-    <View style={[styles.block, { paddingTop: 15.5 }]}>
-      <View style={[styles.memberWrap, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }]}>
-        <View style={[styles.titleRow, { paddingRight: 3, marginBottom: 10 }]}>
-          <Text style={[styles.sectionTitle, { color: p.fg }]}>Upgrade your membership</Text>
-          <Pressable accessibilityRole="button" onPress={() => open()} hitSlop={8} style={styles.linkRow}>
-            <Text style={[styles.link, { color: p.muted }]}>Learn More</Text>
-            <Feather name="chevron-right" size={12} color={p.muted} />
-          </Pressable>
-        </View>
-        <View style={{ gap: 8 }}>
-          {upgradePlans.map((plan) => {
-            const on = plan.key === selected;
-            const save = Math.min(plan.perTripCap, Math.round(tripRent * plan.pct));
-            const bg = on ? p.purple : plan.key === 'pro' ? p.greenBg : p.page;
-            const border = on ? p.purple : plan.key === 'pro' ? p.proBorder : p.memberBorder;
-            const text = on ? '#FFFFFF' : p.fg;
-            const sub = on ? 'rgba(255,255,255,0.85)' : p.muted;
-            return (
-              <Pressable
-                key={plan.key}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: on }}
-                accessibilityLabel={`Upgrade to ${plan.name} membership, ${formatCurrency(plan.price)} a year`}
-                onPress={() => open(plan.key)}
-                style={({ pressed }) => [styles.planCard, { backgroundColor: bg, borderColor: border }, pressed && { opacity: 0.9 }]}
-              >
-                <View style={[styles.radio, on ? styles.radioOn : { borderColor: plan.key === 'pro' ? p.radioRing : border }]} />
-                <View style={{ flex: 1 }}>
-                  <View style={styles.planNameRow}>
-                    {'image' in plan && plan.image ? (
-                      <Image source={plan.image} style={{ width: plan.imageSize, height: plan.imageSize }} contentFit="contain" />
-                    ) : (
-                      <MaterialCommunityIcons name={plan.icon} size={plan.iconSize} color={plan.iconColor} />
-                    )}
-                    <Text style={[styles.planName, { color: text }]}>{plan.name}</Text>
-                    {save > 0 && (
-                      <View style={[styles.saveChip, { backgroundColor: p.green }]}>
-                        <Text style={styles.saveChipText}>Save {formatCurrency(save)} on this trip</Text>
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.planSub, { color: sub }]}>
-                    {plan.pctLabel} off every trip • Upto ₹{plan.annualCap / 1000}k annual savings
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.planPrice, { color: text }]} numberOfLines={1}>{formatCurrency(plan.price)}</Text>
-                  <Text style={[styles.planSub, { color: sub }]}>/year</Text>
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-    </View>
-  );
+  const order = ['starter', 'plus', 'pro'];
+  return <PlanOptions title="Upgrade your membership" plans={PLANS.filter((pl) => order.indexOf(pl.key) > order.indexOf(currentPlan))} tripRent={tripRent} />;
 }
 
 // ── Reviews + guest trip photos ───────────────────────────────────────────────
@@ -490,7 +452,8 @@ export function ReviewsStrip({ car }: { car: Car }) {
   if (reviews.length === 0) return null;
 
   return (
-    <View style={[styles.block, styles.bleed]}>
+    // Figma frame: padding 8/16, 12 between title and cards (8 + 23 + 12 + 97 + 8 = 148).
+    <View style={[styles.block, styles.bleed, { paddingTop: 8, paddingBottom: 8 }]}>
       <View style={{ paddingHorizontal: 16 }}><SectionTitle>Reviews</SectionTitle></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
         {reviews.map((r, i) => (
@@ -523,7 +486,8 @@ export function RealTrips({ car }: { car: Car }) {
   if (photos.length === 0) return null;
 
   return (
-    <View style={[styles.block, styles.bleed]}>
+    // Figma frame: padding 8/16, 12 between title and photos (8 + 23 + 12 + 120 + 8 = 171).
+    <View style={[styles.block, styles.bleed, { paddingTop: 8, paddingBottom: 8 }]}>
       <View style={{ paddingHorizontal: 16 }}><SectionTitle>Real trips, real experiences</SectionTitle></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
         {photos.map((ph, i) => (
@@ -562,23 +526,34 @@ function featureKey(text: string) {
   if (/abs/.test(s)) return 'abs';
   if (/cruise/.test(s)) return 'cruise';
   if (/(push\s*start|keyless)/.test(s)) return 'keyless';
+  if (/central\s*lock/.test(s)) return 'lock';
   return s.trim();
 }
+
+// Figma shows these first, in this order and under these short names; anything else follows as listed.
+const FEATURE_LABELS: [key: string, label?: string][] = [
+  ['carplay', 'Apple CarPlay / Android Auto'], ['bluetooth', 'Bluetooth Connectivity'], ['screen', 'Touchscreen Infotainment'],
+  ['sensor', 'Rear Parking Sensors'], ['lock', 'Central Locking'], ['ac', 'Air Conditioning'], ['usb', 'USB Charging'], ['airbag'],
+];
 
 /** The listed features plus the ones recorded on the vehicle (safety / tech / comfort), without repeats. */
 function allFeatures(car: Car) {
   const raw = [...(car.features || []), ...(car.techFeatures || []), ...(car.safetyFeatures || []), ...(car.comfortFeatures || [])];
   const seen = new Set<string>();
-  const out: string[] = [];
+  const out: { key: string; name: string }[] = [];
   for (const f of raw) {
     const name = f?.trim();
     if (!name) continue;
     const key = featureKey(name);
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push(name);
+    out.push({ key, name });
   }
-  return out;
+  const rank = (key: string) => { const i = FEATURE_LABELS.findIndex(([k]) => k === key); return i < 0 ? FEATURE_LABELS.length : i; };
+  return out
+    .map((f, i) => ({ ...f, i }))
+    .sort((x, y) => rank(x.key) - rank(y.key) || x.i - y.i)
+    .map((f) => FEATURE_LABELS.find(([k]) => k === f.key)?.[1] ?? (/^(2|dual|two)\s+(front\s+)?airbags?( protection)?$/i.test(f.name) ? '2 Front Airbags' : f.name));
 }
 
 export function FeatureList({ car }: { car: Car }) {
@@ -591,7 +566,8 @@ export function FeatureList({ car }: { car: Car }) {
   const canToggle = features.length > FEATURES_COLLAPSED;
 
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16, 12 between the title and the grid (8 + 23 + 12 + 80 + 8 = 131).
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 8 }]}>
       <SectionTitle
         action={canToggle ? (expanded ? 'View Less' : 'View More') : undefined}
         actionIcon={expanded ? 'chevron-up' : 'chevron-down'}
@@ -599,11 +575,21 @@ export function FeatureList({ car }: { car: Car }) {
       >
         Features
       </SectionTitle>
+      {/* Design: two columns, filled row by row (CarPlay | Bluetooth, Touchscreen | Parking sensors, …).
+          Explicit rows of two: a % width + gap grid added up to just over 100% and fell into one column. */}
       <View style={styles.featureGrid}>
-        {shown.map((f) => (
-          <View key={f} style={styles.featureItem}>
-            <Ionicons name="checkmark-circle" size={13} color={p.green} />
-            <Text style={[styles.featureText, { color: p.muted }]} numberOfLines={1}>{f}</Text>
+        {Array.from({ length: Math.ceil(shown.length / 2) }, (_, r) => (
+          <View key={r} style={styles.featureRow}>
+            {[shown[r * 2], shown[r * 2 + 1]].map((f, c) => (
+              <View key={c} style={styles.featureItem}>
+                {!!f && (
+                  <>
+                    <Ionicons name="checkmark-circle" size={12.5} color={p.green} />
+                    <Text style={[styles.featureText, { color: p.muted }]} numberOfLines={1}>{f}</Text>
+                  </>
+                )}
+              </View>
+            ))}
           </View>
         ))}
       </View>
@@ -645,19 +631,22 @@ export function WhyRent() {
 
   return (
     <View style={styles.block}>
-      {/* linear-gradient(236.34deg, #D1CCF9 -14.94%, #F0EFFD 67.82%) — deep lavender at the top-right, pale by two-thirds. */}
+      {/* linear-gradient(236.34deg, #D1CCF9 -14.94%, #F0EFFD 67.82%) on a 361×307 card: the line runs from
+          (1.04, 0.08) to (-0.04, 0.92) of the card, and the colour at its start is #D1CCF9 already 15% of the way
+          to #F0EFFD (#D7D2FA), reaching #F0EFFD at 67.82%. */}
       <LinearGradient
-        colors={[p.memberBorder, p.purpleBg, p.purpleBg]}
-        locations={[0, 0.7, 1]}
-        start={{ x: 1, y: 0 }}
-        end={{ x: 0, y: 1 }}
+        colors={['#D7D2FA', p.purpleBg, p.purpleBg]}
+        locations={[0, 0.6782, 1]}
+        start={{ x: 1.042, y: 0.075 }}
+        end={{ x: -0.042, y: 0.925 }}
         style={[styles.whyCard, { borderColor: p.memberBorder }]}
       >
-        {/* Purple glow from the top-right corner */}
+        {/* Figma "Ellipse 4": a 151×147 #9C90F3 blob, blurred 67, centred about 58 in from the right edge and 13 above the
+            card's top. Drawn as a soft radial wash from that point (SVG filters are unreliable on Android). */}
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
-            <RadialGradient id="whyGlow" cx="100%" cy="0%" rx="80%" ry="75%" fx="100%" fy="0%">
-              <Stop offset="0" stopColor={p.purpleGlow} stopOpacity="1" />
+            <RadialGradient id="whyGlow" cx="84%" cy="-4%" rx="42%" ry="48%" fx="84%" fy="-4%">
+              <Stop offset="0" stopColor={p.purpleGlow} stopOpacity="0.6" />
               <Stop offset="1" stopColor={p.purpleGlow} stopOpacity="0" />
             </RadialGradient>
           </Defs>
@@ -668,7 +657,7 @@ export function WhyRent() {
         <View>
           <Animated.ScrollView
             style={{ height: viewH }}
-            contentContainerStyle={{ gap: 11, paddingBottom: 4 }}
+            contentContainerStyle={{ gap: 10 }}
             nestedScrollEnabled
             showsVerticalScrollIndicator={false}
             onContentSizeChange={(_, h) => setContentH(h)}
@@ -704,7 +693,8 @@ export function WhyRent() {
 export function LocationCard({ deliveryAddress }: { deliveryAddress?: string | null }) {
   const p = useDetailsPalette();
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16 around the 83px card (99px in all).
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 8 }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Open the pickup location in maps"
@@ -722,8 +712,17 @@ export function LocationCard({ deliveryAddress }: { deliveryAddress?: string | n
         </View>
         <View style={styles.mapTile}>
           <Image source={require('@/assets/images/location_map.png')} style={styles.mapImage} contentFit="cover" />
-          <Image source={require('@/assets/images/location_pin.png')} style={styles.mapPin} contentFit="contain" />
-          <Image source={require('@/assets/images/location_pin_dot.png')} style={styles.mapPinDot} contentFit="contain" />
+          {/* The pin from the design's "Frame 110" (50×50): a green #008758 drop with a white dot. */}
+          <Svg style={StyleSheet.absoluteFill} viewBox="0 0 50 50">
+            <Path
+              d="M25.601 34.799C27.461 33.193 33 27.993 33 23C33 20.8783 32.1571 18.8434 30.6569 17.3431C29.1566 15.8429 27.1217 15 25 15C22.8783 15 20.8434 15.8429 19.3431 17.3431C17.8429 18.8434 17 20.8783 17 23C17 27.993 22.539 33.193 24.399 34.799C24.5723 34.9293 24.7832 34.9998 25 34.9998C25.2168 34.9998 25.4277 34.9293 25.601 34.799Z"
+              fill="#008758"
+              stroke="#008758"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <Path d="M25 26C26.6569 26 28 24.6569 28 23C28 21.3431 26.6569 20 25 20C23.3431 20 22 21.3431 22 23C22 24.6569 23.3431 26 25 26Z" fill="#FFFFFF" />
+          </Svg>
         </View>
       </Pressable>
     </View>
@@ -737,7 +736,8 @@ export function CancellationPolicy({ freeCancelUntil }: { freeCancelUntil?: stri
   const p = useDetailsPalette();
   const router = useRouter();
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16, 12 between the title, the timeline and the link.
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 8 }]}>
       <SectionTitle>Cancellation & Policy</SectionTitle>
       <Timeline
         p={p}
@@ -757,7 +757,7 @@ export function CancellationPolicy({ freeCancelUntil }: { freeCancelUntil?: stri
           },
         ]}
       />
-      <Pressable accessibilityRole="link" onPress={() => router.push('/policies')} hitSlop={8} style={[styles.linkRow, { marginTop: 10 }]}>
+      <Pressable accessibilityRole="link" onPress={() => router.push('/policies')} hitSlop={8} style={[styles.linkRow, { marginTop: 12 }]}>
         <Text style={[styles.link, { color: p.muted }]}>View Terms & Condition</Text>
         <Feather name="chevron-right" size={12} color={p.muted} />
       </Pressable>
@@ -786,16 +786,17 @@ const NOT_INCLUDED = [
 export function Inclusions() {
   const p = useDetailsPalette();
   return (
-    <View style={[styles.block, { gap: 12 }]}>
+    // Figma frame: padding 8/16, 12 between the two cards.
+    <View style={[styles.block, { gap: 12, paddingTop: 8, paddingBottom: 8 }]}>
       {/* linear-gradient(180deg, #FFFFFF 30%, …) — white through the top third, then down to the tint. */}
-      <LinearGradient colors={[p.page, p.page, p.greenBg]} locations={[0, 0.3, 1]} style={[styles.card, { borderColor: p.greenBorder }]}>
+      <LinearGradient colors={[p.page, p.page, p.greenBg]} locations={[0, 0.3, 1]} style={[styles.card, styles.incCard, { borderColor: p.greenBorder }]}>
         <View style={styles.incHead}>
           <Ionicons name="thumbs-up" size={16} color={p.green} />
           <Text style={[styles.incTitle, { color: p.fg }]}>Inclusions</Text>
         </View>
         <Bullets items={INCLUDED} p={p} />
       </LinearGradient>
-      <LinearGradient colors={[p.page, p.redBg]} style={[styles.card, { borderColor: p.redBorder }]}>
+      <LinearGradient colors={[p.page, p.redBg]} style={[styles.card, styles.incCard, { borderColor: p.redBorder }]}>
         <View style={styles.incHead}>
           <Ionicons name="thumbs-down" size={16} color={p.red} />
           <Text style={[styles.incTitle, { color: p.fg }]}>What's not included</Text>
@@ -809,7 +810,8 @@ export function Inclusions() {
 export function PaymentSchedule() {
   const p = useDetailsPalette();
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16 around the card (143px = 8 + 127 + 8).
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 8 }]}>
       {/* linear-gradient(262.31deg, #E6F3EE 40.76%, #FFFFFF 104.76%) — mint on the left, white by the right edge. */}
       <LinearGradient
         colors={[p.greenBg, p.greenBg, p.page]}
@@ -853,10 +855,10 @@ export const FAQS = [
 ];
 const FAQS_ON_DETAILS = 4;
 
-/** Accordion list of questions; the first one starts open, any number can be open at once. */
-export function FaqList({ items }: { items: { q: string; a: string }[] }) {
+/** Accordion list of questions; the first one starts open (unless openFirst={false}), any number can be open at once. */
+export function FaqList({ items, openFirst = true }: { items: { q: string; a: string }[]; openFirst?: boolean }) {
   const p = useDetailsPalette();
-  const [open, setOpen] = useState<Set<number>>(() => new Set([0]));
+  const [open, setOpen] = useState<Set<number>>(() => new Set(openFirst ? [0] : []));
   const toggle = (i: number) => {
     LayoutAnimation.easeInEaseOut();
     setOpen((prev) => {
@@ -875,11 +877,11 @@ export function FaqList({ items }: { items: { q: string; a: string }[] }) {
             accessibilityRole="button"
             accessibilityState={{ expanded: isOpen }}
             onPress={() => toggle(i)}
-            style={[styles.faq, { borderColor: p.border, backgroundColor: p.page }]}
+            style={[styles.faq, isOpen && { paddingVertical: 8 }, { borderColor: p.strongBorder, backgroundColor: p.page }]}
           >
             <View style={styles.faqHead}>
               <Text style={[styles.faqQ, { color: p.fg }]}>{f.q}</Text>
-              <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color={p.fg} />
+              <Feather name={isOpen ? 'chevron-up' : 'chevron-down'} size={20} color={p.fg} />
             </View>
             {isOpen && <Text style={[styles.faqA, { color: p.muted }]}>{f.a}</Text>}
           </Pressable>
@@ -892,7 +894,8 @@ export function FaqList({ items }: { items: { q: string; a: string }[] }) {
 export function Faqs() {
   const router = useRouter();
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16, 12 between the title and the list.
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 8 }]}>
       <SectionTitle action="View More" onAction={() => router.push('/faqs')}>FAQs</SectionTitle>
       <FaqList items={FAQS.slice(0, FAQS_ON_DETAILS)} />
     </View>
@@ -904,7 +907,8 @@ export function Faqs() {
 export function HelpCard() {
   const p = useDetailsPalette();
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16/12 around the card (86px = 8 + 66 + 12).
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 12 }]}>
       {/* Same wash as Payment Schedule: mint on the left → white at the right edge. */}
       <LinearGradient
         colors={[p.greenBg, p.greenBg, p.page]}
@@ -929,7 +933,7 @@ export function HelpCard() {
           accessibilityRole="button"
           accessibilityLabel="Chat with MySawari on WhatsApp"
           onPress={() => { Haptics.selectionAsync(); Linking.openURL(SUPPORT_WHATSAPP_URL); }}
-          style={({ pressed }) => [styles.helpBtn, { backgroundColor: p.whatsapp, marginLeft: 10.5 }, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.helpBtn, { backgroundColor: p.whatsapp, marginLeft: 10 }, pressed && { opacity: 0.85 }]}
         >
           <Ionicons name="logo-whatsapp" size={18} color="#FFFFFF" />
         </Pressable>
@@ -942,7 +946,8 @@ export function PolicyAgreement({ agreed, onToggle }: { agreed: boolean; onToggl
   const p = useDetailsPalette();
   const router = useRouter();
   return (
-    <View style={styles.block}>
+    // Figma frame: padding 8/16/16, 12 between the title and the checkbox row (99px with a two-line agreement).
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 16 }]}>
       <SectionTitle action="Learn More" onAction={() => router.push('/policies')}>Policy Agreement</SectionTitle>
       <Pressable
         accessibilityRole="checkbox"
@@ -964,43 +969,40 @@ const styles = StyleSheet.create({
   bleed: { paddingHorizontal: 0 },
   hScroll: { paddingHorizontal: 16, gap: 8 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, letterSpacing: -0.2, flexShrink: 1 },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  link: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, textDecorationLine: 'underline' },
+  sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, letterSpacing: -0.2, flexShrink: 1 },
+  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  link: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, textDecorationLine: 'underline' },
   card: { borderWidth: 1, borderRadius: 10, padding: 13 },
-  itemTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  itemSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10.5, marginTop: 3 },
+  itemTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  itemSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
-  mileCard: { paddingHorizontal: 12, paddingVertical: 11, gap: 12 },
-  mileRow: { flexDirection: 'row', alignItems: 'center', gap: 13 },
+  mileCard: { paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12, gap: 12 },
+  mileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 37 },
   mileHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   mileTag: { borderRadius: 9, paddingHorizontal: 7, height: 17, justifyContent: 'center' },
   mileTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, color: '#FFFFFF', letterSpacing: 0.2 },
   mileTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
   mileSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 4 },
   calCircle: { width: 36.5, height: 36.5, borderRadius: 18.25, alignItems: 'center', justifyContent: 'center' },
-  calBody: { width: 17.5, height: 17.5, borderRadius: 3, backgroundColor: '#ECECEC', overflow: 'hidden', alignItems: 'center' },
-  calTop: { alignSelf: 'stretch', height: 5.5, backgroundColor: '#E53935', flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 2.5 },
-  calRing: { width: 1.8, height: 1.8, borderRadius: 1, backgroundColor: '#FFFFFF' },
-  calDay: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 9, lineHeight: 11.5, color: '#3D3D3D' },
-  addDayCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingLeft: 13, paddingRight: 10, paddingVertical: 12.5, marginTop: 12.5, gap: 10 },
-  addDayTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  addDaySub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 4.5 },
-  addDayBtn: { flexDirection: 'row', alignItems: 'center', gap: 6.5, borderRadius: 6, paddingHorizontal: 10.5, height: 35.5 },
-  addDayBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
+  addDayCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingLeft: 12, paddingRight: 10, paddingVertical: 12, marginTop: 12, gap: 12 },
+  addDayTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  addDaySub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 17 },
+  addDayBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 6, paddingHorizontal: 10, height: 36 },
+  addDayBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
 
-  pills: { paddingHorizontal: 16, paddingVertical: 8, gap: 4 },
-  pill: { borderRadius: 17.75, paddingHorizontal: 13, height: 35.5, alignItems: 'center', justifyContent: 'center' },
+  // Figma "Car Details Navigation": 393×50, padding 4/16/10, 4 between the pills (so a 36px pill).
+  pills: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, gap: 4 },
+  pill: { borderRadius: 18, paddingHorizontal: 13, height: 36, alignItems: 'center', justifyContent: 'center' },
   pillText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
 
   table: { borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
-  tableRow: { flexDirection: 'row', alignItems: 'center', height: 35.5, paddingHorizontal: 12 },
+  tableRow: { flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12 },
   tableLabelCol: { width: '52.2%', flexDirection: 'row', alignItems: 'center', gap: 7 },
   tableLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13 },
   tableValue: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
 
-  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 13 },
-  benefitIcon: { width: 36.5, height: 36.5, borderRadius: 18.25, alignItems: 'center', justifyContent: 'center' },
+  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  benefitIcon: { width: 37, height: 37, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
 
   memberWrap: { borderWidth: 1, borderRadius: 16, padding: 8, paddingTop: 12 },
   planCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingVertical: 10.5, paddingLeft: 8, paddingRight: 9, gap: 9 },
@@ -1008,12 +1010,17 @@ const styles = StyleSheet.create({
   radioOn: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#FFFFFF' },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8.5, flexWrap: 'wrap' },
   planName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
+  planOn: { shadowColor: '#6152D8', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  planRadio: { width: 15, height: 15, borderRadius: 7.5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  planRadioDot: { width: 5.5, height: 5.5, borderRadius: 3 },
+  addedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 },
+  addedText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   saveChip: { borderRadius: 10, paddingHorizontal: 8, height: 19.5, justifyContent: 'center', marginLeft: 0.5 },
   saveChipText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8.5, color: '#FFFFFF' },
   planSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 6.5 },
   planPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15.5 },
 
-  reviewCard: { width: 257, borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingTop: 12, paddingBottom: 9.5 },
+  reviewCard: { width: 257, minHeight: 97, borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingTop: 12, paddingBottom: 9.5 },
   reviewHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
   stars: { flexDirection: 'row', gap: 1.5 },
   reviewRating: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, marginLeft: 6.5, flex: 1 },
@@ -1021,58 +1028,69 @@ const styles = StyleSheet.create({
   reviewText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, lineHeight: 17 },
 
   tripCard: { width: 216, height: 120, borderRadius: 10, overflow: 'hidden' },
-  placeChip: { position: 'absolute', top: 8, left: 7.5, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.14)', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 11, overflow: 'hidden', paddingLeft: 9.5, paddingRight: 10, height: 21.5, maxWidth: 200 },
-  placeText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 9, color: '#FFFFFF' },
+  // Figma chip: 8 in from the corner, padding 4/9/4/8, 4 between the pin and the text, 0.6px white-12% border, radius 40.
+  placeChip: { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 0.6, borderColor: 'rgba(255,255,255,0.12)', borderRadius: 40, overflow: 'hidden', paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 8, height: 21.2, maxWidth: 200 },
+  placeText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
 
-  featureGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 9 },
-  featureItem: { width: '50%', flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8 },
-  featureText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, flexShrink: 1 },
+  // Figma: two 172.5px columns 16 apart, rows 21 apart (17px lines + 4), 12px icon then 4 to the 11/16.5 text.
+  featureGrid: { gap: 4 },
+  featureRow: { flexDirection: 'row', gap: 16 },
+  featureItem: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  featureText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, flexShrink: 1 },
 
-  whyCard: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingTop: 14, paddingBottom: 13, overflow: 'hidden' },
+  // Figma "Why my Sawari": 361×307 border-box, padding 12/16/12/12, 12 between the title and the list.
+  whyCard: { borderWidth: 1, borderRadius: 10, paddingTop: 12, paddingRight: 16, paddingBottom: 12, paddingLeft: 12, overflow: 'hidden' },
   whyThumb: { position: 'absolute', top: 0, right: -8.5, width: 4, borderRadius: 2, backgroundColor: '#A3A3A3' },
-  whyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, marginBottom: 11.5 },
-  whyRow: { flexDirection: 'row', gap: 11.5 },
-  whyCheck: { width: 19.5, height: 19.5, borderRadius: 9.75, alignItems: 'center', justifyContent: 'center', marginTop: 5, marginLeft: 1.5 },
-  whyItemTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
-  whyItemDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 17, marginTop: 2 },
+  whyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginBottom: 12 },
+  whyRow: { flexDirection: 'row', gap: 8 },
+  // Figma: a 24px badge with 4 above it (a 28px box), 8 before the text.
+  whyCheck: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  whyItemTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5 },
+  whyItemDesc: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
-  locCard: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  locTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
-  locAddr: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 17, marginTop: 5.5 },
-  mapTile: { width: 49.5, height: 49.5, borderRadius: 4, overflow: 'hidden', backgroundColor: '#E8EFEA' },
-  mapImage: { width: 49.5, height: 49.5 },
-  mapPin: { position: 'absolute', left: 16.5, top: 14.5, width: 17, height: 21 },
-  mapPinDot: { position: 'absolute', left: 21.75, top: 19.75, width: 6, height: 6 },
+  // Figma "Location": 361×83 border-box, padding 10/12/12, 8 between the text and the map tile.
+  locCard: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 83, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12 },
+  // Figma: "Location" 15/22.5 weight 600, then the address 11/16.5 weight 500, 2 apart.
+  locTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
+  locAddr: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 2 },
+  mapTile: { width: 50, height: 50, borderRadius: 4, overflow: 'hidden', backgroundColor: '#E8EFEA' },
+  mapImage: { width: 50, height: 50 },
 
   tlRow: { flexDirection: 'row' },
-  tlRail: { width: 22.5, alignItems: 'flex-start' },
+  tlRail: { width: 22, alignItems: 'flex-start' },
   tlDot: { width: 10, height: 10, borderRadius: 5 },
   tlLine: { width: 1, flex: 1, marginLeft: 4.5 },
   tlHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  tlTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  tlDesc: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 17, marginTop: 2.5 },
-  badge: { borderRadius: 10, paddingHorizontal: 9, height: 19.5, justifyContent: 'center' },
-  badgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8.5, color: '#FFFFFF' },
-  payCard: { paddingTop: 12, paddingBottom: 12 },
-  payHeading: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, marginBottom: 9.5 },
-  payTitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 },
-  payDesc: { fontSize: 11.5, marginTop: 1 },
+  tlTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  tlDesc: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  // Figma "Overlay": 20px pill, padding 4/8, text 8/12 weight 700.
+  badge: { borderRadius: 24, paddingHorizontal: 8, height: 20, justifyContent: 'center' },
+  badgeText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
+  // Figma Payment Schedule: padding 10/12/12, 6 between the heading and the rows.
+  payCard: { paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12 },
+  payHeading: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginBottom: 6 },
+  payTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5 },
+  payDesc: { fontSize: 11, lineHeight: 16.5 },
 
+  // Figma Include/Exclude cards: padding 10/12/12, 12 between the title and the list; list text 13/20 weight 500.
+  incCard: { paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12 },
   incHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  incTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
+  incTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 6 },
-  bulletDot: { width: 3, height: 3, borderRadius: 1.5, marginTop: 8, marginRight: 9 },
-  bulletText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, lineHeight: 19 },
+  bulletDot: { width: 3, height: 3, borderRadius: 1.5, marginTop: 8.5, marginRight: 9 },
+  bulletText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
 
-  faq: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11 },
+  // Figma Q/A: 40px closed (padding 9/12), 86px open with a two-line answer (padding 8/12, 8 between the question and the answer).
+  faq: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
   faqHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  faqQ: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  faqA: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12, lineHeight: 19, marginTop: 8 },
+  faqQ: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  faqA: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, marginTop: 8 },
 
-  helpCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13.5 },
+  // Figma "Contact Section": 361×66 border-box, padding 10/12/12, a 42px row.
+  helpCard: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12, minHeight: 66 },
   helpTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
   helpSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 6 },
-  helpBtn: { width: 35.5, height: 35.5, borderRadius: 17.75, alignItems: 'center', justifyContent: 'center' },
+  helpBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8.5 },
   checkbox: { width: 13, height: 13, borderRadius: 2.5, borderWidth: 1.2, alignItems: 'center', justifyContent: 'center', marginTop: 3.5 },

@@ -1,23 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
+import { useVehicles } from '@/hooks/useVehicles';
 import { LoginBottomSheet } from '@/components';
 import { cars, getAvailability, splitDateRange, parseDayLabel, dayNumToLabel } from '@/utils/sawari';
 
 import { VehicleHeader } from '@/components/vehicle/details/VehicleHeader';
 import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGallery';
-import { VehicleSummary } from '@/components/vehicle/details/VehicleSummary';
+import { VehicleSummary, DriverCard } from '@/components/vehicle/details/VehicleSummary';
 import {
   MileageLimits, SectionPills, MainSpecification, Benefits, MembershipPicker, MembershipUpgrade, ReviewsStrip, RealTrips, FeatureList,
   WhyRent, LocationCard, CancellationPolicy, Inclusions, PaymentSchedule, Faqs, HelpCard, PolicyAgreement,
 } from '@/components/vehicle/details/CarDetailsSections';
 import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
+import { longAvail } from '@/components/vehicle/CarListCard';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { MembershipSavedPopup } from '@/components/vehicle/details/MembershipSavedPopup';
+import { BlurHost, BlurTarget } from '@/components/common/BottomBlur';
 import Reanimated from 'react-native-reanimated';
 import { rise } from '@/components/common/motion';
 
@@ -25,12 +28,13 @@ import { ActivityAPI } from '@/services/api/activity';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
 
 // Layout follows the Figma "Car Detail Page" frame (My Sawari Customer App V-1, node 852-7608).
-type SectionKey = 'overview' | 'specification' | 'benefits' | 'features';
+type SectionKey = 'overview' | 'specification' | 'benefits' | 'features' | 'location';
 const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'overview', label: 'Overview' },
   { key: 'specification', label: 'Specification' },
   { key: 'benefits', label: 'Benefits' },
   { key: 'features', label: 'Features' },
+  { key: 'location', label: 'Location' },
 ];
 // Index of the section pills among the ScrollView's direct children (top block, pills, …).
 const STICKY_INDEX = 1;
@@ -40,7 +44,19 @@ export default function CarDetailsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { selectedCar, pickup, dropoff, dateRange, bookingSource, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates } = useSawari();
+  const { id: paramCarId } = useLocalSearchParams<{ id?: string }>();
+  const { data: fetchedVehicles = [], isLoading: isFleetLoading } = useVehicles();
+  const { selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates } = useSawari();
+
+  // If a specific car ID was passed or selectedCar is the dummy placeholder, select the real vehicle
+  useEffect(() => {
+    if (paramCarId && fetchedVehicles.length > 0) {
+      const match = fetchedVehicles.find((v) => String(v.id) === String(paramCarId));
+      if (match && match.id !== selectedCar?.id) selectCar(match);
+    } else if ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && fetchedVehicles.length > 0) {
+      selectCar(fetchedVehicles[0]);
+    }
+  }, [paramCarId, fetchedVehicles, selectedCar, selectCar]);
 
   // CarListCard already syncs the Explore page's date to dateRange before navigation.
   const effectiveDateRange = dateRange;
@@ -55,7 +71,8 @@ export default function CarDetailsScreen() {
 
   const requestedStart = parseDayLabel(startStr);
   const requestedEnd = requestedStart !== null ? parseDayLabel(endStr, requestedStart) : null;
-  const hasTrip = requestedStart !== null && requestedEnd !== null && requestedEnd > requestedStart;
+  // A same-day trip (e.g. 8 AM → 8 PM) is a real trip: requiring end > start sent Book Now back to the dates.
+  const hasTrip = requestedStart !== null && requestedEnd !== null && requestedEnd >= requestedStart;
   const requestedLabel = requestedStart !== null
     ? `${dayNumToLabel(requestedStart)}${requestedEnd !== null && requestedEnd > requestedStart ? ` – ${dayNumToLabel(requestedEnd)}` : ''}`
     : 'Today';
@@ -81,17 +98,22 @@ export default function CarDetailsScreen() {
 
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  const [agreed, setAgreed] = useState(true);
+  const [agreed, setAgreed] = useState(false); // the customer ticks it themselves
+  const [barHeight, setBarHeight] = useState(165 + Math.max(insets.bottom, 12));
 
   const openDates = () => {
     Haptics.selectionAsync();
     router.push({ pathname: '/dates', params: { forSpecificCar: 'true' } });
   };
 
+  // Figma flow: Check Availability → date & time → back here with the price → Book Now.
+  // Book Now only asks for the trip destination if it is still missing, then opens the booking.
   const handleBookingProceed = () => {
     const isMissingEnd = !endStr || endStr.includes('Select');
-    if (bookingSource === 'explore' || !dropoff?.name || isMissingEnd) {
+    if (!hasTrip || isMissingEnd) {
       openDates();
+    } else if (!dropoff?.name) {
+      router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
     } else {
       router.push('/booking');
     }
@@ -141,7 +163,7 @@ export default function CarDetailsScreen() {
   // ── One scrolling page with sticky section pills ──
   // The pills highlight the section being read as the page scrolls; tapping one scrolls to it.
   const [activeSection, setActiveSection] = useState<SectionKey>('overview');
-  const sectionTops = useRef<Record<SectionKey, number>>({ overview: 0, specification: 0, benefits: 0, features: 0 });
+  const sectionTops = useRef<Record<SectionKey, number>>({ overview: 0, specification: 0, benefits: 0, features: 0, location: 0 });
   const pillsHeight = useRef(51);
   const jumpingUntil = useRef(0); // ignore scroll updates while a tap-scroll animation is running
 
@@ -165,9 +187,17 @@ export default function CarDetailsScreen() {
     mainScrollRef.current?.scrollTo({ y, animated: true });
   };
 
-  // The app starts with a sample car selected. Reaching this screen without picking a real one
-  // (a stale link, a web refresh) must not show that sample as if it were bookable.
-  if (!selectedCar || selectedCar === cars[0]) {
+  // Show loading indicator if fleet is still loading and no real car is selected yet
+  if ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && isFleetLoading) {
+    return (
+      <View style={[styles.screen, { backgroundColor: p.page, justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={p.navy} />
+      </View>
+    );
+  }
+
+  // If after loading no real vehicle is available
+  if (!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') {
     return (
       <View style={[styles.screen, { backgroundColor: p.page, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: p.fg, fontFamily: 'PlusJakartaSans_500Medium' }}>Car not found</Text>
@@ -179,22 +209,27 @@ export default function CarDetailsScreen() {
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: p.page }]}>
+    <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
       <VehicleHeader title={title} tripLabel={tripLabel} onEditTrip={openDates} />
 
+      <BlurTarget style={{ flex: 1 }}>
       <ScrollView
         ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={32}
         stickyHeaderIndices={[STICKY_INDEX]}
-        contentContainerStyle={{ paddingBottom: 165 + Math.max(insets.bottom, 12) }}
+        contentContainerStyle={{ paddingBottom: barHeight }}
       >
         {/* 0 — status, name card, delivery switch, photos, mileage */}
         <Reanimated.View entering={rise(0)}>
-          <VehicleSummary car={enrichedCar} isAvailable={isAvailable} unavailableNote={unavailableNote} highDemand={highDemand} />
-          <View style={{ height: 14 }} />
+          <VehicleSummary car={enrichedCar} isAvailable={isAvailable} unavailableNote={unavailableNote} highDemand={highDemand} availableOn={availability.nextAvailableFrom ? longAvail(availability.nextAvailableFrom) : undefined} />
+          <View style={{ height: 16 }} />
           <VehicleHeroGallery car={enrichedCar} />
+          {/* Figma: 8 below the photos, 8 above the "Need a driver?" card, then 8 and the mileage block's own 8. */}
+          <View style={{ height: 16 }} />
+          <DriverCard />
+          <View style={{ height: 8 }} />
           {/* Marks which rule this trip falls under; "Add 1 day" is hidden for 2+ day trips, which are already unlimited. */}
           <MileageLimits
             tripDays={hasTrip ? tripDays : undefined}
@@ -226,7 +261,9 @@ export default function CarDetailsScreen() {
         </View>
 
         <WhyRent />
-        <LocationCard deliveryAddress={isDeliveryRequested ? pickup?.name : null} />
+        <View onLayout={onSectionLayout('location')}>
+          <LocationCard deliveryAddress={isDeliveryRequested ? pickup?.name : null} />
+        </View>
         <CancellationPolicy freeCancelUntil={freeCancelUntil} />
         <Inclusions />
         <PaymentSchedule />
@@ -234,10 +271,12 @@ export default function CarDetailsScreen() {
         <HelpCard />
         <PolicyAgreement agreed={agreed} onToggle={() => setAgreed((v) => !v)} />
       </ScrollView>
+      </BlurTarget>
 
       <StickyBookingBar
         isAvailable={isAvailable}
         agreed={agreed}
+        onHeight={setBarHeight}
         hasTrip={hasTrip}
         onCheckAvailability={openDates}
         onNeedLogin={() => {
@@ -249,7 +288,6 @@ export default function CarDetailsScreen() {
       <MembershipSavedPopup hasTrip={hasTrip} tripKey={`${selectedCar.id}|${effectiveDateRange}|${pickupTime}|${returnTime}`} />
       <LoginBottomSheet
         visible={showLogin}
-        required
         onClose={() => setShowLogin(false)}
         onLoginSuccess={() => {
           if (pendingAction) {
@@ -258,7 +296,7 @@ export default function CarDetailsScreen() {
           }
         }}
       />
-    </View>
+    </BlurHost>
   );
 }
 

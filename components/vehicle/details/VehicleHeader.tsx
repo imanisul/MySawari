@@ -41,7 +41,7 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
           style={[styles.iconBtn, { backgroundColor: p.iconBg }]}
         >
-          <Feather name="chevron-left" size={20} color={p.muted} />
+          <Feather name="chevron-left" size={24} color={p.muted} />
         </Pressable>
 
         <View style={styles.titleCol}>
@@ -82,10 +82,10 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
             onPress={handleFavorite}
             style={[styles.iconBtn, { backgroundColor: p.iconBg }]}
           >
-            {/* Same 17pt box in both states -- only the fill and colour change. */}
+            {/* Same 18pt box in both states -- only the fill and colour change. */}
             {isFavorite
-              ? <Ionicons name="heart" size={17} style={styles.favIcon} color={p.red} />
-              : <Feather name="heart" size={17} style={styles.favIcon} color={p.muted} />}
+              ? <Ionicons name="heart" size={18} style={styles.favIcon} color={p.red} />
+              : <Feather name="heart" size={18} style={styles.favIcon} color={p.muted} />}
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -93,7 +93,7 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
             onPress={handleShare}
             style={[styles.iconBtn, { backgroundColor: p.iconBg }]}
           >
-            <Feather name="external-link" size={16} color={p.muted} />
+            <Feather name="external-link" size={17} color={p.muted} />
           </Pressable>
         </View>
       </View>
@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
   // Figma "Header": 393×64, padding 12px 16px, gap 16 between back / title / actions.
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 16, paddingVertical: 12, minHeight: 64 },
   iconBtn: { width: 32, height: 32, borderRadius: 16, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
-  favIcon: { width: 17, height: 17, flexShrink: 0 },
+  favIcon: { width: 18, height: 19, flexShrink: 0 },
   // Frame 94: column of 20px title + 17px date row, 2px apart.
   titleCol: { flex: 1, gap: 2, justifyContent: 'center' },
   // Figma's text box is exactly 20px high and centres its single 13/20 line.

@@ -98,6 +98,7 @@ export function primeVehicles(queryClient: QueryClient) {
       } catch (e) {}
     }
   }).finally(() => {
-    queryClient.prefetchQuery(vehiclesQueryOptions).catch(() => {});
+    // staleTime 0: the saved copy was just written into the cache and would count as fresh for 5 min.
+    queryClient.prefetchQuery({ ...vehiclesQueryOptions, staleTime: 0 }).catch(() => {});
   });
 }

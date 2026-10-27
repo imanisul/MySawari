@@ -1,23 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, BackHandler } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 
 import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWebView';
+import { PaymentFailed } from '@/components/booking/PaymentResult';
+import { PaymentProgress } from '@/components/booking/PaymentProgress';
+
+const STEPS = ['Reserving your car', 'Opening secure payment', 'Confirming your booking'];
 
 export default function PaymentProcessingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { pricingQuote, quoteParams, createBookingSnapshot, confirmBookingPayment, confirmBooking } = useSawari();
+  const { pricingQuote, quoteParams, createBookingSnapshot, confirmBookingPayment, confirmBooking, customer } = useSawari();
 
   const [status, setStatus] = useState<'INITIATING' | 'PAYMENT_PENDING' | 'VERIFYING' | 'SUCCESS' | 'ERROR'>('INITIATING');
   const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string, amountPaise: number, keyId: string } | null>(null);
+  // Which of STEPS is under way while setting up: 0 reserving the car, 1 creating the payment order.
+  const [setupStep, setSetupStep] = useState(0);
   const started = useRef(false);
+  // A plan bought in this payment (named on the success screen).
+  const boughtPlan = useRef<string | null>(null);
+  if (boughtPlan.current === null && pricingQuote?.membershipPlanToBuy) {
+    boughtPlan.current = ({ starter: 'Starter', plus: 'Plus', pro: 'Pro' } as const)[pricingQuote.membershipPlanToBuy];
+  }
   const holdId = useRef<string | null>(null);
   const paid = useRef(false);
+  // Set once the customer leaves this screen (back button, swipe, app navigation) before paying.
+  const left = useRef(false);
 
   // Keep the car soft-locked for this customer while the payment sheet is open (renewed every 45s,
   // the server caps it at 10 minutes). Stops as soon as the sheet closes or this screen goes away.
@@ -30,13 +42,35 @@ export default function PaymentProcessingScreen() {
 
   // Leaving checkout without paying frees the car for other customers straight away.
   const releaseHold = () => {
-    if (holdId.current && !paid.current) API.releaseHold(holdId.current);
+    if (holdId.current && !paid.current) {
+      const id = holdId.current;
+      holdId.current = null; // release once only
+      API.releaseHold(id);
+    }
   };
+
+  // However the screen is left before paying (Android back, iOS swipe, closing the sheet), the car is freed
+  // and the temporary record is released — it used to stay behind and show up as a booking.
+  useEffect(() => () => {
+    left.current = true;
+    releaseHold();
+  }, []);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     // The quote can refresh while this screen is open — only ever start one payment.
     if (started.current) return;
+    // The price can still be on its way (refreshed as this screen opens): wait for it rather than failing
+    // straight away; only after 15 seconds without one is it an error.
+    if (!pricingQuote) {
+      const t = setTimeout(() => {
+        if (started.current) return;
+        started.current = true;
+        setErrorMsg('Couldn’t get the price for this trip. Please try again.');
+        setStatus('ERROR');
+      }, 15000);
+      return () => clearTimeout(t);
+    }
     started.current = true;
 
     async function startPaymentFlow() {
@@ -50,13 +84,18 @@ export default function PaymentProcessingScreen() {
         const snapshot = await createBookingSnapshot();
         if (!snapshot) throw new Error('Failed to secure vehicle lock. Please try again.');
         holdId.current = snapshot.id;
+        // The customer went back while the hold was being created: free it and stop here.
+        if (left.current) { releaseHold(); return; }
+        setSetupStep(1);
 
         // Step 2: Create Order
         const order = await API.createRazorpayOrder({ onlinePayableNow: pricingQuote.onlinePayableNow });
+        if (left.current) { releaseHold(); return; }
         setRazorpayOrder(order);
         setStatus('PAYMENT_PENDING'); 
       } catch (err: any) {
         // Handle 100% sawari cash / zero online payable flow
+        if (left.current) { releaseHold(); return; }
         if (String(err?.message || '').includes('No Razorpay order required')) {
           completeBookingFlow(null); // Bypass Razorpay entirely
         } else {
@@ -87,6 +126,8 @@ export default function PaymentProcessingScreen() {
   };
 
   const completeBookingFlow = async (paymentDetails: { razorpayOrderId?: string, razorpayPaymentId?: string } | null) => {
+    // Confirmation is under way (paid online, or fully covered by Sawari Cash): never release this hold now.
+    paid.current = true;
     setStatus('VERIFYING');
     // The confirm call is safe to repeat (the server answers "already confirmed"). A timeout or dropped
     // connection — common while the server wakes up — does not mean it failed, so it is retried, never cancelled.
@@ -135,9 +176,22 @@ export default function PaymentProcessingScreen() {
   }
 
   const handleCancel = () => {
+    left.current = true;
     releaseHold();
     router.back(); // Go back to payment page to retry
   };
+
+  // Android back button: before payment it cancels the checkout (and frees the hold); while the payment is
+  // being verified it is ignored, so a paid booking is never abandoned half-way.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (status === 'VERIFYING' || status === 'SUCCESS') return true;
+      if (status === 'ERROR' && paid.current) { router.replace('/bookings'); return true; }
+      handleCancel();
+      return true;
+    });
+    return () => sub.remove();
+  }, [status]);
 
   if (status === 'PAYMENT_PENDING' && razorpayOrder) {
     return (
@@ -150,10 +204,18 @@ export default function PaymentProcessingScreen() {
           description="Vehicle Rental Booking"
           themeColor={colors.primary}
           razorpayKey={razorpayOrder.keyId}
+          prefill={{
+            name: customer?.name || undefined,
+            contact: customer?.mobile || undefined,
+            email: customer?.email || undefined,
+          }}
           onSuccess={handleRazorpaySuccess}
           onFailure={(err) => {
             releaseHold();
-            setErrorMsg(typeof err === 'string' ? err : 'Payment failed or cancelled.');
+            const message = typeof err === 'string'
+              ? err
+              : (err?.description || err?.message || err?.reason || 'Payment failed or cancelled.');
+            setErrorMsg(message);
             setStatus('ERROR');
           }}
           onClose={handleCancel}
@@ -163,49 +225,56 @@ export default function PaymentProcessingScreen() {
   }
 
   if (status === 'ERROR') {
-    return (
-      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center' }]}>
-        <Feather name="x-circle" size={48} color={colors.destructive} style={{ marginBottom: 16 }} />
-        <Text style={[styles.title, { color: colors.foreground }]}>{paid.current ? 'Booking Not Confirmed' : 'Payment Failed'}</Text>
-        <Text style={[styles.subtitle, { color: colors.mutedForeground, textAlign: 'center', marginHorizontal: 32 }]}>{errorMsg}</Text>
-        {paid.current ? (
-          // Paid: going back to checkout would invite paying a second time.
-          <Pressable onPress={() => router.replace('/bookings')} style={[styles.btn, { backgroundColor: colors.primary, marginTop: 32 }]}>
-            <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>View My Bookings</Text>
-          </Pressable>
-        ) : (
-          <Pressable onPress={handleCancel} style={[styles.btn, { backgroundColor: colors.primary, marginTop: 32 }]}>
-            <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold' }}>Back to Checkout</Text>
-          </Pressable>
-        )}
-      </View>
+    // Figma "Payment Failed". After money has moved, the button never goes back to checkout (that would
+    // invite paying twice): it opens My Bookings, where the booking or the refund shows up.
+    return paid.current ? (
+      <PaymentFailed
+        title="Booking Not Confirmed"
+        message={errorMsg || 'Your payment was received but the booking could not be confirmed.'}
+        buttonLabel="View My Bookings"
+        onButton={() => router.replace('/bookings')}
+      />
+    ) : (
+      <PaymentFailed
+        message={errorMsg && !/cancel/i.test(errorMsg) ? `${errorMsg} No money was taken.` : 'Your booking is Failed. Try again'}
+        onButton={handleCancel}
+      />
     );
   }
+
+  const payNow = pricingQuote?.onlinePayableNow;
 
   if (status === 'SUCCESS') {
     return (
-      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center' }]}>
-        <Feather name="check-circle" size={48} color={colors.success} />
-        <Text style={[styles.title, { color: colors.foreground, marginTop: 16 }]}>Booking Confirmed!</Text>
-      </View>
+      <PaymentProgress
+        done
+        title="Payment successful"
+        subtitle={boughtPlan.current
+          ? `Your booking is confirmed and your ${boughtPlan.current} membership is active. Taking you to it…`
+          : 'Your booking is confirmed. Taking you to it…'}
+        steps={STEPS}
+        current={STEPS.length}
+        amount={payNow}
+      />
     );
   }
 
-  return (
-    <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ActivityIndicator size="large" color={colors.primaryText} style={{ marginBottom: 24 }} />
-      <Text style={[styles.title, { color: colors.foreground }]}>
-        {status === 'INITIATING' ? 'Initiating Payment...' : 'Verifying Payment...'}
-      </Text>
-      <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>Please do not close this window.</Text>
-    </View>
+  // Setting up checkout, or checking the payment with the server.
+  return status === 'INITIATING' ? (
+    <PaymentProgress
+      title={setupStep === 0 ? 'Reserving your car' : 'Initiating payment'}
+      subtitle="Hold on, this only takes a few seconds. Please don’t press back."
+      steps={STEPS}
+      current={setupStep}
+      amount={payNow}
+    />
+  ) : (
+    <PaymentProgress
+      title="Verifying payment"
+      subtitle="We’re confirming your payment with the bank. Please don’t close the app or press back."
+      steps={STEPS}
+      current={2}
+      amount={payNow}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  screen: { alignItems: 'center', flex: 1, justifyContent: 'center' },
-  razorpayMock: { padding: 32, backgroundColor: '#1A1A1A', borderRadius: 20, width: '85%', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 10 }, elevation: 15, borderWidth: 1, borderColor: '#333' },
-  btn: { alignSelf: 'stretch', marginHorizontal: 24, paddingVertical: 16, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
-  title: { fontFamily: 'Inter_600SemiBold', fontSize: 20 },
-  subtitle: { fontFamily: 'Inter_400Regular', fontSize: 15, marginTop: 8 },
-});

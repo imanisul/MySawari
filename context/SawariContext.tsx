@@ -94,6 +94,9 @@ type SawariContextValue = {
   applySawariCash: (amount: number) => void;
   setFuelEstimate: (estimate: SawariContextValue['fuelEstimate']) => void;
   createBookingSnapshot: () => Promise<BookingSnapshot | null>;
+  /** Plan chosen on car details / payment to buy together with this booking (null = none). */
+  planToBuy: 'starter' | 'plus' | 'pro' | null;
+  setPlanToBuy: (plan: 'starter' | 'plus' | 'pro' | null) => void;
   confirmBookingPayment: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => Promise<void>;
   lastBooking: BookingSnapshot | null;
 
@@ -157,6 +160,26 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [vehicleType, setVehicleType] = useState<'car' | 'bike'>('car');
   const [mode, setMode] = useState<DriverMode>('Self Drive');
   const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
+  const [planToBuy, setPlanToBuy] = useState<'starter' | 'plus' | 'pro' | null>(null);
+  // The plan included in the booking being paid for (set when the car is held, read after payment).
+  const planInPayment = useRef<'starter' | 'plus' | 'pro' | null>(null);
+  // The chosen vehicle is a copy taken when it was tapped. Whenever the live vehicle list refreshes (every
+  // 5 minutes, on app focus, pull to refresh), the copy takes the server's current price and details, so a
+  // price changed on the server never lingers on car details, payment or the trip quote.
+  useEffect(() => {
+    const unsub = queryClient.getQueryCache().subscribe((e: any) => {
+      if (e?.type !== 'updated' || e.query?.queryKey?.[0] !== 'vehicles') return;
+      const list = e.query.state?.data as Car[] | undefined;
+      if (!Array.isArray(list)) return;
+      setSelectedCar((cur) => {
+        if (!cur || cur === cars[0]) return cur;
+        const live = list.find((v) => v.id === cur.id);
+        if (!live || (live.perDay === cur.perDay && live.name === cur.name)) return cur;
+        return { ...cur, ...live, availability: (cur as any).availability, isAvailable: (cur as any).isAvailable } as Car;
+      });
+    });
+    return unsub;
+  }, [queryClient]);
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [bookingSource, setBookingSource] = useState<'home' | 'explore' | null>(null);
   const [pickup, setPickup] = useState<LocationResult | null>(null);
@@ -212,6 +235,40 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // Favourite cars are kept on the phone per account (there is no favourites endpoint on the server); they
+  // used to live only in memory and were lost whenever the app closed. A guest's hearts move into the
+  // account when they log in.
+  const favKey = isAuthenticated && customer.id ? `@favorites_${customer.id}` : '@favorites_guest';
+  const favLoadedKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (isAuthenticated === null) return; // session still being checked
+    let cancelled = false;
+    favLoadedKey.current = null;
+    (async () => {
+      const read = async (k: string) => {
+        try { const raw = await AsyncStorage.getItem(k); const v = raw ? JSON.parse(raw) : []; return Array.isArray(v) ? v.filter((x) => typeof x === 'string') : []; } catch { return []; }
+      };
+      let list: string[] = await read(favKey);
+      if (favKey !== '@favorites_guest') {
+        const guest = await read('@favorites_guest');
+        if (guest.length) {
+          list = Array.from(new Set([...list, ...guest]));
+          AsyncStorage.setItem(favKey, JSON.stringify(list)).catch(() => {});
+          AsyncStorage.removeItem('@favorites_guest').catch(() => {});
+        }
+      }
+      if (cancelled) return;
+      setFavorites(list);
+      favLoadedKey.current = favKey;
+    })();
+    return () => { cancelled = true; };
+  }, [favKey, isAuthenticated]);
+  useEffect(() => {
+    // Save only once this account's list has loaded, so an empty list never overwrites the saved one.
+    if (favLoadedKey.current !== favKey) return;
+    AsyncStorage.setItem(favKey, JSON.stringify(favorites)).catch(() => {});
+  }, [favorites, favKey]);
 
   useEffect(() => {
     import('@/services/api/activity').then(({ ActivityAPI }) => {
@@ -489,9 +546,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       sawariCashToApply,
       driverMode: mode,
       isDeliveryRequested,
-      deliveryMode
+      deliveryMode,
+      buyPlan: planToBuy,
     };
-  }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode]);
+  }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, dropoff?.id, dropoff?.name, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode, planToBuy]);
 
   // Only the newest quote may update the screen: when details change quickly, an older, slower quote
   // used to finish last and overwrite the correct price.
@@ -701,8 +759,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       applySawariCash: setSawariCashToApply,
       setFuelEstimate,
       lastBooking,
+      planToBuy,
+      setPlanToBuy,
       createBookingSnapshot: async () => {
         if (!pricingQuote) return null;
+        planInPayment.current = pricingQuote.membershipPlanToBuy || null;
         const snapshot = await API.createBooking(
           quoteParams,
           selectedCar.id,
@@ -712,8 +773,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           fuelEstimate || undefined
         );
         setLastBooking(snapshot);
-        // Refresh cash from DB to reflect pending hold (if backend updates wallet)
-        applyWallet(await API.getWallet(true));
+        // Refresh cash in the background: a failed wallet refresh must not look like a failed reservation
+        // (the car is already held, and the payment has to open).
+        API.getWallet(true).then(applyWallet).catch(() => {});
         return snapshot;
       },
       confirmBookingPayment: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => {
@@ -724,12 +786,33 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId);
         
         // Update the lastBooking state with the confirmed booking info so the ConfirmationScreen can read the real bookingCode
-        if (lastBooking) {
-          setLastBooking({ ...lastBooking, bookingCode: confirmedBooking.bookingCode });
-        }
+        setLastBooking((prev: any) => ({
+          ...(prev || {}),
+          ...(confirmedBooking || {}),
+          id: String(confirmedBooking?._id || confirmedBooking?.id || (prev as any)?.id || id),
+          bookingCode: confirmedBooking?.bookingCode || (prev as any)?.bookingCode || '',
+        }));
         
-        // Refresh cash to reflect deduction
-        applyWallet(await API.getWallet(true));
+        // A plan paid for in this same payment: the server saves it with the booking. If it hasn't (an older
+        // server), it is saved here with the same payment so the customer is never left without what they paid for.
+        const plan = planInPayment.current;
+        if (plan) {
+          planInPayment.current = null;
+          try {
+            const w: any = await API.getWallet(true);
+            const saved = String(w?.membership?.plan || '').toLowerCase() === plan && !!w?.membership?.expiresAt && new Date(w.membership.expiresAt) > new Date();
+            if (!saved && paymentDetails.razorpayOrderId && paymentDetails.razorpayPaymentId) {
+              await API.activateMembership(plan, { razorpayOrderId: paymentDetails.razorpayOrderId, razorpayPaymentId: paymentDetails.razorpayPaymentId });
+            }
+          } catch (e: any) {
+            console.warn('Membership with booking not saved:', e?.message);
+          }
+          setPlanToBuy(null);
+        }
+
+        // Refresh cash (and the new membership) from the server
+        API.getWallet(true).then(applyWallet).catch(() => {});
+        return confirmedBooking;
       },
       selectCar: setSelectedCar,
       setPickup,
@@ -953,7 +1036,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setEarnedRewards([]);
           setTotalBookings(0);
           setNotifications([]);
-          setFavorites([]);
+          // (Favourites switch to the guest list on their own; clearing them here could save [] over the account's list.)
           queryClient.clear();
           setIsAuthenticated(false);
         } catch (e) {
@@ -978,6 +1061,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       fetchWallet,
     }),
     [
+      planToBuy,
       mode,
       selectedDate,
       bookingSource,

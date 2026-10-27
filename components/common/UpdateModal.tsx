@@ -13,6 +13,7 @@ import {
 import { Feather } from '@expo/vector-icons';
 import type { UpdateStatus } from '@/hooks/useAppUpdates';
 import { useColors } from '@/hooks/useColors';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -71,6 +72,7 @@ export function UpdateModal({
       onRequestClose={isProcessing ? undefined : onLater}
     >
       <View style={styles.overlay}>
+        <ModalBlur />
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           {/* ── Header Icon ── */}
           <View style={styles.iconContainer}>

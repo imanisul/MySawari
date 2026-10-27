@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import * as Haptics from 'expo-haptics';
 import { Category } from '@/utils/sawari';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 export type FilterState = {
   category: Category | string;
@@ -86,6 +87,7 @@ export function FilterSheet({
   return (
     // Figma Filter sheet: a bottom sheet with a round close button above it (not a full page).
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+      <ModalBlur />
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close filters" />
       <Animated.View style={[styles.stack, { transform: [{ translateY: slide }] }]} pointerEvents="box-none">
         <View style={styles.closeRow}>

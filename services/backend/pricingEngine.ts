@@ -63,7 +63,24 @@ export type QuoteParams = {
     /** Discount only applies while this is in the future — a lapsed record must not keep discounting. */
     expiresAt?: string;
   } | null;
+  /**
+   * A plan the customer chose to buy together with this booking (car details / payment page). Its discount
+   * applies to this trip and its yearly price is added to what is paid now, in the same payment.
+   */
+  buyPlan?: MembershipPlanKey | null;
 };
+
+export type MembershipPlanKey = 'starter' | 'plus' | 'pro';
+/** Yearly price of each plan (same as the Membership page). */
+export const MEMBERSHIP_PRICES: Record<MembershipPlanKey, number> = { starter: 999, plus: 1999, pro: 2999 };
+export const MEMBERSHIP_PLAN_NAMES: Record<MembershipPlanKey, string> = { starter: 'Starter', plus: 'Plus', pro: 'Pro' };
+const PLAN_ORDER: MembershipPlanKey[] = ['starter', 'plus', 'pro'];
+
+/** Whether `plan` can be bought now: a non-member can buy any plan, a member only a higher one. */
+export function canBuyPlan(plan: MembershipPlanKey, membership: QuoteParams['membership']): boolean {
+  const active = !!(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()));
+  return !active || PLAN_ORDER.indexOf(plan) > PLAN_ORDER.indexOf(membership!.plan);
+}
 
 export type PricingQuote = {
   rentalDays: number;
@@ -102,6 +119,10 @@ export type PricingQuote = {
   dropLocationName: string;
 
   subscriptionDiscount: number;
+
+  /** A plan bought with this booking: its key, and its price included in onlinePayableNow (0 when none). */
+  membershipPlanToBuy?: MembershipPlanKey | null;
+  membershipFee?: number;
 
   error?: string;
 };

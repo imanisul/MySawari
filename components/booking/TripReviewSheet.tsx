@@ -32,6 +32,7 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
   const [focused, setFocused] = useState(false);
   const [needStars, setNeedStars] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [placeVisited, setPlaceVisited] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
@@ -105,12 +106,24 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       return;
     }
+    const images = photos.filter((ph) => ph.status === 'done' && ph.url).map((ph) => ({ url: ph.url!, publicId: ph.publicId! }));
+    // Backend requires placeVisited when photos are attached
+    if (images.length > 0 && placeVisited.trim().length < 2) {
+      setError('Please tell us where these photos were taken');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      return;
+    }
     if (!canSubmit) return;
     setSubmitting(true);
     setError('');
     try {
-      const images = photos.filter((ph) => ph.status === 'done' && ph.url).map((ph) => ({ url: ph.url!, publicId: ph.publicId! }));
-      await API.reviews.submit(carId, rating, text, { bookingId, images });
+      // Backend requires non-empty text: use a sensible default when the customer skips the text field
+      const reviewText = text.trim() || `${rating} star${rating > 1 ? 's' : ''} for my trip with the ${vehicleName}`;
+      await API.reviews.submit(carId, rating, reviewText, {
+        bookingId,
+        placeVisited: placeVisited.trim() || undefined,
+        images,
+      });
       queryClient.invalidateQueries({ queryKey: ['pendingReviews'] });
       queryClient.invalidateQueries({ queryKey: ['myReviews'] });
       queryClient.invalidateQueries({ queryKey: ['carReviews'] });
@@ -219,6 +232,25 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
           </View>
         )}
 
+        {/* Where did you visit — required when photos are attached */}
+        {photos.length > 0 && (
+          <>
+            <View style={[styles.dashes, { marginTop: 10 }]}>
+              {Array.from({ length: 60 }, (_, i) => <View key={i} style={[styles.dash, { backgroundColor: p.strongBorder }]} />)}
+            </View>
+            <Text style={[styles.photoLabel, { color: p.fg, marginTop: 8 }]}>Where did you visit?</Text>
+            <TextInput
+              value={placeVisited}
+              onChangeText={setPlaceVisited}
+              placeholder="e.g. Shillong, Cherrapunji, Kaziranga"
+              placeholderTextColor={p.muted}
+              maxLength={120}
+              style={[styles.placeInput, { backgroundColor: p.page, borderColor: p.border, color: p.fg }]}
+              accessibilityLabel="Where did you visit"
+            />
+          </>
+        )}
+
         {!!error && <Text style={[styles.error, { color: p.red }]}>{error}</Text>}
 
         <Pressable
@@ -242,6 +274,7 @@ const styles = StyleSheet.create({
   stars: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 9 },
   hint: { fontFamily: F.regular, fontSize: 11, textAlign: 'center', marginTop: 8 },
   input: { minHeight: 36, maxHeight: 90, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingTop: 9, paddingBottom: 9, marginTop: 12, fontFamily: F.regular, fontSize: 12, textAlignVertical: 'top' },
+  placeInput: { height: 36, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, marginTop: 6, fontFamily: F.regular, fontSize: 12 },
   dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3, marginTop: 12 },
   dash: { width: 4, height: 1 },
   photoLabel: { fontFamily: F.medium, fontSize: 10.5, marginTop: 10 },

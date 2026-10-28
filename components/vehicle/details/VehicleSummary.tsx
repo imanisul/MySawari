@@ -6,7 +6,7 @@ import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
 import { Car, MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { API } from '@/services/backend/api';
-import { PICKUP_DROP_RATE_PER_KM, calculateDriverCharge } from '@/services/backend/pricingEngine';
+import { PICKUP_DROP_BASE_FEE, PICKUP_DROP_RATE_PER_KM, calculateDriverCharge } from '@/services/backend/pricingEngine';
 
 /** What a driver adds per day: the same rule the quote uses, so this copy can never drift from the price. */
 const DRIVER_CHARGE_PER_DAY = calculateDriverCharge('With Driver', 1);
@@ -97,9 +97,7 @@ function DeliveryPickupCard() {
       <View style={styles.deliveryHead}>
         <View style={{ flex: 1 }}>
           <Text style={[styles.deliveryTitle, { color: p.fg }]}>Delivery & Pickup</Text>
-          {/* The design shows "Base Price ₹200 + Additional ₹5k/km", which matches nothing we charge:
-              there is no base fee and the rate is ₹20/km (pricingEngine). Keep the real number. */}
-          <Text style={[styles.deliverySub, { color: p.muted }]}>No base fee • ₹{PICKUP_DROP_RATE_PER_KM}/km from our Kahilipara hub to your address</Text>
+          <Text style={[styles.deliverySub, { color: p.muted }]}>Base fee ₹{PICKUP_DROP_BASE_FEE} + ₹{PICKUP_DROP_RATE_PER_KM}/km from our Kahilipara hub</Text>
         </View>
         <Toggle
           label="Delivery and pickup"

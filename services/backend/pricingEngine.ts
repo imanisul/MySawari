@@ -6,6 +6,7 @@ export const MYSAWARI_HUB_COORDINATES = { latitude: 26.129, longitude: 91.748 };
 /** Shown wherever the customer collects/returns the vehicle themselves. */
 export const MYSAWARI_HUB_NAME = 'MySawari, Kahilipara';
 
+export const PICKUP_DROP_BASE_FEE = 200;
 export const PICKUP_DROP_RATE_PER_KM = 20;
 export const BOOKING_ADVANCE_AMOUNT = 500;
 
@@ -252,7 +253,7 @@ export function calculatePickupCharge(
   const requested = !!isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
   if (!requested || !pickupLocation) return { charge: 0, distanceKm: 0 };
   const distanceKm = calculateDistanceKm(MYSAWARI_HUB_COORDINATES, pickupLocation);
-  return { charge: distanceKm * PICKUP_DROP_RATE_PER_KM, distanceKm };
+  return { charge: PICKUP_DROP_BASE_FEE + (distanceKm * PICKUP_DROP_RATE_PER_KM), distanceKm };
 }
 
 /** Drop service = MySawari collects the car from the customer's address back to its hub. */
@@ -264,7 +265,7 @@ export function calculateDropCharge(
   const requested = !!isDeliveryRequested && (deliveryMode === 'return' || deliveryMode === 'both');
   if (!requested || !returnLocation) return { charge: 0, distanceKm: 0 };
   const distanceKm = calculateDistanceKm(MYSAWARI_HUB_COORDINATES, returnLocation);
-  return { charge: distanceKm * PICKUP_DROP_RATE_PER_KM, distanceKm };
+  return { charge: PICKUP_DROP_BASE_FEE + (distanceKm * PICKUP_DROP_RATE_PER_KM), distanceKm };
 }
 
 /**

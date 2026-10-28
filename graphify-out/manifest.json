@@ -498,9 +498,9 @@
     "semantic_hash": ""
   },
   "components/home/HomeSections.tsx": {
-    "mtime": 1793170435.5692508,
-    "seen": 1793170491.582726,
-    "ast_hash": "353480f53e5556b269db27aa5fb5ff9a",
+    "mtime": 1793170994.9182093,
+    "seen": 1793171030.768699,
+    "ast_hash": "e76fb0d465715c44f3acde582707f6f4",
     "semantic_hash": ""
   },
   "components/home/RideJourneyCard.tsx": {
@@ -666,9 +666,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/VehicleSummary.tsx": {
-    "mtime": 1792997580.4127977,
-    "seen": 1793009324.810814,
-    "ast_hash": "d3a6c804e1b7dd23b7a9c8abeda8cff5",
+    "mtime": 1793181387.4313934,
+    "seen": 1793182003.1654952,
+    "ast_hash": "c4017d31fd2b9778530730bae00e7a69",
     "semantic_hash": ""
   },
   "components/vehicle/details/WriteReviewBottomSheet.tsx": {
@@ -1026,9 +1026,9 @@
     "semantic_hash": ""
   },
   "services/backend/pricingEngine.ts": {
-    "mtime": 1793163223.417401,
-    "seen": 1793170107.328036,
-    "ast_hash": "cace011fec44b6de55b4bde19049a5a1",
+    "mtime": 1793181314.4122593,
+    "seen": 1793182003.165555,
+    "ast_hash": "1f0ef56b360b93ee084a9e7710959ebc",
     "semantic_hash": ""
   },
   "services/pushNotification.ts": {

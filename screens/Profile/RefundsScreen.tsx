@@ -15,7 +15,7 @@ import { shortDate, tripTotal, driverLabel } from '@/components/booking/TripDeta
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, PF } from '@/components/profile/ProfileParts';
 
-type Stage = 'refunded' | 'processing' | 'rejected' | 'not_eligible';
+type Stage = 'refunded' | 'approved' | 'processing' | 'rejected' | 'not_eligible';
 
 const amountOf = (b: BookingSnapshot) => Number(b.pendingRefund?.refundAmount ?? b.refundAmount ?? 0) || 0;
 
@@ -25,6 +25,7 @@ function stageOf(b: BookingSnapshot): Stage {
   const st = String(raw || '').toLowerCase();
   if (st === 'rejected') return 'rejected';
   if (['refunded', 'completed', 'processed'].includes(st)) return 'refunded';
+  if (st === 'approved') return 'approved';
   if (raw || amountOf(b) > 0) return 'processing';
   return 'not_eligible'; // cancelled inside 24 hours: the booking amount isn't refundable
 }
@@ -48,6 +49,7 @@ export default function RefundsScreen() {
   const bar = (b: BookingSnapshot) => {
     const st = stageOf(b);
     if (st === 'refunded') return { bg: p.greenBg, fg: p.green, icon: 'check-circle' as const, text: `${formatCurrency(amountOf(b))} refunded successfully` };
+    if (st === 'approved') return { bg: p.summary, fg: p.navy, icon: 'check' as const, text: 'Refund approved · Payment queued' };
     if (st === 'processing') return { bg: p.summary, fg: p.navy, icon: 'clock' as const, text: 'Refund processing…' };
     if (st === 'rejected') return { bg: p.redBg, fg: p.red, icon: 'x-circle' as const, text: 'Refund rejected' };
     return { bg: p.redBg, fg: p.red, icon: 'x-circle' as const, text: 'Not eligible for refund' };

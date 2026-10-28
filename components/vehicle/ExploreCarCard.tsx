@@ -4,7 +4,7 @@ import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import { Car, carTitle, getAvailability, getCarHighlights } from '@/utils/sawari';
+import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { formatCurrency, memberDayPrice } from '@/services/backend/pricingEngine';
 import { useSawari } from '@/context/SawariContext';
 import { ActivityAPI } from '@/services/api/activity';
@@ -18,7 +18,7 @@ export const ExploreCarCard = React.memo(function ExploreCarCard({ car, dateRang
   const router = useRouter();
 
   const images: any[] = (car as any).images?.length ? (car as any).images : [car.image];
-  const tag = getCarHighlights(car)[0];
+  const tag = bestFor(car);
   // Members see their day rate, with the list rate struck through beside it.
   const memberPrice = memberDayPrice(car.perDay, membership as any);
   const availability = car.availability ?? getAvailability(car);

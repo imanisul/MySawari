@@ -12,7 +12,7 @@ import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 const MAX_PHOTOS = 4;
 const RATING_WORDS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
 
-type Photo = { uri: string; mimeType?: string };
+type Photo = { uri: string; mimeType?: string; base64?: string };
 
 export function WriteReviewBottomSheet({
   carId,
@@ -45,7 +45,7 @@ export function WriteReviewBottomSheet({
   const needsScroll = contentHeight > bodyHeight + 1;
 
   const addAssets = (assets: ImagePicker.ImagePickerAsset[]) =>
-    setPhotos(prev => [...prev, ...assets.map(a => ({ uri: a.uri, mimeType: a.mimeType ?? undefined }))].slice(0, MAX_PHOTOS));
+    setPhotos(prev => [...prev, ...assets.map(a => ({ uri: a.uri, mimeType: a.mimeType ?? 'image/jpeg', base64: a.base64 ?? undefined }))].slice(0, MAX_PHOTOS));
 
   const addFromLibrary = async (remaining: number) => {
     try {
@@ -53,7 +53,8 @@ export function WriteReviewBottomSheet({
         mediaTypes: ['images'],
         allowsMultipleSelection: true,
         selectionLimit: remaining,
-        quality: 0.7, // keeps uploads small
+        quality: 0.7, // keeps uploads small and compresses to clean JPEG
+        base64: true,
       });
       if (!result.canceled) addAssets(result.assets);
     } catch (e) {
@@ -76,7 +77,11 @@ export function WriteReviewBottomSheet({
         );
         return;
       }
-      const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+        base64: true,
+      });
       if (!result.canceled) addAssets(result.assets);
     } catch (e) {
       setError('Could not open the camera on this device.');
@@ -133,7 +138,7 @@ export function WriteReviewBottomSheet({
       const uploaded: { url: string; publicId: string }[] = [];
       for (let i = 0; i < photos.length; i++) {
         setProgress(`Uploading photo ${i + 1} of ${photos.length}…`);
-        uploaded.push(await API.reviews.uploadImage(photos[i].uri, photos[i].mimeType));
+        uploaded.push(await API.reviews.uploadImage(photos[i].uri, photos[i].mimeType, photos[i].base64));
       }
       setProgress('Saving your review…');
       await API.reviews.submit(carId, rating, text, {

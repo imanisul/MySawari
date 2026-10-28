@@ -119,6 +119,7 @@ export type PricingQuote = {
   dropLocationName: string;
 
   subscriptionDiscount: number;
+  membershipPlanName?: string | null;
 
   /** A plan bought with this booking: its key, and its price included in onlinePayableNow (0 when none). */
   membershipPlanToBuy?: MembershipPlanKey | null;
@@ -362,8 +363,9 @@ const MEMBERSHIP_PLANS: Record<string, { discountRate: number; tripCap: number; 
 
 /** A member's price for one day of a vehicle: the same discount (rate, trip cap, annual cap) a one-day booking gets. */
 export function memberDayPrice(dailyRate: number, membership: QuoteParams['membership']): number | null {
-  const active = !!(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()));
-  const plan = active ? MEMBERSHIP_PLANS[membership!.plan] : undefined;
+  const planKey = (membership?.plan || '').toLowerCase().trim();
+  const active = !!(planKey && (!membership?.expiresAt || new Date(membership.expiresAt) > new Date()));
+  const plan = active ? MEMBERSHIP_PLANS[planKey] : undefined;
   if (!plan || dailyRate <= 0) return null;
   const remaining = Math.max(0, plan.annualCap - (membership!.totalSaved || 0));
   const discount = Math.min(Math.round(dailyRate * plan.discountRate), plan.tripCap, remaining);
@@ -389,11 +391,12 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const totalAmount = calculateTripTotal(discountedRentalAmount, pickup.charge, drop.charge);
 
   // ── Membership subscription discount ───────────────────────────────────────
-  const isMembershipActive = !!(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date()));
+  const planKey = (membership?.plan || '').toLowerCase().trim();
+  const isMembershipActive = !!(planKey && (!membership?.expiresAt || new Date(membership.expiresAt) > new Date()));
   let subscriptionDiscount = 0;
-  if (isMembershipActive && membership && MEMBERSHIP_PLANS[membership.plan]) {
-    const { discountRate, tripCap, annualCap } = MEMBERSHIP_PLANS[membership.plan];
-    const remaining = Math.max(0, annualCap - (membership.totalSaved || 0));
+  if (isMembershipActive && planKey && MEMBERSHIP_PLANS[planKey]) {
+    const { discountRate, tripCap, annualCap } = MEMBERSHIP_PLANS[planKey];
+    const remaining = Math.max(0, annualCap - (membership?.totalSaved || 0));
     subscriptionDiscount = Math.min(
       Math.round(totalAmount * discountRate),
       tripCap,
@@ -462,5 +465,6 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
     dropDistanceKm: drop.distanceKm,
     dropLocationName: resolvedDropName,
     subscriptionDiscount,
+    membershipPlanName: isMembershipActive && planKey ? (MEMBERSHIP_PLAN_NAMES[planKey as MembershipPlanKey] || (planKey.charAt(0).toUpperCase() + planKey.slice(1))) : null,
   };
 }

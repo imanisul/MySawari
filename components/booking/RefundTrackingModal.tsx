@@ -41,8 +41,8 @@ export function RefundTrackingModal({
 
   // Edit / Input state for pending payout update
   const [isEditing, setIsEditing] = useState(false);
-  const [editType, setEditType] = useState<'upi' | 'bank_account'>(
-    refund?.refundType === 'bank_account' ? 'bank_account' : 'upi'
+  const [editType, setEditType] = useState<'original_payment' | 'upi' | 'bank_account'>(
+    refund?.refundType === 'bank_account' ? 'bank_account' : refund?.refundType === 'upi' ? 'upi' : 'original_payment'
   );
   const [upiId, setUpiId] = useState(refund?.upiId || '');
   const [accountNumber, setAccountNumber] = useState(
@@ -94,7 +94,7 @@ export function RefundTrackingModal({
         Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. mobile@upi or name@bank).');
         return;
       }
-    } else {
+    } else if (editType === 'bank_account') {
       if (!accountHolderName.trim()) {
         Alert.alert('Missing Detail', 'Please enter Account Holder Name.');
         return;
@@ -446,18 +446,16 @@ export function RefundTrackingModal({
                       </TouchableOpacity>
                     </View>
                   ) : (
-                    <View style={{ paddingVertical: 8 }}>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 13, marginBottom: 8 }}>
-                        No payout details saved yet.
-                      </Text>
-                      <TouchableOpacity
-                        style={[styles.primaryBtn, { backgroundColor: colors.primary, paddingVertical: 10 }]}
-                        onPress={() => setIsEditing(true)}
-                      >
-                        <Text style={[styles.primaryBtnText, { color: colors.primaryForeground, fontSize: 13 }]}>
-                          Add UPI or Bank Details
+                    <View style={{ paddingVertical: 4, gap: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Feather name="refresh-cw" size={14} color="#4F46E5" />
+                        <Text style={[styles.payoutVal, { color: colors.foreground, fontFamily: 'Outfit-SemiBold' }]}>
+                          Original Payment Method
                         </Text>
-                      </TouchableOpacity>
+                      </View>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12.5, lineHeight: 18 }}>
+                        Refund will be credited back directly to the original account, card, or UPI app used during booking.
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -465,6 +463,23 @@ export function RefundTrackingModal({
                 /* Edit Mode Form */
                 <View style={styles.editForm}>
                   <View style={styles.typeSelector}>
+                    <TouchableOpacity
+                      style={[
+                        styles.typeBtn,
+                        editType === 'original_payment' && { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
+                      ]}
+                      onPress={() => setEditType('original_payment')}
+                    >
+                      <Text
+                        style={[
+                          styles.typeBtnText,
+                          { color: editType === 'original_payment' ? '#FFF' : colors.mutedForeground },
+                        ]}
+                      >
+                        Original
+                      </Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity
                       style={[
                         styles.typeBtn,
@@ -500,7 +515,16 @@ export function RefundTrackingModal({
                     </TouchableOpacity>
                   </View>
 
-                  {editType === 'upi' ? (
+                  {editType === 'original_payment' ? (
+                    <View style={{ paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#F3F4F6', gap: 4 }}>
+                      <Text style={{ fontFamily: 'Outfit-Medium', fontSize: 13, color: colors.foreground }}>
+                        Return to original payment method
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.mutedForeground, lineHeight: 17 }}>
+                        No extra payout details needed. The refund will automatically be credited to the original payment source.
+                      </Text>
+                    </View>
+                  ) : editType === 'upi' ? (
                     <View style={styles.inputGroup}>
                       <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>UPI ID</Text>
                       <TextInput

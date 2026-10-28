@@ -10,6 +10,18 @@ import { useTripPrice } from './useTripPrice';
 // Trips (car + dates + plan) whose popup was already shown this session — it celebrates once, not on every visit.
 const shown = new Set<string>();
 
+export function clearMembershipPopupShown(carId?: string) {
+  if (!carId) {
+    shown.clear();
+  } else {
+    for (const key of Array.from(shown)) {
+      if (key.startsWith(`${carId}|`)) {
+        shown.delete(key);
+      }
+    }
+  }
+}
+
 // Figma "membership applied": the plan's art (the same crown / shield / gem frames as the Membership page,
 // background removed) with a white card on it. Art files are 708 × 502.
 const ART_W = 264;
@@ -27,7 +39,7 @@ const THEMES: Record<string, Theme> = {
  * and a round ✕ — with a confetti burst (react-native-confetti-cannon) when `confetti` is on.
  * Used when a member's discount first applies to a trip, and when a plan is picked to buy with a booking.
  */
-export function MembershipCelebration({ visible, plan, amount, title, note, confetti = false, onClose }: {
+export function MembershipCelebration({ visible, plan, amount, title, note, confetti = true, onClose }: {
   visible: boolean;
   /** 'Starter' | 'Plus' | 'Pro' */
   plan: string;
@@ -57,7 +69,8 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
     Animated.timing(pop, { toValue: 0, duration: 140, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => onClose());
   };
 
-  const t = THEMES[plan] ?? THEMES.Starter;
+  const normPlan = plan ? (plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase()) : 'Starter';
+  const t = THEMES[normPlan] ?? THEMES[plan] ?? THEMES.Starter;
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
@@ -70,7 +83,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
           style={{ alignItems: 'center', opacity: pop, transform: [{ translateY: pop.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] }}
           accessible
           accessibilityRole="alert"
-          accessibilityLabel={`${amount ? `You're saving ${formatCurrency(amount)} on this booking. ` : ''}${title || `${plan} Membership Applied!`}${note ? ` ${note}` : ''}`}
+          accessibilityLabel={`${amount ? `You're saving ${formatCurrency(amount)} on this booking. ` : ''}${title || `${normPlan} Membership Applied!`}${note ? ` ${note}` : ''}`}
         >
           <View style={{ width: ART_W, height: ART_H, overflow: 'hidden' }}>
             <Image source={t.art} style={{ position: 'absolute', top: 0, left: 0, width: ART_W, height: ART_H }} resizeMode="stretch" fadeDuration={0} accessible={false} />
@@ -87,7 +100,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
               <View style={styles.dashes}>
                 {Array.from({ length: 40 }, (_, i) => <View key={i} style={[styles.dashBit, { backgroundColor: t.dash }]} />)}
               </View>
-              <Text style={[styles.applied, { color: t.applied }]} numberOfLines={1} adjustsFontSizeToFit>{title || `${plan} Membership Applied!`}</Text>
+              <Text style={[styles.applied, { color: t.applied }]} numberOfLines={1} adjustsFontSizeToFit>{title || `${normPlan} Membership Applied!`}</Text>
               {!!amount && !!note && <Text style={styles.note} numberOfLines={1} adjustsFontSizeToFit>{note}</Text>}
             </View>
           </View>
@@ -118,22 +131,32 @@ export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; t
   const price = useTripPrice(hasTrip);
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState<{ amount: number; plan: string } | null>(null);
+  const hasShown = useRef(false);
 
   const ready = price.state === 'ready' && price.membershipDiscount > 0 && !!price.planName && !price.buyingPlan;
   const key = ready ? `${tripKey}|${price.planName}` : '';
 
   useEffect(() => {
-    if (!ready || shown.has(key)) return;
+    if (!ready || hasShown.current || shown.has(key)) return;
     const t = setTimeout(() => {
+      hasShown.current = true;
       shown.add(key);
       setSaving({ amount: price.membershipDiscount, plan: price.planName! });
       setVisible(true);
     }, 450);
     return () => clearTimeout(t);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, ready]);
 
   if (!saving) return null;
-  return <MembershipCelebration visible={visible} plan={saving.plan} amount={saving.amount} onClose={() => setVisible(false)} />;
+  return (
+    <MembershipCelebration
+      visible={visible}
+      confetti
+      plan={saving.plan}
+      amount={saving.amount}
+      onClose={() => setVisible(false)}
+    />
+  );
 }
 
 const styles = StyleSheet.create({

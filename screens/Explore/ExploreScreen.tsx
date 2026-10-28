@@ -217,7 +217,7 @@ export default function ExploreScreen() {
         ref={listRef}
         style={{ flex: 1, backgroundColor: p.page }}
         data={isFetchingCars && filteredCars.length === 0 ? [] : filteredCars}
-        keyExtractor={(c, index) => String(c.id || (c as any)._id || index)}
+        keyExtractor={(c) => c.id}
         renderItem={renderCar}
         ListHeaderComponent={header}
         ListEmptyComponent={empty}

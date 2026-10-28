@@ -65,11 +65,12 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
   // knows the user has an active membership (e.g. wallet was fetched earlier but the current
   // quote call's wallet request failed silently), compute the discount locally using the same
   // formula so the shown price is consistent with the membership chip.
-  const isMembershipActive = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
+  const planKey = (membership?.plan || '').toLowerCase().trim();
+  const isMembershipActive = !!planKey && (!membership?.expiresAt || new Date(membership.expiresAt) > new Date());
   let membershipDiscount = q.subscriptionDiscount || 0;
-  if (membershipDiscount === 0 && isMembershipActive && membership?.plan && PLAN_RATES[membership.plan]) {
-    const { rate, tripCap, annualCap } = PLAN_RATES[membership.plan];
-    const remaining = Math.max(0, annualCap - (membership.totalSaved || 0));
+  if (membershipDiscount === 0 && isMembershipActive && planKey && PLAN_RATES[planKey]) {
+    const { rate, tripCap, annualCap } = PLAN_RATES[planKey];
+    const remaining = Math.max(0, annualCap - (membership?.totalSaved || 0));
     membershipDiscount = Math.min(
       Math.round(original * rate),
       tripCap,
@@ -78,7 +79,10 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
   }
 
   const final = Math.max(0, q.discountedRentalAmount + q.pickupCharge + q.dropCharge - membershipDiscount);
-  const activePlan = isMembershipActive ? PLAN_NAMES[membership!.plan] ?? null : null;
+  const activePlan = isMembershipActive
+    ? (PLAN_NAMES[planKey] ?? (membership!.plan ? membership!.plan.charAt(0).toUpperCase() + membership!.plan.slice(1).toLowerCase() : null))
+    : null;
+  const planName = activePlan || q.membershipPlanName || (q.subscriptionDiscount > 0 && planKey ? (PLAN_NAMES[planKey] ?? 'Plus') : null);
 
   return {
     state: 'ready',
@@ -96,8 +100,8 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     couponCode: q.couponCode,
     couponDiscount: q.couponDiscount,
     membershipDiscount,
-    planName: activePlan,
-    buyingPlan: q.membershipPlanToBuy ? PLAN_NAMES[q.membershipPlanToBuy] ?? null : null,
+    planName,
+    buyingPlan: q.membershipPlanToBuy ? (PLAN_NAMES[q.membershipPlanToBuy.toLowerCase()] ?? q.membershipPlanToBuy) : null,
     membershipFee: q.membershipFee || 0,
     payableNow: q.onlinePayableNow ?? Math.min(BOOKING_ADVANCE_AMOUNT, final),
     sawariCashUsed: q.sawariCashUsed || 0,

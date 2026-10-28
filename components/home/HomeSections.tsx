@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { formatCurrency, memberDayPrice, type QuoteParams } from '@/services/backend/pricingEngine';
-import { Car, carTitle, getAvailability, getCarHighlights } from '@/utils/sawari';
+import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
 
 // Home page (Figma "Home"): purple banner, refer strip, Cars / Bikes search card, then the sections below.
@@ -284,7 +284,7 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
 
   const availability = car.availability ?? getAvailability(car);
   const available = car.isAvailable !== false && availability.available;
-  const tag = getCarHighlights(car)[0];
+  const tag = bestFor(car);
   const year = car.modelYear || car.registrationYear;
   const title = carTitle(car);
   // Members see their price with the day rate struck through; everyone else sees the day rate.

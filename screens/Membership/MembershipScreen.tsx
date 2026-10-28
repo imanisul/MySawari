@@ -102,16 +102,16 @@ export default function MembershipScreen() {
   // ?plan=plus opens the page with that plan picked (Car details' plan picker).
   const params = useLocalSearchParams<{ plan?: string }>();
 
-  const { membership: knownMembership, fetchWallet, isAuthenticated } = useSawari();
+  const { membership: knownMembership, fetchWallet, isAuthenticated, isAuthLoading } = useSawari();
   const known = activeOnly(knownMembership);
 
-  // A member's plan (already loaded at app start) shows instantly and is refreshed in the background.
-  // Without one, the screen waits for the server: plans must never be offered to a member by mistake.
+  // If a member's plan is already known, show it immediately.
+  // For non-members, plans are static catalog items, so render immediately without blocking on network.
   const [membership, setMembership] = useState<ActiveMembership | null>(known);
-  const [loading, setLoading] = useState(!known);
+  const [loading, setLoading] = useState(Boolean(isAuthLoading && !known));
   const [refreshing, setRefreshing] = useState(false);
-  // True while the membership is being (re)checked: buying is paused so a member is never charged twice.
-  const [checking, setChecking] = useState(true);
+  // True while membership is being (re)checked in background: buying is paused so a member is never charged twice.
+  const [checking, setChecking] = useState(false);
   // Guests sign in first (the plan is bought on their account); the page then re-checks their membership.
   const [showLogin, setShowLogin] = useState(false);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -134,24 +134,33 @@ export default function MembershipScreen() {
   const sheetEnter = useRef(new Animated.Value(0)).current;
 
   const fetchMembership = useCallback(async () => {
-    setLoadFailed(false);
     setChecking(true);
-    const wallet: any = await API.getWallet(true).catch(() => ({ failed: true }));
-    if (wallet?.failed) {
-      // Keep a membership we already know about; otherwise say so instead of showing the plans.
-      setLoadFailed(true);
-    } else {
-      setMembership(activeOnly(wallet?.membership));
+    try {
+      const wallet: any = await API.getWallet(true).catch(() => ({ failed: true }));
+      if (!wallet?.failed) {
+        setMembership(activeOnly(wallet?.membership));
+      }
+    } catch {
+      // Background check failed; keep known state
+    } finally {
+      setLoading(false);
+      setChecking(false);
     }
-    setLoading(false);
-    setChecking(false);
   }, []);
 
-  // Fetch on open, and again once a guest signs in on this page.
+  // Sync if known membership updates in context
   useEffect(() => {
-    if (isAuthenticated === null) return; // still checking the session
-    fetchMembership();
-  }, [fetchMembership, isAuthenticated]);
+    if (known) setMembership(known);
+  }, [known]);
+
+  // Fetch in background on open, and again once a guest signs in on this page.
+  useEffect(() => {
+    if (isAuthLoading) return;
+    setLoading(false);
+    if (isAuthenticated) {
+      fetchMembership();
+    }
+  }, [fetchMembership, isAuthenticated, isAuthLoading]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -290,7 +299,7 @@ export default function MembershipScreen() {
           currency="INR"
           name="MySawari Membership"
           description={`Activate ${getPlanDef(activating!)?.name} Plan`}
-          themeColor={colors.primary}
+          themeColor={colors.navy || '#111A2B'}
           razorpayKey={razorpayOrder.keyId}
           onSuccess={handleRazorpaySuccess}
           onFailure={handleCancelPayment}

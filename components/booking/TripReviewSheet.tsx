@@ -1,17 +1,32 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, Image, ActivityIndicator, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, Image, ActivityIndicator, Alert, Linking, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
 import { useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 
 const F = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
 const MAX_PHOTOS = 4;
+
+// Figma "Star 1…5": a 5-point star that fills its 24 × 24 box (top point at the top edge, side points at the
+// left/right edges, bottom points on the bottom edge), Gold/Star #FBBC04 fill with a 1px #FBBC04 border and
+// 1px corner rounding. Empty stars are the same shape, outlined in Neutral/400.
+const STAR_PATH = 'M12 1 L15.06 8.73 L23 9.4 L16.95 14.85 L18.8 23 L12 18.63 L5.2 23 L7.05 14.85 L1 9.4 L8.94 8.73 Z';
+function Star({ on }: { on: boolean }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24">
+      {/* A 2px round-joined edge on the filled star = the design's 1px border + 1px corner rounding (fills the 24 box). */}
+      <Path d={STAR_PATH} fill={on ? '#FBBC04' : '#FFFFFF00'} stroke={on ? '#FBBC04' : '#A3A3A3'} strokeWidth={on ? 2 : 1.2} strokeLinejoin="round" />
+    </Svg>
+  );
+}
 const STAR = '#FBBC04';
 
-type Photo = { key: string; uri: string; mimeType?: string; status: 'uploading' | 'done' | 'error'; url?: string; publicId?: string };
+type Photo = { key: string; uri: string; mimeType?: string; base64?: string; status: 'uploading' | 'done' | 'error'; url?: string; publicId?: string };
 
 /**
  * Figma "How was your trip?" (completed trip): rate the car and overall experience (required), tell us more
@@ -29,13 +44,14 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
   const queryClient = useQueryClient();
   const [rating, setRating] = useState(0);
   const [text, setText] = useState('');
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState<'text' | 'place' | null>(null);
   const [needStars, setNeedStars] = useState(false);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [placeVisited, setPlaceVisited] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
+  const [chooser, setChooser] = useState(false);
 
   const uploading = photos.some((ph) => ph.status === 'uploading');
   const canSubmit = rating > 0 && !uploading && !submitting;
@@ -43,23 +59,39 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
   // ── Photos ──
   const upload = async (ph: Photo) => {
     try {
-      const res = await API.reviews.uploadImage(ph.uri, ph.mimeType);
+      setError('');
+      const res = await API.reviews.uploadImage(ph.uri, ph.mimeType, ph.base64);
       setPhotos((cur) => cur.map((x) => (x.key === ph.key ? { ...x, status: 'done', url: res.url, publicId: res.publicId } : x)));
-    } catch {
+    } catch (err: any) {
+      console.warn('Trip photo upload failed:', err);
+      const msg = err?.message || 'Photo upload failed. Tap retry.';
       setPhotos((cur) => cur.map((x) => (x.key === ph.key ? { ...x, status: 'error' } : x)));
+      setError(msg);
     }
   };
 
   const addAssets = (assets: ImagePicker.ImagePickerAsset[]) => {
     const room = MAX_PHOTOS - photos.length;
-    const added: Photo[] = assets.slice(0, room).map((a, i) => ({ key: `${Date.now()}_${i}`, uri: a.uri, mimeType: a.mimeType ?? undefined, status: 'uploading' }));
+    const added: Photo[] = assets.slice(0, room).map((a, i) => ({
+      key: `${Date.now()}_${i}`,
+      uri: a.uri,
+      mimeType: a.mimeType ?? 'image/jpeg',
+      base64: a.base64 ?? undefined,
+      status: 'uploading' as const,
+    }));
     setPhotos((cur) => [...cur, ...added]);
     added.forEach(upload);
   };
 
   const fromLibrary = async () => {
     try {
-      const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: MAX_PHOTOS - photos.length, quality: 0.7 });
+      const r = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: MAX_PHOTOS - photos.length,
+        quality: 0.7,
+        base64: true,
+      });
       if (!r.canceled) addAssets(r.assets);
     } catch {
       setError('Could not open your photos. Please allow photo access for MySawari.');
@@ -76,7 +108,11 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
         ]);
         return;
       }
-      const r = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.7 });
+      const r = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.7,
+        base64: true,
+      });
       if (!r.canceled) addAssets(r.assets);
     } catch {
       setError('Could not open the camera on this device.');
@@ -89,15 +125,22 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
     setError('');
     const access = await API.reviews.canAddPhotos();
     if (!access.allowed) { setError(access.message || 'Photos are not available right now.'); return; }
-    Alert.alert('Add trip photos', undefined, [
-      { text: 'Take photo', onPress: fromCamera },
-      { text: 'Choose from gallery', onPress: fromLibrary },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setChooser(true);
+  };
+
+  // The camera / gallery opens once the chooser has slid away (iOS can't show it over a closing sheet).
+  const choose = (source: 'camera' | 'library') => {
+    Haptics.selectionAsync();
+    setChooser(false);
+    setTimeout(() => (source === 'camera' ? fromCamera() : fromLibrary()), 350);
   };
 
   const removePhoto = (key: string) => { Haptics.selectionAsync(); setPhotos((cur) => cur.filter((x) => x.key !== key)); };
-  const retry = (ph: Photo) => { setPhotos((cur) => cur.map((x) => (x.key === ph.key ? { ...x, status: 'uploading' } : x))); upload(ph); };
+  const retry = (ph: Photo) => {
+    setError('');
+    setPhotos((cur) => cur.map((x) => (x.key === ph.key ? { ...x, status: 'uploading' } : x)));
+    upload(ph);
+  };
 
   // ── Submit ──
   const submit = async () => {
@@ -155,12 +198,22 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
     );
   }
 
-  return (
-    <View>
-      <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header">How was your trip?</Text>
-      <Text style={[styles.sub, { color: p.muted }]}>Your trip with the {vehicleName} is complete. Share your experience to help us improve.</Text>
+  const Dashes = () => (
+    <View style={styles.dashes}>
+      {Array.from({ length: 70 }, (_, i) => <View key={i} style={styles.dash} />)}
+    </View>
+  );
 
-      <View style={[styles.box, { backgroundColor: p.soft, borderColor: p.border }]}>
+  return (
+    <View style={styles.wrap}>
+      {/* Figma: 19 semibold title, 13 medium grey line, 8 apart */}
+      <View style={{ gap: 8 }}>
+        <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header">How was your trip?</Text>
+        <Text style={[styles.sub, { color: p.muted }]}>Your trip with the {vehicleName} is complete. Share your experience to help us improve.</Text>
+      </View>
+
+      {/* Grey card: rating, text, photos, place visited, Submit (16/12/12 padding, 12 between rows) */}
+      <View style={styles.box}>
         <Text style={[styles.rateTitle, { color: p.fg }]}>Rate the car and overall experience</Text>
         <View style={styles.stars} accessibilityRole="adjustable" accessibilityLabel={`Rating ${rating} of 5`}>
           {[1, 2, 3, 4, 5].map((n) => (
@@ -168,88 +221,97 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
               key={n}
               accessibilityRole="button"
               accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}
-              hitSlop={6}
+              hitSlop={4}
               onPress={() => { Haptics.selectionAsync(); setRating(n); setNeedStars(false); }}
             >
-              <Ionicons name={n <= rating ? 'star' : 'star-outline'} size={22} color={n <= rating ? STAR : p.muted} />
+              <Star on={n <= rating} />
             </Pressable>
           ))}
         </View>
-        {needStars && rating === 0 && <Text style={[styles.hint, { color: p.sub }]}>Please select a star rating to continue.</Text>}
+        {needStars && rating === 0 && <Text style={[styles.hint, { color: p.red }]}>Please select a star rating to continue.</Text>}
 
         <TextInput
           value={text}
           onChangeText={setText}
-          placeholder="Tell us more (optional)"
+          placeholder="Tell us more"
           placeholderTextColor={p.muted}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onFocus={() => setFocused('text')}
+          onBlur={() => setFocused(null)}
           multiline
           maxLength={500}
-          style={[styles.input, { backgroundColor: p.page, borderColor: focused ? p.muted : p.border, color: p.fg }]}
+          style={[styles.input, { borderColor: focused === 'text' ? '#BFC3D4' : '#EAECF1', color: p.fg }]}
           selectionColor={p.navy}
           accessibilityLabel="Tell us more"
         />
 
-        {/* Trip photos */}
-        <View style={styles.dashes}>
-          {Array.from({ length: 60 }, (_, i) => <View key={i} style={[styles.dash, { backgroundColor: p.strongBorder }]} />)}
-        </View>
-        <Text style={[styles.photoLabel, { color: p.fg }]}>Add Trip Photos (optional)</Text>
-        {photos.length === 0 ? (
-          <Pressable accessibilityRole="button" onPress={addPhotos} style={({ pressed }) => [styles.addWide, { backgroundColor: p.page, borderColor: p.border }, pressed && { opacity: 0.8 }]}>
-            <Feather name="upload" size={15} color={p.sub} />
-            <Text style={[styles.addText, { color: p.sub }]}>Add Photos</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.tiles}>
-            {photos.map((ph) => (
-              <View key={ph.key} style={[styles.tile, { borderColor: p.border, backgroundColor: p.page }]}>
-                {ph.status === 'uploading' ? (
-                  <View style={styles.tileCenter}>
-                    <ActivityIndicator size="small" color={p.sub} />
-                    <Text style={[styles.tileText, { color: p.sub }]}>Uploading</Text>
-                  </View>
-                ) : ph.status === 'error' ? (
-                  <Pressable accessibilityRole="button" accessibilityLabel="Retry upload" onPress={() => retry(ph)} style={styles.tileCenter}>
-                    <Feather name="refresh-cw" size={14} color={p.red} />
-                    <Text style={[styles.tileText, { color: p.red }]}>Retry</Text>
-                  </Pressable>
-                ) : (
-                  <Image source={{ uri: ph.uri }} style={styles.tileImg} />
-                )}
-                <Pressable accessibilityRole="button" accessibilityLabel="Remove photo" hitSlop={8} onPress={() => removePhoto(ph.key)} style={[styles.remove, { backgroundColor: p.page, borderColor: p.border }]}>
-                  <Feather name="x" size={9} color={p.sub} />
-                </Pressable>
-              </View>
-            ))}
-            {photos.length < MAX_PHOTOS && (
-              <Pressable accessibilityRole="button" accessibilityLabel="Add more photos" onPress={addPhotos} style={({ pressed }) => [styles.tile, styles.tileAdd, { borderColor: p.strongBorder, backgroundColor: p.page }, pressed && { opacity: 0.8 }]}>
-                <Feather name="upload" size={13} color={p.sub} />
-                <Text style={[styles.tileText, { color: p.sub }]}>Add Photos</Text>
-              </Pressable>
-            )}
-          </View>
-        )}
+        <Dashes />
 
-        {/* Where did you visit — required when photos are attached */}
-        {photos.length > 0 && (
-          <>
-            <View style={[styles.dashes, { marginTop: 10 }]}>
-              {Array.from({ length: 60 }, (_, i) => <View key={i} style={[styles.dash, { backgroundColor: p.strongBorder }]} />)}
+        {/* Trip photos: up to 4 tiles in one row (each a quarter wide), the next slot is "Add Photos" */}
+        <View style={{ gap: 8 }}>
+          <Text style={[styles.label, { color: p.fg }]}>Add Trip Photos (optional)</Text>
+          {photos.length === 0 ? (
+            <Pressable accessibilityRole="button" onPress={addPhotos} style={({ pressed }) => [styles.addWide, pressed && { opacity: 0.8 }]}>
+              <Feather name="upload" size={16} color="#737373" />
+              <Text style={styles.addWideText}>Add Photos</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.tiles}>
+              {Array.from({ length: MAX_PHOTOS }, (_, i) => {
+                const ph = photos[i];
+                if (ph) {
+                  return (
+                    <View key={ph.key} style={[styles.tile, { borderColor: '#BFC3D4' }]}>
+                      {ph.status === 'uploading' ? (
+                        <View style={[styles.tileCenter, styles.tileDashed]}>
+                          <ActivityIndicator size="small" color="#737373" />
+                          <Text style={styles.tileText}>Uploading</Text>
+                        </View>
+                      ) : ph.status === 'error' ? (
+                        <Pressable accessibilityRole="button" accessibilityLabel="Retry upload" onPress={() => retry(ph)} style={styles.tileCenter}>
+                          <Feather name="refresh-cw" size={14} color={p.red} />
+                          <Text style={[styles.tileText, { color: p.red }]}>Retry</Text>
+                        </Pressable>
+                      ) : (
+                        <Image source={{ uri: ph.uri }} style={styles.tileImg} />
+                      )}
+                      <Pressable accessibilityRole="button" accessibilityLabel="Remove photo" hitSlop={8} onPress={() => removePhoto(ph.key)} style={styles.remove}>
+                        <Feather name="x" size={9} color="#A3A3A3" />
+                      </Pressable>
+                    </View>
+                  );
+                }
+                // The first free slot adds photos; the rest keep the row's spacing (invisible, as in the design).
+                if (i === photos.length) {
+                  return (
+                    <Pressable key={`add-${i}`} accessibilityRole="button" accessibilityLabel="Add more photos" onPress={addPhotos} style={({ pressed }) => [styles.tile, styles.tileDashed, styles.tileCenter, pressed && { opacity: 0.8 }]}>
+                      <Feather name="upload" size={16} color="#737373" />
+                      <Text style={styles.tileText}>Add Photos</Text>
+                    </Pressable>
+                  );
+                }
+                return <View key={`gap-${i}`} style={[styles.tile, { borderWidth: 0, backgroundColor: 'transparent' }]} />;
+              })}
             </View>
-            <Text style={[styles.photoLabel, { color: p.fg, marginTop: 8 }]}>Where did you visit?</Text>
-            <TextInput
-              value={placeVisited}
-              onChangeText={setPlaceVisited}
-              placeholder="e.g. Shillong, Cherrapunji, Kaziranga"
-              placeholderTextColor={p.muted}
-              maxLength={120}
-              style={[styles.placeInput, { backgroundColor: p.page, borderColor: p.border, color: p.fg }]}
-              accessibilityLabel="Where did you visit"
-            />
-          </>
-        )}
+          )}
+        </View>
+
+        {/* Place visited — shown with the photos (the server needs it when photos are attached) */}
+        <View style={{ gap: 8 }}>
+          <Text style={[styles.label, { color: p.fg }]}>{photos.length > 0 ? 'Place visited' : 'Place visited (optional)'}</Text>
+          <TextInput
+            value={placeVisited}
+            onChangeText={(t) => { setPlaceVisited(t); if (error) setError(''); }}
+            placeholder="e.g. Shillong, Cherrapunji, Kaziranga"
+            placeholderTextColor={p.muted}
+            onFocus={() => setFocused('place')}
+            onBlur={() => setFocused(null)}
+            maxLength={120}
+            returnKeyType="done"
+            style={[styles.input, styles.placeInput, { borderColor: focused === 'place' ? '#BFC3D4' : photos.length > 0 && !!error && placeVisited.trim().length < 2 ? p.red : '#EAECF1', color: p.fg }]}
+            selectionColor={p.navy}
+            accessibilityLabel="Place visited"
+          />
+        </View>
 
         {!!error && <Text style={[styles.error, { color: p.red }]}>{error}</Text>}
 
@@ -257,42 +319,114 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSubmit }}
           onPress={submit}
-          style={({ pressed }) => [styles.submit, { backgroundColor: canSubmit ? p.navy : '#9EA5C4' }, pressed && canSubmit && { opacity: 0.88 }]}
+          style={({ pressed }) => [styles.submit, { backgroundColor: canSubmit ? p.navy : '#A0A6C2' }, pressed && canSubmit && { opacity: 0.88 }]}
         >
           {submitting ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Submit</Text>}
         </Pressable>
       </View>
+
+      <PhotoSourceSheet visible={chooser} left={MAX_PHOTOS - photos.length} onPick={choose} onClose={() => setChooser(false)} />
     </View>
   );
 }
 
+/**
+ * "Add trip photos" chooser (same look as the review sheet): round ✕ above a white sheet, title, how many
+ * photos can still be added, and two option cards — Take photo / Choose from gallery.
+ */
+function PhotoSourceSheet({ visible, left, onPick, onClose }: {
+  visible: boolean;
+  left: number;
+  onPick: (source: 'camera' | 'library') => void;
+  onClose: () => void;
+}) {
+  const p = useDetailsPalette();
+  const insets = useSafeAreaInsets();
+  const Option = ({ icon, title, sub, source }: { icon: React.ComponentProps<typeof Feather>['name']; title: string; sub: string; source: 'camera' | 'library' }) => (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      onPress={() => onPick(source)}
+      style={({ pressed }) => [styles.option, pressed && { backgroundColor: '#ECEFF6' }]}
+    >
+      <View style={styles.optionIcon}>
+        <Feather name={icon} size={19} color={p.navy} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.optionTitle, { color: p.fg }]}>{title}</Text>
+        <Text style={[styles.optionSub, { color: p.muted }]}>{sub}</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color="#A3A3A3" />
+    </Pressable>
+  );
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.chooserOverlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
+        <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} style={styles.chooserClose}>
+          <Feather name="x" size={20} color="#737373" />
+        </Pressable>
+        <View style={[styles.chooserSheet, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+          <View style={{ gap: 8 }}>
+            <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header">Add trip photos</Text>
+            <Text style={[styles.sub, { color: p.muted }]}>
+              Share the best moments of your trip. You can add {left} more photo{left === 1 ? '' : 's'}.
+            </Text>
+          </View>
+          <View style={{ gap: 12 }}>
+            <Option icon="camera" title="Take photo" sub="Use your camera to click a photo now" source="camera" />
+            <Option icon="image" title="Choose from gallery" sub={`Pick up to ${left} photo${left === 1 ? '' : 's'} from your phone`} source="library" />
+          </View>
+          <Pressable accessibilityRole="button" onPress={onClose} style={({ pressed }) => [styles.cancelBtn, pressed && { opacity: 0.8 }]}>
+            <Text style={[styles.cancelText, { color: p.navy }]}>Cancel</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// Sizes and colours from the Figma "How was your trip?" frame (393 wide).
 const styles = StyleSheet.create({
-  title: { fontFamily: F.medium, fontSize: 16.5, lineHeight: 23, textAlign: 'center' },
-  sub: { fontFamily: F.regular, fontSize: 11.5, lineHeight: 17, textAlign: 'center', marginTop: 6, paddingHorizontal: 8 },
-  box: { borderWidth: 1, borderRadius: 12, padding: 10, marginTop: 14 },
-  rateTitle: { fontFamily: F.medium, fontSize: 13, textAlign: 'center', marginTop: 4 },
-  stars: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 9 },
-  hint: { fontFamily: F.regular, fontSize: 11, textAlign: 'center', marginTop: 8 },
-  input: { minHeight: 36, maxHeight: 90, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingTop: 9, paddingBottom: 9, marginTop: 12, fontFamily: F.regular, fontSize: 12, textAlignVertical: 'top' },
-  placeInput: { height: 36, borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, marginTop: 6, fontFamily: F.regular, fontSize: 12 },
-  dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3, marginTop: 12 },
-  dash: { width: 4, height: 1 },
-  photoLabel: { fontFamily: F.medium, fontSize: 10.5, marginTop: 10 },
-  addWide: { height: 52, borderWidth: 1, borderRadius: 6, alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 8 },
-  addText: { fontFamily: F.regular, fontSize: 10.5 },
-  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 },
-  tile: { width: 60, height: 52, borderRadius: 6, borderWidth: 1 },
-  tileAdd: { borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  wrap: { gap: 16 },
+  title: { fontFamily: F.semibold, fontSize: 19, lineHeight: 28.5, textAlign: 'center' },
+  sub: { fontFamily: F.medium, fontSize: 13, lineHeight: 19.5, textAlign: 'center' },
+  box: { backgroundColor: '#F4F6FA', borderWidth: 1, borderColor: '#EAECF1', borderRadius: 13, paddingTop: 16, paddingHorizontal: 12, paddingBottom: 12, gap: 12 },
+  rateTitle: { fontFamily: F.semibold, fontSize: 15, lineHeight: 22.5, textAlign: 'center' },
+  // Figma: one 24-tall row, stars 24 × 24, 4 apart, centred.
+  stars: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 4, height: 24, alignSelf: 'stretch' },
+  hint: { fontFamily: F.medium, fontSize: 11.5, lineHeight: 16, textAlign: 'center', marginTop: -4 },
+  input: { minHeight: 46, maxHeight: 110, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingTop: 13, paddingBottom: 13, fontFamily: F.medium, fontSize: 13, lineHeight: 19.5, textAlignVertical: 'top' },
+  placeInput: { minHeight: 46, height: 46, paddingTop: 0, paddingBottom: 0, textAlignVertical: 'center' },
+  dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3 },
+  dash: { width: 5, height: 1, backgroundColor: '#BFC3D4' },
+  label: { fontFamily: F.semibold, fontSize: 11, lineHeight: 16.5 },
+  addWide: { height: 67, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EAECF1', borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 4 },
+  addWideText: { fontFamily: F.medium, fontSize: 11, lineHeight: 16.5, color: '#737373' },
+  tiles: { flexDirection: 'row', gap: 12 },
+  tile: { flex: 1, height: 67, borderRadius: 12, borderWidth: 1, backgroundColor: '#FFFFFF' },
+  tileDashed: { borderStyle: 'dashed', borderColor: '#BFC3D4', borderWidth: 1, borderRadius: 12 },
   tileCenter: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  tileImg: { width: '100%', height: '100%', borderRadius: 5 },
-  tileText: { fontFamily: F.regular, fontSize: 8 },
-  remove: { position: 'absolute', top: -5, right: -5, width: 15, height: 15, borderRadius: 7.5, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  error: { fontFamily: F.regular, fontSize: 11.5, lineHeight: 16, textAlign: 'center', marginTop: 10 },
-  submit: { height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  submitText: { fontFamily: F.medium, fontSize: 14, color: '#FFFFFF' },
-  thanks: { borderWidth: 1, borderRadius: 10, paddingVertical: 14, marginTop: 14, alignItems: 'center' },
-  thanksText: { fontFamily: F.medium, fontSize: 15.5, lineHeight: 21, textAlign: 'center' },
-  appreciate: { fontFamily: F.regular, fontSize: 11.5, lineHeight: 17, textAlign: 'center', marginTop: 14, paddingHorizontal: 12 },
-  doneBtn: { height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-  doneText: { fontFamily: F.medium, fontSize: 13.5 },
+  tileImg: { width: '100%', height: '100%', borderRadius: 11 },
+  tileText: { fontFamily: F.medium, fontSize: 8, lineHeight: 12, color: '#737373' },
+  remove: { position: 'absolute', top: -3, right: -3.75, width: 19, height: 19, borderRadius: 9.5, borderWidth: 1, borderColor: '#BFC3D4', backgroundColor: '#F9F9FB', alignItems: 'center', justifyContent: 'center' },
+  error: { fontFamily: F.medium, fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
+  submit: { height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  submitText: { fontFamily: F.semibold, fontSize: 17, lineHeight: 25.5, color: '#FFFFFF' },
+  thanks: { borderWidth: 1, borderRadius: 13, paddingVertical: 16, marginTop: 16, alignItems: 'center' },
+  thanksText: { fontFamily: F.semibold, fontSize: 17, lineHeight: 24, textAlign: 'center' },
+  appreciate: { fontFamily: F.medium, fontSize: 13, lineHeight: 19.5, textAlign: 'center', marginTop: 16, paddingHorizontal: 12 },
+  doneBtn: { height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  doneText: { fontFamily: F.semibold, fontSize: 17 },
+
+  // Photo source chooser
+  chooserOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.45)' },
+  chooserClose: { alignSelf: 'flex-end', marginRight: 12, marginBottom: 8, width: 32, height: 32, borderRadius: 16, backgroundColor: '#FAFAFA', alignItems: 'center', justifyContent: 'center' },
+  chooserSheet: { backgroundColor: '#FFFFFF', borderWidth: 1, borderBottomWidth: 0, borderColor: '#E7EAF4', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 20, gap: 16 },
+  option: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F4F6FA', borderWidth: 1, borderColor: '#EAECF1', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 12 },
+  optionIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EAECF1', alignItems: 'center', justifyContent: 'center' },
+  optionTitle: { fontFamily: F.semibold, fontSize: 15, lineHeight: 22.5 },
+  optionSub: { fontFamily: F.medium, fontSize: 12, lineHeight: 18 },
+  cancelBtn: { height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAFAFA' },
+  cancelText: { fontFamily: F.semibold, fontSize: 17 },
 });

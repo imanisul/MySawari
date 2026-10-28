@@ -5,12 +5,14 @@ import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import { Car, getAvailability, MIN_PUBLIC_REVIEW_RATING, parseDayLabel } from '@/utils/sawari';
+import { Car, getAvailability, MIN_PUBLIC_REVIEW_RATING, parseDayLabel, bestFor } from '@/utils/sawari';
+export { bestFor };
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { API } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import { ActivityAPI } from '@/services/api/activity';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { clearMembershipPopupShown } from '@/components/vehicle/details/MembershipSavedPopup';
 
 /**
  * Vehicle card (Figma "Explore": photo carousel with a "Best for …" tag and heart, name with the rating pill,
@@ -38,26 +40,7 @@ export const longAvail = (label?: string) => {
   return `${d.getUTCDate()} ${MONTH_FULL[d.getUTCMonth()]}`;
 };
 
-/** The one-word "Best for …" tag on the photo (design: "Best for Comfort"), from the vehicle's own details. */
-export function bestFor(car: Pick<Car, 'category' | 'type' | 'transmission' | 'seats' | 'fuel'>): string | null {
-  const fuel = String(car.fuel || '').toLowerCase();
-  if (car.type === 'Bike' || car.category === 'Bike') {
-    if (fuel === 'ev' || fuel.includes('electric')) return 'Eco Rides';
-    return car.transmission === 'Automatic' ? 'City Rides' : 'Long Rides';
-  }
-  if (fuel === 'ev' || fuel.includes('electric')) return 'Eco Trips';
-  const seats = parseInt(String(car.seats), 10);
-  switch (car.category) {
-    case 'Luxury': return 'Luxury';
-    case 'Off-road': return 'Adventure';
-    case 'MUV': return 'Family';
-    case 'Hatchback': return 'City';
-    case 'SUV':
-    case 'Sedan': return !isNaN(seats) && seats >= 7 ? 'Family' : 'Comfort';
-  }
-  if (!isNaN(seats) && seats >= 7) return 'Family';
-  return car.transmission === 'Automatic' ? 'City' : 'Comfort';
-}
+
 
 const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress }: CarListCardProps & { onCarPress: () => void }) {
   const p = useDetailsPalette();
@@ -222,6 +205,7 @@ export const CarListCard = React.memo(function CarListCard(props: CarListCardPro
       return;
     }
     selectCar(props.car);
+    clearMembershipPopupShown(props.car.id);
     const dateRange = props.effectiveDateRange ?? globalDateRange;
     const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
 

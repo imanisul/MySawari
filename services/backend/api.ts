@@ -47,7 +47,7 @@ export type BookingSnapshot = {
     requestedAt: string;
     reason?: string;
     status?: string;
-    refundType?: 'upi' | 'bank_account';
+    refundType?: 'original_payment' | 'upi' | 'bank_account' | string;
     upiId?: string;
     accountDetails?: {
       accountNumber?: string;
@@ -838,15 +838,15 @@ export const API = {
   async quoteBooking(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<PricingQuote> {
     // Fetch wallet and coupons in parallel — they don't depend on each other
     let availableSawariCash = 0;
-    let membership: QuoteParams['membership'] = null;
+    let membership: QuoteParams['membership'] = params.membership || null;
     const [walletData] = await Promise.all([
       this.getWallet().catch(() => null),
       // Pre-warm the coupon cache so applyCoupon() is instant; result not needed here
       params.couponCode ? this.getCoupons().catch(() => []) : Promise.resolve([]),
     ]);
     if (walletData && !walletData.failed) {
-      availableSawariCash = walletData.walletBalance || 0;
-      if (walletData.membership) {
+      availableSawariCash = (typeof walletData.sawariCash === 'number' ? walletData.sawariCash : walletData.walletBalance) || 0;
+      if (walletData.membership?.plan) {
         membership = {
           plan: walletData.membership.plan,
           totalSaved: walletData.membership.totalSaved || 0,
@@ -1021,6 +1021,42 @@ export const API = {
       ).toISOString();
     };
 
+    const isDelivery = Boolean(params.isDeliveryRequested);
+    const delMode = params.deliveryMode || 'both';
+    const wantsPickup = isDelivery && (delMode === 'delivery' || delMode === 'both');
+    const wantsDrop = isDelivery && (delMode === 'return' || delMode === 'both');
+
+    const rawPickAddr = wantsPickup
+      ? (params.pickupLocation?.address || params.pickupLocation?.name || quote.pickupLocationName || '')
+      : (quote.pickupLocationName || 'Office');
+    const rawDropAddr = wantsDrop
+      ? (params.returnLocation?.address || params.returnLocation?.name || quote.dropLocationName || '')
+      : (quote.dropLocationName || 'Office');
+
+    // When both are chosen, ensure neither defaults to 'Office' if an address was provided
+    const finalPickupLoc = (wantsPickup && wantsDrop && (!rawPickAddr || rawPickAddr === 'Office') && rawDropAddr && rawDropAddr !== 'Office')
+      ? rawDropAddr
+      : rawPickAddr;
+    const finalDropLoc = (wantsPickup && wantsDrop && (!rawDropAddr || rawDropAddr === 'Office') && rawPickAddr && rawPickAddr !== 'Office')
+      ? rawPickAddr
+      : rawDropAddr;
+
+    const pickupMapLink = wantsPickup && params.pickupLocation?.latitude && params.pickupLocation?.longitude
+      ? `https://www.google.com/maps?q=${params.pickupLocation.latitude},${params.pickupLocation.longitude}`
+      : (wantsPickup && wantsDrop && params.returnLocation?.latitude && params.returnLocation?.longitude
+        ? `https://www.google.com/maps?q=${params.returnLocation.latitude},${params.returnLocation.longitude}`
+        : '');
+
+    const dropMapLink = wantsDrop && params.returnLocation?.latitude && params.returnLocation?.longitude
+      ? `https://www.google.com/maps?q=${params.returnLocation.latitude},${params.returnLocation.longitude}`
+      : (wantsPickup && wantsDrop && params.pickupLocation?.latitude && params.pickupLocation?.longitude
+        ? `https://www.google.com/maps?q=${params.pickupLocation.latitude},${params.pickupLocation.longitude}`
+        : '');
+
+    const resolvedServiceType = isDelivery
+      ? (delMode === 'both' ? 'pickup_drop' : (delMode === 'return' ? 'drop' : 'pickup'))
+      : 'pickup_drop';
+
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/hold`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1034,18 +1070,18 @@ export const API = {
         dropTime: params.returnTime || '10:00 AM',
         totalDays: quote.rentalDays,
         destination: params.dropoffLocation?.name || '',
+        pickupDropRequired: isDelivery,
+        serviceType: resolvedServiceType,
         pickup: {
-          // Use the resolved name from the quote (already accounts for delivery mode)
-          location: quote.pickupLocationName,
+          location: finalPickupLoc,
           landmark: '',
-          mapLink: '',
+          mapLink: pickupMapLink,
           charge: quote.pickupCharge || 0
         },
         drop: {
-          // Use the resolved name from the quote (already accounts for return mode)
-          location: quote.dropLocationName,
+          location: finalDropLoc,
           landmark: '',
-          mapLink: '',
+          mapLink: dropMapLink,
           charge: quote.dropCharge || 0
         },
         payment: {
@@ -1413,7 +1449,7 @@ export const API = {
     reason?: string; 
     customerId: string; 
     customerMobile?: string;
-    refundType?: 'upi' | 'bank_account';
+    refundType?: 'original_payment' | 'upi' | 'bank_account' | string;
     upiId?: string;
     accountDetails?: {
       accountNumber?: string;
@@ -1433,7 +1469,7 @@ export const API = {
   },
 
   async updateRefundPayoutDetails(refundId: string, data: {
-    refundType: 'upi' | 'bank_account';
+    refundType: 'original_payment' | 'upi' | 'bank_account' | string;
     upiId?: string;
     accountDetails?: {
       accountNumber?: string;
@@ -1913,17 +1949,97 @@ export const API = {
     /**
      * Uploads one photo straight to Cloudinary using a signature from our
      * backend (the Cloudinary secret never leaves the server).
+     * Supports base64 data URI directly, FileSystem reading, and native multipart fallback.
      */
-    async uploadImage(uri: string, mimeType?: string): Promise<{ url: string; publicId: string }> {
+    async uploadImage(uri: string, mimeType?: string, base64?: string): Promise<{ url: string; publicId: string }> {
       const sigRes = await fetchWithAuth(`${BACKEND_URL}/reviews/upload-signature`);
       const sigData = await sigRes.json();
       if (!sigRes.ok) throw new Error(sigData.message || 'Could not start the upload');
       const { cloudName, apiKey, timestamp, folder, signature } = sigData.data;
 
-      const type = mimeType || 'image/jpeg';
-      const ext = type.split('/')[1] || 'jpg';
+      // Clean MIME type and extension
+      const rawType = (mimeType || '').split(';')[0].trim().toLowerCase();
+      const type = rawType.startsWith('image/') ? rawType : 'image/jpeg';
+      const ext = type.replace('image/', '') === 'jpeg' ? 'jpg' : (type.replace('image/', '') || 'jpg');
+
+      // Strategy 1: Direct Base64 JSON upload (avoids React Native Android FormData/boundary issues)
+      let dataUri: string | null = null;
+      if (base64) {
+        dataUri = base64.startsWith('data:') ? base64 : `data:${type};base64,${base64}`;
+      } else if (uri.startsWith('data:')) {
+        dataUri = uri;
+      } else {
+        try {
+          const FileSystem = require('expo-file-system');
+          if (FileSystem && FileSystem.readAsStringAsync) {
+            const b64 = await FileSystem.readAsStringAsync(uri, {
+              encoding: FileSystem.EncodingType?.Base64 || 'base64',
+            });
+            if (b64) {
+              dataUri = `data:${type};base64,${b64}`;
+            }
+          }
+        } catch (readErr) {
+          // ignore and proceed to next strategies
+        }
+      }
+
+      if (dataUri) {
+        try {
+          const jsonRes = await timedFetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              file: dataUri,
+              api_key: String(apiKey),
+              timestamp: Number(timestamp),
+              folder,
+              signature,
+            }),
+          }, 60000);
+          const result = await jsonRes.json().catch(() => ({}));
+          if (jsonRes.ok && result.secure_url) {
+            return { url: result.secure_url, publicId: result.public_id };
+          }
+        } catch (jsonErr) {
+          // Fall through to native upload if JSON fetch fails
+        }
+      }
+
+      // Strategy 2: Native FileSystem.uploadAsync
+      const fixedUri = uri && !/^[a-z][a-z0-9+.-]*:/i.test(uri) && uri.startsWith('/') ? `file://${uri}` : uri;
+      try {
+        const FileSystem = require('expo-file-system');
+        if (FileSystem && FileSystem.uploadAsync && fixedUri && !fixedUri.startsWith('data:')) {
+          const fsRes = await FileSystem.uploadAsync(
+            `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+            fixedUri,
+            {
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              fieldName: 'file',
+              parameters: {
+                api_key: String(apiKey),
+                timestamp: String(timestamp),
+                folder,
+                signature,
+              },
+            }
+          );
+          if (fsRes.status >= 200 && fsRes.status < 300) {
+            const fsData = JSON.parse(fsRes.body);
+            if (fsData.secure_url) {
+              return { url: fsData.secure_url, publicId: fsData.public_id };
+            }
+          }
+        }
+      } catch (fsErr) {
+        // Fall through to FormData
+      }
+
+      // Strategy 3: FormData multipart fallback
       const form = new FormData();
-      form.append('file', { uri, type, name: `trip-${timestamp}.${ext}` } as any);
+      form.append('file', { uri: fixedUri, type, name: `trip-${timestamp}.${ext}` } as any);
       form.append('api_key', String(apiKey));
       form.append('timestamp', String(timestamp));
       form.append('folder', folder);
@@ -1933,7 +2049,7 @@ export const API = {
         method: 'POST',
         body: form,
       }, 60000);
-      const result = await upload.json();
+      const result = await upload.json().catch(() => ({}));
       if (!upload.ok || !result.secure_url) {
         throw new Error(result?.error?.message || 'Photo upload failed');
       }

@@ -29,7 +29,7 @@ export function RazorpayCheckoutWebView({
   description,
   image,
   prefill,
-  themeColor = '#000000',
+  themeColor = '#111A2B',
   razorpayKey,
   onSuccess,
   onFailure,
@@ -48,13 +48,10 @@ export function RazorpayCheckoutWebView({
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>Razorpay Checkout</title>
         <style>
-          body { margin: 0; padding: 0; background-color: #f8f9fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
-          .loader { border: 4px solid #f3f3f3; border-top: 4px solid ${themeColor}; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
-          @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
         </style>
     </head>
     <body>
-        <div class="loader"></div>
         <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script>
             var options = {
@@ -95,10 +92,11 @@ export function RazorpayCheckoutWebView({
                 }));
             });
             
-            // Auto open the modal
-            setTimeout(() => {
+            try {
               rzp1.open();
-            }, 500);
+            } catch(e) {
+              setTimeout(function(){ rzp1.open(); }, 100);
+            }
         </script>
     </body>
     </html>
@@ -156,12 +154,7 @@ export function RazorpayCheckoutWebView({
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        startInLoadingState={true}
-        renderLoading={() => (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={themeColor} />
-          </View>
-        )}
+        startInLoadingState={false}
         style={{ flex: 1, backgroundColor: 'transparent' }}
       />
     </View>
@@ -171,12 +164,6 @@ export function RazorpayCheckoutWebView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
   },
-  loadingContainer: {
-    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-  }
 });

@@ -106,6 +106,7 @@ type SawariContextValue = {
   expoPushToken: string | null;
   earnedRewards: Offer[];
   sawariCash: number;
+  walletBalance: number;
   membership: Membership;
   totalBookings: number;
   incrementBookings: () => void;
@@ -215,12 +216,14 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [earnedRewards, setEarnedRewards] = useState<Offer[]>([]);
   const [sawariCash, setSawariCash] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);
   const [membership, setMembership] = useState<Membership>(null);
   // Wallet balance and membership status arrive together from the same endpoint — keep them in sync.
-  const applyWallet = useCallback((wallet: { walletBalance?: number; membership?: Membership; failed?: boolean } | null | undefined) => {
+  const applyWallet = useCallback((wallet: { walletBalance?: number; sawariCash?: number; membership?: Membership; failed?: boolean } | null | undefined) => {
     // A failed request keeps the last known balance and membership (never resets a member to "none").
     if (!wallet || wallet.failed) return;
-    setSawariCash(wallet.walletBalance || 0);
+    setSawariCash((typeof wallet.sawariCash === 'number' ? wallet.sawariCash : wallet.walletBalance) || 0);
+    setWalletBalance(wallet.walletBalance || 0);
     setMembership(wallet.membership || null);
   }, []);
 
@@ -548,8 +551,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       isDeliveryRequested,
       deliveryMode,
       buyPlan: planToBuy,
+      membership: membership?.plan ? {
+        plan: (membership.plan || '').toLowerCase().trim() as any,
+        totalSaved: membership.totalSaved || 0,
+        expiresAt: membership.expiresAt,
+      } : null,
     };
-  }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, dropoff?.id, dropoff?.name, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode, planToBuy]);
+  }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, dropoff?.id, dropoff?.name, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode, planToBuy, membership]);
 
   // Only the newest quote may update the screen: when details change quickly, an older, slower quote
   // used to finish last and overwrite the correct price.
@@ -745,6 +753,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       setReturnAddress,
       customer,
       sawariCash,
+      walletBalance,
       membership,
       totalBookings,
       pricingQuote,
@@ -1032,6 +1041,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: ''
           });
           setSawariCash(0);
+          setWalletBalance(0);
           setMembership(null);
           setEarnedRewards([]);
           setTotalBookings(0);
@@ -1085,6 +1095,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       expoPushToken,
       earnedRewards,
       sawariCash,
+      walletBalance,
       membership,
       totalBookings,
       hasSeenPermissions,

@@ -44,7 +44,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
-  const { customer, sawariCash, isAuthenticated, membership, fetchWallet, logout } = useSawari();
+  const { customer, sawariCash, walletBalance, isAuthenticated, membership, fetchWallet, logout } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   // Figma: the card's top lines up with the ⋮ icon's top and its right edge sits 4px left of the icon.
@@ -210,12 +210,12 @@ export default function ProfileScreen() {
           {/* ── Wallet ── */}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Wallet balance ${inr2(sawariCash)}`}
+            accessibilityLabel={`Wallet balance ${inr2(walletBalance)}`}
             onPress={() => go('/wallet')}
             style={({ pressed }) => [styles.wallet, { borderColor: p.segBorder, backgroundColor: p.page }, pressed && { opacity: 0.92 }]}
           >
             <Text style={[styles.walletLabel, { color: p.fg }]}>Wallet Balance</Text>
-            <Text style={[styles.walletValue, { color: p.navy }]}>{inr2(sawariCash)}</Text>
+            <Text style={[styles.walletValue, { color: p.navy }]}>{inr2(walletBalance)}</Text>
           </Pressable>
 
           {/* ── Rows ── */}

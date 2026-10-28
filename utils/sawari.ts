@@ -207,6 +207,27 @@ export function getCarHighlights(car: Pick<Car, 'category' | 'transmission' | 's
   return tags.slice(0, 4);
 }
 
+/** The one-word "Best for …" tag on the photo (design: "Best for Comfort"), from the vehicle's own details. */
+export function bestFor(car: Pick<Car, 'category' | 'type' | 'transmission' | 'seats' | 'fuel'>): string | null {
+  const fuel = String(car.fuel || '').toLowerCase();
+  if (car.type === 'Bike' || car.category === 'Bike') {
+    if (fuel === 'ev' || fuel.includes('electric')) return 'Eco Rides';
+    return car.transmission === 'Automatic' ? 'City Rides' : 'Long Rides';
+  }
+  if (fuel === 'ev' || fuel.includes('electric')) return 'Eco Trips';
+  const seats = parseInt(String(car.seats), 10);
+  switch (car.category) {
+    case 'Luxury': return 'Luxury';
+    case 'Off-road': return 'Adventure';
+    case 'MUV': return 'Family';
+    case 'Hatchback': return 'City';
+    case 'SUV':
+    case 'Sedan': return !isNaN(seats) && seats >= 7 ? 'Family' : 'Comfort';
+  }
+  if (!isNaN(seats) && seats >= 7) return 'Family';
+  return car.transmission === 'Automatic' ? 'City' : 'Comfort';
+}
+
 const baseCars: Car[] = [
   {
     id: 'creta',

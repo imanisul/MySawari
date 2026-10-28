@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, BackHandler } from 'react-native';
+import { View, BackHandler, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
@@ -193,33 +193,44 @@ export default function PaymentProcessingScreen() {
     return () => sub.remove();
   }, [status]);
 
+  const payNow = pricingQuote?.onlinePayableNow;
+
   if (status === 'PAYMENT_PENDING' && razorpayOrder) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <RazorpayCheckoutWebView
-          orderId={razorpayOrder.orderId}
-          amount={razorpayOrder.amountPaise}
-          currency="INR"
-          name="MySawari"
-          description="Vehicle Rental Booking"
-          themeColor={colors.primary}
-          razorpayKey={razorpayOrder.keyId}
-          prefill={{
-            name: customer?.name || undefined,
-            contact: customer?.mobile || undefined,
-            email: customer?.email || undefined,
-          }}
-          onSuccess={handleRazorpaySuccess}
-          onFailure={(err) => {
-            releaseHold();
-            const message = typeof err === 'string'
-              ? err
-              : (err?.description || err?.message || err?.reason || 'Payment failed or cancelled.');
-            setErrorMsg(message);
-            setStatus('ERROR');
-          }}
-          onClose={handleCancel}
+        <PaymentProgress
+          title="Opening secure payment"
+          subtitle="Connecting to Razorpay. Please don’t close the app or press back."
+          steps={STEPS}
+          current={1}
+          amount={payNow}
         />
+        <View style={StyleSheet.absoluteFill}>
+          <RazorpayCheckoutWebView
+            orderId={razorpayOrder.orderId}
+            amount={razorpayOrder.amountPaise}
+            currency="INR"
+            name="MySawari"
+            description="Vehicle Rental Booking"
+            themeColor={colors.navy || '#111A2B'}
+            razorpayKey={razorpayOrder.keyId}
+            prefill={{
+              name: customer?.name || undefined,
+              contact: customer?.mobile || undefined,
+              email: customer?.email || undefined,
+            }}
+            onSuccess={handleRazorpaySuccess}
+            onFailure={(err) => {
+              releaseHold();
+              const message = typeof err === 'string'
+                ? err
+                : (err?.description || err?.message || err?.reason || 'Payment failed or cancelled.');
+              setErrorMsg(message);
+              setStatus('ERROR');
+            }}
+            onClose={handleCancel}
+          />
+        </View>
       </View>
     );
   }
@@ -242,7 +253,7 @@ export default function PaymentProcessingScreen() {
     );
   }
 
-  const payNow = pricingQuote?.onlinePayableNow;
+
 
   if (status === 'SUCCESS') {
     return (

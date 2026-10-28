@@ -48,7 +48,7 @@ export function CancelBookingSheet({
   const [refundNote, setRefundNote] = useState<string | null>(null);
 
   // Where the refund is paid (the refund request needs it; it can also be changed later from Trip Details).
-  const [payoutType, setPayoutType] = useState<'upi' | 'bank_account'>('upi');
+  const [payoutType, setPayoutType] = useState<'original_payment' | 'upi' | 'bank_account'>('original_payment');
   const [upiId, setUpiId] = useState('');
   const [holder, setHolder] = useState(customer?.name || '');
   const [accountNumber, setAccountNumber] = useState('');
@@ -67,6 +67,7 @@ export function CancelBookingSheet({
 
   const payoutError = (): string | null => {
     if (refund <= 0) return null;
+    if (payoutType === 'original_payment') return null;
     if (payoutType === 'upi') return upiId.trim().includes('@') ? null : 'Enter a valid UPI ID (for example 9876543210@upi) to receive your refund.';
     if (!holder.trim()) return 'Enter the account holder name.';
     if (!accountNumber.trim()) return 'Enter the account number.';
@@ -183,18 +184,36 @@ export function CancelBookingSheet({
             <View style={{ gap: 12 }}>
               <Text style={[styles.section, { color: c.foreground }]}>Where should we send {rupees(refund)}?</Text>
               <View style={styles.switchRow}>
-                {(['upi', 'bank_account'] as const).map((t) => {
-                  const on = payoutType === t;
+                {([
+                  { id: 'original_payment', label: 'Original Source' },
+                  { id: 'upi', label: 'UPI ID' },
+                  { id: 'bank_account', label: 'Bank Account' },
+                ] as const).map((t) => {
+                  const on = payoutType === t.id;
                   return (
-                    <Pressable key={t} onPress={() => setPayoutType(t)} style={[styles.switchBtn, { borderColor: on ? c.navy : c.border, backgroundColor: on ? c.navy : c.card }]}>
-                      <Text style={{ fontFamily: FONT.semibold, fontSize: 13, color: on ? '#FFFFFF' : c.mutedForeground }}>
-                        {t === 'upi' ? 'UPI ID' : 'Bank account'}
+                    <Pressable
+                      key={t.id}
+                      onPress={() => setPayoutType(t.id)}
+                      style={[styles.switchBtn, { borderColor: on ? c.navy : c.border, backgroundColor: on ? c.navy : c.card }]}
+                    >
+                      <Text style={{ fontFamily: FONT.semibold, fontSize: 11.5, color: on ? '#FFFFFF' : c.mutedForeground }}>
+                        {t.label}
                       </Text>
                     </Pressable>
                   );
                 })}
               </View>
-              {payoutType === 'upi' ? (
+              {payoutType === 'original_payment' ? (
+                <View style={[styles.originalBox, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4' }]}>
+                  <Feather name="refresh-cw" size={16} color={c.navy} style={{ marginTop: 2 }} />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={[styles.originalTitle, { color: c.foreground }]}>Original Payment Method</Text>
+                    <Text style={[styles.originalDesc, { color: c.mutedForeground }]}>
+                      Refund of {rupees(refund)} will be credited back directly to the source account / card / UPI used during booking within 5–7 business days after approval.
+                    </Text>
+                  </View>
+                </View>
+              ) : payoutType === 'upi' ? (
                 <Field label="UPI ID" value={upiId} onChange={setUpiId} placeholder="e.g. 9876543210@upi" />
               ) : (
                 <>
@@ -333,4 +352,7 @@ const styles = StyleSheet.create({
   nextRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   nextText: { flex: 1, fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
   popupClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  originalBox: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 8, padding: 12, alignItems: 'flex-start' },
+  originalTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 18 },
+  originalDesc: { fontFamily: FONT.medium, fontSize: 11.5, lineHeight: 17 },
 });

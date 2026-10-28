@@ -1,17 +1,17 @@
 # Graph Report - MySawari  (2026-10-28)
 
 ## Corpus Check
-- 219 files · ~1,217,379 words
+- 219 files · ~1,217,352 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 2, .example 1)
 
 ## Summary
-- 1345 nodes · 4317 edges · 73 communities (68 shown, 5 thin omitted)
+- 1345 nodes · 4316 edges · 73 communities (68 shown, 5 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 8 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `16782dae`
+- Built from commit: `46ebc01d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -138,7 +138,7 @@ Nodes (20): ErrorBoundary, ErrorBoundaryProps, ErrorBoundaryState, ErrorFallback
 
 ### Community 5 - "package.json"
 Cohesion: 0.06
-Nodes (30): main, name, private, version, @babel/core, babel-plugin-react-compiler, expo-build-properties, expo-camera (+22 more)
+Nodes (31): main, name, private, version, @babel/core, babel-plugin-react-compiler, expo-build-properties, expo-camera (+23 more)
 
 ### Community 6 - "expo-haptics"
 Cohesion: 0.07
@@ -213,8 +213,8 @@ Cohesion: 0.39
 Nodes (5): Route(), useVehicles(), styles, WishlistScreen(), byAvailability()
 
 ### Community 24 - "react-native-safe-area-context"
-Cohesion: 0.05
-Nodes (81): Route(), Route(), Route(), Route(), CancelBookingSheet(), Field(), REASONS, styles (+73 more)
+Cohesion: 0.06
+Nodes (80): Route(), Route(), Route(), Route(), CancelBookingSheet(), Field(), REASONS, styles (+72 more)
 
 ### Community 25 - "ExploreFilters.tsx"
 Cohesion: 0.14
@@ -389,8 +389,8 @@ Cohesion: 0.67
 Nodes (3): asString(), PushData, PushNotificationHandler()
 
 ## Knowledge Gaps
-- **27 isolated node(s):** `@babel/core`, `@expo/cli`, `@expo/ngrok`, `@stardazed/streams-text-encoding`, `@types/react` (+22 more)
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 513 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **28 isolated node(s):** `@babel/core`, `@expo/cli`, `@expo/ngrok`, `@stardazed/streams-text-encoding`, `@types/react` (+23 more)
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 514 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
 - **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
@@ -399,7 +399,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `react` connect `react` to `PaymentsListScreen.tsx`, `ReferralScreen.tsx`, `CarDetailsSections.tsx`, `fetch_images.js`, `package.json`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `useDetailsPalette`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `DatesSheet.tsx`, `BottomNavigation.tsx`, `useVehicles.ts`, `SearchScreen.tsx`, `useColors`, `DetailsTabs.tsx`, `useSawari`, `WishlistScreen.tsx`, `react-native-safe-area-context`, `ExploreFilters.tsx`, `react-native`, `SawariContext.tsx`, `expo-haptics`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `TripReviewSheet.tsx`, `DropoffSheet.tsx`, `CarListCard.tsx`, `FilterSheet.tsx`, `formatCurrency`, `useColors.ts`, `useAppUpdates.ts`, `BookingsScreen.tsx`, `HomeSections.tsx`, `LoginBottomSheet`, `DriverChargesScreen.tsx`, `AnimatedSplash.tsx`, `FaqsScreen.tsx`, `RideJourneyCard.tsx`, `API`, `SocialLinks.tsx`, `PushNotificationHandler.tsx`?**
   _High betweenness centrality (0.186) - this node is a cross-community bridge._
 - **What connects `@babel/core`, `@expo/cli`, `@expo/ngrok` to the rest of the system?**
-  _27 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _28 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `PaymentsListScreen.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.14761904761904762 - nodes in this community are weakly interconnected._
 - **Why does `react-native` connect `react-native` to `PaymentsListScreen.tsx`, `ReferralScreen.tsx`, `CarDetailsSections.tsx`, `fetch_images.js`, `package.json`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `sawari.ts`, `useDetailsPalette`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `DatesSheet.tsx`, `BottomNavigation.tsx`, `SearchScreen.tsx`, `useColors`, `DetailsTabs.tsx`, `useSawari`, `WishlistScreen.tsx`, `react-native-safe-area-context`, `ExploreFilters.tsx`, `SawariContext.tsx`, `expo-haptics`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `TripReviewSheet.tsx`, `fetchWithAuth`, `DropoffSheet.tsx`, `CarListCard.tsx`, `FilterSheet.tsx`, `activity.ts`, `formatCurrency`, `useColors.ts`, `react`, `useAppUpdates.ts`, `BookingsScreen.tsx`, `HomeSections.tsx`, `LoginBottomSheet`, `AnimatedSplash.tsx`, `FaqsScreen.tsx`, `RideJourneyCard.tsx`, `API`, `SocialLinks.tsx`?**

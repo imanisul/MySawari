@@ -1,10 +1,8 @@
 import React from 'react';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, BackHandler, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useNavigation, useRouter } from 'expo-router';
-import { CommonActions } from '@react-navigation/native';
-import { BackHandler } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoadingImage } from '@/components/common/LoadingImage';
@@ -29,7 +27,6 @@ const NEXT = [
 export default function ConfirmationScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { selectedCar, mode, dateRange, duration, pickupTime, returnTime, pricingQuote, lastBooking } = useSawari();
@@ -66,36 +63,12 @@ export default function ConfirmationScreen() {
 
   const openBooking = React.useCallback(() => {
     const targetId = effective?.id || b?.id || (effective as any)?._id || (b as any)?._id;
-    try {
-      if (targetId) {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 1,
-            routes: [
-              { name: 'index' },
-              { name: 'booking-detail', params: { id: targetId } },
-            ],
-          })
-        );
-      } else {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 1,
-            routes: [
-              { name: 'index' },
-              { name: 'bookings' },
-            ],
-          })
-        );
-      }
-    } catch {
-      if (targetId) {
-        router.replace({ pathname: '/booking-detail', params: { id: targetId } } as any);
-      } else {
-        router.replace('/bookings');
-      }
+    if (targetId) {
+      router.replace({ pathname: '/booking-detail', params: { id: targetId, fromConfirmation: 'true' } } as any);
+    } else {
+      router.replace('/bookings');
     }
-  }, [effective, b, navigation, router]);
+  }, [effective, b, router]);
 
   // Handle hardware back press: navigate directly to booking view instead of returning to payment/booking checkout
   React.useEffect(() => {

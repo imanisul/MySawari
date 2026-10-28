@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -56,7 +56,7 @@ export default function BookingDetailScreen() {
   const queryClient = useQueryClient();
   const { selectCar, isAuthenticated, lastBooking } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, fromConfirmation } = useLocalSearchParams<{ id?: string; fromConfirmation?: string }>();
 
   // From the shared bookings list (usually already loaded, so it opens instantly); refreshed on focus.
   const { data: allBookings, isLoading: listLoading, isFetching: listFetching, isError: listFailed, refetch: refetchBookings } = useQuery({
@@ -90,14 +90,25 @@ export default function BookingDetailScreen() {
   const pricingY = useRef(0);
   const toPricing = () => scrollRef.current?.scrollTo({ y: Math.max(0, pricingY.current - 12), animated: true });
 
-  const handleBack = () => {
+  const handleBack = React.useCallback(() => {
     Haptics.selectionAsync();
-    if (router.canGoBack()) {
+    if (fromConfirmation === 'true') {
+      router.replace('/bookings');
+    } else if (router.canGoBack()) {
       router.back();
     } else {
       router.replace('/bookings');
     }
-  };
+  }, [fromConfirmation, router]);
+
+  React.useEffect(() => {
+    if (fromConfirmation !== 'true') return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      handleBack();
+      return true;
+    });
+    return () => sub.remove();
+  }, [fromConfirmation, handleBack]);
 
   const header = (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>

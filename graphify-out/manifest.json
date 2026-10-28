@@ -810,9 +810,9 @@
     "semantic_hash": ""
   },
   "screens/Booking/BookingDetailScreen.tsx": {
-    "mtime": 1793169671.9683282,
-    "seen": 1793170107.3279989,
-    "ast_hash": "b3f6111de163bfc92c831400e94dafb3",
+    "mtime": 1793170702.320543,
+    "seen": 1793170832.290415,
+    "ast_hash": "dd6993517395df7766028ce891aaf0f9",
     "semantic_hash": ""
   },
   "screens/Booking/BookingScreen.tsx": {
@@ -828,9 +828,9 @@
     "semantic_hash": ""
   },
   "screens/Booking/ConfirmationScreen.tsx": {
-    "mtime": 1793169695.3889303,
-    "seen": 1793170107.328001,
-    "ast_hash": "d09467f58f67c190dfb9553fc5ebc952",
+    "mtime": 1793170660.598076,
+    "seen": 1793170832.290418,
+    "ast_hash": "be33fd32c104ba3c933528dbb74a42d1",
     "semantic_hash": ""
   },
   "screens/Booking/DriverChargesScreen.tsx": {

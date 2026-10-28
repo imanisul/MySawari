@@ -54,7 +54,7 @@ export default function BookingDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { selectCar, isAuthenticated } = useSawari();
+  const { selectCar, isAuthenticated, lastBooking } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const { id } = useLocalSearchParams<{ id?: string }>();
 
@@ -67,7 +67,11 @@ export default function BookingDetailScreen() {
   // A cancel / extend answer from the sheets shows straight away, before the list catches up.
   const [updated, setUpdated] = useState<BookingSnapshot | null>(null);
   useEffect(() => { setUpdated(null); }, [allBookings]);
-  const snapshot: BookingSnapshot | null = updated && updated.id === id ? updated : (allBookings || []).find((b) => b.id === id) || null;
+  const snapshot: BookingSnapshot | null =
+    updated && updated.id === id
+      ? updated
+      : (allBookings || []).find((b) => b.id === id || (b as any)?._id === id || b.bookingCode === id) ||
+        (lastBooking && (lastBooking.id === id || (lastBooking as any)?._id === id || lastBooking.bookingCode === id) ? lastBooking : null);
   const loading = (!!id && !snapshot && (listLoading || listFetching)) || isAuthenticated === null;
   const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); };
   useFocusEffect(React.useCallback(() => { if (id && isAuthenticated) refetchBookings({ cancelRefetch: false }); }, [id, isAuthenticated, refetchBookings]));
@@ -86,9 +90,18 @@ export default function BookingDetailScreen() {
   const pricingY = useRef(0);
   const toPricing = () => scrollRef.current?.scrollTo({ y: Math.max(0, pricingY.current - 12), animated: true });
 
+  const handleBack = () => {
+    Haptics.selectionAsync();
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/bookings');
+    }
+  };
+
   const header = (
     <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-      <Pressable onPress={() => { Haptics.selectionAsync(); router.back(); }} style={styles.back} accessibilityLabel="Back" hitSlop={8}>
+      <Pressable onPress={handleBack} style={styles.back} accessibilityLabel="Back" hitSlop={8}>
         <Feather name="chevron-left" size={24} color={c.mutedForeground} />
       </Pressable>
       <Text style={[styles.headerTitle, { color: c.foreground }]}>Trip Details</Text>
@@ -130,7 +143,7 @@ export default function BookingDetailScreen() {
           <Feather name={listFailed ? 'wifi-off' : 'inbox'} size={40} color={c.mutedForeground} />
           <Text style={[styles.centerTitle, { color: c.foreground }]}>{listFailed ? "Couldn't load this trip" : 'Booking not found'}</Text>
           {listFailed && <Text style={[styles.body, { color: c.mutedForeground, textAlign: 'center' }]}>Check your internet connection and try again.</Text>}
-          <Pressable onPress={() => (listFailed ? refetchBookings() : router.back())} style={[styles.smallCta, { backgroundColor: c.primary }]}>
+          <Pressable onPress={() => (listFailed ? refetchBookings() : handleBack())} style={[styles.smallCta, { backgroundColor: c.primary }]}>
             <Text style={{ color: c.primaryForeground, fontFamily: FONT.semibold }}>{listFailed ? 'Retry' : 'Go back'}</Text>
           </Pressable>
         </View>

@@ -1027,10 +1027,10 @@ export const API = {
     const wantsDrop = isDelivery && (delMode === 'return' || delMode === 'both');
 
     const rawPickAddr = wantsPickup
-      ? (params.pickupLocation?.address || params.pickupLocation?.name || quote.pickupLocationName || '')
+      ? ((params.pickupLocation as any)?.address || params.pickupLocation?.name || quote.pickupLocationName || '')
       : (quote.pickupLocationName || 'Office');
     const rawDropAddr = wantsDrop
-      ? (params.returnLocation?.address || params.returnLocation?.name || quote.dropLocationName || '')
+      ? ((params.returnLocation as any)?.address || params.returnLocation?.name || quote.dropLocationName || '')
       : (quote.dropLocationName || 'Office');
 
     // When both are chosen, ensure neither defaults to 'Office' if an address was provided

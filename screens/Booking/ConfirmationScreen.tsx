@@ -2,7 +2,9 @@ import React from 'react';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
 import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
+import { CommonActions } from '@react-navigation/native';
+import { BackHandler } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoadingImage } from '@/components/common/LoadingImage';
@@ -27,6 +29,7 @@ const NEXT = [
 export default function ConfirmationScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { selectedCar, mode, dateRange, duration, pickupTime, returnTime, pricingQuote, lastBooking } = useSawari();
@@ -61,14 +64,47 @@ export default function ConfirmationScreen() {
   }, [pop, rise]);
   const riseStyle = { opacity: rise, transform: [{ translateY: rise.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] };
 
-  const openBooking = () => {
-    router.dismissAll();
-    setTimeout(() => {
-      const targetId = effective?.id || b?.id;
-      if (targetId) router.push(`/booking-detail?id=${targetId}` as any);
-      else router.push('/bookings');
-    }, 50);
-  };
+  const openBooking = React.useCallback(() => {
+    const targetId = effective?.id || b?.id || (effective as any)?._id || (b as any)?._id;
+    try {
+      if (targetId) {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 1,
+            routes: [
+              { name: 'index' },
+              { name: 'booking-detail', params: { id: targetId } },
+            ],
+          })
+        );
+      } else {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 1,
+            routes: [
+              { name: 'index' },
+              { name: 'bookings' },
+            ],
+          })
+        );
+      }
+    } catch {
+      if (targetId) {
+        router.replace({ pathname: '/booking-detail', params: { id: targetId } } as any);
+      } else {
+        router.replace('/bookings');
+      }
+    }
+  }, [effective, b, navigation, router]);
+
+  // Handle hardware back press: navigate directly to booking view instead of returning to payment/booking checkout
+  React.useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      openBooking();
+      return true;
+    });
+    return () => sub.remove();
+  }, [openBooking]);
 
   return (
     <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
@@ -81,12 +117,12 @@ export default function ConfirmationScreen() {
           <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header">Your car is booked!</Text>
           <Text style={[styles.sub, { color: p.sub }]}>Your booking is confirmed. Get ready to hit the road!</Text>
 
-          <View style={[styles.idPill, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+          <Pressable onPress={openBooking} style={[styles.idPill, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]} accessibilityRole="button" accessibilityLabel={`Booking ID ${displayId}`}>
             <Text style={[styles.idText, { color: p.navy }]} selectable>Booking ID: {displayId}</Text>
-          </View>
+          </Pressable>
 
           <View style={[styles.card, { borderColor: p.deliveryBorder }]}>
-            <View style={styles.carRow}>
+            <Pressable onPress={openBooking} style={styles.carRow} accessibilityRole="button" accessibilityLabel="View booking details">
               <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
                 <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" />
               </View>
@@ -97,7 +133,7 @@ export default function ConfirmationScreen() {
                 <Text style={[styles.meta, { color: p.muted }]}>{driver}  •  {days} day{days === 1 ? '' : 's'}</Text>
                 <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(total)}</Text>
               </View>
-            </View>
+            </Pressable>
 
             <View style={[styles.next, { borderColor: p.deliveryBorder }]}>
               <Text style={[styles.nextTitle, { color: p.fg }]}>What’s next</Text>

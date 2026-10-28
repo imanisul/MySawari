@@ -998,11 +998,11 @@ const styles = StyleSheet.create({
   table: { borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   tableRow: { flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12 },
   tableLabelCol: { width: '52.2%', flexDirection: 'row', alignItems: 'center', gap: 7 },
-  tableLabel: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13 },
+  tableLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
   tableValue: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
 
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  benefitIcon: { width: 37, height: 37, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  benefitIcon: { width: 28, height: 28, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
 
   memberWrap: { borderWidth: 1, borderRadius: 16, padding: 8, paddingTop: 12 },
   planCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingVertical: 10.5, paddingLeft: 8, paddingRight: 9, gap: 9 },
@@ -1020,7 +1020,7 @@ const styles = StyleSheet.create({
   planSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 6.5 },
   planPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15.5 },
 
-  reviewCard: { width: 257, minHeight: 97, borderWidth: 1, borderRadius: 10, paddingHorizontal: 13, paddingTop: 12, paddingBottom: 9.5 },
+  reviewCard: { width: 257, minHeight: 97, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 9.5 },
   reviewHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 7 },
   stars: { flexDirection: 'row', gap: 1.5 },
   reviewRating: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, marginLeft: 6.5, flex: 1 },

@@ -311,8 +311,8 @@ function TripCard({ p, booking: b, image, canRate, onOpen, onRate, onExtend, onB
               </Pressable>
             ) : <View />}
             <View style={styles.viewRow}>
-              <Text style={[styles.viewText, { color: p.sub }]}>View Details</Text>
-              <Feather name="chevron-right" size={13} color={p.sub} />
+              <Text style={[styles.viewText, { color: p.muted }]}>View Details</Text>
+              <Feather name="chevron-right" size={13} color={p.muted} />
             </View>
           </View>
         </View>
@@ -366,11 +366,11 @@ function Empty({ p, icon, title, copy, action, onAction }: { p: DetailsPalette; 
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  title: { fontFamily: FONT.semibold, fontSize: 28, lineHeight: 36, paddingHorizontal: 16 },
+  title: { fontFamily: FONT.semibold, fontSize: 24, lineHeight: 36, paddingHorizontal: 16 },
   // Figma frame: 393×48 — 4 above, 8 below, a 36px strip of tabs between (text centred, underline on the bottom edge).
   tabs: { paddingHorizontal: 16, gap: 22, paddingTop: 4, paddingBottom: 8 },
-  tab: { alignItems: 'center', justifyContent: 'flex-end', height: 36 },
-  tabText: { fontSize: 14, lineHeight: 20, paddingHorizontal: 2 },
+  tab: { alignItems: 'center', justifyContent: 'flex-end', height: 40 },
+  tabText: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, paddingHorizontal: 2 },
   underline: { height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 6 },
   list: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
 
@@ -381,20 +381,20 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   info: { flex: 1, minWidth: 0, gap: 3 },
   tag: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, height: 18, justifyContent: 'center', marginBottom: 2 },
-  tagText: { fontFamily: FONT.medium, fontSize: 9 },
-  name: { fontFamily: FONT.medium, fontSize: 15, lineHeight: 20 },
-  meta: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18 },
+  tagText: { fontFamily: FONT.semibold, fontSize: 8 },
+  name: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
+  meta: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 18 },
   linksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   rateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, height: 24 },
   rateText: { fontFamily: FONT.medium, fontSize: 12 },
   viewRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewText: { fontFamily: FONT.medium, fontSize: 8, textDecorationLine: 'underline' },
+  viewText: { fontFamily: FONT.semibold, fontSize: 8, textDecorationLine: 'underline' },
 
   action: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 8 },
   actionTitle: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 17 },
   actionSub: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 17 },
   bookAgain: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, borderWidth: 1, borderRadius: 8, height: 30 },
-  bookAgainText: { fontFamily: FONT.medium, fontSize: 12 },
+  bookAgainText: { fontFamily: FONT.semibold, fontSize: 11 },
 
   signedOut: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, marginTop: -60 },
   loginBtn: { alignSelf: 'stretch', height: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 24 },

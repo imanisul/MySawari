@@ -251,9 +251,9 @@ export default function ProfileScreen() {
               </React.Fragment>
             ))}
           </View>
-          {autoCash && sawariCash > 0 && (
+          {/* {autoCash && sawariCash > 0 && (
             <Text style={[styles.cashNote, { color: p.muted }]}>Sawari Cash is applied automatically at checkout (up to ₹50 or 10% of the rent per trip).</Text>
-          )}
+          )} */}
           {/* ── Safety / Terms / Cancellation ── */}
           <View style={[styles.list, { borderColor: p.segBorder, backgroundColor: p.page }]}>
             {infoRows.map((r, i) => (
@@ -397,10 +397,10 @@ const styles = StyleSheet.create({
   menuItem: { paddingHorizontal: 12, height: 35, justifyContent: 'center' },
   menuText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
   dialogOverlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', paddingHorizontal: 18 },
-  dialog: { borderRadius: 12, paddingHorizontal: 12, paddingTop: 26, paddingBottom: 14 },
-  dialogTitle: { fontFamily: FONT.medium, fontSize: 17.5, lineHeight: 25, textAlign: 'center' },
-  dialogBody: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 10, paddingHorizontal: 12 },
+  dialog: { borderRadius: 12, paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
+  dialogTitle: { fontFamily: FONT.semibold, fontSize: 19, lineHeight: 25, textAlign: 'center' },
+  dialogBody: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 10, paddingHorizontal: 12 },
   dialogBtns: { flexDirection: 'row', gap: 12, marginTop: 20 },
   dialogBtn: { flex: 1, height: 47, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  dialogBtnText: { fontFamily: FONT.medium, fontSize: 14.5 },
+  dialogBtnText: { fontFamily: FONT.semibold, fontSize: 15},
 });

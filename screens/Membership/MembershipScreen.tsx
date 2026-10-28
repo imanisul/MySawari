@@ -607,17 +607,17 @@ const styles = StyleSheet.create({
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   planName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 20 },
   offChip: { height: 19.5, paddingHorizontal: 8, borderRadius: 10, backgroundColor: GREEN, justifyContent: 'center', marginLeft: 2 },
-  offChipText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8.5, color: '#FFFFFF' },
-  planSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5, marginTop: 4 },
+  offChipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, color: '#FFFFFF' },
+  planSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 4 },
   planPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 22 },
 
   sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22, marginBottom: 12 },
   howRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   // 37px circle (Figma rgba(234,236,241,0.4)) around the 24px artwork.
-  howIcon: { width: 37, height: 37, borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(234,236,241,0.4)' },
+  howIcon: { width: 37, height: 37, borderRadius: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBBC041A' },
   howArt: { width: 24, height: 24 },
   howTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5 },
-  howSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5 },
+  howSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Sticky button
   ctaWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },

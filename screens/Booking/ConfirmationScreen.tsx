@@ -12,7 +12,7 @@ import { formatCurrency } from '@/services/backend/pricingEngine';
 import { PricingSummary, tripTotal, shortDate } from '@/components/booking/TripDetailParts';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 
-const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
+const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
 
 const NEXT = [
   'Host contact details are available in your booking.',
@@ -153,23 +153,23 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, alignItems: 'stretch' },
   check: { alignSelf: 'center', width: 79, height: 79, borderRadius: 39.5, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: FONT.semibold, fontSize: 24, lineHeight: 32, textAlign: 'center', marginTop: 34, letterSpacing: -0.2 },
-  sub: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6 },
+  sub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6 },
   idPill: { borderWidth: 1, borderRadius: 8, height: 38, alignItems: 'center', justifyContent: 'center', marginTop: 26 },
-  idText: { fontFamily: FONT.medium, fontSize: 14 },
+  idText: { fontFamily: FONT.semibold, fontSize: 13 },
   card: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12, gap: 12 },
   carRow: { flexDirection: 'row', gap: 12 },
   carImage: { width: 120, height: 99, borderRadius: 6, overflow: 'hidden' },
-  brand: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
-  carName: { fontFamily: FONT.medium, fontSize: 14, lineHeight: 20, marginTop: 1 },
-  meta: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16, marginTop: 3 },
-  price: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 20, marginTop: 4 },
+  brand: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
+  carName: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, marginTop: 1 },
+  meta: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  price: { fontFamily: FONT.bold, fontSize: 13, lineHeight: 20, marginTop: 4 },
   next: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingTop: 12, paddingBottom: 14 },
-  nextTitle: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 19 },
+  nextTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 19 },
   dashes: { flexDirection: 'row', gap: 3, overflow: 'hidden', marginTop: 10, marginBottom: 14 },
   dash: { width: 4, height: 1 },
   nextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   tick: { width: 10, height: 10, borderRadius: 5, alignItems: 'center', justifyContent: 'center', marginTop: 3.5 },
-  nextText: { flex: 1, fontFamily: FONT.regular, fontSize: 11, lineHeight: 17 },
+  nextText: { flex: 1, fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
   section: { fontFamily: FONT.medium, fontSize: 16, lineHeight: 22, marginTop: 24, marginBottom: 10 },
   footerWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   fade: { height: 64 },

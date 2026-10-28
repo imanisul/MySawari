@@ -71,7 +71,7 @@ export default function RefundsScreen() {
             <Pressable
               accessibilityRole="link"
               onPress={() => router.push({ pathname: '/policies', params: { policy: 'cancellation' } })}
-              style={({ pressed }) => [styles.banner, { backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.banner, { backgroundColor: p.segOn, borderColor: p.border }, pressed && { opacity: 0.85 }]}
             >
               <Text style={[styles.bannerText, { color: p.fg }]}>Refunds go back to your original payment method.</Text>
               <Feather name="arrow-right" size={13} color={p.fg} />
@@ -95,7 +95,7 @@ export default function RefundsScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={[styles.tag, { borderColor: p.border }]}>
-                      <Text style={[styles.tagText, { color: p.sub }]}>Cancelled</Text>
+                      <Text style={[styles.tagText, { color: p.muted }]}>Cancelled</Text>
                     </View>
                     <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{b.vehicleName}</Text>
                     <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1}>
@@ -132,17 +132,17 @@ const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
   banner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderRadius: 8, height: 36, marginBottom: 12, paddingHorizontal: 10 },
-  bannerText: { fontFamily: PF.regular, fontSize: 11.5 },
+  bannerText: { fontFamily: PF.semibold, fontSize: 11 },
   card: { borderWidth: 1, borderRadius: 10, padding: 8 },
   top: { flexDirection: 'row', gap: 12 },
   photo: { width: 118, height: 88, borderRadius: 6, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   tag: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 10, paddingHorizontal: 7, height: 18, justifyContent: 'center' },
-  tagText: { fontFamily: PF.regular, fontSize: 9.5 },
-  name: { fontFamily: PF.medium, fontSize: 14, marginTop: 4 },
-  meta: { fontFamily: PF.regular, fontSize: 11, lineHeight: 16, marginTop: 1 },
-  price: { fontFamily: PF.semibold, fontSize: 14, marginTop: 4 },
+  tagText: { fontFamily: PF.semibold, fontSize: 8},
+  name: { fontFamily: PF.semibold, fontSize: 13, marginTop: 4 },
+  meta: { fontFamily: PF.medium, fontSize: 11, lineHeight: 16, marginTop: 1 },
+  price: { fontFamily: PF.bold, fontSize: 13, marginTop: 4 },
   status: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, borderRadius: 6, marginTop: 8 },
-  statusText: { fontFamily: PF.medium, fontSize: 12.5 },
+  statusText: { fontFamily: PF.semibold, fontSize: 13},
   reason: { fontFamily: PF.regular, fontSize: 11.5, lineHeight: 16, marginTop: 6, paddingHorizontal: 2 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 60 },
   emptyTitle: { fontFamily: PF.medium, fontSize: 17, marginTop: 10 },

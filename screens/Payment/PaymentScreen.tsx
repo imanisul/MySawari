@@ -97,11 +97,25 @@ export default function PaymentScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.screen, { backgroundColor: colors.background }]}>
         
-        <View style={[styles.topBar, { paddingTop: insets.top + 16 }]}>
-          <Pressable accessibilityLabel="Back" onPress={() => router.back()} style={styles.backButton}>
-            <Feather name="chevron-left" size={24} color={colors.foreground} />
+        <View style={[styles.topBar, { paddingTop: insets.top }]}>
+          <Pressable
+            accessibilityLabel="Back"
+            onPress={() => router.back()}
+            style={[styles.headerIconButton, { backgroundColor: '#f5f5f5' }]}
+          >
+            <Feather name="chevron-left" size={20} color="#262626" />
           </Pressable>
-          <Text style={[styles.title, { color: colors.foreground }]}>Checkout</Text>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.title, { color: '#262626' }]}>Payment Option</Text>
+            <Text style={styles.subtitle}>Secure &amp; encrypted payment</Text>
+          </View>
+          <Pressable
+            accessibilityLabel="Payment information"
+            onPress={() => undefined}
+            style={[styles.headerIconButton, { backgroundColor: '#f5f5f5' }]}
+          >
+            <Feather name="info" size={17} color="#525252" />
+          </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 + insets.bottom }]} showsVerticalScrollIndicator={false}>
@@ -416,14 +430,16 @@ export default function PaymentScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { alignItems: 'center', flexDirection: 'row', paddingHorizontal: 20, paddingBottom: 16 },
-  backButton: { padding: 8, marginLeft: -8 },
-  title: { fontFamily: 'Inter_700Bold', fontSize: 24, marginLeft: 8 },
+  topBar: { alignItems: 'center', flexDirection: 'row', height: 64, paddingHorizontal: 16 },
+  headerIconButton: { alignItems: 'center', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
+  headerCopy: { flex: 1, gap: 2, justifyContent: 'center', marginHorizontal: 12 },
+  title: { fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 20 },
+  subtitle: { color: '#525252', fontFamily: 'Inter_500Medium', fontSize: 11, lineHeight: 17 },
   content: { padding: 20, paddingBottom: 100 },
-  sectionTitle: { fontFamily: 'Inter_700Bold', fontSize: 18, marginBottom: 12, marginTop: 24 },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 17, marginBottom: 12, marginTop: 24 },
   sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24, marginBottom: 12 },
-  sectionSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: -8, marginBottom: 12 },
-  card: { borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 16 },
+  sectionSubtitle: { fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: -8, marginBottom: 12 },
+  card: { borderWidth: 1, borderRadius: 12, padding: 8, marginBottom: 16, borderColor: '#eaecf1' },
   cardTitle: { fontFamily: 'Inter_700Bold', fontSize: 18 },
   cardSub: { fontFamily: 'Inter_500Medium', fontSize: 13, marginTop: 4, marginBottom: 12 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

@@ -461,8 +461,8 @@ const styles = StyleSheet.create({
   stopDot: { width: 11, height: 11, borderRadius: 6 },
   // Figma refund timeline: 11px ring, 2.5px border, white centre.
   stopRing: { width: 11, height: 11, borderRadius: 6, borderWidth: 2.5 },
-  refundTitle: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
-  refundLineText: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+  refundTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 18 },
+  refundLineText: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
   stopTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
   stopWhen: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   stopSep: { width: 3, height: 3, borderRadius: 2 },

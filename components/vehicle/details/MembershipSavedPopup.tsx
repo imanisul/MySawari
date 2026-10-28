@@ -74,7 +74,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <BlurView intensity={18} tint="default" style={StyleSheet.absoluteFill}>
+      <BlurView intensity={38}  style={StyleSheet.absoluteFill}>
         <Pressable accessibilityLabel="Close" style={[StyleSheet.absoluteFill, styles.dim]} onPress={close} />
       </BlurView>
 
@@ -160,7 +160,7 @@ export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; t
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: 'rgba(0,0,0,0.27)' },
+  dim: { backgroundColor: 'rgba(0,0,0,0.57)' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // The white card sits inside the art's frame (fractions of the 708 × 502 art), as in the design.
   inner: {

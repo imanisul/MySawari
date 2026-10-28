@@ -7,7 +7,7 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 // Shared pieces of the Profile flow screens (Wallet, Referrals, Refunds, Offers, Saved Addresses…):
 // the back + title header and the status timeline used for withdrawals and referral rewards.
 
-export const PF = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
+export const PF = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
 
 export function ScreenHeader({ title, divider, onBack, right }: { title: string; divider?: boolean; onBack?: () => void; right?: React.ReactNode }) {
   const p = useDetailsPalette();
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   knob: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 1.5, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   back: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  title: { flex: 1, fontFamily: PF.semibold, fontSize: 19, lineHeight: 28 },
+  title: { flex: 1, fontFamily: PF.semibold, fontSize: 17, lineHeight: 28 },
   dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3 },
   dash: { width: 4, height: 1 },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

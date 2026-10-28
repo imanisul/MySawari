@@ -519,9 +519,9 @@ export const API = {
   mapVehicles(dbVehicles: any[]): Car[] {
     const { getVehicleKnowledge } = require('../../utils/vehicleKnowledge');
 
-    // One malformed record (missing name, id or price) must not blank the whole list: it is skipped.
+    // One malformed record (missing name, id or price) or internal vehicle (isPublic: false) must not be in the public list
     const valid = (Array.isArray(dbVehicles) ? dbVehicles : []).filter(
-      (v: any) => v && v._id && typeof v.vehicleName === 'string' && v.vehicleName.trim() && Number.isFinite(Number(v.pricePerDay))
+      (v: any) => v && v._id && typeof v.vehicleName === 'string' && v.vehicleName.trim() && Number.isFinite(Number(v.pricePerDay)) && v.isPublic !== false
     );
     return valid.map((v: any) => {
       // Robust check for bikes: Seating capacity <= 2 guarantees it's a two-wheeler,
@@ -774,6 +774,7 @@ export const API = {
         comfortFeatures,
 
         // Availability is derived from these facts (see getAvailability in utils/sawari).
+        isPublic: v.isPublic !== false,
         dbStatus: v.status || 'available',
         bookedRanges: v.bookedRanges || [],
         maintenanceUntil: v.maintenanceUntil || null,

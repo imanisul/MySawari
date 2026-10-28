@@ -1,7 +1,7 @@
 # Graph Report - MySawari  (2026-10-28)
 
 ## Corpus Check
-- 219 files · ~1,217,330 words
+- 219 files · ~1,217,361 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 2, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `31b40e24`
+- Built from commit: `12809053`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -357,16 +357,16 @@ Nodes (3): notification, color, icon
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `react` to `PaymentsListScreen.tsx`, `ReferralScreen.tsx`, `CarDetailsSections.tsx`, `fetch_images.js`, `package.json`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `sawari.ts`, `HomeScreen.tsx`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `react-native-safe-area-context`, `pricingEngine.ts`, `BottomNavigation.tsx`, `useVehicles.ts`, `SearchScreen.tsx`, `useColors`, `expo-haptics`, `useSawari`, `WishlistScreen.tsx`, `TripDetailParts.tsx`, `ExploreFilters.tsx`, `react-native`, `ReferEarnScreen.tsx`, `BookingDetailScreen.tsx`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `TripReviewSheet.tsx`, `PaymentProcessingScreen.tsx`, `SawariContext.tsx`, `EditProfileScreen.tsx`, `FilterSheet.tsx`, `useColors.ts`, `useAppUpdates.ts`, `BookingsScreen.tsx`, `LoginBottomSheet`, `DriverChargesScreen.tsx`, `AnimatedSplash.tsx`, `RideJourneyCard.tsx`?**
-  _High betweenness centrality (0.192) - this node is a cross-community bridge._
+  _High betweenness centrality (0.197) - this node is a cross-community bridge._
 - **What connects `@babel/core`, `@expo/cli`, `@expo/ngrok` to the rest of the system?**
   _28 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `PaymentsListScreen.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.11396011396011396 - nodes in this community are weakly interconnected._
 - **Why does `react-native` connect `react-native` to `PaymentsListScreen.tsx`, `ReferralScreen.tsx`, `CarDetailsSections.tsx`, `fetch_images.js`, `package.json`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `sawari.ts`, `HomeScreen.tsx`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `react-native-safe-area-context`, `pricingEngine.ts`, `BottomNavigation.tsx`, `useVehicles.ts`, `SearchScreen.tsx`, `useColors`, `expo-haptics`, `useSawari`, `WishlistScreen.tsx`, `TripDetailParts.tsx`, `ExploreFilters.tsx`, `ReferEarnScreen.tsx`, `BookingDetailScreen.tsx`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `TripReviewSheet.tsx`, `PaymentProcessingScreen.tsx`, `SawariContext.tsx`, `EditProfileScreen.tsx`, `FilterSheet.tsx`, `activity.ts`, `useColors.ts`, `react`, `useAppUpdates.ts`, `BookingsScreen.tsx`, `LoginBottomSheet`, `AnimatedSplash.tsx`, `RideJourneyCard.tsx`?**
-  _High betweenness centrality (0.114) - this node is a cross-community bridge._
+  _High betweenness centrality (0.108) - this node is a cross-community bridge._
 - **Should `ReferralScreen.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.10931174089068826 - nodes in this community are weakly interconnected._
 - **Why does `devDependencies` connect `devDependencies` to `package.json`?**
-  _High betweenness centrality (0.054) - this node is a cross-community bridge._
+  _High betweenness centrality (0.053) - this node is a cross-community bridge._
 - **Should `CarDetailsSections.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.11394557823129252 - nodes in this community are weakly interconnected._

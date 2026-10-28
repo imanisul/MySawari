@@ -86,6 +86,7 @@ export type Car = {
   ratingDistribution?: RatingDistribution;
   reviews?: Review[];
   isAvailable?: boolean;
+  isPublic?: boolean;
   dbStatus?: string;
   /** Open bookings holding this vehicle (ISO dates, calendar day = UTC date). */
   bookedRanges?: { start: string; end: string; status?: string }[];
@@ -596,6 +597,7 @@ export function carTitle(car: Pick<Car, 'displayName' | 'name' | 'manufacturer' 
  */
 export function getAvailability(car: Car | undefined | null, startLabel?: string, endLabel?: string): AvailabilityInfo {
   if (!car) return { available: false, label: 'ON A TRIP', headline: 'On a trip', detail: '' };
+  if (car.isPublic === false) return { available: false, label: 'INTERNAL', headline: 'Not available', detail: 'Internal vehicle only' };
 
   const today = todayDayNum();
   const start = parseDayLabel(startLabel);

@@ -252,12 +252,14 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
         accessibilityRole="button"
         accessibilityLabel="Select your destination"
         onPress={() => { Haptics.selectionAsync(); onDestination(); }}
-        style={({ pressed }) => [styles.destRing, { borderColor: p.strongBorder }, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [
+          styles.destBox,
+          { backgroundColor: p.page, borderColor: p.strongBorder },
+          pressed && { opacity: 0.85 },
+        ]}
       >
-        <View style={[styles.destField, { backgroundColor: p.page }]}>
-          <Image source={require('@/assets/images/search_icon.png')} style={[styles.destIcon, { tintColor: p.muted }]} />
-          <Text style={[styles.destText, { color: p.muted }]}>Select your Destination</Text>
-        </View>
+        <Image source={require('@/assets/images/search_icon.png')} style={[styles.destIcon, { tintColor: p.muted }]} resizeMode="contain" />
+        <Text style={[styles.destText, { color: p.muted }]}>Select your Destination</Text>
       </Pressable>
     </View>
   );
@@ -554,9 +556,18 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', gap: 12 },
   tab: { flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
   tabText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
-  // Figma search box: 361×49, 1px Neutral/300 (#D4D4D4) border, radius 8, 12px padding, 9 between icon and text.
-  destRing: { marginTop: 8, borderWidth: 1, borderRadius: 8 },
-  destField: { height: 47, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 7, paddingHorizontal: 12 },
+  // Figma search box: Flow Horizontal, Width Fill (347px), Height Hug (53px), Radius 12px, Border 3px, Padding 12px, Gap 9px
+  destBox: {
+    marginTop: 8,
+    width: '100%',
+    height: 53,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    borderRadius: 12,
+    borderWidth: 3,
+    paddingHorizontal: 12,
+  },
   destIcon: { width: 20, height: 20 },
   destText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22.5 },
 

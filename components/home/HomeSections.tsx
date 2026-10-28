@@ -592,11 +592,11 @@ const styles = StyleSheet.create({
   pickAvail: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8, lineHeight: 12, letterSpacing: 0.16, flexShrink: 1 },
 
   // Milestone
-  milestone: { marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingTop: 9, paddingBottom: 8.5 },
+  milestone: { marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8},
   // The logo's artwork fills 360 × 316 of its 470 × 480 file; this shows that part at 32 × 27.
-  milestoneLogo: { position: 'absolute', top: 11.5, right: 2, width: 42, height: 43, opacity: 0.32 },
+  milestoneLogo: { position: 'absolute', top: 11.5, right: 2, width: 42, height: 40, opacity: 0.32 },
   milestoneTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
-  milestoneSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5, marginTop: 3, marginRight: 40 },
+  milestoneSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 3, marginRight: 40 },
   // The marks' centres sit 8 in from each edge, so the rail runs between them.
   track: { height: 16, marginTop: 12, marginHorizontal: 8, justifyContent: 'center' },
   trackRail: { position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, overflow: 'hidden' },
@@ -607,8 +607,8 @@ const styles = StyleSheet.create({
   coin: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF8E5', shadowColor: '#FBBC04', shadowOpacity: 0.28, shadowRadius: 2, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
   coinImage: { width: 12, height: 12 },
   milestoneFoot: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  milestoneCount: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5 },
-  milestoneRight: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5 },
+  milestoneCount: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  milestoneRight: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Destinations
   destTile: { width: 216, height: 144, borderRadius: 12, overflow: 'hidden', justifyContent: 'flex-end' },

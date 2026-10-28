@@ -982,7 +982,7 @@ const styles = StyleSheet.create({
   mileTag: { borderRadius: 9, paddingHorizontal: 7, height: 17, justifyContent: 'center' },
   mileTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, color: '#FFFFFF', letterSpacing: 0.2 },
   mileTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  mileSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 4 },
+  mileSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, marginTop: 4 },
   calCircle: { width: 36.5, height: 36.5, borderRadius: 18.25, alignItems: 'center', justifyContent: 'center' },
   addDayCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingLeft: 12, paddingRight: 10, paddingVertical: 12, marginTop: 12, gap: 12 },
   addDayTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
@@ -1094,5 +1094,5 @@ const styles = StyleSheet.create({
 
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8.5 },
   checkbox: { width: 13, height: 13, borderRadius: 2.5, borderWidth: 1.2, alignItems: 'center', justifyContent: 'center', marginTop: 3.5 },
-  agreeText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 20 },
+  agreeText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
 });

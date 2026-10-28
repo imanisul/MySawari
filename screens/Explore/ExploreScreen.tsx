@@ -158,10 +158,10 @@ export default function ExploreScreen() {
           accessibilityRole="button"
           accessibilityLabel={`Filter${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
           onPress={() => { Haptics.selectionAsync(); setShowFilterSheet(true); }}
-          style={[styles.chip, styles.filterChip, { borderColor: p.segBorder, backgroundColor: p.segOn }]}
+          style={[styles.chip, styles.filterChip, styles.filterChipFixed, { borderColor: p.segBorder, backgroundColor: p.segOn }]}
         >
           <FunnelIcon color={p.muted} size={16} />
-          <Text style={[styles.chipText, { color: p.muted }]}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
+          <Text style={[styles.chipText, { color: p.muted }]}>Filter</Text>
         </Pressable>
         {CHIPS.map((c) => {
           const on = chip === c.label;
@@ -269,6 +269,7 @@ const styles = StyleSheet.create({
   chips: { gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
   chip: { height: 36, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4 },
+  filterChipFixed: { width: 70 },
   chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   empty: { borderWidth: 1, borderRadius: 12, marginHorizontal: 16, marginTop: 8, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, marginTop: 6 },

@@ -254,7 +254,7 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
         onPress={() => { Haptics.selectionAsync(); onDestination(); }}
         style={({ pressed }) => [
           styles.destBox,
-          { backgroundColor: p.page, borderColor: p.strongBorder },
+          { backgroundColor: p.page, borderColor: p.deliveryBorder },
           pressed && { opacity: 0.85 },
         ]}
       >
@@ -566,6 +566,7 @@ const styles = StyleSheet.create({
     gap: 9,
     borderRadius: 12,
     borderWidth: 3,
+    borderColor: '#E7EAF4',
     paddingHorizontal: 12,
   },
   destIcon: { width: 20, height: 20 },

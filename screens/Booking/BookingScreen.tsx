@@ -243,7 +243,7 @@ export default function BookingScreen() {
               <Text style={[styles.headerTitle, { color: p.fg }]}>Payment Option</Text>
               <Text style={[styles.headerSub, { color: p.sub }]}>Secure & encrypted payment</Text>
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Booking policies" onPress={() => router.push('/policies')} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Booking policies" onPress={() => router.push('/terms')} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
               <Feather name="info" size={16} color={p.sub} />
             </Pressable>
           </View>

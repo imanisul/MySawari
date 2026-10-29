@@ -757,7 +757,7 @@ export function CancellationPolicy({ freeCancelUntil }: { freeCancelUntil?: stri
           },
         ]}
       />
-      <Pressable accessibilityRole="link" onPress={() => router.push('/policies')} hitSlop={8} style={[styles.linkRow, { marginTop: 12 }]}>
+      <Pressable accessibilityRole="link" onPress={() => router.push('/terms')} hitSlop={8} style={[styles.linkRow, { marginTop: 12 }]}>
         <Text style={[styles.link, { color: p.muted }]}>View Terms & Condition</Text>
         <Feather name="chevron-right" size={12} color={p.muted} />
       </Pressable>
@@ -948,7 +948,7 @@ export function PolicyAgreement({ agreed, onToggle }: { agreed: boolean; onToggl
   return (
     // Figma frame: padding 8/16/16, 12 between the title and the checkbox row (99px with a two-line agreement).
     <View style={[styles.block, { paddingTop: 8, paddingBottom: 16 }]}>
-      <SectionTitle action="Learn More" onAction={() => router.push('/policies')}>Policy Agreement</SectionTitle>
+      <SectionTitle action="Learn More" onAction={() => router.push('/terms')}>Policy Agreement</SectionTitle>
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: agreed }}

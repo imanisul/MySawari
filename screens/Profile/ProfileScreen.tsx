@@ -142,9 +142,9 @@ export default function ProfileScreen() {
   // Second card (design): plain rows without a subtitle.
   const infoRows: RowDef[] = [
     { key: 'safety', icon: 'shield', title: 'Safety', onPress: () => go('/safety') },
-    { key: 'terms', icon: 'file-text', title: 'Terms & Condition', onPress: () => go({ pathname: '/policies', params: { policy: 'terms' } }) },
-    { key: 'cancel', icon: 'x-square', title: 'Cancellation Policy', onPress: () => go({ pathname: '/policies', params: { policy: 'cancellation' } }) },
-    { key: 'privacy', icon: 'file-text', title: 'Privacy Policy', onPress: () => go({ pathname: '/policies', params: { policy: 'cancellation' } }) },
+    { key: 'terms', icon: 'file-text', title: 'Terms & Condition', onPress: () => go('/terms') },
+    { key: 'cancel', icon: 'x-square', title: 'Cancellation Policy', onPress: () => go('/cancellation-policy') },
+    { key: 'privacy', icon: 'file-text', title: 'Privacy Policy', onPress: () => go('/privacy') },
   ];
 
   return (

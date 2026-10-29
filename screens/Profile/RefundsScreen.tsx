@@ -70,7 +70,7 @@ export default function RefundsScreen() {
           ListHeaderComponent={
             <Pressable
               accessibilityRole="link"
-              onPress={() => router.push({ pathname: '/policies', params: { policy: 'cancellation' } })}
+              onPress={() => router.push('/cancellation-policy')}
               style={({ pressed }) => [styles.banner, { backgroundColor: p.segOn, borderColor: p.border }, pressed && { opacity: 0.85 }]}
             >
               <Text style={[styles.bannerText, { color: p.fg }]}>Refunds go back to your original payment method.</Text>

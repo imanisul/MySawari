@@ -32,7 +32,6 @@ const LIGHT = {
   title: '#262626',
   copy: '#737373',
   faint: '#A3A3A3',
-  skip: '#D4D4D4',
   fieldBg: '#FAFAFA',
   fieldBorder: '#EAECF1',
   field2: '#E5E5E5', // name and email boxes use Neutral/200
@@ -56,7 +55,7 @@ const digitsOf = (v: string) => v.replace(/\s/g, '');
 const isOtpError = (msg: string) => /otp|code|invalid|incorrect|expired|wrong/i.test(msg);
 
 export function LoginBottomSheet({
-  visible, onClose, onLoginSuccess, showSkip = true, required = false,
+  visible, onClose, onLoginSuccess, required = false,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -72,7 +71,7 @@ export function LoginBottomSheet({
   const ui = isDarkMode
     ? {
         sheet: colors.card, title: colors.foreground, copy: colors.mutedForeground, faint: colors.mutedForeground,
-        skip: colors.disabledText, fieldBg: colors.muted, fieldBorder: colors.border, field2: colors.border, fieldFocus: colors.mutedForeground,
+        fieldBg: colors.muted, fieldBorder: colors.border, field2: colors.border, fieldFocus: colors.mutedForeground,
         navy: '#3E509A', onNavy: '#FFFFFF', disabledBg: colors.disabledBg, disabledText: colors.disabledText,
         roundBtn: colors.secondary, error: colors.destructive, errorBg: colors.destructive + '14', errorBorder: colors.destructive + '40',
       }
@@ -231,11 +230,6 @@ export function LoginBottomSheet({
             <>
               <View style={styles.headRow}>
                 <Text style={[styles.title, { color: ui.title, flex: 1 }]}>Get started with My Sawari</Text>
-                {showSkip && !required && (
-                  <Pressable onPress={() => !loading && onClose()} hitSlop={10} accessibilityRole="button" accessibilityLabel="Skip">
-                    <Text style={[styles.skip, { color: ui.skip }]}>SKIP</Text>
-                  </Pressable>
-                )}
               </View>
               <Text style={[styles.copy, { color: ui.copy }]}>We'll use your phone number to verify your account. No spam, we promise.</Text>
               <View style={field('phone')}>
@@ -494,7 +488,6 @@ const styles = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
   center: { textAlign: 'center' },
-  skip: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   copy: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22, marginTop: -8 },
   copyPlain: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22 },
   small: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },

@@ -223,7 +223,7 @@ function PhoneSheet({ address, onClose, onSave }: { address: SavedAddress | null
           {!!error && <Text style={[styles.error, { color: p.red }]}>{error}</Text>}
           <Text style={[styles.legal, { color: p.muted }]}>
             By continuing, you agree to our{' '}
-            <Text style={{ color: p.navy }} onPress={() => { onClose(); router.push({ pathname: '/policies', params: { policy: 'terms' } }); }}>Terms & Conditions</Text>
+            <Text style={{ color: p.navy }} onPress={() => { onClose(); router.push('/terms'); }}>Terms & Conditions</Text>
             {' '}and Privacy Policy.
           </Text>
           <Pressable accessibilityRole="button" onPress={save} style={({ pressed }) => [styles.primary, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>

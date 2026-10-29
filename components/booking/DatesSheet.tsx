@@ -515,7 +515,7 @@ export function DatesSheet() {
           style={({ pressed }) => [styles.cta, { backgroundColor: ui.navy }, !canApply && styles.ctaDisabled, pressed && { opacity: 0.9 }]}
         >
           <Text style={[styles.ctaText, { color: ui.onNavy }]} numberOfLines={1}>
-            {returnBack === 'true' ? 'Confirm Dates' : 'Search'}
+            {returnBack === 'true' || forSpecificCar === 'true' ? 'Confirm Dates' : 'Search'}
           </Text>
         </Pressable>
       </View>

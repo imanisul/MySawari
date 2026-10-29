@@ -145,7 +145,13 @@ export function MembershipSavedPopup({
   const hasShown = useRef(false);
 
   const planKey = (membership?.plan || '').toLowerCase().trim();
-  const isMember = !!planKey && (!membership?.expiresAt || new Date(membership.expiresAt) > new Date());
+  const isMember = !!planKey && (
+    !membership?.expiresAt ||
+    (() => {
+      const exp = new Date(membership.expiresAt).getTime();
+      return isNaN(exp) || exp > Date.now();
+    })()
+  );
   const memberPlanName = isMember
     ? (planKey.charAt(0).toUpperCase() + planKey.slice(1).toLowerCase())
     : null;
@@ -172,6 +178,13 @@ export function MembershipSavedPopup({
     }, 450);
     return () => clearTimeout(t);
   }, [key, isReady, planName, discount, forceShow]);
+
+  // Keep savings amount updated if price calculation resolves after initial popup mount
+  useEffect(() => {
+    if (discount !== null && saving && saving.amount !== discount) {
+      setSaving((prev) => (prev ? { ...prev, amount: discount, note: undefined } : prev));
+    }
+  }, [discount, saving]);
 
   if (!saving) return null;
   return (

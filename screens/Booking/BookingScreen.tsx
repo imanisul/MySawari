@@ -536,7 +536,7 @@ export default function BookingScreen() {
         {/* "You're saving ₹X — <Plan> Membership Applied!": highlights member savings on the Payment Option page. */}
         <MembershipSavedPopup
           hasTrip={!isMissingDates}
-          tripKey={`${selectedCar.id}|${dateRange}|${pickupTime}|${returnTime}`}
+          tripKey={`${selectedCar?.id || 'car'}|${dateRange}|${pickupTime}|${returnTime}`}
           screen="booking"
           forceShow={true}
         />

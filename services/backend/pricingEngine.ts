@@ -168,45 +168,57 @@ export function calculateRentalDays(start: string, end: string, startTime?: stri
       endDate.setFullYear(endDate.getFullYear() + 1);
     }
 
-    const applyTime = (timeStr: string | undefined, dateObj: Date) => {
-      if (!timeStr) return;
+    const parseTimeMinutes = (timeStr?: string): number | null => {
+      if (!timeStr) return null;
       const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
-      if (match) {
-        let [_, h, m, period] = match;
-        let hours = parseInt(h, 10);
-        const minutes = parseInt(m, 10);
-        if (period.toUpperCase() === 'PM' && hours < 12) hours += 12;
-        if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
-        dateObj.setHours(hours, minutes, 0, 0);
-      }
+      if (!match) return null;
+      let [_, h, m, period] = match;
+      let hours = parseInt(h, 10);
+      const minutes = parseInt(m, 10);
+      if (period.toUpperCase() === 'PM' && hours < 12) hours += 12;
+      if (period.toUpperCase() === 'AM' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
     };
-
-    applyTime(startTime, startDate);
-    applyTime(endTime, endDate);
 
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       const startDay = parseInt(start.replace(/\D/g, ''));
       const endDay = parseInt(end.replace(/\D/g, ''));
       if (!isNaN(startDay) && !isNaN(endDay)) {
         const diff = (endDay - startDay);
-        return diff > 0 ? diff : 1;
+        let days = diff > 0 ? diff : 1;
+        if (diff > 0) {
+          const retMins = parseTimeMinutes(endTime);
+          if (retMins !== null && retMins > 8 * 60) {
+            days += 1;
+          }
+        }
+        return days;
       }
       return 1;
     }
 
-    const diffTime = endDate.getTime() - startDate.getTime();
-    if (diffTime <= 0) return 1;
-    
-    // HACK for Option D: The pricing engine now strictly uses Calendar Date difference.
-    // Late returns (times > 8:00 AM) are handled directly by the frontend UI bumping the endDate.
     const startCalendarDate = new Date(startDate);
-    startCalendarDate.setHours(0,0,0,0);
+    startCalendarDate.setHours(0, 0, 0, 0);
     const endCalendarDate = new Date(endDate);
-    endCalendarDate.setHours(0,0,0,0);
-    
-    const diffDays = Math.max(1, Math.round((endCalendarDate.getTime() - startCalendarDate.getTime()) / (1000 * 60 * 60 * 24)));
+    endCalendarDate.setHours(0, 0, 0, 0);
 
-    return diffDays;
+    const calendarDiffDays = Math.round((endCalendarDate.getTime() - startCalendarDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Same-day trip (or return date <= start date) is priced as 1 rental day.
+    if (calendarDiffDays <= 0) {
+      return 1;
+    }
+
+    // Standard rental cycle is 8:00 AM to 8:00 AM the following day.
+    // Returning after 8:00 AM on the return date adds 1 extra day to the rental charge,
+    // while keeping the calendar return date intact.
+    let rentalDays = calendarDiffDays;
+    const returnMinutes = parseTimeMinutes(endTime);
+    if (returnMinutes !== null && returnMinutes > 8 * 60) {
+      rentalDays += 1;
+    }
+
+    return Math.max(1, rentalDays);
   } catch (e) {
     return 1;
   }

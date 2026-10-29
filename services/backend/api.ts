@@ -883,17 +883,23 @@ export const API = {
   /**
    * POST /api/payments/create-order
    */
-  async createRazorpayOrder(params: any): Promise<{ orderId: string, amountPaise: number, keyId: string }> {
+  async createRazorpayOrder(params: any, idempotencyKey?: string): Promise<{ orderId: string, amountPaise: number, keyId: string }> {
     try {
       const amountToPay = params.onlinePayableNow || params.rentalAmount || 0;
       if (amountToPay <= 0) {
         throw new Error('No Razorpay order required for zero amount');
       }
 
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const key = idempotencyKey || params.idempotencyKey;
+      if (key) {
+        headers['Idempotency-Key'] = String(key);
+      }
+
       const response = await fetchWithAuth(`${BACKEND_URL}/payments/create-order`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: amountToPay })
+        headers,
+        body: JSON.stringify({ amount: amountToPay, receipt: key })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to create Razorpay order');
@@ -927,6 +933,21 @@ export const API = {
   },
 
   /**
+   * GET /api/payments/my-payments
+   */
+  async getMyPayments(): Promise<any[]> {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/payments/my-payments`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch payment history');
+      return data.data || [];
+    } catch (e: any) {
+      console.warn('[API.getMyPayments] Error:', e.message);
+      return [];
+    }
+  },
+
+  /**
    * POST /api/bookings
    */
   async getActiveHandover() {
@@ -940,7 +961,8 @@ export const API = {
     vehicleName: string,
     customerDetails: { name: string; mobile: string; email?: string },
     paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string },
-    fuelEstimateDetails?: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number }
+    fuelEstimateDetails?: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number },
+    idempotencyKey?: string
   ): Promise<BookingSnapshot> {
     // BACKEND VALIDATION: Recalculate quote to prevent frontend manipulation
     const serverQuote = await this.quoteBooking(params);
@@ -1058,9 +1080,14 @@ export const API = {
       ? (delMode === 'both' ? 'pickup_drop' : (delMode === 'return' ? 'drop' : 'pickup'))
       : 'pickup_drop';
 
+    const holdHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (idempotencyKey) {
+      holdHeaders['Idempotency-Key'] = idempotencyKey;
+    }
+
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/hold`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: holdHeaders,
       body: JSON.stringify({
         vehicleId: vehicleId,
         vehicleName: vehicleName,
@@ -1152,10 +1179,15 @@ export const API = {
     }
   },
 
-  async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string): Promise<any> {
+  async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string, idempotencyKey?: string): Promise<any> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (idempotencyKey) {
+      headers['Idempotency-Key'] = idempotencyKey;
+    }
+
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/confirm`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ razorpayOrderId, razorpayPaymentId })
     });
     const saved = await response.json().catch(() => ({}));

@@ -189,7 +189,7 @@ export function DatesSheet() {
   const [tempReturnTime, setTempReturnTime] = useState<string | null>(!freshPick && returnTime && returnTime !== '--:--' ? returnTime.replace(/^0/, '') : '8:00 AM');
   
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
-  const [hasAutoJumpedLate, setHasAutoJumpedLate] = useState(false);
+  const [hasShownLateNotice, setHasShownLateNotice] = useState(false);
   const [showLateReturnModal, setShowLateReturnModal] = useState(false);
 
   const months = Array.from({ length: MONTHS_AHEAD }, (_, i) => new Date(today.getFullYear(), today.getMonth() + i, 1));
@@ -205,7 +205,7 @@ export function DatesSheet() {
       setStart(date);
       setEnd(null);
       setTempReturnTime(SAME_DAY_RETURN);
-      setHasAutoJumpedLate(false);
+      setHasShownLateNotice(false);
       return;
     }
     
@@ -216,18 +216,18 @@ export function DatesSheet() {
         setStart(date);
         setEnd(null);
         setTempReturnTime(SAME_DAY_RETURN);
-        setHasAutoJumpedLate(false);
+        setHasShownLateNotice(false);
       } else if (date.getTime() === start.getTime()) {
         // Tapping the same start date again → deselect it entirely
         setStart(null);
         setEnd(null);
         setTempReturnTime(DAY_TIME);
-        setHasAutoJumpedLate(false);
+        setHasShownLateNotice(false);
       } else {
         // Picked a date after start, make it the end: a multi-day trip, back to 8 AM drop-off.
         setEnd(date);
         setTempReturnTime(DAY_TIME);
-        setHasAutoJumpedLate(false);
+        setHasShownLateNotice(false);
       }
       return;
     }
@@ -236,7 +236,7 @@ export function DatesSheet() {
     setStart(date);
     setEnd(null);
     setTempReturnTime(SAME_DAY_RETURN);
-    setHasAutoJumpedLate(false);
+    setHasShownLateNotice(false);
   };
 
   const handleClear = () => {
@@ -246,7 +246,7 @@ export function DatesSheet() {
     setEnd(null);
     setTempPickupTime('8:00 AM');
     setTempReturnTime('8:00 AM');
-    setHasAutoJumpedLate(false);
+    setHasShownLateNotice(false);
   };
 
   const formatDateStr = (date: Date | null) => {
@@ -296,17 +296,11 @@ export function DatesSheet() {
     if (start && effectiveEnd) {
       const isSameDaySelection = start.getTime() === effectiveEnd.getTime();
       if (!isSameDaySelection) {
-        if (timeIndex > 16 && !hasAutoJumpedLate) {
-          const newEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate() + 1);
-          newEnd.setHours(0, 0, 0, 0);
-          setEnd(newEnd);
-          setHasAutoJumpedLate(true);
+        if (timeIndex > 16 && !hasShownLateNotice) {
           setShowLateReturnModal(true);
-        } else if (timeIndex <= 16 && hasAutoJumpedLate) {
-          const newEnd = new Date(effectiveEnd.getFullYear(), effectiveEnd.getMonth(), effectiveEnd.getDate() - 1);
-          newEnd.setHours(0, 0, 0, 0);
-          setEnd(newEnd);
-          setHasAutoJumpedLate(false);
+          setHasShownLateNotice(true);
+        } else if (timeIndex <= 16) {
+          setHasShownLateNotice(false);
         }
       }
     }

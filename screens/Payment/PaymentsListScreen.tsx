@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, RefreshControl } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
@@ -42,6 +42,13 @@ export default function PaymentsScreen() {
   });
 
   const transactions = walletData?.transactions || [];
+
+  // Fetch Booking Payments
+  const { data: bookingPayments = [], isLoading: isLoadingPayments, refetch: refetchPayments, isFetching: isFetchingPayments } = useQuery({
+    queryKey: ['myPayments'],
+    queryFn: () => API.getMyPayments(),
+    enabled: !!customer?.id
+  });
 
   useEffect(() => {
     loadSavedMethods();
@@ -154,8 +161,19 @@ export default function PaymentsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <SafeAreaView style={styles.safeArea} edges={['bottom']}>
         <Header title="Payment Methods" back={true} />
-        
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={Boolean(isFetchingWallet || isFetchingPayments)}
+              onRefresh={() => {
+                refetchWallet();
+                refetchPayments();
+              }}
+              tintColor={colors.primary}
+            />
+          }
+        >
           {/* SawariCash Top Card */}
           <LinearGradient 
             colors={['#1F2937', '#111827']} 
@@ -215,6 +233,74 @@ export default function PaymentsScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          )}
+
+          {/* Booking & Ride Payments Section */}
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32 }]}>Payment History</Text>
+          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
+            All completed ride and booking transactions.
+          </Text>
+
+          {isLoadingPayments ? (
+            <PaymentsSkeleton />
+          ) : bookingPayments.length === 0 ? (
+            <View style={[styles.emptyCard, { borderColor: colors.border }]}>
+              <Feather name="credit-card" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
+              <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No Payments Yet</Text>
+              <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>Completed bookings and Razorpay transactions will appear here.</Text>
+            </View>
+          ) : (
+            <Reveal>
+              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 8 }]}>
+                {bookingPayments.map((p: any, index: number) => {
+                  const vehicleName = p.vehicle?.vehicleName || 'Trip Booking';
+                  const dateStr = p.paymentDate || p.createdAt;
+                  const dateLabel = dateStr ? new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
+                  const timeLabel = p.paymentTime || (dateStr ? new Date(dateStr).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+
+                  return (
+                    <View
+                      key={p._id || p.transactionId || index}
+                      style={[
+                        styles.methodRow,
+                        { justifyContent: 'space-between' },
+                        index !== bookingPayments.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }
+                      ]}
+                    >
+                      <View style={[styles.iconBox, { backgroundColor: 'rgba(16, 185, 129, 0.1)' }]}>
+                        <Feather name="check-circle" size={18} color="#10B981" />
+                      </View>
+                      <View style={{ flex: 1, paddingRight: 12 }}>
+                        <Text style={[styles.methodTitle, { color: colors.foreground }]}>{vehicleName}</Text>
+                        <Text style={[styles.methodSubtitle, { color: colors.mutedForeground }]}>
+                          {p.transactionId ? `${p.transactionId} · ` : ''}{dateLabel} {timeLabel}
+                        </Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{
+                          fontFamily: 'Inter_700Bold',
+                          fontSize: 16,
+                          color: colors.foreground
+                        }}>
+                          ₹{Number(p.amount || 0).toLocaleString('en-IN')}
+                        </Text>
+                        <View style={{
+                          marginTop: 3,
+                          paddingHorizontal: 6,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          backgroundColor: 'rgba(16, 185, 129, 0.15)'
+                        }}>
+                          <Text style={{ fontFamily: 'Inter_600SemiBold', fontSize: 10, color: '#10B981', textTransform: 'uppercase' }}>
+                            {p.paymentMethod || 'Razorpay'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </Reveal>
           )}
 
           {/* Backend Wallet Transactions Section */}

@@ -46,6 +46,7 @@ export default function PaymentScreen() {
 
   // Toggle for Sawari Cash
   const useCash = sawariCashToApply > 0;
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     // Fetch coupons (likely already cached from startup warm-up, so this is instant)
@@ -407,14 +408,17 @@ export default function PaymentScreen() {
 
         <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>
           <Pressable
-            disabled={isQuoteLoading || !pricingQuote || isTripIncomplete}
+            disabled={isQuoteLoading || !pricingQuote || isTripIncomplete || isSubmitting}
             onPress={() => {
+              if (isSubmitting) return;
+              setIsSubmitting(true);
               import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_started', 'PaymentScreen', { amount: pricingQuote?.onlinePayableNow }));
               router.push('/payment-processing');
+              setTimeout(() => setIsSubmitting(false), 2000);
             }}
-            style={[styles.payButton, { flex: 1, backgroundColor: isQuoteLoading || isTripIncomplete || !pricingQuote ? colors.muted : colors.primary }]}
+            style={[styles.payButton, { flex: 1, backgroundColor: isQuoteLoading || isTripIncomplete || !pricingQuote || isSubmitting ? colors.muted : colors.primary }]}
           >
-            {isQuoteLoading ? (
+            {isQuoteLoading || isSubmitting ? (
               <ActivityIndicator color={colors.primaryForeground} />
             ) : (
               <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>

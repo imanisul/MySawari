@@ -28,6 +28,8 @@ export default function PaymentProcessingScreen() {
   }
   const holdId = useRef<string | null>(null);
   const paid = useRef(false);
+  // Unique idempotency key generated per payment attempt to prevent double-charging or double-booking
+  const idempotencyKey = useRef<string>('pay_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9));
   // Set once the customer leaves this screen (back button, swipe, app navigation) before paying.
   const left = useRef(false);
 
@@ -80,16 +82,19 @@ export default function PaymentProcessingScreen() {
         return;
       }
       try {
-        // Step 1: Secure Vehicle Hold (Atomic OCC)
-        const snapshot = await createBookingSnapshot();
+        // Step 1: Secure Vehicle Hold (Atomic OCC + Idempotency)
+        const snapshot = await createBookingSnapshot(idempotencyKey.current);
         if (!snapshot) throw new Error('Failed to secure vehicle lock. Please try again.');
         holdId.current = snapshot.id;
         // The customer went back while the hold was being created: free it and stop here.
         if (left.current) { releaseHold(); return; }
         setSetupStep(1);
 
-        // Step 2: Create Order
-        const order = await API.createRazorpayOrder({ onlinePayableNow: pricingQuote.onlinePayableNow });
+        // Step 2: Create Order (Idempotent order creation with gateway receipt key)
+        const order = await API.createRazorpayOrder(
+          { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
+          idempotencyKey.current
+        );
         if (left.current) { releaseHold(); return; }
         setRazorpayOrder(order);
         setStatus('PAYMENT_PENDING'); 
@@ -135,7 +140,7 @@ export default function PaymentProcessingScreen() {
     const confirmWithRetry = async () => {
       for (let attempt = 1; ; attempt++) {
         try {
-          return await confirmBookingPayment(paymentDetails || {}, holdId.current || undefined);
+          return await confirmBookingPayment(paymentDetails || {}, holdId.current || undefined, idempotencyKey.current);
         } catch (e: any) {
           if (attempt >= 3 || !isConnectionError(e)) throw e;
           await new Promise((r) => setTimeout(r, 2000 * attempt));

@@ -93,11 +93,11 @@ type SawariContextValue = {
   applyCoupon: (code: string | null) => void;
   applySawariCash: (amount: number) => void;
   setFuelEstimate: (estimate: SawariContextValue['fuelEstimate']) => void;
-  createBookingSnapshot: () => Promise<BookingSnapshot | null>;
+  createBookingSnapshot: (idempotencyKey?: string) => Promise<BookingSnapshot | null>;
   /** Plan chosen on car details / payment to buy together with this booking (null = none). */
   planToBuy: 'starter' | 'plus' | 'pro' | null;
   setPlanToBuy: (plan: 'starter' | 'plus' | 'pro' | null) => void;
-  confirmBookingPayment: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => Promise<void>;
+  confirmBookingPayment: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string, idempotencyKey?: string) => Promise<void>;
   lastBooking: BookingSnapshot | null;
 
   customer: AppCustomer;
@@ -770,7 +770,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       lastBooking,
       planToBuy,
       setPlanToBuy,
-      createBookingSnapshot: async () => {
+      createBookingSnapshot: async (idempotencyKey?: string) => {
         if (!pricingQuote) return null;
         planInPayment.current = pricingQuote.membershipPlanToBuy || null;
         const snapshot = await API.createBooking(
@@ -779,7 +779,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           selectedCar.name,
           customer,
           {}, // Payment details no longer needed here (it's a hold)
-          fuelEstimate || undefined
+          fuelEstimate || undefined,
+          idempotencyKey
         );
         setLastBooking(snapshot);
         // Refresh cash in the background: a failed wallet refresh must not look like a failed reservation
@@ -787,12 +788,12 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         API.getWallet(true).then(applyWallet).catch(() => {});
         return snapshot;
       },
-      confirmBookingPayment: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string) => {
+      confirmBookingPayment: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string, idempotencyKey?: string) => {
         // The id is passed in by the payment screen: reading `lastBooking` here could see an old copy of
         // state (it is set moments earlier in the same flow), which failed with "No active booking hold".
         const id = bookingId || lastBooking?.id;
         if (!id) throw new Error('No active booking hold found');
-        const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId);
+        const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId, idempotencyKey);
         
         // Update the lastBooking state with the confirmed booking info so the ConfirmationScreen can read the real bookingCode
         setLastBooking((prev: any) => ({

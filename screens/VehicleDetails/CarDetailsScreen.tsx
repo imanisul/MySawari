@@ -19,7 +19,6 @@ import {
 import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
 import { longAvail } from '@/components/vehicle/CarListCard';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
-import { MembershipSavedPopup } from '@/components/vehicle/details/MembershipSavedPopup';
 import { BlurHost } from '@/components/common/BottomBlur';
 import { BlurTargetView } from 'expo-blur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
@@ -289,7 +288,6 @@ export default function CarDetailsScreen() {
         }}
         onBookNow={handleBookingProceed}
       />
-      <MembershipSavedPopup screen="details" hasTrip={hasTrip} tripKey={`${selectedCar.id}|${effectiveDateRange}|${pickupTime}|${returnTime}`} />
       <LoginBottomSheet
         visible={showLogin}
         onClose={() => setShowLogin(false)}

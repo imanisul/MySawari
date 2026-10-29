@@ -130,7 +130,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
 export function MembershipSavedPopup({
   hasTrip,
   tripKey,
-  screen = 'details',
+  screen = 'booking',
   forceShow = false,
 }: {
   hasTrip: boolean;
@@ -138,6 +138,9 @@ export function MembershipSavedPopup({
   screen?: string;
   forceShow?: boolean;
 }) {
+  // Existing member discount popup should not appear on car details page; it only shows on the payment option page.
+  if (screen === 'details') return null;
+
   const { membership } = useSawari();
   const price = useTripPrice(hasTrip);
   const [visible, setVisible] = useState(false);

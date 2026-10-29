@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, Modal, Share, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { BlurTargetView } from 'expo-blur';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +10,7 @@ import { getSavedAddresses, removeSavedAddress, updateSavedAddress, SavedAddress
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, PF } from '@/components/profile/ProfileParts';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 
 /**
  * Figma "Saved Addresses": "+ Add Address", then each saved place (tag, full address, contact number) with
@@ -16,6 +18,7 @@ import { ModalBlur } from '@/components/common/ModalBlur';
  * and Share. Kept on the device per account; the same list the address search offers first.
  */
 export default function SavedAddressesScreen() {
+  const blurTarget = useRef<View | null>(null);
   const p = useDetailsPalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -44,57 +47,62 @@ export default function SavedAddressesScreen() {
   const icon = (label?: string) => (/home/i.test(label || '') ? 'home-outline' : /work|office/i.test(label || '') ? 'briefcase-outline' : 'location-outline');
 
   return (
-    <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
-      <ScreenHeader title="Saved Addresses" />
+    <BlurTargetProvider target={blurTarget}>
+      <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
+        <BlurTargetView ref={blurTarget} style={styles.screen}>
+          <ScreenHeader title="Saved Addresses" />
 
-      <FlatList
-        data={list || []}
-        keyExtractor={(a) => a.id}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
-        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-        ListHeaderComponent={
-          <>
-            <Pressable accessibilityRole="button" onPress={add} style={({ pressed }) => [styles.addRow, { borderColor: p.border }, pressed && { backgroundColor: p.soft }]}>
-              <Feather name="plus" size={16} color={p.navy} />
-              <Text style={[styles.addText, { color: p.navy }]}>Add Address</Text>
-              <Feather name="chevron-right" size={16} color={p.muted} />
-            </Pressable>
-            {!!list?.length && <Text style={[styles.section, { color: p.sub }]}>Your saved address</Text>}
-          </>
-        }
-        renderItem={({ item: a }) => (
-          <View style={[styles.card, { borderColor: p.border }]}>
-            <View style={[styles.icon, { backgroundColor: p.iconBg }]}>
-              <Ionicons name={icon(a.label) as any} size={17} color={p.sub} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{a.label || a.name}</Text>
-              <Text style={[styles.addr, { color: p.muted }]} numberOfLines={3}>{a.label ? `${a.name}, ${a.address}` : a.address}</Text>
-              {!!a.phone && <Text style={[styles.addr, { color: p.muted }]}>Phone number: +91 {a.phone}</Text>}
-            </View>
-            <View style={styles.actions}>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Options for ${a.label || a.name}`} onPress={() => { Haptics.selectionAsync(); setMenuFor(a); }} hitSlop={8}>
-                <Feather name="more-horizontal" size={17} color={p.fg} />
-              </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={`Share ${a.label || a.name}`} onPress={() => share(a)} hitSlop={8}>
-                <Feather name="share" size={15} color={p.fg} />
-              </Pressable>
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={list ? (
-          <View style={styles.empty}>
-            <Feather name="map-pin" size={22} color={p.fg} />
-            <Text style={[styles.emptyTitle, { color: p.fg }]}>No saved addresses yet</Text>
-            <Text style={[styles.emptySub, { color: p.muted }]}>Save your home, work or hotel to pick it in one tap for doorstep delivery.</Text>
-          </View>
-        ) : null}
-      />
+          <FlatList
+            data={list || []}
+            keyExtractor={(a) => a.id}
+            contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+            ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+            ListHeaderComponent={
+              <>
+                <Pressable accessibilityRole="button" onPress={add} style={({ pressed }) => [styles.addRow, { borderColor: p.border }, pressed && { backgroundColor: p.soft }]}>
+                  <Feather name="plus" size={16} color={p.navy} />
+                  <Text style={[styles.addText, { color: p.navy }]}>Add Address</Text>
+                  <Feather name="chevron-right" size={16} color={p.muted} />
+                </Pressable>
+                {!!list?.length && <Text style={[styles.section, { color: p.sub }]}>Your saved address</Text>}
+              </>
+            }
+            renderItem={({ item: a }) => (
+              <View style={[styles.card, { borderColor: p.border }]}>
+                <View style={[styles.icon, { backgroundColor: p.iconBg }]}>
+                  <Ionicons name={icon(a.label) as any} size={17} color={p.sub} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{a.label || a.name}</Text>
+                  <Text style={[styles.addr, { color: p.muted }]} numberOfLines={3}>{a.label ? `${a.name}, ${a.address}` : a.address}</Text>
+                  {!!a.phone && <Text style={[styles.addr, { color: p.muted }]}>Phone number: +91 {a.phone}</Text>}
+                </View>
+                <View style={styles.actions}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Options for ${a.label || a.name}`} onPress={() => { Haptics.selectionAsync(); setMenuFor(a); }} hitSlop={8}>
+                    <Feather name="more-horizontal" size={17} color={p.fg} />
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Share ${a.label || a.name}`} onPress={() => share(a)} hitSlop={8}>
+                    <Feather name="share" size={15} color={p.fg} />
+                  </Pressable>
+                </View>
+              </View>
+            )}
+            ListEmptyComponent={list ? (
+              <View style={styles.empty}>
+                <Feather name="map-pin" size={22} color={p.fg} />
+                <Text style={[styles.emptyTitle, { color: p.fg }]}>No saved addresses yet</Text>
+                <Text style={[styles.emptySub, { color: p.muted }]}>Save your home, work or hotel to pick it in one tap for doorstep delivery.</Text>
+              </View>
+            ) : null}
+          />
+        </BlurTargetView>
+      </SafeAreaView>
 
       {/* ── Select option ── */}
       <Modal visible={!!menuFor} transparent animationType="slide" onRequestClose={() => setMenuFor(null)}>
         <View style={styles.sheetWrap}>
           <ModalBlur />
+          <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuFor(null)} accessibilityLabel="Close" />
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => setMenuFor(null)} style={[styles.closeBubble, { backgroundColor: p.page }]}>
             <Feather name="x" size={16} color={p.sub} />
@@ -129,6 +137,7 @@ export default function SavedAddressesScreen() {
       <Modal visible={!!deleteFor} transparent animationType="fade" onRequestClose={() => setDeleteFor(null)}>
         <View style={styles.dialogWrap}>
           <ModalBlur />
+          <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
           <View style={[styles.dialog, { backgroundColor: p.page }]} accessibilityViewIsModal>
             <Text style={[styles.dialogTitle, { color: p.fg }]}>Delete this address?</Text>
             <Text style={[styles.dialogBody, { color: p.muted }]}>You won't be able to recover this address once deleted. Do you want to continue?</Text>
@@ -158,7 +167,7 @@ export default function SavedAddressesScreen() {
           setList(await updateSavedAddress(userId, a.id, { phone }));
         }}
       />
-    </SafeAreaView>
+    </BlurTargetProvider>
   );
 }
 
@@ -186,6 +195,7 @@ function PhoneSheet({ address, onClose, onSave }: { address: SavedAddress | null
     <Modal visible={!!address} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetWrap}>
         <ModalBlur />
+        <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={[styles.closeBubble, { backgroundColor: p.page }]}>
           <Feather name="x" size={16} color={p.sub} />
@@ -248,13 +258,14 @@ const styles = StyleSheet.create({
   opt: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 56 },
   optIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   optText: { flex: 1, fontFamily: PF.medium, fontSize: 14.5 },
+  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
   dialogWrap: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', paddingHorizontal: 24 },
   dialog: { borderRadius: 12, paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
-  dialogTitle: { fontFamily: PF.medium, fontSize: 17, textAlign: 'center' },
-  dialogBody: { fontFamily: PF.regular, fontSize: 12.5, lineHeight: 19, textAlign: 'center', marginTop: 8, paddingHorizontal: 8 },
+  dialogTitle: { fontFamily: PF.semibold, fontSize: 19, textAlign: 'center' },
+  dialogBody: { fontFamily: PF.medium, fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8, paddingHorizontal: 8 },
   dialogBtns: { flexDirection: 'row', gap: 8, marginTop: 16 },
   dialogBtn: { flex: 1, height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  dialogBtnText: { fontFamily: PF.medium, fontSize: 14 },
+  dialogBtnText: { fontFamily: PF.semibold, fontSize: 15 },
   phoneBox: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 50, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, marginTop: 14 },
   cc: { fontFamily: PF.regular, fontSize: 15 },
   phoneInput: { flex: 1, fontFamily: PF.medium, fontSize: 15, paddingVertical: 0 },

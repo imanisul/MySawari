@@ -30,6 +30,7 @@ export function ManageBookingSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: 'rgba(38, 38, 38, 0.32)' }]}>
         <ModalBlur />
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={styles.wrap}>
           <View style={styles.closeRow}>
@@ -74,8 +75,9 @@ export function ManageBookingSheet({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
+  dim: { backgroundColor: 'rgba(0, 0, 0, 0.18)' },
   wrap: { gap: 8 },
-  closeRow: { alignItems: 'flex-end', paddingHorizontal: 12 },
+  closeRow: { alignItems: 'flex-end', paddingHorizontal: 10 },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: '#E7EAF4', paddingHorizontal: 16, paddingTop: 20, gap: 16 },
   title: { fontFamily: FONT.semibold, fontSize: 19, lineHeight: 28, textAlign: 'center' },
@@ -83,7 +85,7 @@ const styles = StyleSheet.create({
   notice: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, gap: 2 },
   noticeTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
   noticeBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
-  subhead: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
+  subhead: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 23 },
   cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  ctaText: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
+  ctaText: { fontFamily: FONT.medium, fontSize: 14, lineHeight: 26 },
 });

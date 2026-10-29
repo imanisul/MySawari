@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
+import React, { useEffect, useRef, useState } from 'react';
+import { BlurHost, BottomBlur } from '@/components/common/BottomBlur';
+import { BlurTargetView } from 'expo-blur';
+import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 import { Alert, LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -59,6 +61,7 @@ function dayAndTime(label?: string, time?: string) {
 }
 
 export default function BookingScreen() {
+  const blurTarget = useRef<View | null>(null);
   useTrackTripProgress('booking'); // Recent searches resume this trip on this page
   const p = useDetailsPalette();
   const router = useRouter();
@@ -226,9 +229,10 @@ export default function BookingScreen() {
   const payable = ready?.payableNow ?? pricingQuote?.onlinePayableNow ?? 500;
 
   return (
+    <BlurTargetProvider target={blurTarget}>
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
-       <BlurTarget style={{ flex: 1 }}>
+       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: 260 + insets.bottom }]}>
           {/* Header */}
           <View style={styles.header}>
@@ -518,7 +522,7 @@ export default function BookingScreen() {
             *Note : Original Driving License and Aadhaar Card verification is Mandatory at the time of vehicle handover
           </Text>
         </ScrollView>
-       </BlurTarget>
+       </BlurTargetView>
 
         <StickyBookingBar
           hasTrip={!isMissingDates}
@@ -545,6 +549,7 @@ export default function BookingScreen() {
         <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
       </BlurHost>
     </KeyboardAvoidingView>
+    </BlurTargetProvider>
   );
 }
 

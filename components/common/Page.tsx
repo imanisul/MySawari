@@ -1,10 +1,12 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
+import { BlurTargetView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { BottomNavigation } from '../navigation/BottomNavigation';
-import { BlurHost, BlurTarget } from './BottomBlur';
+import { BlurHost } from './BottomBlur';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
+import { BlurTargetProvider } from './BlurTargetContext';
 
 export function Page({
   children,
@@ -18,6 +20,7 @@ export function Page({
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
+  const blurTarget = useRef<View | null>(null);
   const content = (
     <View
       style={[
@@ -37,15 +40,17 @@ export function Page({
   return (
     // The tab bar blurs the page under it (BlurTarget = the page content, never the bar itself).
     <BlurHost style={[styles.screen, { backgroundColor: colors.background }]}>
-      <BlurTarget style={styles.screen}>
-        {scroll ? (
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-            {content}
-          </ScrollView>
-        ) : (
-          content
-        )}
-      </BlurTarget>
+      <BlurTargetProvider target={blurTarget}>
+        <BlurTargetView ref={blurTarget} style={styles.screen}>
+          {scroll ? (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+              {content}
+            </ScrollView>
+          ) : (
+            content
+          )}
+        </BlurTargetView>
+      </BlurTargetProvider>
       {bottomNav && <BottomNavigation />}
     </BlurHost>
   );

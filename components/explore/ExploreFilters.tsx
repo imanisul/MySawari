@@ -202,6 +202,7 @@ function SheetFrame({ visible, onClose, title, onClear, children, footer }: {
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={styles.overlay}>
         <ModalBlur />
+        <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={styles.closeRow}>
           <Pressable onPress={onClose} style={[styles.closeBtn, { backgroundColor: p.page }]} accessibilityRole="button" accessibilityLabel="Close">
@@ -462,7 +463,7 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 16, paddingVertical: 12 },
   cta: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17 },
-
+  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
   sortCard: { marginHorizontal: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13 },
   sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 },
   sortText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },

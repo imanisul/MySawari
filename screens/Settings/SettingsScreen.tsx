@@ -186,10 +186,10 @@ const styles = StyleSheet.create({
   deleteText: { fontFamily: FONT.medium, fontSize: 14 },
   overlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 36 },
   popup: { alignSelf: 'stretch', borderRadius: 16, borderWidth: 1, paddingHorizontal: 13, paddingTop: 22, paddingBottom: 13 },
-  popupTitle: { fontFamily: FONT.medium, fontSize: 17.5, lineHeight: 25, textAlign: 'center' },
-  popupBody: { fontFamily: FONT.regular, fontSize: 12.5, lineHeight: 19, textAlign: 'center', marginTop: 10, paddingHorizontal: 10 },
+  popupTitle: { fontFamily: FONT.medium, fontSize: 17, lineHeight: 25, textAlign: 'center' },
+  popupBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 19, textAlign: 'center', marginTop: 10, paddingHorizontal: 10 },
   popupBox: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 17, marginTop: 17 },
-  popupBoxText: { fontFamily: FONT.regular, fontSize: 12.5, lineHeight: 19, textAlign: 'center' },
+  popupBoxText: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 19, textAlign: 'center' },
   link: { textDecorationLine: 'underline', fontFamily: FONT.regular },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
 });

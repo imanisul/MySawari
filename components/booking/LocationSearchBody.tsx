@@ -158,7 +158,7 @@ export function LocationSearchBody({
         }
       } catch (error: any) {
         if (error.name !== 'AbortError' && !currentSignal.aborted) {
-          console.error("Search failed:", error);
+          if (__DEV__) console.warn("Location search failed:", error?.message);
           setPredictions([]);
         }
       } finally {
@@ -200,8 +200,8 @@ export function LocationSearchBody({
           addressStr = reverseData.address || addressStr;
           placeName = reverseData.name || placeName;
         }
-      } catch (e) {
-        console.warn('Reverse geocode failed', e);
+      } catch (e: any) {
+        if (__DEV__) console.warn('Reverse geocode failed:', e?.message);
       }
 
       const loc: LocationResult = {
@@ -215,8 +215,8 @@ export function LocationSearchBody({
 
       import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('select_location', 'LocationSheet', { locationName: 'Current Location', mode }));
       onSelect(loc);
-    } catch (error) {
-      console.error('Error fetching location:', error);
+    } catch (error: any) {
+      if (__DEV__) console.warn('Error fetching location:', error?.message);
       Alert.alert('Could not get your location', POSITION_FAILURE_MESSAGE.unavailable);
     } finally {
       setLoading(false);

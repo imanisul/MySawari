@@ -112,8 +112,8 @@ export function RazorpayCheckoutWebView({
       } else if (data.event === 'dismiss') {
         onClose();
       }
-    } catch (e) {
-      console.error('Failed to parse webview message', e);
+    } catch (e: any) {
+      if (__DEV__) console.warn('Failed to parse webview message');
       onFailure(e);
     }
   };

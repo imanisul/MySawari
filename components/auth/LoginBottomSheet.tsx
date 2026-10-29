@@ -23,8 +23,8 @@ import { ModalBlur } from '@/components/common/ModalBlur';
  * These are the same calls (and the same order) the app used before.
  */
 
-const OTP_LENGTH = 4;
-const RESEND_SECONDS = 30;
+const OTP_LENGTH = 6;
+const RESEND_SECONDS = 60;
 
 // Design palette (light). Dark mode keeps the app's own tokens.
 const LIGHT = {
@@ -81,6 +81,7 @@ export function LoginBottomSheet({
   const [step, setStep] = useState<'phone' | 'otp' | 'profile'>('phone');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
+  const [otpId, setOtpId] = useState<string | null>(null);
   const [isExisting, setIsExisting] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -94,7 +95,7 @@ export function LoginBottomSheet({
   // Fresh sheet every time it opens.
   useEffect(() => {
     if (!visible) return;
-    setStep('phone'); setMobile(''); setOtp(''); setIsExisting(false);
+    setStep('phone'); setMobile(''); setOtp(''); setOtpId(null); setIsExisting(false);
     setName(''); setEmail(''); setReferral(''); setConfirmed(false);
     setLoading(false); setError(null); setResendIn(0);
   }, [visible]);
@@ -126,6 +127,7 @@ export function LoginBottomSheet({
     try {
       const res = await API.sendOtp(mobile);
       setIsExisting(!!res.isExistingUser);
+      setOtpId(res.otpId || null);
       setOtp('');
       setResendIn(RESEND_SECONDS);
       setStep('otp');
@@ -140,7 +142,8 @@ export function LoginBottomSheet({
     if (resendIn > 0 || loading) return;
     setLoading(true); setError(null);
     try {
-      await API.sendOtp(mobile);
+      const res = await API.sendOtp(mobile);
+      setOtpId(res.otpId || null);
       setOtp('');
       setResendIn(RESEND_SECONDS);
     } catch (e: any) {
@@ -162,7 +165,7 @@ export function LoginBottomSheet({
     }
     setLoading(true);
     try {
-      const { token, refreshToken, user } = await API.verifyOtp(mobile, code, '', '');
+      const { token, refreshToken, user } = await API.verifyOtp(mobile, code, '', '', otpId || undefined);
       await login(token, refreshToken, user);
       askForNotifications();
       finish();
@@ -184,7 +187,7 @@ export function LoginBottomSheet({
     Haptics.selectionAsync().catch(() => {});
     setLoading(true); setError(null);
     try {
-      const { token, refreshToken, user } = await API.verifyOtp(mobile, digitsOf(otp), name.trim(), referral);
+      const { token, refreshToken, user } = await API.verifyOtp(mobile, digitsOf(otp), name.trim(), referral, otpId || undefined);
       await login(token, refreshToken, user);
       // Email is optional and saved after the account exists; a failure here never blocks sign-in.
       if (email.trim()) saveProfile({ email: email.trim() }).catch(() => {});
@@ -284,7 +287,7 @@ export function LoginBottomSheet({
                 </Pressable>)}
               </View>
               <Text style={[styles.small, styles.center, { color: ui.copy }]}>
-                Enter the 4-digit code sent to WhatsApp{'\n'}{masked(mobile)} ·{' '}
+                Enter the 6-digit code sent to WhatsApp{'\n'}{masked(mobile)} ·{' '}
                 <Text style={{ color: ui.navy, fontFamily: 'PlusJakartaSans_600SemiBold' }} onPress={back} accessibilityRole="button">Change</Text>
               </Text>
               <OtpBoxes
@@ -490,8 +493,8 @@ const styles = StyleSheet.create({
   terms: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   otpHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   round: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
-  otpBox: { width: 52, height: 52, borderWidth: 1, borderRadius: 8, textAlign: 'center', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, padding: 0 },
+  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 6 },
+  otpBox: { width: 46, height: 50, borderWidth: 1, borderRadius: 8, textAlign: 'center', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 18, padding: 0 },
   error: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: -4 },
   label: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 17 },
   checkRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },

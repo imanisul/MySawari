@@ -47,8 +47,8 @@ function prefetchVehicleImages(vehicles: any[]) {
       const batch = Image.prefetch(uniqueUrls, 'memory-disk').catch(() => false);
       cardImagesPromise = Promise.all([cardImagesPromise, batch]);
     }
-  } catch (e) {
-    console.warn('Failed to prefetch images', e);
+  } catch (e: any) {
+    if (__DEV__) console.warn('Failed to prefetch images:', e?.message);
   }
 }
 

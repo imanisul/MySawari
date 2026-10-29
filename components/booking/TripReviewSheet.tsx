@@ -63,7 +63,7 @@ export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubm
       const res = await API.reviews.uploadImage(ph.uri, ph.mimeType, ph.base64);
       setPhotos((cur) => cur.map((x) => (x.key === ph.key ? { ...x, status: 'done', url: res.url, publicId: res.publicId } : x)));
     } catch (err: any) {
-      console.warn('Trip photo upload failed:', err);
+      if (__DEV__) console.warn('Trip photo upload failed:', err?.message);
       const msg = err?.message || 'Photo upload failed. Tap retry.';
       setPhotos((cur) => cur.map((x) => (x.key === ph.key ? { ...x, status: 'error' } : x)));
       setError(msg);

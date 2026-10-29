@@ -27,3 +27,9 @@ export async function deleteItemAsync(key: string): Promise<void> {
     storage()?.removeItem(key);
   } catch {}
 }
+
+export async function clearAuthCredentials(): Promise<void> {
+  ['auth_token', 'refresh_token', 'user_id'].forEach((k) => {
+    try { storage()?.removeItem(k); } catch {}
+  });
+}

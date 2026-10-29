@@ -34,7 +34,7 @@ export const NotificationsAPI = {
       }
       throw new Error(data?.message || `Could not load notifications (${res.status})`);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      if (__DEV__) console.warn('Error fetching notifications:', (error as any)?.message);
       // Thrown, not []: an empty list here wiped the notifications on screen whenever one refresh failed.
       throw error;
     }
@@ -48,7 +48,7 @@ export const NotificationsAPI = {
       const data = await res.json();
       return !!data.success;
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      if (__DEV__) console.warn('Error marking notification as read:', (error as any)?.message);
       return false;
     }
   },
@@ -65,7 +65,7 @@ export const NotificationsAPI = {
       const data = await res.json().catch(() => ({}));
       return res.ok && !!data.success;
     } catch (error) {
-      console.error('Error clearing notifications:', error);
+      if (__DEV__) console.warn('Error clearing notifications:', (error as any)?.message);
       return false;
     }
   },
@@ -82,7 +82,7 @@ export const NotificationsAPI = {
       const data = await res.json();
       return !!data.success;
     } catch (error) {
-      console.error('Error registering device token:', error);
+      if (__DEV__) console.warn('Error registering device token:', (error as any)?.message);
       return false;
     }
   }

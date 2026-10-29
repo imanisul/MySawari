@@ -25,7 +25,7 @@ export const ActivityAPI = {
       });
     } catch (error) {
       // Ignore errors so tracking doesn't break the app
-      console.log('Activity logging failed:', error);
+      if (__DEV__) console.warn('Activity logging failed');
     }
   }
 };

@@ -64,8 +64,8 @@ export default function PaymentsScreen() {
       } else {
         setMethods([]); // Clear on new user
       }
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      if (__DEV__) console.warn('Failed to load saved payment methods:', e?.message);
     }
   };
 
@@ -134,8 +134,8 @@ export default function PaymentsScreen() {
       setCardName('');
       setExpiry('');
       setCvv('');
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      if (__DEV__) console.warn('Failed to save payment method:', e?.message);
       Alert.alert('Error', 'Failed to save payment method.');
     } finally {
       setIsSaving(false);

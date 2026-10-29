@@ -16,18 +16,18 @@ const asString = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() :
  */
 export function PushNotificationHandler() {
   const navReady = !!useRootNavigationState()?.key;
-  const { isAuthenticated, syncNotifications, markNotificationRead, selectCar } = useSawari();
+  const { isAuthenticated, isAuthLoading, syncNotifications, markNotificationRead, selectCar } = useSawari();
 
   // Listeners are registered once, so they read the latest values from here.
-  const latest = useRef({ isAuthenticated, syncNotifications, markNotificationRead, navReady, selectCar });
-  latest.current = { isAuthenticated, syncNotifications, markNotificationRead, navReady, selectCar };
+  const latest = useRef({ isAuthenticated, isAuthLoading, syncNotifications, markNotificationRead, navReady, selectCar });
+  latest.current = { isAuthenticated, isAuthLoading, syncNotifications, markNotificationRead, navReady, selectCar };
 
   const pending = useRef<PushData>(null);
   // A tap can be reported both live and as the "last response" at launch — act on it once.
   const handled = useRef(new Set<string>());
 
   const navigateFor = (data: PushData) => {
-    const { isAuthenticated: authed, syncNotifications: sync, markNotificationRead: markRead, selectCar } = latest.current;
+    const { syncNotifications: sync, markNotificationRead: markRead, selectCar } = latest.current;
     const notificationId = asString(data?.notificationId);
     const bookingId = asString(data?.bookingId);
     const carId = asString(data?.carId);
@@ -36,7 +36,7 @@ export function PushNotificationHandler() {
     if (notificationId) markRead(notificationId).catch(() => {});
     sync().catch(() => {});
 
-    if (bookingId && authed) {
+    if (bookingId) {
       router.push({ pathname: '/booking-detail', params: { id: bookingId } });
     } else if (carId) {
       import('@/services/backend/api').then(({ API }) => {
@@ -71,20 +71,20 @@ export function PushNotificationHandler() {
       Notifications.dismissNotificationAsync?.(key).catch(() => {});
     }
 
-    if (!latest.current.navReady) {
-      pending.current = data || {}; // cold start: navigate once the app's screens exist
+    if (!latest.current.navReady || latest.current.isAuthLoading) {
+      pending.current = data || {}; // cold start: navigate once navigation and auth exist
       return;
     }
     navigateFor(data);
   };
 
-  // A tap that launched the app is handled as soon as navigation is ready.
+  // A tap that launched the app is handled as soon as navigation and auth are ready.
   useEffect(() => {
-    if (!navReady || !pending.current) return;
+    if (!navReady || isAuthLoading || !pending.current) return;
     const data = pending.current;
     pending.current = null;
     navigateFor(data);
-  }, [navReady]);
+  }, [navReady, isAuthLoading]);
 
   useEffect(() => {
     const unsubscribers: (() => void)[] = [];

@@ -325,8 +325,8 @@ function LocationTracker() {
         if (isMounted) {
           await API.updateLocation(location.coords.latitude, location.coords.longitude);
         }
-      } catch (e) {
-        console.warn('Location Tracker Error:', e);
+      } catch (e: any) {
+        if (__DEV__) console.warn('Location Tracker Error:', e?.message);
       }
     };
 

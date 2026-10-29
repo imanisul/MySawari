@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { CustomAlert } from '@/components';
 import { useSawari } from '@/context/SawariContext';
+import { API } from '@/services/backend/api';
 import Notifications from '@/utils/notifications';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { getContactPrefs, setContactPrefs, ContactPrefs } from '@/utils/contactPreferences';
@@ -18,16 +19,16 @@ const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_5
 
 /**
  * Figma "Settings": Recommendations & Reminder (SMS / WhatsApp switches with the note), Notifications &
- * Location (the real phone permissions, in the same box style), and Account Deletion (a request goes
- * through support — popup).
+ * Location (the real phone permissions, in the same box style), and Account Deletion (Apple Guideline 5.1.1(v) compliant).
  */
 export default function SettingsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
-  const { isAuthenticated, customer } = useSawari();
+  const { isAuthenticated, customer, logout } = useSawari();
 
   const [prefs, setPrefs] = useState<ContactPrefs>({ sms: true, whatsapp: true });
   const [showDelete, setShowDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Reflect the real OS permissions (re-read when coming back from the system Settings app).
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -138,32 +139,79 @@ export default function SettingsScreen() {
 
       </ScrollView>
 
-      {/* ── "Need to deactivate your account?" ── */}
-      <Modal visible={showDelete} transparent animationType="fade" onRequestClose={() => setShowDelete(false)}>
+      {/* ── Apple Guideline 5.1.1(v) Compliant Account Deletion ── */}
+      <Modal visible={showDelete} transparent animationType="fade" onRequestClose={() => !isDeleting && setShowDelete(false)}>
         <View style={styles.overlay}>
           <ModalBlur />
           <View style={[styles.popup, { backgroundColor: p.page, borderColor: p.redBorder }]} accessibilityViewIsModal>
-            <Text style={[styles.popupTitle, { color: p.fg }]}>Need to deactivate your account?</Text>
-            <Text style={[styles.popupBody, { color: p.muted }]}>Account deactivation requests can only be made through our support team.</Text>
-            <View style={[styles.popupBox, { borderColor: p.border }]}>
+            <Text style={[styles.popupTitle, { color: p.fg }]}>Delete MySawari Account</Text>
+            <Text style={[styles.popupBody, { color: p.muted }]}>
+              Deleting your account is permanent. All your personal details, rental history, and wallet balances will be permanently erased. This cannot be undone.
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Confirm permanent account deletion"
+              disabled={isDeleting}
+              onPress={() => {
+                CustomAlert.alert(
+                  'Permanent Account Deletion',
+                  'Are you absolutely sure you want to permanently delete your account? You will be logged out immediately.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Delete My Account',
+                      style: 'destructive',
+                      onPress: async () => {
+                        try {
+                          setIsDeleting(true);
+                          await API.deleteAccount();
+                          await logout();
+                          setShowDelete(false);
+                          CustomAlert.alert('Account Deleted', 'Your MySawari account and associated data have been permanently deleted.');
+                          router.replace('/');
+                        } catch (err: any) {
+                          CustomAlert.alert('Error', err?.message || 'Failed to delete account. Please try again.');
+                        } finally {
+                          setIsDeleting(false);
+                        }
+                      },
+                    },
+                  ]
+                );
+              }}
+              style={({ pressed }) => [
+                styles.confirmDeleteBtn,
+                { backgroundColor: p.red },
+                pressed && { opacity: 0.85 },
+                isDeleting && { opacity: 0.6 },
+              ]}
+            >
+              {isDeleting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.confirmDeleteText}>Permanently Delete Account</Text>
+              )}
+            </Pressable>
+
+            <View style={[styles.popupBox, { borderColor: p.border, marginTop: 12 }]}>
               <Text style={[styles.popupBoxText, { color: p.muted }]}>
-                Please{' '}
-                <Text accessibilityRole="link" accessibilityHint="Calls MySawari support" onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`)}>call us</Text>
-                {' '}or email{' '}
+                Need help or have an active booking?{' '}
                 <Text
                   accessibilityRole="link"
-                  onPress={() => Linking.openURL(`mailto:${ACCOUNT_EMAIL}?subject=${encodeURIComponent('Account deactivation request')}&body=${encodeURIComponent(`Please deactivate my MySawari account.\nRegistered mobile: ${customer?.mobile || ''}`)}`)}
+                  onPress={() => Linking.openURL(`mailto:${ACCOUNT_EMAIL}?subject=${encodeURIComponent('Account assistance')}`)}
                   style={[styles.link, { color: p.navy }]}
                 >
-                  {ACCOUNT_EMAIL}
+                  Contact Support
                 </Text>
-                {' '}to request account deactivation.
               </Text>
             </View>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowDelete(false)} hitSlop={8} style={[styles.close, { backgroundColor: p.iconBg }]}>
-            <Feather name="x" size={17} color={p.sub} />
-          </Pressable>
+          {!isDeleting && (
+            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowDelete(false)} hitSlop={8} style={[styles.close, { backgroundColor: p.iconBg }]}>
+              <Feather name="x" size={17} color={p.sub} />
+            </Pressable>
+          )}
         </View>
       </Modal>
     </SafeAreaView>
@@ -192,4 +240,6 @@ const styles = StyleSheet.create({
   popupBoxText: { fontFamily: FONT.regular, fontSize: 12.5, lineHeight: 19, textAlign: 'center' },
   link: { textDecorationLine: 'underline', fontFamily: FONT.regular },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  confirmDeleteBtn: { height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 18, paddingHorizontal: 16 },
+  confirmDeleteText: { fontFamily: FONT.semibold, fontSize: 14, color: '#FFFFFF' },
 });

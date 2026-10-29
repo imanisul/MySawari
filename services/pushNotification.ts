@@ -13,7 +13,7 @@ let Notifications: any = null;
 try {
   Notifications = require('expo-notifications');
 } catch (error) {
-  console.log('expo-notifications not available (likely Expo Go on Android SDK 53+)');
+  if (__DEV__) console.log('expo-notifications not available (likely Expo Go on Android SDK 53+)');
 }
 
 // A failed registration (server waking up, weak signal) is retried, so the phone isn't left without pushes
@@ -63,10 +63,10 @@ async function registerOnce(generation: number) {
       }),
     });
   } catch (error) {
-    console.log('Push notifications handler setup failed:', error);
+    if (__DEV__) console.warn('Push notifications handler setup failed');
   }
   if (!Device.isDevice) {
-    console.log('Must use a physical device for Push Notifications');
+    if (__DEV__) console.log('Must use a physical device for Push Notifications');
     return;
   }
 
@@ -91,7 +91,7 @@ async function registerOnce(generation: number) {
   }
 
   if (finalStatus !== 'granted') {
-    console.log('User denied push notification permissions!');
+    if (__DEV__) console.log('User denied push notification permissions');
     return;
   }
 
@@ -117,14 +117,14 @@ async function registerOnce(generation: number) {
     if (generation !== registrationGeneration) return; // a newer registration (e.g. after login) took over
     try {
       if (await sendRegistration(expoPushToken)) {
-        console.log('Device successfully registered for push notifications!');
+        if (__DEV__) console.log('Device successfully registered for push notifications');
         return;
       }
     } catch (error) {
-      console.log('Push registration attempt failed:', error);
+      if (__DEV__) console.warn('Push registration attempt failed');
     }
     if (attempt >= REGISTER_RETRY_DELAYS_MS.length) {
-      console.log('Push registration failed after retries; will try again on the next launch or login.');
+      if (__DEV__) console.warn('Push registration failed after retries; will retry on the next launch or login.');
       return;
     }
     await sleep(REGISTER_RETRY_DELAYS_MS[attempt]);
@@ -137,14 +137,16 @@ async function registerOnce(generation: number) {
  */
 export function registerDeviceForPushNotifications(): Promise<void> {
   if (!Notifications) {
-    console.log('Push notifications are not supported in this environment.');
+    if (__DEV__) console.log('Push notifications are not supported in this environment.');
     return Promise.resolve();
   }
   const generation = ++registrationGeneration;
   // One registration at a time, in order: the newest always runs last, with the current login state.
   registrationQueue = registrationQueue
     .then(() => registerOnce(generation))
-    .catch((error) => console.log('Failed to register device token or push notifications unsupported:', error));
+    .catch((error) => {
+      if (__DEV__) console.warn('Device token registration skipped or unsupported');
+    });
   return registrationQueue;
 }
 
@@ -165,6 +167,6 @@ export async function unregisterDeviceForPushNotifications(authToken: string | n
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
   } catch (error) {
-    console.log('Failed to unregister push device:', error);
+    if (__DEV__) console.warn('Failed to unregister push device');
   }
 }

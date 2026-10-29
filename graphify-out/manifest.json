@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "components/auth/LoginBottomSheet.tsx": {
-    "mtime": 1793016117.3660042,
-    "seen": 1793016271.136193,
-    "ast_hash": "726adf1e5d49ae92a2ee66dafb69c9a1",
+    "mtime": 1793250253.2209089,
+    "seen": 1793250731.5810182,
+    "ast_hash": "66db613f4a7dfef8e590ea5a6306411e",
     "semantic_hash": ""
   },
   "components/auth/PhoneNumberSheet.tsx": {
@@ -558,9 +558,9 @@
     "semantic_hash": ""
   },
   "components/notifications/PushNotificationHandler.tsx": {
-    "mtime": 1792992579.5813158,
-    "seen": 1792992597.327866,
-    "ast_hash": "45e5e2d510908d5b2a43109d61efb7da",
+    "mtime": 1793271633.0707686,
+    "seen": 1793271688.449975,
+    "ast_hash": "6edbd00e69a4cb3697fff88ac9d56e1b",
     "semantic_hash": ""
   },
   "components/payment/RazorpayCheckoutWebView.tsx": {
@@ -720,9 +720,9 @@
     "semantic_hash": ""
   },
   "eas.json": {
-    "mtime": 1791540485.9818943,
-    "seen": 1792489957.517785,
-    "ast_hash": "7be3fe482ba4420bbce88d4f47e97f62",
+    "mtime": 1793270081.9045608,
+    "seen": 1793270585.261296,
+    "ast_hash": "f2b9518830fafcc475fc7a288529df05",
     "semantic_hash": ""
   },
   "fetch_images.js": {
@@ -942,9 +942,9 @@
     "semantic_hash": ""
   },
   "screens/Settings/SettingsScreen.tsx": {
-    "mtime": 1793016117.3721883,
-    "seen": 1793016271.136757,
-    "ast_hash": "b3e518e2faa80fb5533851625883b5bb",
+    "mtime": 1793270069.2240903,
+    "seen": 1793270585.26134,
+    "ast_hash": "f5284a0c5b09c24d8c510661ae405163",
     "semantic_hash": ""
   },
   "screens/Support/AddressConfirmScreen.tsx": {
@@ -1020,9 +1020,9 @@
     "semantic_hash": ""
   },
   "services/backend/api.ts": {
-    "mtime": 1793247428.3511403,
-    "seen": 1793247501.983244,
-    "ast_hash": "6be6061178c558304523df2fb4c4e085",
+    "mtime": 1793271150.7138176,
+    "seen": 1793271333.117957,
+    "ast_hash": "d3fd601ad782082aa824135d5f8bf4d7",
     "semantic_hash": ""
   },
   "services/backend/pricingEngine.ts": {
@@ -1092,15 +1092,15 @@
     "semantic_hash": ""
   },
   "utils/secureStore.ts": {
-    "mtime": 1790397371.082431,
-    "seen": 1792489957.517828,
-    "ast_hash": "49796291cee78eda9b4e1be32a7614b8",
+    "mtime": 1793269153.3087916,
+    "seen": 1793270585.261371,
+    "ast_hash": "8f5c144c6521b1385e071e1d4e96624e",
     "semantic_hash": ""
   },
   "utils/secureStore.web.ts": {
-    "mtime": 1790397371.109793,
-    "seen": 1792489957.5178292,
-    "ast_hash": "22da4c704583bee1d5da55997175f2f4",
+    "mtime": 1793269177.3466759,
+    "seen": 1793270585.2613719,
+    "ast_hash": "1e845bf51dde19d4212e63ea039e6f7a",
     "semantic_hash": ""
   },
   "utils/vehicleImages.ts": {
@@ -2259,6 +2259,12 @@
     "mtime": 1793016117.3128085,
     "seen": 1793016271.136332,
     "ast_hash": "4949260d9ea6248e1da4f5d398ed28dd",
+    "semantic_hash": ""
+  },
+  "services/security/appIntegrity.ts": {
+    "mtime": 1793269504.4205096,
+    "seen": 1793270585.2613592,
+    "ast_hash": "1bb350df8c1145aca744dc4c2da30561",
     "semantic_hash": ""
   }
 }

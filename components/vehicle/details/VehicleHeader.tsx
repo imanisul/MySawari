@@ -22,8 +22,8 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
         message: `Check out the ${title} on MySawari! Rent it now for an amazing trip.`,
         title: `Rent ${title} on MySawari`,
       });
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      if (__DEV__) console.warn('Vehicle sharing dismissed or failed');
     }
   };
 

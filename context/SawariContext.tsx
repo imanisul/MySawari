@@ -366,8 +366,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             addressStr = reverseData.address || addressStr;
             placeName = reverseData.name || placeName;
           }
-        } catch (e) {
-          console.warn('Reverse geocode failed', e);
+        } catch (e: any) {
+          if (__DEV__) console.warn('Reverse geocode failed:', e?.message);
         }
 
         const detected: LocationResult = {
@@ -382,8 +382,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setPickup((prev) => (isAuto(prev) ? detected : prev));
           setReturnAddress((prev) => (isAuto(prev) ? detected : prev));
         }
-      } catch (e) {
-        console.warn('Failed to auto-detect location', e);
+      } catch (e: any) {
+        if (__DEV__) console.warn('Failed to auto-detect location:', e?.message);
       }
     };
 
@@ -651,9 +651,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         const locallyRead = new Set(prev.filter(n => n.read).map(n => n.id));
         return mapped.map((n: any) => ({ ...n, read: n.read || locallyRead.has(n.id) }));
       });
-    } catch (e) {
+    } catch (e: any) {
       // Network / server problem: the list on screen stays as it was.
-      console.error('syncNotifications error:', e);
+      if (__DEV__) console.warn('syncNotifications error:', e?.message);
     }
   }, [isAuthenticated, clearedKey, readClearedAt]);
 
@@ -815,7 +815,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
               await API.activateMembership(plan, { razorpayOrderId: paymentDetails.razorpayOrderId, razorpayPaymentId: paymentDetails.razorpayPaymentId });
             }
           } catch (e: any) {
-            console.warn('Membership with booking not saved:', e?.message);
+            if (__DEV__) console.warn('Membership with booking not saved:', e?.message);
           }
           setPlanToBuy(null);
         }
@@ -868,8 +868,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             AsyncStorage.setItem(`@customer_info_${prev.id || 'guest'}`, JSON.stringify(cacheable)).catch(() => {});
             return next;
           });
-        } catch (e) {
-          console.error("Failed to save profile", e);
+        } catch (e: any) {
+          if (__DEV__) console.warn("Failed to save profile", e?.message);
           throw e; // Let the UI handle the error
         }
       },
@@ -1005,8 +1005,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           // Trips searched as a guest on this phone stay in their recent searches.
           import('@/utils/recentSearches').then(({ adoptGuestSearches }) => adoptGuestSearches(String(user.id))).catch(() => {});
           import('@/utils/recentlyViewed').then(({ adoptGuestViewed }) => adoptGuestViewed(String(user.id))).catch(() => {});
-        } catch (e) {
-          console.error(e);
+        } catch (e: any) {
+          if (__DEV__) console.warn('Login follow-up tasks failed:', e?.message);
         }
       },
       logout: async () => {
@@ -1033,8 +1033,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             try {
               const sanitizedMobile = customer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');
               // (Removed FCM Topic Unsubscribe Failed logic to let expo-notifications handle pushes)
-            } catch (fcmError) {
-              console.warn('FCM Topic Unsubscribe Failed:', fcmError);
+            } catch (fcmError: any) {
+              if (__DEV__) console.warn('FCM Topic Unsubscribe Failed:', fcmError?.message);
             }
           }
 

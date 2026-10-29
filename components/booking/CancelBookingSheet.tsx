@@ -108,7 +108,7 @@ export function CancelBookingSheet({
               : undefined,
           });
         } catch (e: any) {
-          console.warn('Secondary requestRefund warning:', e?.message);
+          if (__DEV__) console.warn('Secondary requestRefund warning:', e?.message);
         }
       }
       setDone(res.snapshot);

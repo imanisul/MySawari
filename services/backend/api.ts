@@ -150,7 +150,23 @@ import { hasGoogleMaps, googleSearchPlaces, googleReverseLocation } from '../map
 // The backend is a separate project, deployed on Render. EXPO_PUBLIC_API_BASE_URL overrides it
 // (e.g. http://<your-computer's-LAN-IP>:5001 to test against a local backend on a real phone).
 const DEFAULT_API_BASE_URL = 'https://mysawari-customer-backend-1.onrender.com';
-const BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+const rawBase = (process.env.EXPO_PUBLIC_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/+$/, '');
+
+/**
+ * Enforces HTTPS for all remote API communications in production builds.
+ */
+export function enforceHttpsUrl(url: string): string {
+  if (typeof url !== 'string') return url;
+  if (!__DEV__ && url.startsWith('http://')) {
+    const isLocal = /localhost|127\.0\.0\.1|10\.0\.2\.2/i.test(url);
+    if (!isLocal) {
+      return url.replace(/^http:\/\//i, 'https://');
+    }
+  }
+  return url;
+}
+
+const BASE_URL = enforceHttpsUrl(rawBase);
 export const BACKEND_URL = `${BASE_URL}/api`;
 
 
@@ -189,6 +205,7 @@ async function withInstallId(headers: Record<string, string> = {}): Promise<Reco
  * (and their loading spinners) hanging forever. A caller's own AbortSignal still works as before.
  */
 export async function timedFetch(url: string, options: RequestInit = {}, timeoutMs: number = 20000): Promise<Response> {
+  const secureUrl = enforceHttpsUrl(url);
   const controller = new AbortController();
   const outer = options.signal;
   const onOuterAbort = () => controller.abort();
@@ -199,7 +216,7 @@ export async function timedFetch(url: string, options: RequestInit = {}, timeout
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   try {
-    const rawRes = await fetch(url, { ...options, signal: controller.signal });
+    const rawRes = await fetch(secureUrl, { ...options, signal: controller.signal });
     return await normalizeResponse(rawRes);
   } catch (error: any) {
     if (timedOut) {
@@ -364,38 +381,126 @@ async function normalizeResponse(response: Response): Promise<Response> {
     } catch {}
   }
 
-  return response;
-}
-
-export async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  const { getItemAsync, setItemAsync, deleteItemAsync } = require('../../utils/secureStore');
-  let token = await getItemAsync('auth_token');
-
-  const headers = new Headers(options.headers || {});
-  if (token) headers.set('Authorization', `Bearer ${token}`);
-  try { headers.set('X-Install-Id', await getInstallId()); } catch {}
-  
-  let response;
-  try {
-    response = await timedFetch(url, { ...options, headers });
-  } catch (error: any) {
-    if (error.name === 'TypeError' && error.message === 'Network request failed') {
-      throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
+  // Normalize 429 Rate Limiting with helpful user message
+  if (response.status === 429) {
+    try {
+      const body = await response.clone().json();
+      return new Response(JSON.stringify({
+        success: false,
+        message: body?.message || 'Too many requests. Please slow down and try again in a few moments.',
+        isRateLimited: true,
+      }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    } catch {
+      return new Response(JSON.stringify({
+        success: false,
+        message: 'Too many requests. Please slow down and try again in a few moments.',
+        isRateLimited: true,
+      }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
-    throw error;
   }
 
-  // If server is cold-starting on Render (502/503/504), retry automatically with backoff
-  let retryCount = 0;
-  while ((response.status === 502 || response.status === 503 || response.status === 504) && retryCount < 2) {
-    retryCount++;
-    await new Promise((r) => setTimeout(r, retryCount * 2000));
+  // Normalize 403 Forbidden with clear permission context
+  if (response.status === 403) {
     try {
-      response = await timedFetch(url, { ...options, headers });
+      const body = await response.clone().json();
+      if (!body?.message) {
+        return new Response(JSON.stringify({
+          success: false,
+          message: 'Access denied or device integrity verification required.',
+          isForbidden: true,
+        }), {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     } catch {}
   }
 
-  response = await normalizeResponse(response);
+  return response;
+}
+
+/**
+ * Deduplication map for in-flight GET requests. Prevents duplicate network spikes when multiple
+ * components mount simultaneously or re-render during state updates.
+ */
+const inFlightGetRequests = new Map<string, Promise<Response>>();
+
+/**
+ * Global submission lock to prevent rapid double-tap submissions on mobile action buttons (bookings, payments).
+ */
+const activeSubmissionLocks = new Set<string>();
+
+export async function withSubmissionGuard<T>(
+  lockKey: string,
+  fn: () => Promise<T>,
+  ttlMs: number = 1500
+): Promise<T> {
+  if (activeSubmissionLocks.has(lockKey)) {
+    throw new Error('Action already in progress, please wait.');
+  }
+  activeSubmissionLocks.add(lockKey);
+  const timer = setTimeout(() => activeSubmissionLocks.delete(lockKey), ttlMs);
+  try {
+    return await fn();
+  } finally {
+    clearTimeout(timer);
+    activeSubmissionLocks.delete(lockKey);
+  }
+}
+
+export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+  const method = (options.method || 'GET').toUpperCase();
+  const isGet = method === 'GET';
+
+  const { getItemAsync, setItemAsync, deleteItemAsync } = require('../../utils/secureStore');
+  let token = await getItemAsync('auth_token');
+
+  // Coalesce identical in-flight GET requests
+  const dedupeKey = isGet ? `${url}::${token || ''}` : null;
+  if (isGet && dedupeKey && inFlightGetRequests.has(dedupeKey)) {
+    const active = inFlightGetRequests.get(dedupeKey)!;
+    return active.then((res) => res.clone());
+  }
+
+  const runRequest = async (): Promise<Response> => {
+    const headers = new Headers(options.headers || {});
+    if (token) headers.set('Authorization', `Bearer ${token}`);
+    try { headers.set('X-Install-Id', await getInstallId()); } catch {}
+    
+    let response: Response;
+    try {
+      response = await timedFetch(url, { ...options, headers });
+    } catch (error: any) {
+      if (error.name === 'TypeError' && error.message === 'Network request failed') {
+        throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
+      }
+      throw error;
+    }
+
+    // Exponential backoff with random jitter ONLY for safe, idempotent GET requests.
+    // NEVER automatically retry POST/PUT/DELETE (payments, bookings, OTPs).
+    let retryCount = 0;
+    while (isGet && (response.status === 502 || response.status === 503 || response.status === 504 || response.status === 429) && retryCount < 2) {
+      retryCount++;
+      const retryAfterHeader = response.headers.get('Retry-After');
+      let delayMs = 1000 * Math.pow(1.5, retryCount) + Math.random() * 300;
+      if (retryAfterHeader) {
+        const sec = parseInt(retryAfterHeader, 10);
+        if (!isNaN(sec) && sec > 0) delayMs = Math.min(sec * 1000, 4000);
+      }
+      await new Promise((r) => setTimeout(r, delayMs));
+      try {
+        response = await timedFetch(url, { ...options, headers });
+      } catch {}
+    }
+
+    response = await normalizeResponse(response);
 
   if (response.status === 401) {
     if (!token) {
@@ -471,10 +576,22 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
       }
       throw error;
     }
-    response = await normalizeResponse(response);
+      response = await normalizeResponse(response);
+    }
+
+    return response;
+  };
+
+  if (isGet && dedupeKey) {
+    const promise = runRequest();
+    inFlightGetRequests.set(dedupeKey, promise);
+    promise.finally(() => {
+      inFlightGetRequests.delete(dedupeKey);
+    });
+    return promise.then((r) => r.clone());
   }
 
-  return response;
+  return runRequest();
 }
 
 export const API = {
@@ -510,7 +627,7 @@ export const API = {
       // Extra safeguard: explicitly filter out any vehicles marked as deleted
       return (data.data || []).filter((v: any) => v.isDeleted !== true);
     } catch (e: any) {
-      console.error('getVehiclesRaw error:', e);
+      if (__DEV__) console.warn('getVehiclesRaw error:', e?.message);
       throw e;
     }
   },
@@ -942,7 +1059,7 @@ export const API = {
       if (!response.ok) throw new Error(data.message || 'Failed to fetch payment history');
       return data.data || [];
     } catch (e: any) {
-      console.warn('[API.getMyPayments] Error:', e.message);
+      if (__DEV__) console.warn('[API.getMyPayments] Error:', e?.message);
       return [];
     }
   },
@@ -1214,8 +1331,8 @@ export const API = {
         body: JSON.stringify(data)
       });
       return await response.json();
-    } catch (e) {
-      console.warn('Failed to track lead:', e);
+    } catch (e: any) {
+      if (__DEV__) console.warn('Failed to track lead:', e?.message);
       return null; // Fire and forget, don't break the UI
     }
   },
@@ -1245,7 +1362,7 @@ export const API = {
       if (!response.ok) throw new Error(data.message || 'Failed to fetch ride journey');
       return data.data;
     } catch (e: any) {
-      console.error('getRideJourney error:', e.message);
+      if (__DEV__) console.warn('getRideJourney error:', e?.message);
       return null;
     }
   },
@@ -1262,7 +1379,7 @@ export const API = {
       invalidateWalletCache();
       return data.data;
     } catch (e: any) {
-      console.error('claimMilestoneReward error:', e.message);
+      if (__DEV__) console.warn('claimMilestoneReward error:', e?.message);
       throw e;
     }
   },
@@ -1293,7 +1410,7 @@ export const API = {
     } catch (e: any) {
       // An expired session is already handled (logout) by fetchWithAuth — not an error here.
       if (!/session expired|not authorized/i.test(e.message)) {
-        console.error('getWallet error:', e.message);
+        if (__DEV__) console.warn('getWallet error:', e?.message);
       }
       // `failed` tells screens this is NOT a real empty wallet: they keep what they had (balance,
       // membership) or offer a retry, instead of showing ₹0 / "not a member" to a paying member.
@@ -1313,7 +1430,7 @@ export const API = {
       invalidateWalletCache();
       return data.data;
     } catch (e: any) {
-      console.error('requestWithdrawal error:', e.message);
+      if (__DEV__) console.warn('requestWithdrawal error:', e?.message);
       throw e;
     }
   },
@@ -1330,7 +1447,7 @@ export const API = {
       invalidateWalletCache();
       return data.data;
     } catch (e: any) {
-      console.error('activateMembership error:', e.message);
+      if (__DEV__) console.warn('activateMembership error:', e?.message);
       throw e;
     }
   },
@@ -1437,7 +1554,7 @@ export const API = {
         } as BookingSnapshot;
       });
     } catch (e: any) {
-      console.error('getAllBookings error:', e);
+      if (__DEV__) console.warn('getAllBookings error:', e?.message);
       // Thrown, not []: an empty list here replaced the customer's real trips with "No upcoming trips"
       // whenever one refresh failed. React Query keeps the last good list and the screens offer a retry.
       throw e;
@@ -1579,16 +1696,22 @@ export const API = {
   /**
    * POST /api/auth/send-otp
    */
-  async sendOtp(mobile: string) {
+  async sendOtp(mobile: string, deviceId?: string) {
     try {
       const res = await timedFetch(`${BACKEND_URL}/auth/send-otp`, {
         method: 'POST',
         headers: await withInstallId({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ mobileNumber: mobile })
+        body: JSON.stringify({ mobileNumber: mobile, deviceId })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
-      return { success: true, message: data.message, isExistingUser: data.data?.isExistingUser };
+      return { 
+        success: true, 
+        message: data.message, 
+        isExistingUser: data.data?.isExistingUser,
+        otpId: data.data?.otpId,
+        expiresInSec: data.data?.expiresInSec
+      };
     } catch (e: any) {
       throw new Error(e.message);
     }
@@ -1597,17 +1720,24 @@ export const API = {
   /**
    * POST /api/auth/verify-otp
    */
-  async verifyOtp(mobile: string, otp: string, name?: string, referredByCode?: string) {
+  async verifyOtp(mobile: string, otp: string, name?: string, referredByCode?: string, otpId?: string, deviceId?: string) {
     try {
       const res = await timedFetch(`${BACKEND_URL}/auth/verify-otp`, {
         method: 'POST',
         headers: await withInstallId({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ mobileNumber: mobile, otp, customerName: name, referredByCode })
+        body: JSON.stringify({ 
+          mobileNumber: mobile, 
+          otp, 
+          customerName: name, 
+          referredByCode,
+          otpId,
+          deviceId
+        })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to verify OTP');
       
-      const { token, refreshToken, customer } = data.data;
+      const { token, refreshToken, customer, su } = data.data;
       
       const user = {
         id: customer._id,
@@ -1618,12 +1748,27 @@ export const API = {
         gender: customer.gender,
         license: customer.documents?.dlNumber || '',
         referralCode: customer.referralCode,
-        createdAt: customer.createdAt
+        createdAt: customer.createdAt,
+        su: Boolean(su)
       };
       
-      return { user, token, refreshToken };
+      return { user, token, refreshToken, su: Boolean(su) };
     } catch (e: any) {
       throw new Error(e.message);
+    }
+  },
+
+  /**
+   * POST /api/auth/logout-all
+   */
+  async logoutAll() {
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/auth/logout-all`, {
+        method: 'POST'
+      });
+      return res.ok;
+    } catch {
+      return false;
     }
   },
 
@@ -1638,8 +1783,8 @@ export const API = {
         const customer = data.data?.customer;
         return customer ? { ...customer, name: customer.customerName } : null;
       }
-    } catch(e) {
-      console.log('Error fetching profile from backend:', e);
+    } catch(e: any) {
+      if (__DEV__) console.warn('Error fetching profile from backend:', e?.message);
     }
     return null;
   },
@@ -1675,6 +1820,24 @@ export const API = {
   },
 
   /**
+   * DELETE /api/customers/profile
+   * Complies with Apple App Store Guideline 5.1.1(v) for in-app account deletion.
+   */
+  async deleteAccount(): Promise<boolean> {
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/customers/profile`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to delete account');
+      return true;
+    } catch (e: any) {
+      throw new Error(e.message || 'Failed to delete account');
+    }
+  },
+
+  /**
    * PUT /api/customers/location
    */
   async updateLocation(lat: number, lng: number) {
@@ -1690,7 +1853,7 @@ export const API = {
       }
       return true;
     } catch (e: any) {
-      console.warn('Failed to update location:', e.message);
+      if (__DEV__) console.warn('Failed to update location:', e?.message);
       return false;
     }
   },
@@ -1705,7 +1868,7 @@ export const API = {
       if (!response.ok) throw new Error(data.message || 'Failed to fetch referrals');
       return data.data || [];
     } catch (e: any) {
-      console.error('getReferrals error:', e);
+      if (__DEV__) console.warn('getReferrals error:', e?.message);
       throw e; // the screen shows a retry; an empty list would look like "you referred nobody"
     }
   },
@@ -1782,7 +1945,7 @@ export const API = {
       }
       
       if (!e.message.includes('status 503') && !e.message.includes('status 502')) {
-        console.warn(`Photon search failed: ${e.message}. Falling back to Nominatim...`);
+        if (__DEV__) console.warn(`Photon search failed: ${e.message}. Falling back to Nominatim...`);
       }
       try {
         // Fallback: Nominatim API
@@ -1826,7 +1989,7 @@ export const API = {
         return remember(dedupeLocations(mapped));
       } catch (fallbackError: any) {
         if (fallbackError.name === 'AbortError' || (signal && signal.aborted)) throw fallbackError;
-        console.error('All location search APIs failed:', fallbackError.message);
+        if (__DEV__) console.warn('All location search APIs failed:', fallbackError.message);
         return [];
       }
     }
@@ -1908,7 +2071,7 @@ export const API = {
           country: data.address?.country || null,
         };
       } catch (fallbackError: any) {
-        console.error('All reverse geocoding APIs failed:', fallbackError.message);
+        if (__DEV__) console.warn('All reverse geocoding APIs failed:', fallbackError.message);
         return null;
       }
     }

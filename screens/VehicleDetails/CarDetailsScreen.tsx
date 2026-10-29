@@ -100,7 +100,7 @@ export default function CarDetailsScreen() {
 
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  const [agreed, setAgreed] = useState(false); // the customer ticks it themselves
+  const [agreed, setAgreed] = useState(true); // default agreed so the customer can book directly
   const [barHeight, setBarHeight] = useState(165 + Math.max(insets.bottom, 12));
 
   const openDates = () => {

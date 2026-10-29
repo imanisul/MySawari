@@ -45,6 +45,8 @@ function ChevronIcon({ color }: { color: string }) {
 export const POPULAR_DESTINATIONS = [
   { id: 'pop1', name: 'Kaziranga National Park', address: 'Kanchanjuri, Assam', latitude: 26.5775, longitude: 93.1711 },
   { id: 'pop2', name: 'Shillong', address: 'East Khasi Hills, Meghalaya', latitude: 25.5788, longitude: 91.8933 },
+  { id: 'pop_cherra', name: 'Cherrapunji', address: 'Sohra, East Khasi Hills, Meghalaya', latitude: 25.2700, longitude: 91.7320 },
+  { id: 'pop_umrangso', name: 'Umrangso', address: 'Dima Hasao, Assam', latitude: 25.5186, longitude: 92.7483 },
   { id: 'pop3', name: 'Kamakhya Temple', address: 'Kamakhya, Guwahati, Assam', latitude: 26.1670, longitude: 91.7086 },
   { id: 'pop4', name: 'Tawang Monastery', address: 'Tawang, Arunachal Pradesh', latitude: 27.5866, longitude: 91.8596 },
   { id: 'pop5', name: 'Lokpriya Gopinath Bordoloi Airport', address: 'Borjhar, Guwahati, Assam', latitude: 26.1062, longitude: 91.5859 },

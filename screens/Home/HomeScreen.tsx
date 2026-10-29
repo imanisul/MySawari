@@ -4,7 +4,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability } from '@/utils/sawari';
+import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, cars, LocationResult } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet } from '@/components';
 import { PhoneNumberSheet } from '@/components/auth/PhoneNumberSheet';
@@ -21,15 +21,57 @@ import {
 } from '@/components/home/HomeSections';
 
 const DESTINATIONS: { id: string; title: string; blurb: string; image: ImageSourcePropType; faded?: boolean }[] = [
-  { id: '3', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/meghalaya.png'), faded: true },
-  { id: '8', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/sikkim_mountains.png'), faded: true },
-  { id: '1', title: 'Assam', blurb: 'Tea gardens, Kaziranga safaris, and the mighty Brahmaputra.', image: require('../../assets/images/kaziranga.jpg') },
-  { id: '2', title: 'Arunachal Pradesh', blurb: 'High passes, Tawang Monastery, and the Ziro Valley.', image: require('../../assets/images/tawang.jpg') },
-  { id: '6', title: 'Nagaland', blurb: 'Dzükou Valley treks, Kohima, and the Hornbill Festival.', image: require('../../assets/images/nagaland.jpg') },
-  { id: '4', title: 'Manipur', blurb: 'Loktak Lake, floating phumdis, and Kangla Fort.', image: require('../../assets/images/manipur.jpg') },
-  { id: '5', title: 'Mizoram', blurb: 'Rolling hills around Aizawl, Reiek, and Phawngpui.', image: require('../../assets/images/mizoram.jpg') },
-  { id: '7', title: 'Tripura', blurb: 'Ujjayanta Palace, Neermahal, and the Unakoti carvings.', image: require('../../assets/images/tripura.jpg') },
+  { id: 'shillong', title: 'Shillong', blurb: 'Pine-covered hills, cafe culture, and Scotland of the East vibes.', image: require('../../assets/images/shillong.jpg') },
+  { id: 'tawang', title: 'Tawang', blurb: 'High-altitude passes, majestic monastery, and snow peaks.', image: require('../../assets/images/tawang.jpg') },
+  { id: 'cherrapunji', title: 'Cherrapunji', blurb: 'Living root bridges, roaring waterfalls, and misty cliffs.', image: require('../../assets/images/cherrapunji.jpg') },
+  { id: 'umrangso', title: 'Umrangso', blurb: 'Serene Kapili Lake, scenic golf course, and misty rolling hills.', image: require('../../assets/images/umrangso.jpg') },
+  { id: 'kaziranga', title: 'Kaziranga', blurb: 'Wild safaris, the one-horned rhino, and lush tea estates.', image: require('../../assets/images/kaziranga.jpg') },
+  { id: 'meghalaya', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/meghalaya.png'), faded: true },
+  { id: 'sikkim', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/sikkim_mountains.png'), faded: true },
 ];
+
+const DESTINATION_LOCATIONS: Record<string, LocationResult> = {
+  Shillong: {
+    id: 'shillong',
+    name: 'Shillong, Meghalaya',
+    address: 'Scotland of the East',
+    latitude: 25.5788,
+    longitude: 91.8933,
+    source: 'database',
+  },
+  Tawang: {
+    id: 'tawang',
+    name: 'Tawang, Arunachal Pradesh',
+    address: 'Monasteries and Snow Peaks',
+    latitude: 27.5861,
+    longitude: 91.8594,
+    source: 'database',
+  },
+  Cherrapunji: {
+    id: 'cherrapunji',
+    name: 'Cherrapunji, Meghalaya',
+    address: 'Living Root Bridges & Waterfalls',
+    latitude: 25.2986,
+    longitude: 91.5822,
+    source: 'database',
+  },
+  Umrangso: {
+    id: 'umrangso',
+    name: 'Umrangso, Assam',
+    address: 'Kapili Lake & Scenic Golf Course',
+    latitude: 25.5186,
+    longitude: 92.7486,
+    source: 'database',
+  },
+  Kaziranga: {
+    id: 'kaziranga',
+    name: 'Kaziranga National Park, Assam',
+    address: 'Home of the One-Horned Rhino',
+    latitude: 26.5775,
+    longitude: 93.1711,
+    source: 'database',
+  },
+};
 
 // The first trip milestone (backend MILESTONES in booking.controller.js) — shown to guests, who have no journey yet.
 const FIRST_MILESTONE = { rides: 4, rewardAmount: 50 };
@@ -47,7 +89,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const {
-    vehicleType, setVehicleType, customer, selectCar, isAuthenticated, isAuthLoading, setBookingSource, dateRange,
+    vehicleType, setVehicleType, customer, selectedCar, selectCar, isAuthenticated, isAuthLoading, setBookingSource, dateRange,
     membership, fetchWallet, syncNotifications, sawariCash, unreadCount, earnSawariCash, isDarkMode,
     dropoff, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress,
   } = useSawari();
@@ -210,6 +252,33 @@ export default function HomeScreen() {
     router.push({ pathname: '/dropoff', params: q ? { q, returnBack: 'false' } : { returnBack: 'false' } });
   }, [router, setBookingSource]);
 
+  const handleDestinationPress = useCallback((title: string) => {
+    setBookingSource('home');
+    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'HomeScreen', { destination: title }));
+
+    const loc = DESTINATION_LOCATIONS[title] || {
+      id: title.toLowerCase(),
+      name: `${title}, India`,
+      address: 'Popular Destination',
+      latitude: 0,
+      longitude: 0,
+      source: 'database' as const,
+    };
+    setDropoff(loc);
+
+    if (!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') {
+      const topCar = picks.find((v) => v.isAvailable) || picks[0] || fetchedVehicles.find((v) => v.type === typeName && v.isAvailable) || fetchedVehicles[0];
+      if (topCar) {
+        selectCar(topCar);
+      }
+    }
+
+    router.push({
+      pathname: '/dates',
+      params: { fromDestination: 'true', forSpecificCar: 'true' },
+    });
+  }, [setBookingSource, setDropoff, selectedCar, picks, fetchedVehicles, typeName, selectCar, router]);
+
   const sections = useMemo(() => ['header', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
@@ -274,10 +343,7 @@ export default function HomeScreen() {
               horizontal
               keyExtractor={(d) => d.id}
               renderItem={({ item: d }) => (
-                <DestinationTile image={d.image} faded={d.faded} title={d.title} blurb={d.blurb} onPress={() => {
-                  import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'HomeScreen', { destination: d.title }));
-                  openDestination(d.title);
-                }} />
+                <DestinationTile image={d.image} faded={d.faded} title={d.title} blurb={d.blurb} onPress={() => handleDestinationPress(d.title)} />
               )}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.row, { gap: 8 }]}
@@ -308,7 +374,7 @@ export default function HomeScreen() {
     }
     if (!content) return null;
     return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, picks, openPick, milestone, journey, claimable, claiming, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, openPick, milestone, journey, claimable, claiming, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>

@@ -26,6 +26,7 @@ const POPULAR: Place[] = [
   ['dawki', 'Dawki, Meghalaya', 'Crystal Clear Umngot River'],
   ['kaziranga', 'Kaziranga National Park, Assam', 'Home of the One-Horned Rhino'],
   ['tawang', 'Tawang, Arunachal Pradesh', 'Monasteries and Snow Peaks'],
+  ['umrangso', 'Umrangso, Assam', 'Kapili Lake & Scenic Golf Course'],
   ['dirang', 'Dirang, Arunachal Pradesh', 'Hot Water Springs & Orchards'],
   ['bomdila', 'Bomdila, Arunachal Pradesh', 'Buddhist Monasteries & Viewpoints'],
   ['ziro', 'Ziro Valley, Arunachal Pradesh', 'Apatani Villages & Rice Fields'],

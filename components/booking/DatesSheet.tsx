@@ -148,7 +148,12 @@ export function DatesSheet() {
   const router = useRouter();
   // fresh: opened right after choosing a destination (or for a trip whose dates have passed) — the
   // customer picks the dates themselves, nothing is pre-filled from an earlier search.
-  const { returnBack, fresh, forSpecificCar } = useLocalSearchParams();
+  const { returnBack, fresh, forSpecificCar, fromDestination } = useLocalSearchParams<{
+    returnBack?: string;
+    fresh?: string;
+    forSpecificCar?: string;
+    fromDestination?: string;
+  }>();
   const freshPick = fresh === 'true';
   const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, dropoff, isDarkMode } = useSawari();
 
@@ -335,6 +340,9 @@ export function DatesSheet() {
 
     if (returnBack === 'true') {
       router.back();
+    } else if (fromDestination === 'true') {
+      // Flow from home Top Destination card: destination and car are already selected, proceed directly to car details
+      router.replace('/car-details');
     } else if (forSpecificCar === 'true') {
       // Flow from car availability check: proceed directly to location search, which then goes to payment option page
       router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
@@ -515,7 +523,7 @@ export function DatesSheet() {
           style={({ pressed }) => [styles.cta, { backgroundColor: ui.navy }, !canApply && styles.ctaDisabled, pressed && { opacity: 0.9 }]}
         >
           <Text style={[styles.ctaText, { color: ui.onNavy }]} numberOfLines={1}>
-            {returnBack === 'true' || forSpecificCar === 'true' ? 'Confirm Dates' : 'Search'}
+            {returnBack === 'true' || forSpecificCar === 'true' || fromDestination === 'true' ? 'Confirm Dates' : 'Search'}
           </Text>
         </Pressable>
       </View>

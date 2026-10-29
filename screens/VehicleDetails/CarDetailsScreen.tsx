@@ -20,7 +20,9 @@ import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar'
 import { longAvail } from '@/components/vehicle/CarListCard';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { MembershipSavedPopup } from '@/components/vehicle/details/MembershipSavedPopup';
-import { BlurHost, BlurTarget } from '@/components/common/BottomBlur';
+import { BlurHost } from '@/components/common/BottomBlur';
+import { BlurTargetView } from 'expo-blur';
+import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 import Reanimated from 'react-native-reanimated';
 import { rise } from '@/components/common/motion';
 
@@ -42,6 +44,7 @@ const STICKY_INDEX = 1;
 export default function CarDetailsScreen() {
   useTrackTripProgress('car'); // Recent searches resume this trip on this page
   const p = useDetailsPalette();
+  const blurTarget = useRef<View | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id: paramCarId } = useLocalSearchParams<{ id?: string }>();
@@ -209,10 +212,11 @@ export default function CarDetailsScreen() {
   }
 
   return (
-    <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
-      <VehicleHeader title={title} tripLabel={tripLabel} onEditTrip={openDates} />
+    <BlurTargetProvider target={blurTarget}>
+      <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
+        <VehicleHeader title={title} tripLabel={tripLabel} onEditTrip={openDates} />
 
-      <BlurTarget style={{ flex: 1 }}>
+      <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
       <ScrollView
         ref={mainScrollRef}
         showsVerticalScrollIndicator={false}
@@ -271,7 +275,7 @@ export default function CarDetailsScreen() {
         <HelpCard />
         <PolicyAgreement agreed={agreed} onToggle={() => setAgreed((v) => !v)} />
       </ScrollView>
-      </BlurTarget>
+      </BlurTargetView>
 
       <StickyBookingBar
         isAvailable={isAvailable}
@@ -296,7 +300,8 @@ export default function CarDetailsScreen() {
           }
         }}
       />
-    </BlurHost>
+      </BlurHost>
+    </BlurTargetProvider>
   );
 }
 

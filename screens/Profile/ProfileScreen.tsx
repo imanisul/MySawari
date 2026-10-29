@@ -144,6 +144,7 @@ export default function ProfileScreen() {
     { key: 'safety', icon: 'shield', title: 'Safety', onPress: () => go('/safety') },
     { key: 'terms', icon: 'file-text', title: 'Terms & Condition', onPress: () => go({ pathname: '/policies', params: { policy: 'terms' } }) },
     { key: 'cancel', icon: 'x-square', title: 'Cancellation Policy', onPress: () => go({ pathname: '/policies', params: { policy: 'cancellation' } }) },
+    { key: 'privacy', icon: 'file-text', title: 'Privacy Policy', onPress: () => go({ pathname: '/policies', params: { policy: 'cancellation' } }) },
   ];
 
   return (
@@ -296,8 +297,9 @@ export default function ProfileScreen() {
 
       {/* ── Logout confirmation ── */}
       <Modal visible={confirmLogout} transparent animationType="fade" onRequestClose={() => !loggingOut && setConfirmLogout(false)}>
-        <View style={styles.dialogOverlay}>
+        <View style={[styles.dialogOverlay]}>
           <ModalBlur />
+           <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
           <View style={[styles.dialog, { backgroundColor: p.page }]} accessibilityViewIsModal>
             <Text style={[styles.dialogTitle, { color: p.fg }]}>Are You Sure ?</Text>
             <Text style={[styles.dialogBody, { color: p.muted }]}>You will not be able to reuse previous old number for the next 6 months. Do you want to continue?</Text>
@@ -346,6 +348,7 @@ function Dashes({ color }: { color: string }) {
 }
 
 const styles = StyleSheet.create({
+  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
   header: { paddingLeft: 16, paddingRight: 16, paddingBottom: 16 + 24 },
   headerTop: { flexDirection: 'row', justifyContent: 'flex-end', height: 24, alignItems: 'center', marginBottom: 32 },
   more: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
@@ -396,8 +399,8 @@ const styles = StyleSheet.create({
   menu: { position: 'absolute', width: 92, borderRadius: 8, paddingVertical: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   menuItem: { paddingHorizontal: 12, height: 35, justifyContent: 'center' },
   menuText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
-  dialogOverlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', paddingHorizontal: 18 },
-  dialog: { borderRadius: 12, paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
+  dialogOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 18 },
+  dialog: { borderRadius: 12, paddingHorizontal: 8, paddingTop: 20, paddingBottom: 12 },
   dialogTitle: { fontFamily: FONT.semibold, fontSize: 19, lineHeight: 25, textAlign: 'center' },
   dialogBody: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 10, paddingHorizontal: 12 },
   dialogBtns: { flexDirection: 'row', gap: 12, marginTop: 20 },

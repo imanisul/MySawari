@@ -74,7 +74,7 @@ const POLICIES: Policy[] = [
 
 function Bullet({ text, p, indent = 0 }: { text: string; p: DetailsPalette; indent?: number }) {
   return (
-    <View style={[styles.bulletRow, { paddingLeft: 6 + indent * 14 }]}>
+    <View style={[styles.bulletRow, { paddingLeft: 16.5 + indent * 16.5 }]}>
       <View style={[styles.bulletDot, { backgroundColor: p.muted }]} />
       <Text style={[styles.bulletText, { color: p.muted }]}>{text}</Text>
     </View>
@@ -88,12 +88,12 @@ export default function PolicyScreen() {
       <SubPageHeader title="Policy Agreements" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {POLICIES.map((policy, pi) => (
-          <View key={policy.title} style={pi > 0 && { marginTop: 28 }}>
+          <View key={policy.title} style={[styles.policyBlock, pi > 0 && styles.policyBlockSeparated]}>
             <Text style={[styles.policyTitle, { color: p.fg }]}>{policy.title}</Text>
             {policy.clauses.map((clause, ci) => (
-              <View key={clause.title} style={{ marginTop: ci === 0 ? 14 : 18 }}>
+              <View key={clause.title} style={[styles.clause, ci === 0 && styles.firstClause]}>
                 <Text style={[styles.clauseTitle, { color: p.fg }]}>{ci + 1}.  {clause.title}</Text>
-                <View style={{ gap: 3 }}>
+                <View style={styles.points}>
                   {clause.points.map((pt) =>
                     typeof pt === 'string' ? (
                       <Bullet key={pt} text={pt} p={p} />
@@ -117,11 +117,16 @@ export default function PolicyScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  content: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 40 },
-  policyTitle: { fontFamily: 'Inter_500Medium', fontSize: 15.5 },
-  clauseTitle: { fontFamily: 'Inter_500Medium', fontSize: 13, marginBottom: 8 },
-  bulletRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  content: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 82, gap: 12 },
+  policyBlock: { width: '100%', paddingVertical: 4, gap: 12 },
+  policyBlockSeparated: { marginTop: 0 },
+  policyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 23 },
+  clause: { gap: 4, marginTop: 4 },
+  firstClause: { marginTop: 0 },
+  clauseTitle: { paddingLeft: 19.5, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  points: { gap: 0 },
+  bulletRow: { flexDirection: 'row', alignItems: 'flex-start', paddingLeft: 6 },
   bulletDot: { width: 3, height: 3, borderRadius: 1.5, marginTop: 7, marginRight: 8 },
-  bulletText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17 },
-  note: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 17, marginTop: 3 },
+  bulletText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5 },
+  note: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5, marginTop: 0 },
 });

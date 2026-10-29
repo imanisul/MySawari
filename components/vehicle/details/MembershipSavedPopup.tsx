@@ -1,11 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing, Image, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useTripPrice } from './useTripPrice';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 // Trips (car + dates + plan) whose popup was already shown this session — it celebrates once, not on every visit.
 const shown = new Set<string>();
@@ -25,13 +25,13 @@ export function clearMembershipPopupShown(carId?: string) {
 // Figma "membership applied": the plan's art (the same crown / shield / gem frames as the Membership page,
 // background removed) with a white card on it. Art files are 708 × 502.
 const ART_W = 264;
-const ART_H = Math.round((ART_W * 502) / 708);
+const ART_H = Math.round((ART_W * 552) / 748);
 
 type Theme = { art: any; innerBorder: string; dash: string; applied: string; confetti: string[] };
 const THEMES: Record<string, Theme> = {
-  Starter: { art: require('@/assets/images/membership_popup_starter.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#2F3E75', confetti: ['#2F3E75', '#6152D8', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
-  Plus: { art: require('@/assets/images/membership_popup_plus.png'), innerBorder: '#FFFFFF', dash: '#C9C2F7', applied: '#6152D8', confetti: ['#6152D8', '#F59E0B', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
-  Pro: { art: require('@/assets/images/membership_popup_pro.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
+  Starter: { art: require('@/assets/images/membership_card_starter.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#2F3E75', confetti: ['#2F3E75', '#6152D8', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
+  Plus: { art: require('@/assets/images/membership_card_plus.png'), innerBorder: '#FFFFFF', dash: '#C9C2F7', applied: '#6152D8', confetti: ['#6152D8', '#F59E0B', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
+  Pro: { art: require('@/assets/images/membership_card_pro.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
 };
 
 /**
@@ -74,9 +74,8 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
-      <BlurView intensity={38}  style={StyleSheet.absoluteFill}>
-        <Pressable accessibilityLabel="Close" style={[StyleSheet.absoluteFill, styles.dim]} onPress={close} />
-      </BlurView>
+      <ModalBlur sigmaX={2} sigmaY={2} />
+      <Pressable accessibilityLabel="Close" style={[StyleSheet.absoluteFill, styles.dim]} onPress={close} />
 
       <View style={styles.center} pointerEvents="box-none">
         <Animated.View
@@ -86,7 +85,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
           accessibilityLabel={`${amount ? `You're saving ${formatCurrency(amount)} on this booking. ` : ''}${title || `${normPlan} Membership Applied!`}${note ? ` ${note}` : ''}`}
         >
           <View style={{ width: ART_W, height: ART_H, overflow: 'hidden' }}>
-            <Image source={t.art} style={{ position: 'absolute', top: 0, left: 0, width: ART_W, height: ART_H }} resizeMode="stretch" fadeDuration={0} accessible={false} />
+            <Image source={t.art} style={{ position: 'absolute', top: 0, left: 0, width: ART_W, height: ART_H }} resizeMode="center" fadeDuration={0} accessible={false} />
             <View style={[styles.inner, { borderColor: t.innerBorder }]}>
               {amount ? (
                 <>
@@ -160,7 +159,7 @@ export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; t
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: 'rgba(0,0,0,0.57)' },
+  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   // The white card sits inside the art's frame (fractions of the 708 × 502 art), as in the design.
   inner: {
@@ -174,7 +173,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal:10,
+    marginHorizontal: 10,
+    marginBottom:10
   },
   saving: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9.5, lineHeight: 13, color: '#525252' },
   amount: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 20, lineHeight: 26, color: '#008758', marginTop: 1 },

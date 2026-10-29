@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { BlurTargetView } from 'expo-blur';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -20,6 +21,7 @@ import { ManageBookingSheet } from '@/components/booking/ManageBookingSheet';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal } from '@/components/booking/ReviewModal';
 import { RefundTrackingModal } from '@/components/booking/RefundTrackingModal';
+import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
 import {
   ActionRow, BookingCard, FONT, HelpCard, PricingSummary, RefundTimeline, SectionTitle, TripTimeline, pickupMoment, refundStage, rupees, shortDate,
@@ -50,6 +52,7 @@ const HANDOVER_STEPS = [
 ];
 
 export default function BookingDetailScreen() {
+  const blurTarget = useRef<View | null>(null);
   const c = useTripColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -217,9 +220,11 @@ export default function BookingDetailScreen() {
   })();
 
   return (
-    <View style={[styles.screen, { backgroundColor: c.background }]}>
-      {header}
-      <Animated.View entering={FadeIn.duration(250)} style={{ flex: 1 }}>
+    <BlurTargetProvider target={blurTarget}>
+      <View style={[ styles.screen, { backgroundColor: c.background }]}>
+        <BlurTargetView ref={blurTarget} style={styles.screen}>
+          {header}
+          <Animated.View entering={FadeIn.duration(250)} style={{ flex: 1 }}>
         <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: bottomBar ? 24 : insets.bottom + 24 }]}>
           {/* Ongoing: the status line comes first */}
           {ongoing && (
@@ -401,7 +406,7 @@ export default function BookingDetailScreen() {
 
           {ongoing && <ActionRow title="Need to change your plans?" subtitle="Modify your trip or manage your booking." onPress={openSupport} />}
         </ScrollView>
-      </Animated.View>
+          </Animated.View>
 
       {!!bottomBar && (
         <View style={[styles.bottomBar, { backgroundColor: c.background, borderTopColor: '#E7EAF4', paddingBottom: insets.bottom + 8 }]}>
@@ -418,7 +423,9 @@ export default function BookingDetailScreen() {
         trip={showReview ? { bookingId: s.id, carId: String(s.vehicleId), vehicleName: s.vehicleName } : null}
         onClose={() => { setShowReview(false); queryClient.invalidateQueries({ queryKey: ['myReviews'] }); }}
       />
-    </View>
+        </BlurTargetView>
+      </View>
+    </BlurTargetProvider>
   );
 }
 
@@ -513,6 +520,7 @@ function RateTrip({ reviewed, onSubmit, onAddPhotos }: {
 }
 
 const styles = StyleSheet.create({
+  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
   screen: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
   back: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },

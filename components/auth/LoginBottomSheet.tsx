@@ -86,6 +86,7 @@ export function LoginBottomSheet({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [referral, setReferral] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +97,7 @@ export function LoginBottomSheet({
   useEffect(() => {
     if (!visible) return;
     setStep('phone'); setMobile(''); setOtp(''); setOtpId(null); setIsExisting(false);
-    setName(''); setEmail(''); setReferral(''); setConfirmed(false);
+    setName(''); setEmail(''); setReferral(''); setTermsAccepted(false); setConfirmed(false);
     setLoading(false); setError(null); setResendIn(0);
   }, [visible]);
 
@@ -121,7 +122,7 @@ export function LoginBottomSheet({
 
   // ── Step 1: phone ──
   const sendOtp = async () => {
-    if (mobile.length !== 10 || loading) return;
+    if (mobile.length !== 10 || !termsAccepted || loading) return;
     Haptics.selectionAsync().catch(() => {});
     setLoading(true); setError(null);
     try {
@@ -212,7 +213,7 @@ export function LoginBottomSheet({
 
   // ── Render ──
   const cta = step === 'phone'
-    ? { label: 'Send OTP', enabled: mobile.length === 10 && !loading, onPress: sendOtp }
+    ? { label: 'Send OTP', enabled: mobile.length === 10 && termsAccepted && !loading, onPress: sendOtp }
     : step === 'otp'
       ? { label: 'Verify & Continue', enabled: digitsOf(otp).length === OTP_LENGTH && !loading, onPress: () => verify() }
       : { label: 'Continue', enabled: canCreate, onPress: createAccount };
@@ -265,12 +266,25 @@ export function LoginBottomSheet({
                 />
               </View>
               {!!error && <Text style={[styles.error, { color: ui.error, textAlign: 'left' }]}>{error}</Text>}
-              <Text style={[styles.terms, { color: ui.copy }]}>
-                By continuing, you agree to our{' '}
-                <Text style={{ color: ui.navy }} onPress={() => Linking.openURL('https://mysawari.in/terms/').catch(() => {})}>Terms &amp; Conditions</Text>
-                {' '}and{' '}
-                <Text onPress={() => Linking.openURL('https://mysawari.in/privacy/').catch(() => {})}>Privacy Policy</Text>.
-              </Text>
+              <View style={styles.checkRow}>
+                <Pressable
+                  onPress={() => setTermsAccepted((accepted) => !accepted)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: termsAccepted }}
+                  accessibilityLabel="Agree to Terms and Conditions and Privacy Policy"
+                  hitSlop={6}
+                >
+                  <View style={[styles.check, { borderColor: termsAccepted ? ui.navy : ui.faint, backgroundColor: termsAccepted ? ui.navy : 'transparent' }]}>
+                    {termsAccepted && <Feather name="check" size={10} color="#FFFFFF" />}
+                  </View>
+                </Pressable>
+                <Text style={[styles.terms, { color: ui.copy }]}>
+                  By continuing, you agree to our{' '}
+                  <Text style={{ color: ui.navy }} onPress={() => Linking.openURL('https://mysawari.in/terms/').catch(() => {})}>Terms &amp; Conditions</Text>
+                  {'  '}and{' '}
+                  <Text onPress={() => Linking.openURL('https://mysawari.in/privacy/').catch(() => {})}>Privacy Policy</Text>.
+                </Text>
+              </View>
             </>
           )}
 
@@ -498,7 +512,7 @@ const styles = StyleSheet.create({
   error: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: -4 },
   label: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 17 },
   checkRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
-  check: { width: 16, height: 16, borderRadius: 4, borderWidth: 1.5, marginTop: 2, alignItems: 'center', justifyContent: 'center' },
+  check: { width: 15, height: 15, borderRadius: 4, borderWidth: 1.5, marginTop: 3, alignItems: 'center', justifyContent: 'center' },
   checkText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },

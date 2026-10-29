@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Keyboard, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
@@ -25,6 +27,7 @@ import { ModalBlur } from '@/components/common/ModalBlur';
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;
+const HAS_LOGGED_IN_KEY = '@mysawari_has_logged_in_before';
 
 // Design palette (light). Dark mode keeps the app's own tokens.
 const LIGHT = {
@@ -77,11 +80,13 @@ export function LoginBottomSheet({
       }
     : LIGHT;
 
+  const router = useRouter();
   const [step, setStep] = useState<'phone' | 'otp' | 'profile'>('phone');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
   const [isExisting, setIsExisting] = useState(false);
+  const [isFirstTime, setIsFirstTime] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [referral, setReferral] = useState('');
@@ -96,8 +101,20 @@ export function LoginBottomSheet({
   useEffect(() => {
     if (!visible) return;
     setStep('phone'); setMobile(''); setOtp(''); setOtpId(null); setIsExisting(false);
-    setName(''); setEmail(''); setReferral(''); setTermsAccepted(false); setConfirmed(false);
+    setName(''); setEmail(''); setReferral(''); setConfirmed(false);
     setLoading(false); setError(null); setResendIn(0);
+
+    // If user has logged in before on this device, it's 2nd time: don't show tick button and auto-accept
+    AsyncStorage.getItem(HAS_LOGGED_IN_KEY)
+      .then((val) => {
+        const hasLoggedIn = val === 'true';
+        setIsFirstTime(!hasLoggedIn);
+        setTermsAccepted(hasLoggedIn);
+      })
+      .catch(() => {
+        setIsFirstTime(true);
+        setTermsAccepted(false);
+      });
   }, [visible]);
 
   // Resend countdown.
@@ -106,6 +123,18 @@ export function LoginBottomSheet({
     const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
     return () => clearTimeout(t);
   }, [step, resendIn]);
+
+  const openTerms = () => {
+    Keyboard.dismiss();
+    onClose();
+    router.push('/terms');
+  };
+
+  const openPrivacy = () => {
+    Keyboard.dismiss();
+    onClose();
+    router.push('/privacy');
+  };
 
   const askForNotifications = () => {
     Notifications.getPermissionsAsync()
@@ -121,12 +150,18 @@ export function LoginBottomSheet({
 
   // ── Step 1: phone ──
   const sendOtp = async () => {
-    if (mobile.length !== 10 || !termsAccepted || loading) return;
+    if (mobile.length !== 10 || (isFirstTime && !termsAccepted) || loading) return;
     Haptics.selectionAsync().catch(() => {});
     setLoading(true); setError(null);
     try {
       const res = await API.sendOtp(mobile);
-      setIsExisting(!!res.isExistingUser);
+      const existing = !!res.isExistingUser;
+      setIsExisting(existing);
+      if (existing) {
+        setIsFirstTime(false);
+        setTermsAccepted(true);
+        AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+      }
       setOtpId(res.otpId || null);
       setOtp('');
       setResendIn(RESEND_SECONDS);
@@ -166,6 +201,7 @@ export function LoginBottomSheet({
     setLoading(true);
     try {
       const { token, refreshToken, user } = await API.verifyOtp(mobile, code, '', '', otpId || undefined);
+      await AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
       await login(token, refreshToken, user);
       askForNotifications();
       finish();
@@ -188,6 +224,7 @@ export function LoginBottomSheet({
     setLoading(true); setError(null);
     try {
       const { token, refreshToken, user } = await API.verifyOtp(mobile, digitsOf(otp), name.trim(), referral, otpId || undefined);
+      await AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
       await login(token, refreshToken, user);
       // Email is optional and saved after the account exists; a failure here never blocks sign-in.
       if (email.trim()) saveProfile({ email: email.trim() }).catch(() => {});
@@ -212,7 +249,7 @@ export function LoginBottomSheet({
 
   // ── Render ──
   const cta = step === 'phone'
-    ? { label: 'Send OTP', enabled: mobile.length === 10 && termsAccepted && !loading, onPress: sendOtp }
+    ? { label: 'Send OTP', enabled: mobile.length === 10 && (isFirstTime ? termsAccepted : true) && !loading, onPress: sendOtp }
     : step === 'otp'
       ? { label: 'Verify & Continue', enabled: digitsOf(otp).length === OTP_LENGTH && !loading, onPress: () => verify() }
       : { label: 'Continue', enabled: canCreate, onPress: createAccount };
@@ -260,25 +297,34 @@ export function LoginBottomSheet({
                 />
               </View>
               {!!error && <Text style={[styles.error, { color: ui.error, textAlign: 'left' }]}>{error}</Text>}
-              <View style={styles.checkRow}>
-                <Pressable
-                  onPress={() => setTermsAccepted((accepted) => !accepted)}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: termsAccepted }}
-                  accessibilityLabel="Agree to Terms and Conditions and Privacy Policy"
-                  hitSlop={6}
-                >
-                  <View style={[styles.check, { borderColor: termsAccepted ? ui.navy : ui.faint, backgroundColor: termsAccepted ? ui.navy : 'transparent' }]}>
-                    {termsAccepted && <Feather name="check" size={10} color="#FFFFFF" />}
-                  </View>
-                </Pressable>
-                <Text style={[styles.terms, { color: ui.copy }]}>
+              {isFirstTime ? (
+                <View style={styles.checkRow}>
+                  <Pressable
+                    onPress={() => setTermsAccepted((accepted) => !accepted)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: termsAccepted }}
+                    accessibilityLabel="Agree to Terms and Conditions and Privacy Policy"
+                    hitSlop={6}
+                  >
+                    <View style={[styles.check, { borderColor: termsAccepted ? ui.navy : ui.faint, backgroundColor: termsAccepted ? ui.navy : 'transparent' }]}>
+                      {termsAccepted && <Feather name="check" size={10} color="#FFFFFF" />}
+                    </View>
+                  </Pressable>
+                  <Text style={[styles.terms, { color: ui.copy }]}>
+                    By continuing, you agree to our{' '}
+                    <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={openTerms}>Terms &amp; Conditions</Text>
+                    {'  '}and{' '}
+                    <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={openPrivacy}>Privacy Policy</Text>.
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.terms, { color: ui.copy, textAlign: 'center', marginTop: 4 }]}>
                   By continuing, you agree to our{' '}
-                  <Text style={{ color: ui.navy }} onPress={() => Linking.openURL('https://mysawari.in/terms/').catch(() => {})}>Terms &amp; Conditions</Text>
+                  <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={openTerms}>Terms &amp; Conditions</Text>
                   {'  '}and{' '}
-                  <Text onPress={() => Linking.openURL('https://mysawari.in/privacy/').catch(() => {})}>Privacy Policy</Text>.
+                  <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={openPrivacy}>Privacy Policy</Text>.
                 </Text>
-              </View>
+              )}
             </>
           )}
 

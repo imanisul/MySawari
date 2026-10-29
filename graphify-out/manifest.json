@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "components/auth/LoginBottomSheet.tsx": {
-    "mtime": 1793277161.8038087,
-    "seen": 1793277246.9323509,
-    "ast_hash": "d8e30dc61f19e5d87ac6f5085a7770ab",
+    "mtime": 1793278707.3535771,
+    "seen": 1793278744.937215,
+    "ast_hash": "3f099740199e87637f8ed1a30c435e3b",
     "semantic_hash": ""
   },
   "components/auth/PhoneNumberSheet.tsx": {
@@ -600,9 +600,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/CarDetailsSections.tsx": {
-    "mtime": 1793192450.9191573,
-    "seen": 1793247501.983178,
-    "ast_hash": "d81f737bd8c249bf59dce78dc03dbb61",
+    "mtime": 1793278331.8405774,
+    "seen": 1793278744.937279,
+    "ast_hash": "a21b0f4b2f4ca0e316c4512e9cd4c00a",
     "semantic_hash": ""
   },
   "components/vehicle/details/DetailsTabs.tsx": {
@@ -654,9 +654,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/VehicleSummary.tsx": {
-    "mtime": 1793181387.4313934,
-    "seen": 1793182003.1654952,
-    "ast_hash": "c4017d31fd2b9778530730bae00e7a69",
+    "mtime": 1793278331.841187,
+    "seen": 1793278744.937286,
+    "ast_hash": "16c2087b549aef8b393345a16fd9fd1c",
     "semantic_hash": ""
   },
   "components/vehicle/details/WriteReviewBottomSheet.tsx": {
@@ -786,9 +786,9 @@
     "semantic_hash": ""
   },
   "screens/Booking/BookingScreen.tsx": {
-    "mtime": 1793277928.7379987,
-    "seen": 1793277974.701252,
-    "ast_hash": "1ef54d4b3b76322054840e5ad4b2d273",
+    "mtime": 1793278331.841678,
+    "seen": 1793278744.937305,
+    "ast_hash": "882ddc1b3eef46d0f3a8d7d6f2082f68",
     "semantic_hash": ""
   },
   "screens/Booking/BookingsScreen.tsx": {
@@ -900,9 +900,9 @@
     "semantic_hash": ""
   },
   "screens/Profile/ProfileScreen.tsx": {
-    "mtime": 1793277083.4490025,
-    "seen": 1793277246.932461,
-    "ast_hash": "22b421bfb72c00c581959fa114ad811c",
+    "mtime": 1793278331.8421535,
+    "seen": 1793278744.93732,
+    "ast_hash": "1752ff5cc3dcb6393eac931e9605ae8d",
     "semantic_hash": ""
   },
   "screens/Settings/SettingsScreen.tsx": {
@@ -936,9 +936,9 @@
     "semantic_hash": ""
   },
   "screens/Support/PolicyScreen.tsx": {
-    "mtime": 1793277083.4506881,
-    "seen": 1793277246.932471,
-    "ast_hash": "c165c81bf436663a4cdab60562e2271f",
+    "mtime": 1793278331.843713,
+    "seen": 1793278744.9373288,
+    "ast_hash": "5546f5b22596d4edc8713487041d0433",
     "semantic_hash": ""
   },
   "screens/Support/SafetyScreen.tsx": {
@@ -1800,15 +1800,15 @@
     "semantic_hash": ""
   },
   "screens/Profile/RefundsScreen.tsx": {
-    "mtime": 1793192450.9225683,
-    "seen": 1793247501.983226,
-    "ast_hash": "a589d9ee0ed02ee1cf744448ecc0edab",
+    "mtime": 1793278331.8428159,
+    "seen": 1793278744.937321,
+    "ast_hash": "caa7e57070cfd8c818970e7c8bf762f2",
     "semantic_hash": ""
   },
   "screens/Profile/SavedAddressesScreen.tsx": {
-    "mtime": 1793277083.449671,
-    "seen": 1793277246.932462,
-    "ast_hash": "f0dd726d32464019c28b8b81f685c567",
+    "mtime": 1793278331.8432536,
+    "seen": 1793278744.937322,
+    "ast_hash": "4dc19c8dd580dbe8715b4ea5ea4bcf95",
     "semantic_hash": ""
   },
   "screens/Referral/MyReferralsScreen.tsx": {
@@ -2205,6 +2205,36 @@
     "mtime": 1793277083.4439902,
     "seen": 1793277246.932377,
     "ast_hash": "3a9880a648b8ce099c0c5a2f7958f5ff",
+    "semantic_hash": ""
+  },
+  "app/cancellation-policy.tsx": {
+    "mtime": 1793278331.837549,
+    "seen": 1793278744.9371789,
+    "ast_hash": "453b8cb20e7d1ca8fff4f810e4c53bd0",
+    "semantic_hash": ""
+  },
+  "app/consent-policy.tsx": {
+    "mtime": 1793278331.8377905,
+    "seen": 1793278744.937183,
+    "ast_hash": "2a4f1201b62e411153d9afd0bb48bf6c",
+    "semantic_hash": ""
+  },
+  "app/grievance-policy.tsx": {
+    "mtime": 1793278331.8379889,
+    "seen": 1793278744.9371898,
+    "ast_hash": "796d5eacc8e85b75938cc08ab122d896",
+    "semantic_hash": ""
+  },
+  "app/privacy.tsx": {
+    "mtime": 1793278331.8382647,
+    "seen": 1793278744.9372,
+    "ast_hash": "4bc97cc7afe13449e1f6159d2a4f9627",
+    "semantic_hash": ""
+  },
+  "app/terms.tsx": {
+    "mtime": 1793278331.83847,
+    "seen": 1793278744.93721,
+    "ast_hash": "bca3eb1445c8b7e424a2ed5d81f6c0e1",
     "semantic_hash": ""
   }
 }

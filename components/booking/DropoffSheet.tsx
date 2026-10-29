@@ -90,8 +90,11 @@ export function DropoffSheet() {
     setDropoff({ id: pl.id, name: pl.name, address: pl.address, latitude: pl.latitude, longitude: pl.longitude, source: pl.source });
     import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: pl.name }));
     if (params.forSpecificCar === 'true') {
-      // Car page → destination → booking: swap this page for the booking page (no jump through Home).
-      router.replace('/booking');
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/car-details');
+      }
     } else if (params.returnBack === 'true') {
       // Changing the destination from the date picker, the booking page or the trip sheet: go straight
       // back there with the dates already chosen. (It used to open a second, empty date picker whose

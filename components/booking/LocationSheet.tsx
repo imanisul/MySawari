@@ -41,7 +41,11 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
 
   const leaveAfterDestination = () => {
     if (forSpecificCar === 'true') {
-      router.replace('/booking');
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/car-details');
+      }
     } else if (returnBack === 'false') {
       // Opened from Home: the destination leads straight on to picking dates & times.
       router.replace({ pathname: '/dates', params: { fresh: 'true' } });

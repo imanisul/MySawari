@@ -1,17 +1,17 @@
 # Graph Report - MySawari  (2026-10-29)
 
 ## Corpus Check
-- 211 files · ~1,207,619 words
+- 211 files · ~1,207,776 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 2, .example 1)
 
 ## Summary
-- 1299 nodes · 4237 edges · 67 communities (64 shown, 3 thin omitted)
+- 1299 nodes · 4241 edges · 67 communities (64 shown, 3 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 8 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `eeb9b717`
+- Built from commit: `c6ca531b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -85,11 +85,11 @@
 
 ## God Nodes (most connected - your core abstractions)
 1. `react` - 168 edges
-2. `useSawari()` - 132 edges
+2. `useSawari()` - 134 edges
 3. `react-native` - 124 edges
 4. `useColors()` - 122 edges
 5. `useDetailsPalette()` - 114 edges
-6. `@expo/vector-icons` - 83 edges
+6. `@expo/vector-icons` - 84 edges
 7. `react-native-safe-area-context` - 61 edges
 8. `expo-haptics` - 56 edges
 9. `expo-router` - 55 edges
@@ -377,16 +377,16 @@ Nodes (20): Route(), Route(), ReviewTrip, rise(), Reveal(), revealedScreens, exp
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `react` to `PaymentsListScreen.tsx`, `ExploreFilters.tsx`, `useDetailsPalette`, `ErrorFallback.tsx`, `package.json`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `sawari.ts`, `HomeScreen.tsx`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `CarListCard.tsx`, `BottomNavigation.tsx`, `PaymentScreen.tsx`, `SearchScreen.tsx`, `index.ts`, `expo-haptics`, `useSawari`, `WishlistScreen.tsx`, `ReferEarnScreen.tsx`, `ProfileScreen.tsx`, `react-native`, `react-native-safe-area-context`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `API`, `DatesSheet.tsx`, `PaymentProcessingScreen.tsx`, `SawariContext.tsx`, `LocationSearchBody.tsx`, `RefundsScreen.tsx`, `formatCurrency`, `CarListCard.tsx`, `FilterSheet.tsx`, `useAppUpdates.ts`, `DropoffSheet.tsx`, `LoginBottomSheet`, `AnimatedSplash.tsx`, `TripReviewSheet.tsx`, `expo-router`?**
-  _High betweenness centrality (0.187) - this node is a cross-community bridge._
+  _High betweenness centrality (0.186) - this node is a cross-community bridge._
 - **What connects `@babel/core`, `@expo/cli`, `@expo/ngrok` to the rest of the system?**
   _28 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `PaymentsListScreen.tsx` be split into smaller, more focused modules?**
   _Cohesion score 0.14736842105263157 - nodes in this community are weakly interconnected._
 - **Why does `react-native` connect `react-native` to `PaymentsListScreen.tsx`, `ExploreFilters.tsx`, `useDetailsPalette`, `ErrorFallback.tsx`, `package.json`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `sawari.ts`, `HomeScreen.tsx`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `CarListCard.tsx`, `BottomNavigation.tsx`, `SearchScreen.tsx`, `index.ts`, `expo-haptics`, `useSawari`, `WishlistScreen.tsx`, `ReferEarnScreen.tsx`, `ProfileScreen.tsx`, `fetchWithAuth`, `react-native-safe-area-context`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `API`, `DatesSheet.tsx`, `PaymentProcessingScreen.tsx`, `SawariContext.tsx`, `LocationSearchBody.tsx`, `RefundsScreen.tsx`, `activity.ts`, `formatCurrency`, `CarListCard.tsx`, `FilterSheet.tsx`, `useAppUpdates.ts`, `DropoffSheet.tsx`, `LoginBottomSheet`, `AnimatedSplash.tsx`, `TripReviewSheet.tsx`, `expo-router`?**
-  _High betweenness centrality (0.093) - this node is a cross-community bridge._
+  _High betweenness centrality (0.092) - this node is a cross-community bridge._
 - **Should `useDetailsPalette` be split into smaller, more focused modules?**
   _Cohesion score 0.11563367252543941 - nodes in this community are weakly interconnected._
-- **Why does `useSawari()` connect `useSawari` to `PaymentsListScreen.tsx`, `useDetailsPalette`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `sawari.ts`, `HomeScreen.tsx`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `CarListCard.tsx`, `BottomNavigation.tsx`, `PaymentScreen.tsx`, `SearchScreen.tsx`, `expo-haptics`, `WishlistScreen.tsx`, `ReferEarnScreen.tsx`, `ProfileScreen.tsx`, `react-native-safe-area-context`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `API`, `DatesSheet.tsx`, `PaymentProcessingScreen.tsx`, `SawariContext.tsx`, `LocationSearchBody.tsx`, `RefundsScreen.tsx`, `formatCurrency`, `react`, `DropoffSheet.tsx`, `LoginBottomSheet`, `expo-router`?**
-  _High betweenness centrality (0.072) - this node is a cross-community bridge._
+- **Why does `useSawari()` connect `useSawari` to `PaymentsListScreen.tsx`, `useDetailsPalette`, `expo-haptics`, `detailsPalette.ts`, `useColors`, `sawari.ts`, `HomeScreen.tsx`, `_layout.tsx`, `detailsPalette.ts`, `LocationSearchBody.tsx`, `CarListCard.tsx`, `BottomNavigation.tsx`, `PaymentScreen.tsx`, `SearchScreen.tsx`, `expo-haptics`, `WishlistScreen.tsx`, `ReferEarnScreen.tsx`, `ProfileScreen.tsx`, `react-native-safe-area-context`, `BookingScreen.tsx`, `MembershipScreen.tsx`, `API`, `DatesSheet.tsx`, `PaymentProcessingScreen.tsx`, `SawariContext.tsx`, `LocationSearchBody.tsx`, `RefundsScreen.tsx`, `formatCurrency`, `CarListCard.tsx`, `react`, `DropoffSheet.tsx`, `LoginBottomSheet`, `expo-router`?**
+  _High betweenness centrality (0.074) - this node is a cross-community bridge._
 - **Should `devDependencies` be split into smaller, more focused modules?**
   _Cohesion score 0.05128205128205128 - nodes in this community are weakly interconnected._

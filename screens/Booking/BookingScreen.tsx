@@ -533,8 +533,13 @@ export default function BookingScreen() {
           onBookNow={payAndBook}
           onCheckAvailability={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
         />
-        {/* "You're saving ₹X — <Plan> Membership Applied!": same trip key as the car page, so it shows once per trip. */}
-        <MembershipSavedPopup hasTrip={!isMissingDates} tripKey={`${selectedCar.id}|${dateRange}|${pickupTime}|${returnTime}`} />
+        {/* "You're saving ₹X — <Plan> Membership Applied!": highlights member savings on the Payment Option page. */}
+        <MembershipSavedPopup
+          hasTrip={!isMissingDates}
+          tripKey={`${selectedCar.id}|${dateRange}|${pickupTime}|${returnTime}`}
+          screen="booking"
+          forceShow={true}
+        />
         {celebrate && (
           <MembershipCelebration
             visible

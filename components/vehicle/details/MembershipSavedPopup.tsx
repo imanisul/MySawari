@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useTripPrice } from './useTripPrice';
+import { useSawari } from '@/context/SawariContext';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
 // Trips (car + dates + plan) whose popup was already shown this session — it celebrates once, not on every visit.
@@ -126,25 +127,51 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
  * time a priced trip includes a member's discount. The amount is the quote's membership discount
  * (the same figure as in View breakup). A plan being bought has its own popup when it is picked.
  */
-export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; tripKey: string }) {
+export function MembershipSavedPopup({
+  hasTrip,
+  tripKey,
+  screen = 'details',
+  forceShow = false,
+}: {
+  hasTrip: boolean;
+  tripKey: string;
+  screen?: string;
+  forceShow?: boolean;
+}) {
+  const { membership } = useSawari();
   const price = useTripPrice(hasTrip);
   const [visible, setVisible] = useState(false);
-  const [saving, setSaving] = useState<{ amount: number; plan: string } | null>(null);
+  const [saving, setSaving] = useState<{ amount: number | null; plan: string; note?: string } | null>(null);
   const hasShown = useRef(false);
 
-  const ready = price.state === 'ready' && price.membershipDiscount > 0 && !!price.planName && !price.buyingPlan;
-  const key = ready ? `${tripKey}|${price.planName}` : '';
+  const planKey = (membership?.plan || '').toLowerCase().trim();
+  const isMember = !!planKey && (!membership?.expiresAt || new Date(membership.expiresAt) > new Date());
+  const memberPlanName = isMember
+    ? (planKey.charAt(0).toUpperCase() + planKey.slice(1).toLowerCase())
+    : null;
+
+  const planName = (price.state === 'ready' && price.planName) ? price.planName : memberPlanName;
+  const discount = (price.state === 'ready' && price.membershipDiscount > 0) ? price.membershipDiscount : null;
+
+  const isReady = (price.state === 'ready' && (discount !== null || isMember)) || (isMember && price.state !== 'loading');
+  const key = `${screen}|${tripKey}|${planName}`;
 
   useEffect(() => {
-    if (!ready || hasShown.current || shown.has(key)) return;
+    if (!isReady || !planName || hasShown.current) return;
+    if (!forceShow && shown.has(key)) return;
+
     const t = setTimeout(() => {
       hasShown.current = true;
       shown.add(key);
-      setSaving({ amount: price.membershipDiscount, plan: price.planName! });
+      setSaving({
+        amount: discount,
+        plan: planName,
+        note: discount ? undefined : 'Active Member Benefits Applied',
+      });
       setVisible(true);
     }, 450);
     return () => clearTimeout(t);
-  }, [key, ready]);
+  }, [key, isReady, planName, discount, forceShow]);
 
   if (!saving) return null;
   return (
@@ -153,6 +180,7 @@ export function MembershipSavedPopup({ hasTrip, tripKey }: { hasTrip: boolean; t
       confetti
       plan={saving.plan}
       amount={saving.amount}
+      note={saving.note}
       onClose={() => setVisible(false)}
     />
   );

@@ -336,9 +336,8 @@ export function DatesSheet() {
     if (returnBack === 'true') {
       router.back();
     } else if (forSpecificCar === 'true') {
-      // Back to the car page, which now shows the trip price and Book Now.
-      if (router.canGoBack()) router.back();
-      else router.replace('/car-details');
+      // Flow from car availability check: proceed directly to location search, which then goes to payment option page
+      router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
     } else {
       // Swap this page for the results. (It used to close every page back to Home and then open the
       // results, so Home flashed on screen in between.) Back from the results returns to Home.

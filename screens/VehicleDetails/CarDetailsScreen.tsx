@@ -289,7 +289,7 @@ export default function CarDetailsScreen() {
         }}
         onBookNow={handleBookingProceed}
       />
-      <MembershipSavedPopup hasTrip={hasTrip} tripKey={`${selectedCar.id}|${effectiveDateRange}|${pickupTime}|${returnTime}`} />
+      <MembershipSavedPopup screen="details" hasTrip={hasTrip} tripKey={`${selectedCar.id}|${effectiveDateRange}|${pickupTime}|${returnTime}`} />
       <LoginBottomSheet
         visible={showLogin}
         onClose={() => setShowLogin(false)}

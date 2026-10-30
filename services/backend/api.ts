@@ -182,10 +182,10 @@ export function getInstallId(): Promise<string> {
       try {
         const existing = await getItemAsync('install_id');
         if (existing && /^[A-Za-z0-9-]{16,64}$/.test(existing)) return existing;
-      } catch {}
+      } catch { }
       const rand = () => Math.floor(Math.random() * 0x100000000).toString(16).padStart(8, '0');
       const id = `${Date.now().toString(16)}-${rand()}${rand()}${rand()}`;
-      try { await setItemAsync('install_id', id); } catch {}
+      try { await setItemAsync('install_id', id); } catch { }
       return id;
     })();
   }
@@ -355,7 +355,7 @@ const onRefreshed = (token: string) => {
  */
 async function normalizeResponse(response: Response): Promise<Response> {
   const contentType = response.headers.get('content-type') || '';
-  
+
   // Intercept HTML gateway errors (502, 503, 504 from Render/Cloudflare)
   if (!response.ok && !contentType.includes('application/json')) {
     const isGatewayError = response.status === 502 || response.status === 503 || response.status === 504;
@@ -378,7 +378,7 @@ async function normalizeResponse(response: Response): Promise<Response> {
           headers: { 'Content-Type': 'application/json' },
         });
       }
-    } catch {}
+    } catch { }
   }
 
   // Normalize 429 Rate Limiting with helpful user message
@@ -419,7 +419,7 @@ async function normalizeResponse(response: Response): Promise<Response> {
           headers: { 'Content-Type': 'application/json' },
         });
       }
-    } catch {}
+    } catch { }
   }
 
   return response;
@@ -471,8 +471,8 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
   const runRequest = async (): Promise<Response> => {
     const headers = new Headers(options.headers || {});
     if (token) headers.set('Authorization', `Bearer ${token}`);
-    try { headers.set('X-Install-Id', await getInstallId()); } catch {}
-    
+    try { headers.set('X-Install-Id', await getInstallId()); } catch { }
+
     let response: Response;
     try {
       response = await timedFetch(url, { ...options, headers });
@@ -497,85 +497,85 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
       await new Promise((r) => setTimeout(r, delayMs));
       try {
         response = await timedFetch(url, { ...options, headers });
-      } catch {}
+      } catch { }
     }
 
     response = await normalizeResponse(response);
 
-  if (response.status === 401) {
-    if (!token) {
-      return response;
-    }
+    if (response.status === 401) {
+      if (!token) {
+        return response;
+      }
 
-    if (!isRefreshing) {
-      isRefreshing = true;
-      // Only a definite "no" from the server ends the session. A network drop, timeout, rate limit or
-      // server error used to wipe the tokens and log the customer out; now it just fails this request.
-      let sessionRejected = false;
-      try {
-        const refreshToken = await getItemAsync('refresh_token');
-        if (!refreshToken) {
-          sessionRejected = true;
-          throw new Error('No refresh token');
+      if (!isRefreshing) {
+        isRefreshing = true;
+        // Only a definite "no" from the server ends the session. A network drop, timeout, rate limit or
+        // server error used to wipe the tokens and log the customer out; now it just fails this request.
+        let sessionRejected = false;
+        try {
+          const refreshToken = await getItemAsync('refresh_token');
+          if (!refreshToken) {
+            sessionRejected = true;
+            throw new Error('No refresh token');
+          }
+
+          const refreshRes = await timedFetch(`${BACKEND_URL}/auth/refresh`, {
+            method: 'POST',
+            headers: await withInstallId({ 'Content-Type': 'application/json' }),
+            body: JSON.stringify({ refreshToken })
+          });
+
+          if (refreshRes.status === 401 || refreshRes.status === 403) {
+            sessionRejected = true;
+            throw new Error('Session expired');
+          }
+          if (!refreshRes.ok) throw new Error('Refresh temporarily unavailable');
+
+          const data = await refreshRes.json();
+          const newToken = data?.data?.token;
+          const newRefreshToken = data?.data?.refreshToken;
+          if (!newToken) throw new Error('Refresh temporarily unavailable');
+
+          await setItemAsync('auth_token', newToken);
+          if (newRefreshToken) await setItemAsync('refresh_token', newRefreshToken);
+
+          token = newToken;
+          onRefreshed(newToken);
+        } catch (e) {
+          onRefreshed(''); // release anyone waiting on this refresh
+          if (!sessionRejected) {
+            throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
+          }
+          // Force logout
+          await deleteItemAsync('auth_token');
+          await deleteItemAsync('refresh_token');
+
+          // Emit global event for Context to log the user out of the UI
+          const { DeviceEventEmitter } = require('react-native');
+          DeviceEventEmitter.emit('onSessionExpired');
+
+          throw new Error('Session expired. Please log in again.');
+        } finally {
+          isRefreshing = false;
         }
-
-        const refreshRes = await timedFetch(`${BACKEND_URL}/auth/refresh`, {
-          method: 'POST',
-          headers: await withInstallId({ 'Content-Type': 'application/json' }),
-          body: JSON.stringify({ refreshToken })
+      } else {
+        // Wait for the active refresh to complete
+        token = await new Promise((resolve) => {
+          subscribeTokenRefresh(resolve);
         });
+        if (!token) throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
+      }
 
-        if (refreshRes.status === 401 || refreshRes.status === 403) {
-          sessionRejected = true;
-          throw new Error('Session expired');
-        }
-        if (!refreshRes.ok) throw new Error('Refresh temporarily unavailable');
-
-        const data = await refreshRes.json();
-        const newToken = data?.data?.token;
-        const newRefreshToken = data?.data?.refreshToken;
-        if (!newToken) throw new Error('Refresh temporarily unavailable');
-
-        await setItemAsync('auth_token', newToken);
-        if (newRefreshToken) await setItemAsync('refresh_token', newRefreshToken);
-        
-        token = newToken;
-        onRefreshed(newToken);
-      } catch (e) {
-        onRefreshed(''); // release anyone waiting on this refresh
-        if (!sessionRejected) {
+      // Retry original request
+      headers.set('Authorization', `Bearer ${token}`);
+      try {
+        response = await timedFetch(url, { ...options, headers });
+      } catch (error: any) {
+        if (error.name === 'TypeError' && error.message === 'Network request failed') {
           throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
         }
-        // Force logout
-        await deleteItemAsync('auth_token');
-        await deleteItemAsync('refresh_token');
-        
-        // Emit global event for Context to log the user out of the UI
-        const { DeviceEventEmitter } = require('react-native');
-        DeviceEventEmitter.emit('onSessionExpired');
-        
-        throw new Error('Session expired. Please log in again.');
-      } finally {
-        isRefreshing = false;
+        throw error;
       }
-    } else {
-      // Wait for the active refresh to complete
-      token = await new Promise((resolve) => {
-        subscribeTokenRefresh(resolve);
-      });
-      if (!token) throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
-    }
-
-    // Retry original request
-    headers.set('Authorization', `Bearer ${token}`);
-    try {
-      response = await timedFetch(url, { ...options, headers });
-    } catch (error: any) {
-      if (error.name === 'TypeError' && error.message === 'Network request failed') {
-        throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
-      }
-      throw error;
-    }
       response = await normalizeResponse(response);
     }
 
@@ -621,9 +621,9 @@ export const API = {
       const headers = await withInstallId();
       const response = await timedFetch(`${BACKEND_URL}/vehicles`, { headers });
       const data = await response.json();
-      
+
       if (!response.ok) throw new Error(data.message || 'Failed to fetch vehicles');
-      
+
       // Extra safeguard: explicitly filter out any vehicles marked as deleted
       return (data.data || []).filter((v: any) => v.isDeleted !== true);
     } catch (e: any) {
@@ -972,7 +972,7 @@ export const API = {
         };
       }
     }
-    
+
     // A plan bought with this booking counts as the customer's plan for this trip (a fresh year: nothing
     // saved yet), and its price is paid now together with the booking amount.
     const buyPlan = params.buyPlan && canBuyPlan(params.buyPlan, membership) ? params.buyPlan : null;
@@ -989,11 +989,11 @@ export const API = {
     quote.membershipPlanToBuy = buyPlan;
     quote.membershipFee = membershipFee;
     quote.onlinePayableNow = (quote.onlinePayableNow || 0) + membershipFee;
-    
+
     if (quote.error) {
       throw new Error(quote.error);
     }
-    
+
     return quote;
   },
 
@@ -1020,7 +1020,7 @@ export const API = {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to create Razorpay order');
-      
+
       return { orderId: data.data.id, amountPaise: data.data.amount, keyId: data.data.keyId };
     } catch (e: any) {
       throw new Error(e.message);
@@ -1073,7 +1073,7 @@ export const API = {
   },
 
   async createBooking(
-    params: Omit<QuoteParams, 'availableSawariCash'>, 
+    params: Omit<QuoteParams, 'availableSawariCash'>,
     vehicleId: string,
     vehicleName: string,
     customerDetails: { name: string; mobile: string; email?: string },
@@ -1087,7 +1087,7 @@ export const API = {
     // A plan bought together with this booking: its price is part of the one payment, but not of the booking.
     const membershipFee = quote.membershipFee || 0;
     const bookingPaidNow = Math.max(0, quote.onlinePayableNow - membershipFee);
-    
+
     // 1. (Sawari Cash is now managed securely by the backend)
     // 2. Create snapshot
     const snapshot: BookingSnapshot = {
@@ -1100,7 +1100,7 @@ export const API = {
       rentalDays: quote.rentalDays,
       dailyRate: quote.dailyRate,
       rentalAmount: quote.rentalAmount,
-      
+
       distanceKm: quote.distanceKm,
       ratePerKm: quote.ratePerKm,
       pickupLocationName: quote.pickupLocationName,
@@ -1114,44 +1114,44 @@ export const API = {
 
       driverMode: quote.driverMode,
       driverCharge: quote.driverCharge,
-      
+
       couponCode: quote.couponCode,
       couponDiscount: quote.couponDiscount,
       membershipDiscount: quote.subscriptionDiscount || 0,
       sawariCashUsed: quote.sawariCashUsed,
-      
+
       bookingAdvance: quote.bookingAdvance,
       onlinePayableNow: bookingPaidNow,
       remainingRentalAmount: quote.remainingRentalAmount,
-      
+
       ...fuelEstimateDetails,
-      
+
       customerName: customerDetails.name,
       customerMobile: customerDetails.mobile,
       customerEmail: customerDetails.email,
-      
+
       razorpayOrderId: paymentDetails.razorpayOrderId,
       razorpayPaymentId: paymentDetails.razorpayPaymentId,
       paidAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
     };
-    
+
     // 3. Save to backend DB. The server re-validates price, availability and the
     // Razorpay payment, so a failure here must surface — the user has already paid.
     const toExactLocalTime = (label: string, timeStr: string) => {
       const day = parseDayLabel(label);
       if (day === null) throw new Error('Invalid booking date');
-      
+
       const match = (timeStr || '10:00 AM').match(/(\d+):(\d+)\s*(AM|PM)?/i);
       if (!match) return new Date(day * 86400000).toISOString();
-      
+
       let hours = parseInt(match[1], 10);
       const minutes = parseInt(match[2], 10);
       const ampm = match[3]?.toUpperCase();
-      
+
       if (ampm === 'PM' && hours < 12) hours += 12;
       if (ampm === 'AM' && hours === 12) hours = 0;
-      
+
       const utcMidnight = new Date(day * 86400000);
       return new Date(
         utcMidnight.getUTCFullYear(),
@@ -1313,7 +1313,7 @@ export const API = {
     }
     return saved.data;
   },
-  
+
   async trackLead(data: {
     mobileNumber?: string;
     customerName?: string;
@@ -1336,7 +1336,7 @@ export const API = {
       return null; // Fire and forget, don't break the UI
     }
   },
-  
+
   async getBooking(id: string): Promise<BookingSnapshot | null> {
     const bookings = await this.getAllBookings();
     return bookings.find(b => b.id === id) || null;
@@ -1456,12 +1456,12 @@ export const API = {
     try {
       const response = await fetchWithAuth(`${BACKEND_URL}/bookings/my-bookings`);
       const data = await response.json();
-      
+
       if (!response.ok) throw new Error(data.message || 'Failed to fetch bookings');
 
       // Booking dates are calendar days stored at UTC midnight — format them in UTC so the day never shifts.
       const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
-      
+
       // Map backend booking model to frontend BookingSnapshot
       return (data.data || []).filter((b: any) => !isUnpaidHold(b)).map((b: any) => {
         const p = b.payment || {};
@@ -1475,15 +1475,15 @@ export const API = {
         const couponCode = (b.couponCode || p.couponCode || '').trim() || undefined;
 
         // Defensive calculation for couponDiscount if not explicitly provided
-        const couponDiscount = rawCouponDiscount !== undefined 
-          ? rawCouponDiscount 
+        const couponDiscount = rawCouponDiscount !== undefined
+          ? rawCouponDiscount
           : Math.max(0, asAmount(p.discountAmount) - memDiscount - cashUsed - manualDiscount);
 
         // Derive base rental amount before discounts:
         const dailyRateFromVeh = asAmount(b.vehicleId?.pricePerDay);
         const baseFromDaily = dailyRateFromVeh > 0 ? dailyRateFromVeh * days : 0;
-        const rentalAmount = baseFromDaily > 0 
-          ? baseFromDaily 
+        const rentalAmount = baseFromDaily > 0
+          ? baseFromDaily
           : (totalAmount > vehicleRent ? totalAmount : (vehicleRent > 0 && couponDiscount > 0 ? vehicleRent + couponDiscount : (vehicleRent || totalAmount)));
         const dailyRate = dailyRateFromVeh > 0 ? dailyRateFromVeh : (Math.round(rentalAmount / days) || 0);
 
@@ -1593,11 +1593,11 @@ export const API = {
     return { success: true, snapshot };
   },
 
-  async requestRefund(data: { 
-    bookingId: string; 
-    amount: number; 
-    reason?: string; 
-    customerId: string; 
+  async requestRefund(data: {
+    bookingId: string;
+    amount: number;
+    reason?: string;
+    customerId: string;
     customerMobile?: string;
     refundType?: 'original_payment' | 'upi' | 'bank_account' | string;
     upiId?: string;
@@ -1724,9 +1724,9 @@ export const API = {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
-      return { 
-        success: true, 
-        message: data.message, 
+      return {
+        success: true,
+        message: data.message,
         isExistingUser: data.data?.isExistingUser,
         otpId: data.data?.otpId,
         expiresInSec: data.data?.expiresInSec
@@ -1744,10 +1744,10 @@ export const API = {
       const res = await timedFetch(`${BACKEND_URL}/auth/verify-otp`, {
         method: 'POST',
         headers: await withInstallId({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ 
-          mobileNumber: mobile, 
-          otp, 
-          customerName: name, 
+        body: JSON.stringify({
+          mobileNumber: mobile,
+          otp,
+          customerName: name,
           referredByCode,
           otpId,
           deviceId
@@ -1755,9 +1755,9 @@ export const API = {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to verify OTP');
-      
+
       const { token, refreshToken, customer, su } = data.data;
-      
+
       const user = {
         id: customer._id,
         name: customer.customerName,
@@ -1770,7 +1770,7 @@ export const API = {
         createdAt: customer.createdAt,
         su: Boolean(su)
       };
-      
+
       return { user, token, refreshToken, su: Boolean(su) };
     } catch (e: any) {
       throw new Error(e.message);
@@ -1802,7 +1802,7 @@ export const API = {
         const customer = data.data?.customer;
         return customer ? { ...customer, name: customer.customerName } : null;
       }
-    } catch(e: any) {
+    } catch (e: any) {
       if (__DEV__) console.warn('Error fetching profile from backend:', e?.message);
     }
     return null;
@@ -1820,7 +1820,7 @@ export const API = {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to update profile');
-      
+
       const customer = data.data.customer;
       return {
         id: customer._id,
@@ -1842,18 +1842,22 @@ export const API = {
    * DELETE /api/customers/profile
    * Complies with Apple App Store Guideline 5.1.1(v) for in-app account deletion.
    */
-  async deleteAccount(): Promise<boolean> {
-    try {
-      const res = await fetchWithAuth(`${BACKEND_URL}/customers/profile`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to delete account');
-      return true;
-    } catch (e: any) {
-      throw new Error(e.message || 'Failed to delete account');
-    }
+  async sendDeletionCode(): Promise<string> {
+    const res = await fetchWithAuth(`${BACKEND_URL}/auth/step-up/send`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Could not send the verification code');
+    return String(data?.data?.otpId || '');
+  },
+
+  async deleteAccount(otpId: string, otp: string): Promise<boolean> {
+    const res = await fetchWithAuth(`${BACKEND_URL}/customers/profile`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ otpId, otp }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Failed to delete account');
+    return true;
   },
 
   /**
@@ -1988,7 +1992,7 @@ export const API = {
       if (e.name === 'AbortError' || e.message === 'Aborted' || (signal && signal.aborted)) {
         throw e;
       }
-      
+
       if (!e.message.includes('status 503') && !e.message.includes('status 502')) {
         if (__DEV__) console.warn(`Photon search failed: ${e.message}. Falling back to Nominatim...`);
       }
@@ -2010,16 +2014,16 @@ export const API = {
           headers: { 'User-Agent': 'MySawariApp/1.0 (contact@mysawari.com)' },
           signal,
         });
-        
+
         if (!response.ok) throw new Error(`Nominatim API responded with status ${response.status}`);
         const data = await response.json();
-        
+
         const mapped = data.map((item: any) => {
           let name = item.name;
           if (!name && item.address) {
             name = item.address.road || item.address.suburb || item.address.city;
           }
-          
+
           return {
             id: item.osm_id?.toString() || `osm_${Math.random()}`,
             name: name || 'Unknown Place',
@@ -2085,17 +2089,17 @@ export const API = {
         url.searchParams.set('lat', latitude.toString());
         url.searchParams.set('lon', longitude.toString());
         url.searchParams.set('format', 'json');
-        
+
         // Ensure a valid user agent is passed, which Nominatim requires
         const response = await timedFetch(url.toString(), {
           headers: { 'User-Agent': 'MySawariApp/1.0 (contact@mysawari.com)' },
         });
-        
+
         if (!response.ok) throw new Error(`Nominatim API responded with status ${response.status}`);
         const data = await response.json();
-        
+
         if (data.error) throw new Error(data.error);
-        
+
         let name = data.name;
         let address = data.display_name;
         if (options.areaOnly && data.address) {
@@ -2105,7 +2109,7 @@ export const API = {
         } else if (!name && data.address) {
           name = data.address.road || data.address.suburb || data.address.city;
         }
-        
+
         return {
           id: data.osm_id?.toString() || `osm_${Math.random()}`,
           name: name || 'Unknown Place',
@@ -2158,7 +2162,7 @@ export const API = {
         const response = await fetchWithAuth(`${BACKEND_URL}/reviews/mine`);
         const data = await response.json();
         if (response.ok) base = data.data;
-      } catch (e) {}
+      } catch (e) { }
 
       return base;
     },

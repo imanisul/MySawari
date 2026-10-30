@@ -349,7 +349,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       if (Date.now() - lastGpsCheck < 60 * 1000 && preferFresh) return; // don't hammer the GPS
       lastGpsCheck = Date.now();
       try {
-        const result = await getDevicePosition({ preferFresh, askPermission: !preferFresh });
+        // Never prompts here: the permission is asked for where the customer chooses "current location" (with a reason), not at launch.
+        const result = await getDevicePosition({ preferFresh, askPermission: false });
         if (!result.ok || !isMounted) return;
         const { latitude, longitude } = result.position.coords;
 

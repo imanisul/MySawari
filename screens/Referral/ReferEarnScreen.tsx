@@ -17,7 +17,7 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { FaqList } from '@/components/vehicle/details/CarDetailsSections';
 import { PF } from '@/components/profile/ProfileParts';
 
-const REFERRAL_BASE_URL = 'https://mysawari.com/refer';
+const DEFAULT_PLAY_STORE_BASE = 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
 const PURPLE = '#6152D8';
 
 /** Light rays fanning out from below the avatars (design hero). */
@@ -63,14 +63,26 @@ export default function ReferEarnScreen() {
   }, [isAuthenticated, customer.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const code = customer.referralCode || '';
-  const link = `${REFERRAL_BASE_URL}?code=${code}`;
+  const rawBaseUrl = (config?.referralShareUrl || DEFAULT_PLAY_STORE_BASE).trim();
+
+  // Dynamically format link: handles Google Play Store referrer format or standard URL query format
+  const link = useMemo(() => {
+    if (!code) return rawBaseUrl;
+    if (rawBaseUrl.includes('play.google.com')) {
+      return `${rawBaseUrl}&referrer=code%3D${encodeURIComponent(code)}`;
+    }
+    const sep = rawBaseUrl.includes('?') ? '&' : '?';
+    return `${rawBaseUrl}${sep}code=${encodeURIComponent(code)}`;
+  }, [rawBaseUrl, code]);
+
   const shortLink = link.replace(/^https?:\/\//, '');
   const pct = config?.referralRewardType === 'PERCENTAGE' && config?.referralRewardAmount ? `${config.referralRewardAmount}%` : '10%';
-  const friendGets = config?.referralDiscountType === 'FLAT' && config?.referralDiscountAmount ? `₹${config.referralDiscountAmount}` : '₹100';
-  const message = `🚗 Join me on MySawari! Use my code *${code}* when you sign up and get ${friendGets} off your first trip.\n\n${link}`;
+  const friendGets = '100 SawariCash';
+  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\nDownload or open MySawari:\n${link}\n\n(Referral code: *${code}*)`;
 
   const faqs = useMemo(() => [
-    { q: 'How does the Refer & Earn program work?', a: `Share your link or code. When your friend signs up with it and completes their first trip, you get ${pct} of their trip amount as MySawari Cash.` },
+    { q: 'How does the Refer & Earn program work?', a: `Share your link or code. When your friend signs up with it and completes their first trip, you get ${pct} of their booking amount as commission in your wallet.` },
+    { q: 'What does my friend get?', a: 'Your friend gets 100 SawariCash credited instantly to their wallet upon signing up with your invite code.' },
     { q: 'Who is eligible for the referral offer?', a: 'Anyone new to MySawari who signs up with your code or link. Existing customers and your own numbers do not count.' },
     { q: 'What if my friend books without using my referral link?', a: 'The referral is only linked when your friend signs up with your code or link, so the reward cannot be added afterwards.' },
     { q: 'Where can I check my referral status?', a: 'Open "See your referral history" on this page, or Profile → Referral Tracking, to follow each friend from sign-up to reward.' },
@@ -107,8 +119,8 @@ export default function ReferEarnScreen() {
 
   const STEPS = [
     { t: 'Share Your Code or Link', s: 'Send your personal link or code to your friends.' },
-    { t: 'They book a Car or Bike', s: `Your friend signs up with your code and gets ${friendGets} off on the final checkout screen.` },
-    { t: `You get ${pct} back`, s: `The moment your friend completes their first trip, you get ${pct} of their trip total as MySawari Cash.` },
+    { t: 'They Sign Up & Book', s: 'Your friend signs up with your code and gets 100 SawariCash credited instantly.' },
+    { t: `You get ${pct} Commission`, s: `The moment your friend completes their first trip, you get ${pct} of their trip booking amount as commission.` },
   ];
 
   // Measured from the design (393 wide): purple header 182 below the status bar, the white card 88 from its

@@ -26,8 +26,8 @@ const DESTINATIONS: { id: string; title: string; blurb: string; image: ImageSour
   { id: 'cherrapunji', title: 'Cherrapunji', blurb: 'Living root bridges, roaring waterfalls, and misty cliffs.', image: require('../../assets/images/cherrapunji.jpg') },
   { id: 'umrangso', title: 'Umrangso', blurb: 'Serene Kapili Lake, scenic golf course, and misty rolling hills.', image: require('../../assets/images/umrangso.jpg') },
   { id: 'kaziranga', title: 'Kaziranga', blurb: 'Wild safaris, the one-horned rhino, and lush tea estates.', image: require('../../assets/images/kaziranga.jpg') },
-  { id: 'meghalaya', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/meghalaya.png'), faded: true },
-  { id: 'sikkim', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/sikkim_mountains.png'), faded: true },
+  { id: 'meghalaya', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/meghalaya.jpg') },
+  { id: 'sikkim', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/sikkim.jpg') },
 ];
 
 const DESTINATION_LOCATIONS: Record<string, LocationResult> = {
@@ -69,6 +69,22 @@ const DESTINATION_LOCATIONS: Record<string, LocationResult> = {
     address: 'Home of the One-Horned Rhino',
     latitude: 26.5775,
     longitude: 93.1711,
+    source: 'database',
+  },
+  Meghalaya: {
+    id: 'meghalaya',
+    name: 'Meghalaya, India',
+    address: 'Abode of Clouds & Scenic Waterfalls',
+    latitude: 25.4670,
+    longitude: 91.3662,
+    source: 'database',
+  },
+  Sikkim: {
+    id: 'sikkim',
+    name: 'Sikkim, India',
+    address: 'Himalayan Passes & Monasteries',
+    latitude: 27.5330,
+    longitude: 88.5122,
     source: 'database',
   },
 };
@@ -260,24 +276,26 @@ export default function HomeScreen() {
       id: title.toLowerCase(),
       name: `${title}, India`,
       address: 'Popular Destination',
-      latitude: 0,
-      longitude: 0,
+      latitude: 26.1445,
+      longitude: 91.7362,
       source: 'database' as const,
     };
     setDropoff(loc);
 
-    if (!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') {
-      const topCar = picks.find((v) => v.isAvailable) || picks[0] || fetchedVehicles.find((v) => v.type === typeName && v.isAvailable) || fetchedVehicles[0];
-      if (topCar) {
-        selectCar(topCar);
-      }
+    // Ensure a real vehicle matching current vehicle type tab (Car / Bike) is selected
+    const activeCar = (selectedCar && selectedCar.type === typeName && selectedCar !== cars[0] && selectedCar.id !== 'seltos')
+      ? selectedCar
+      : (picks.find((v) => v.isAvailable) || picks[0] || fetchedVehicles.find((v) => v.type === typeName && v.isAvailable) || fetchedVehicles.find((v) => v.type === typeName) || fetchedVehicles[0]);
+
+    if (activeCar) {
+      selectCar(activeCar);
     }
 
     router.push({
       pathname: '/dates',
       params: { fromDestination: 'true', forSpecificCar: 'true' },
     });
-  }, [setBookingSource, setDropoff, selectedCar, picks, fetchedVehicles, typeName, selectCar, router]);
+  }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 
   const sections = useMemo(() => ['header', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
 
@@ -294,7 +312,7 @@ export default function HomeScreen() {
               onWallet={() => router.push('/rewards')}            >
               <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
             </HomeHero>
-            <View style={[styles.sheet, { backgroundColor: p.page }]}>
+            <View style={[styles.sheet, { backgroundColor: p.page, borderColor: p.deliveryBorder }]}>
               <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDestination={() => openDestination()} />
             </View>
           </View>
@@ -412,8 +430,12 @@ export default function HomeScreen() {
 
       <LoginBottomSheet
         visible={showLogin}
-        onClose={() => setShowLogin(false)}
+        onClose={() => {
+          setShowLogin(false);
+          setPendingAction(null);
+        }}
         onLoginSuccess={() => {
+          setShowLogin(false);
           if (pendingAction) {
             pendingAction();
             setPendingAction(null);
@@ -455,6 +477,6 @@ const styles = StyleSheet.create({
   footerSmall: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, letterSpacing: 0.5 },
   footerBig: { fontFamily: 'Anton_400Regular', fontSize: 56, lineHeight: 66, letterSpacing: 2, marginTop: 2 },
   // The refer strip sits inside the banner (rays behind it); the white sheet's rounded top covers its foot.
-  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12 },
+  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, paddingTop: 12 },
   row: { gap: 10, paddingHorizontal: 16 },
 });

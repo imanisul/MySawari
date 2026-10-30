@@ -11,6 +11,7 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, PF } from '@/components/profile/ProfileParts';
 import { ModalBlur } from '@/components/common/ModalBlur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
+import { LoginBottomSheet } from '@/components';
 
 /**
  * Figma "Saved Addresses": "+ Add Address", then each saved place (tag, full address, contact number) with
@@ -25,14 +26,19 @@ export default function SavedAddressesScreen() {
   const { customer, isAuthenticated } = useSawari();
   const userId = isAuthenticated ? customer?.id : null;
   const [list, setList] = useState<SavedAddress[] | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
   const [menuFor, setMenuFor] = useState<SavedAddress | null>(null);
   const [deleteFor, setDeleteFor] = useState<SavedAddress | null>(null);
   const [phoneFor, setPhoneFor] = useState<SavedAddress | null>(null);
 
   // Reloaded whenever the page shows again (e.g. back from adding or editing one).
-  useFocusEffect(useCallback(() => { getSavedAddresses(userId).then(setList); }, [userId]));
+  useFocusEffect(useCallback(() => { if (userId) getSavedAddresses(userId).then(setList); }, [userId]));
 
   const add = () => {
+    if (!isAuthenticated) {
+      setShowLogin(true);
+      return;
+    }
     Haptics.selectionAsync();
     router.push({ pathname: '/address-search', params: { kind: 'save' } });
   };
@@ -45,6 +51,31 @@ export default function SavedAddressesScreen() {
   };
 
   const icon = (label?: string) => (/home/i.test(label || '') ? 'home-outline' : /work|office/i.test(label || '') ? 'briefcase-outline' : 'location-outline');
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
+        <ScreenHeader title="Saved Addresses" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <Feather name="map-pin" size={32} color={p.fg} />
+          <Text style={{ fontFamily: PF.semibold, fontSize: 16, color: p.fg, marginTop: 14, textAlign: 'center' }}>
+            Log in to see your saved addresses
+          </Text>
+          <Text style={{ fontFamily: PF.regular, fontSize: 13, color: p.muted, marginTop: 6, textAlign: 'center', lineHeight: 20 }}>
+            Save your home, work or other addresses to quickly select delivery locations.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}
+            style={({ pressed }) => [{ backgroundColor: p.navy, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24, marginTop: 18 }, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={{ color: '#FFFFFF', fontFamily: PF.semibold, fontSize: 14 }}>Log In</Text>
+          </Pressable>
+        </View>
+        <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
+      </SafeAreaView>
+    );
+  }
 
   return (
     <BlurTargetProvider target={blurTarget}>

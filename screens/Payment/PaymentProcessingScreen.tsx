@@ -14,7 +14,13 @@ const STEPS = ['Reserving your car', 'Opening secure payment', 'Confirming your 
 export default function PaymentProcessingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { pricingQuote, quoteParams, createBookingSnapshot, confirmBookingPayment, confirmBooking, customer } = useSawari();
+  const { isAuthenticated, isAuthLoading, pricingQuote, quoteParams, createBookingSnapshot, confirmBookingPayment, confirmBooking, customer } = useSawari();
+
+  useEffect(() => {
+    if (!isAuthLoading && isAuthenticated === false) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, isAuthLoading]);
 
   const [status, setStatus] = useState<'INITIATING' | 'PAYMENT_PENDING' | 'VERIFYING' | 'SUCCESS' | 'ERROR'>('INITIATING');
   const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string, amountPaise: number, keyId: string } | null>(null);
@@ -60,8 +66,12 @@ export default function PaymentProcessingScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!isAuthLoading && isAuthenticated === false) {
+      router.replace('/');
+      return;
+    }
     // The quote can refresh while this screen is open — only ever start one payment.
-    if (started.current) return;
+    if (started.current || !isAuthenticated) return;
     // The price can still be on its way (refreshed as this screen opens): wait for it rather than failing
     // straight away; only after 15 seconds without one is it an error.
     if (!pricingQuote) {

@@ -565,12 +565,12 @@ function Bullet({ text, p, indent = 0 }: { text: string; p: DetailsPalette; inde
   );
 }
 
-export function PolicyDocumentScreen({ policyKey }: { policyKey: PolicyKey }) {
+export function PolicyDocumentScreen({ policyKey, onBack }: { policyKey: PolicyKey; onBack?: () => void }) {
   const p = useDetailsPalette();
   const policy = POLICIES.find((item) => item.key === policyKey) ?? POLICIES[0];
   return (
     <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
-      <SubPageHeader title={policy.title} />
+      <SubPageHeader title={policy.title} onBack={onBack} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.policyBlock}>
           <Text style={[styles.policyTitle, { color: p.fg }]}>{policy.title}</Text>

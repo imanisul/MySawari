@@ -1664,14 +1664,33 @@ export const API = {
   },
 
   /**
-   * GET /api/config
+   * GET /api/auth/referral/config — dynamically loads reward amounts & share link
    */
   async getAppConfig() {
+    try {
+      const response = await timedFetch(`${BACKEND_URL}/auth/referral/config`, {
+        method: 'GET',
+        headers: await withInstallId({ 'Content-Type': 'application/json' }),
+      });
+      const res = await response.json();
+      if (response.ok && res?.success && res.data) {
+        return {
+          referralRewardAmount: res.data.defaultCommission ?? 10,
+          referralRewardType: 'PERCENTAGE',
+          referralDiscountAmount: res.data.bonusSawariCash ?? 100,
+          referralDiscountType: 'FLAT',
+          referralShareUrl: res.data.shareBaseUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
+        };
+      }
+    } catch {
+      // Fallback if offline or network unavailable
+    }
     return {
       referralRewardAmount: 10,
       referralRewardType: 'PERCENTAGE',
       referralDiscountAmount: 100,
-      referralDiscountType: 'FLAT'
+      referralDiscountType: 'FLAT',
+      referralShareUrl: 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
     };
   },
 
@@ -1885,6 +1904,32 @@ export const API = {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Could not add this referral');
+    return data.data;
+  },
+
+  /**
+   * GET /api/auth/referral/validate/:code
+   * Validates a referral code before sign-up and returns the referrer's name and bonus details.
+   */
+  async validateReferralCode(code: string): Promise<{
+    valid: boolean;
+    referralCode: string;
+    referrerName: string;
+    rewardText: string;
+    bonusSawariCash?: number;
+  }> {
+    const cleanCode = (code || '').trim().toUpperCase();
+    if (!cleanCode || cleanCode.length < 3) {
+      throw new Error('Please enter a valid referral code');
+    }
+    const response = await timedFetch(`${BACKEND_URL}/auth/referral/validate/${encodeURIComponent(cleanCode)}`, {
+      method: 'GET',
+      headers: await withInstallId({ 'Content-Type': 'application/json' }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Invalid referral code');
+    }
     return data.data;
   },
 

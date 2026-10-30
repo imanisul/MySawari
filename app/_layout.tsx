@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LogBox, View, Platform } from 'react-native';
+import { LogBox, View, Platform, Linking } from 'react-native';
 
 LogBox.ignoreLogs([
   'ProgressBarAndroid has been extracted from react-native core',
@@ -37,6 +37,7 @@ import { PostTripReviewPrompt } from '@/components/booking/PostTripReviewPrompt'
 import { PushNotificationHandler } from '@/components/notifications/PushNotificationHandler';
 import * as Location from 'expo-location';
 import { API } from '@/services/backend/api';
+import { handleDeepLinkReferralUrl } from '@/utils/referralLinkHandler';
 
 // The native splash is the only splash. It stays up until the first usable screen is ready (see AppGate).
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -250,6 +251,19 @@ function AppGate({
     import('@/hooks/useVehicles').then(({ vehiclesQueryOptions }) => client.prefetchQuery(vehiclesQueryOptions));
     import('@/services/api/offers').then(({ offersQueryOptions }) => client.prefetchQuery(offersQueryOptions));
   }, [client]);
+
+  // Capture referral deep link URLs (e.g. car-rental-mobile://refer?code=... or universal link)
+  useEffect(() => {
+    Linking.getInitialURL().then((url) => {
+      if (url) handleDeepLinkReferralUrl(url);
+    }).catch(() => {});
+
+    const sub = Linking.addEventListener('url', (event) => {
+      if (event?.url) handleDeepLinkReferralUrl(event.url);
+    });
+
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (isAuthLoading || homeDataReady) return;

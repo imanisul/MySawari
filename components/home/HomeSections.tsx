@@ -631,7 +631,7 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
         {stops.slice(0, 3).map((m, i) => {
           const reached = done >= m;
           return (
-            <View key={i} style={[styles.mark, { left: `${(i / 3) * 100}%`, borderColor: reached ? HOME_PURPLE : '#FFFFFF', backgroundColor: reached ? HOME_PURPLE : '#FFFFFF' }]}>
+            <View key={i} style={[styles.mark, { left: `${(i / 3) * 100}%`, borderColor: reached ? HOME_PURPLE : '#6152D852', backgroundColor: reached ? HOME_PURPLE : '#FFFFFF' }]}>
               <Text style={[styles.markText, { color: reached ? '#FFFFFF' : p.muted }]}>{m}</Text>
             </View>
           );
@@ -1035,7 +1035,7 @@ const styles = StyleSheet.create({
   trackRail: { position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, overflow: 'hidden' },
   trackLine: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
   mark: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowColor: '#6152D8', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
-  markText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 7.5, lineHeight: 10, includeFontPadding: false },
+  markText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 7.5, lineHeight: 10, includeFontPadding: false },
   // Figma: a 16px mark like the others, gold-tinted (rgba(251,188,4,.1) over white) with a soft gold glow, holding the 12px star coin.
   coin: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF8E5', shadowColor: '#FBBC04', shadowOpacity: 0.28, shadowRadius: 2, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
   coinImage: { width: 12, height: 12 },

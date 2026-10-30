@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
   error: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: -4 },
   label: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 17 },
   checkRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
-  check: { width: 15, height: 15, borderRadius: 4, borderWidth: 1.5, marginTop: 3, alignItems: 'center', justifyContent: 'center' },
+  check: { width: 15, height: 15, borderRadius: 4, borderWidth: 1.5, marginTop: 4, alignItems: 'center', justifyContent: 'center' },
   checkText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },

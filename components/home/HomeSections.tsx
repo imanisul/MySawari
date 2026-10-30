@@ -9,6 +9,16 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { formatCurrency, memberDayPrice, type QuoteParams } from '@/services/backend/pricingEngine';
 import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
+import LowestPriceIcon from '@/assets/images/benefit_lowest_price.svg';
+import UnlimitedKmIcon from '@/assets/images/benefit_unlimited_km.svg';
+import WellMaintainedIcon from '@/assets/images/benefit_well_maintained.svg';
+import ZeroDepositIcon from '@/assets/images/benefit_zero_deposit.svg';
+import ZeroCancellationIcon from '@/assets/images/benefit_zero_cancellation.svg';
+import WalletCoinsIcon from '@/assets/images/wallet_coins.svg';
+import ReferHandCoinIcon from '@/assets/images/refer_hand_coin.svg';
+import HomeTabCarIcon from '@/assets/images/home_tab_car.svg';
+import HomeTabBikeIcon from '@/assets/images/home_tab_bike.svg';
+import MilestoneCoinIcon from '@/assets/images/milestone_coin.svg';
 
 // Home page (Figma "Home"): purple banner, refer strip, Cars / Bikes search card, then the sections below.
 export const HOME_PURPLE = '#6152D8';
@@ -147,7 +157,7 @@ export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
           style={({ pressed }) => [styles.walletPill, pressed && { opacity: 0.85 }]}
         >
           <Text style={styles.walletText}>{cash}</Text>
-          <Image source={require('@/assets/images/wallet_coins.png')} style={styles.walletCoin} />
+          <WalletCoinsIcon width={12} height={12} />
         </Pressable>
       </View>
 
@@ -197,7 +207,7 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       style={({ pressed }) => [styles.refer, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.9 }]}
     >
       <View style={[styles.referIconWrap, { backgroundColor: p.iconBg }]}>
-        <Image source={require('@/assets/images/refer_hand_coin.png')} style={styles.referIcon} />
+        <ReferHandCoinIcon width={24} height={24} />
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.referTop}>
@@ -396,7 +406,7 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
           );
         })}
         <View style={[styles.coin, { left: '100%' }]}>
-          <Image source={require('@/assets/images/milestone_coin.png')} style={styles.coinImage} />
+          <MilestoneCoinIcon width={12} height={12} />
         </View>
       </View>
 
@@ -435,12 +445,46 @@ export function DestinationTile({ image, faded, title, blurb, onPress }: { image
 
 // Design order and copy. Uses the pictures already in assets/images; `wide` takes the whole row (the fifth item).
 // Design order and copy (five rows of the grid; `wide` takes the whole row).
-const BENEFITS: { title: string; sub: string; image: ImageSourcePropType; size: number; wide?: boolean }[] = [
-  { title: 'Lowest Price', sub: 'Guaranteed low rates', image: require('@/assets/images/benefit_lowest_price.png'), size: 20 },
-  { title: 'Unlimited KM', sub: 'Unlimited on 1+ day trips', image: require('@/assets/images/benefit_unlimited_km.png'), size: 24 },
-  { title: 'Well Maintained', sub: 'Regularly serviced', image: require('@/assets/images/benefit_well_maintained.png'), size: 24 },
-  { title: 'Zero Deposit', sub: 'No security deposit', image: require('@/assets/images/benefit_zero_deposit.png'), size: 24 },
-  { title: 'Zero cancellation/rescheduling fees', sub: '100% refund up to 24 hours before your trip', image: require('@/assets/images/benefit_zero_cancellation.png'), size: 24, wide: true },
+// const BENEFITS: { title: string; sub: string; image: ImageSourcePropType; size: number; wide?: boolean }[] = [
+//   { title: 'Lowest Price', sub: 'Guaranteed low rates', image: require('@/assets/images/benefit_lowest_price.png'), size: 20 },
+//   { title: 'Unlimited KM', sub: 'Unlimited on 1+ day trips', image: require('@/assets/images/benefit_unlimited_km.png'), size: 24 },
+//   { title: 'Well Maintained', sub: 'Regularly serviced', image: require('@/assets/images/benefit_well_maintained.png'), size: 24 },
+//   { title: 'Zero Deposit', sub: 'No security deposit', image: require('@/assets/images/benefit_zero_deposit.png'), size: 24 },
+//   { title: 'Zero cancellation/rescheduling fees', sub: '100% refund up to 24 hours before your trip', image: require('@/assets/images/benefit_zero_cancellation.png'), size: 24, wide: true },
+// ];
+
+const BENEFITS = [
+  {
+    title: 'Lowest Price',
+    sub: 'Guaranteed low rates',
+    Icon: LowestPriceIcon,
+    size: 20,
+  },
+  {
+    title: 'Unlimited KM',
+    sub: 'Unlimited on 1+ day trips',
+    Icon: UnlimitedKmIcon,
+    size: 24,
+  },
+  {
+    title: 'Well Maintained',
+    sub: 'Regularly serviced',
+    Icon: WellMaintainedIcon,
+    size: 24,
+  },
+  {
+    title: 'Zero Deposit',
+    sub: 'No security deposit',
+    Icon: ZeroDepositIcon,
+    size: 24,
+  },
+  {
+    title: 'Zero cancellation/rescheduling fees',
+    sub: '100% refund up to 24 hours before your trip',
+    Icon: ZeroCancellationIcon,
+    size: 24,
+    wide: true,
+  },
 ];
 
 export function BenefitsGrid() {
@@ -450,7 +494,8 @@ export function BenefitsGrid() {
       {BENEFITS.map((b) => (
         <View key={b.title} style={[styles.benefit, b.wide && { flexBasis: '100%' }]} accessible accessibilityLabel={`${b.title}, ${b.sub}`}>
           <View style={styles.benefitCircle}>
-            <Image source={b.image} style={{ width: b.size, height: b.size }} resizeMode="contain" />
+            {/* <Image source={b.image} style={{ width: b.size, height: b.size }} resizeMode="contain" /> */}
+            <b.Icon width={b.size} height={b.size} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.benefitTitle, { color: p.fg }]} numberOfLines={1}>{b.title}</Text>
@@ -580,7 +625,7 @@ const styles = StyleSheet.create({
   // Figma: 240×144 photo, radius 8, 4px inset for the tag (top) and the dots (bottom).
   pickImageWrap: { height: 144, borderRadius: 8, overflow: 'hidden' },
   pickTag: { position: 'absolute', top: 4, left: 4, height: 20, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 20 },
-  pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
+  pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#FFFFFF' },
   // Dots: the current one is a 12×4 white pill, the others 4×4 Neutral/300, 5 apart.
   pickDots: { position: 'absolute', bottom: 4, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5 },
   pickDot: { width: 4, height: 4, borderRadius: 20, backgroundColor: '#D4D4D4' },
@@ -637,7 +682,7 @@ const styles = StyleSheet.create({
   benefitSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Membership
-  member: { marginHorizontal: 16, marginTop: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8 },
+  member: { marginHorizontal: 16, marginTop: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 },
   memberHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 3 },
   memberTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, flexShrink: 1 },
   memberBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 22, paddingHorizontal: 10, borderRadius: 31 },

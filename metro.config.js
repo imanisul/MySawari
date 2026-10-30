@@ -10,4 +10,15 @@ const backendFolder = new RegExp(`^${escapeRegExp(path.resolve(__dirname, 'mysaw
 // Expo's default blockList is an array of patterns; keep them and add ours.
 config.resolver.blockList = [].concat(config.resolver.blockList || [], backendFolder);
 
+config.transformer.babelTransformerPath = require.resolve(
+  'react-native-svg-transformer'
+);
+
+config.resolver.assetExts = config.resolver.assetExts.filter(
+  (ext) => ext !== 'svg'
+);
+
+config.resolver.sourceExts.push('svg');
+
+
 module.exports = config;

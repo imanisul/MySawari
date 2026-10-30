@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   // Design: Plus Jakarta Sans 600, 8px / 12px, in every state.
   navLabel: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 8,
+    fontSize: 8.5,
     lineHeight: 12,
     textAlign: 'center',
   },

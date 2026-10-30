@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BlurHost, BottomBlur } from '@/components/common/BottomBlur';
 import { BlurTargetView } from 'expo-blur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 import { Alert, LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -175,6 +175,16 @@ export default function BookingScreen() {
   // waited for (the payment opens by itself once it arrives).
   const [showLogin, setShowLogin] = useState(false);
   const [waitingForPrice, setWaitingForPrice] = useState(false);
+
+  // Booking requires an authenticated session
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated === false) {
+        setShowLogin(true);
+      }
+    }, [isAuthenticated])
+  );
+
   useEffect(() => {
     if (!waitingForPrice || isQuoteLoading || !pricingQuote) return;
     setWaitingForPrice(false);
@@ -551,7 +561,18 @@ export default function BookingScreen() {
             onClose={() => setCelebrate(null)}
           />
         )}
-        <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
+        <LoginBottomSheet
+          visible={showLogin}
+          showSkip={false}
+          required={isAuthenticated === false}
+          onClose={() => {
+            setShowLogin(false);
+            if (isAuthenticated === false) {
+              router.back();
+            }
+          }}
+          onLoginSuccess={() => setShowLogin(false)}
+        />
       </BlurHost>
     </KeyboardAvoidingView>
     </BlurTargetProvider>

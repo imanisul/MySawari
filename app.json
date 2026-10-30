@@ -10,11 +10,6 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "updates": {
-      "url": "https://u.expo.dev/7eae244d-1043-4c00-b2af-e384e4a921e4",
-      "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
-    },
     "ios": {
       "bundleIdentifier": "com.mysawari.customer",
       "buildNumber": "2",
@@ -102,9 +97,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "7eae244d-1043-4c00-b2af-e384e4a921e4"
+        "projectId": "d7cbac30-5e68-40ef-b527-8babd470346e"
       }
     },
-    "owner": "mysawari"
+    "owner": "masudalom"
   }
 }

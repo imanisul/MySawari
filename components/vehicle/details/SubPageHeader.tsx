@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useDetailsPalette } from './detailsPalette';
 
 /** Grey round back button + title, with a hairline under it (FAQs, Policy Agreements). */
-export function SubPageHeader({ title }: { title: string }) {
+export function SubPageHeader({ title, onBack }: { title: string; onBack?: () => void }) {
   const p = useDetailsPalette();
   const router = useRouter();
   return (
@@ -13,7 +13,7 @@ export function SubPageHeader({ title }: { title: string }) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Back"
-        onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+        onPress={() => (onBack ? onBack() : router.canGoBack() ? router.back() : router.replace('/'))}
         style={({ pressed }) => [styles.backBtn, { backgroundColor: p.iconBg }, pressed && { opacity: 0.7 }]}
       >
         <Feather name="chevron-left" size={18} color={p.sub} />

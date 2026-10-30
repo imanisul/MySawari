@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -14,6 +14,7 @@ import { LoadingImage } from '@/components/common/LoadingImage';
 import { shortDate, tripTotal, driverLabel } from '@/components/booking/TripDetailParts';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, PF } from '@/components/profile/ProfileParts';
+import { LoginBottomSheet } from '@/components';
 
 type Stage = 'refunded' | 'approved' | 'processing' | 'rejected' | 'not_eligible';
 
@@ -39,8 +40,34 @@ export default function RefundsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
   const { isAuthenticated } = useSawari();
+  const [showLogin, setShowLogin] = useState(false);
   const { data: vehicles = [] } = useVehicles();
   const { data: bookings = [], isLoading, isError, refetch, isRefetching } = useQuery({ ...bookingsQueryOptions, enabled: isAuthenticated === true });
+
+  if (!isAuthenticated) {
+    return (
+      <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
+        <ScreenHeader title="My Refund" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <Feather name="rotate-ccw" size={32} color={p.fg} />
+          <Text style={{ fontFamily: PF.semibold, fontSize: 16, color: p.fg, marginTop: 14, textAlign: 'center' }}>
+            Log in to see your refunds
+          </Text>
+          <Text style={{ fontFamily: PF.regular, fontSize: 13, color: p.muted, marginTop: 6, textAlign: 'center', lineHeight: 20 }}>
+            View refund status and timelines for your cancelled bookings.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}
+            style={({ pressed }) => [{ backgroundColor: p.navy, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24, marginTop: 18 }, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={{ color: '#FFFFFF', fontFamily: PF.semibold, fontSize: 14 }}>Log In</Text>
+          </Pressable>
+        </View>
+        <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
+      </SafeAreaView>
+    );
+  }
 
   const list = bookings
     .filter((b) => b.status === 'CANCELLED' && ((b.onlinePayableNow || 0) > 0 || amountOf(b) > 0 || !!b.pendingRefund || !!b.refundStatus))

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
+import { useVehicles } from '@/hooks/useVehicles';
 import { calculateRentalDays } from '@/services/backend/pricingEngine';
 import { checkCarAvailability } from '@/utils/sawari';
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
@@ -155,7 +156,8 @@ export function DatesSheet() {
     fromDestination?: string;
   }>();
   const freshPick = fresh === 'true';
-  const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, dropoff, isDarkMode } = useSawari();
+  const { data: fetchedVehicles = [] } = useVehicles();
+  const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, selectCar, dropoff, isDarkMode } = useSawari();
 
   // Figma palette in light mode; dark mode keeps the theme tokens.
   const ui = isDarkMode
@@ -320,8 +322,19 @@ export function DatesSheet() {
     if (forSpecificCar === 'true' && selectedCar) {
       const isAvail = checkCarAvailability(selectedCar, formatDateStr(start), formatDateStr(effectiveEnd));
       if (!isAvail) {
-        Alert.alert('Car Not Available', 'The selected car is not available for these dates. Please choose different dates.');
-        return;
+        if (fromDestination === 'true') {
+          // Check if another vehicle of the same type is available
+          const altCar = fetchedVehicles.find((v) => v.type === selectedCar.type && checkCarAvailability(v, formatDateStr(start), formatDateStr(effectiveEnd)));
+          if (altCar) {
+            selectCar(altCar);
+          } else {
+            Alert.alert('Vehicles In High Demand', 'Vehicles are not available for these selected dates. Please choose different dates.');
+            return;
+          }
+        } else {
+          Alert.alert('Car Not Available', 'The selected car is not available for these dates. Please choose different dates.');
+          return;
+        }
       }
     }
 
@@ -344,11 +357,15 @@ export function DatesSheet() {
       // Flow from home Top Destination card: destination and car are already selected, proceed directly to car details
       router.replace('/car-details');
     } else if (forSpecificCar === 'true') {
-      // Flow from car availability check: proceed directly to location search, which then goes to payment option page
-      router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+      if (dropoff?.name) {
+        // Destination already selected, return to car details directly
+        router.replace('/car-details');
+      } else {
+        // Needs destination: go to dropoff
+        router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+      }
     } else {
-      // Swap this page for the results. (It used to close every page back to Home and then open the
-      // results, so Home flashed on screen in between.) Back from the results returns to Home.
+      // Swap this page for the results. Back from the results returns to Home.
       router.replace('/search');
     }
   };
@@ -394,18 +411,33 @@ export function DatesSheet() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Change destination"
-          onPress={() => router.push({ pathname: '/dropoff', params: { returnBack: 'true' } })}
-          style={[styles.destField, { borderColor: ui.border }]}
-        >
-          <PinOutline color={ui.muted} />
-          <Text style={[styles.destText, { color: ui.muted }]} numberOfLines={1}>
-            {dropoff?.name || 'Select your Destination'}
-          </Text>
-          <Chevron color={ui.muted} />
-        </Pressable>
+        <View style={styles.topNavRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+            hitSlop={10}
+            onPress={() => router.back()}
+            style={({ pressed }) => [
+              styles.backBtn,
+              { backgroundColor: isDarkMode ? colors.card : '#F5F6FA', borderColor: ui.border },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Feather name="chevron-left" size={22} color={ui.text} />
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Change destination"
+            onPress={() => router.push({ pathname: '/dropoff', params: { returnBack: 'true' } })}
+            style={[styles.destField, { flex: 1, borderColor: ui.border }]}
+          >
+            <PinOutline color={dropoff?.name ? ui.navy : ui.muted} />
+            <Text style={[styles.destText, { color: dropoff?.name ? ui.text : ui.muted }]} numberOfLines={1}>
+              {dropoff?.name || 'Select your Destination'}
+            </Text>
+            <Chevron color={ui.muted} />
+          </Pressable>
+        </View>
 
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: ui.text }]}>Select your date & time</Text>
@@ -612,6 +644,20 @@ export function DatesSheet() {
 const styles = StyleSheet.create({
   page: { flex: 1 },
   content: { paddingHorizontal: 16, paddingBottom: 24 },
+  topNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  backBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   destField: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -12,6 +12,13 @@ import { useSawari } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import Notifications from '@/utils/notifications';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { PolicyDocumentScreen, PolicyKey } from '@/screens/Support/PolicyScreen';
+import {
+  getPendingReferral,
+  detectReferralFromClipboard,
+  clearPendingReferral,
+  PendingReferral,
+} from '@/utils/referralLinkHandler';
 
 /**
  * Sign-in sheet (design: "Get started with My Sawari" → "Verify your account" → "Let's complete your profile").
@@ -90,12 +97,17 @@ export function LoginBottomSheet({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [referral, setReferral] = useState('');
+  const [pendingReferral, setPendingReferral] = useState<PendingReferral | null>(null);
+  const [isEditingReferral, setIsEditingReferral] = useState(false);
+  const [referralValidating, setReferralValidating] = useState(false);
+  const [referralStatusMsg, setReferralStatusMsg] = useState<{ text: string; valid: boolean } | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
   const [focus, setFocus] = useState<string | null>(null);
+  const [viewingPolicy, setViewingPolicy] = useState<PolicyKey | null>(null);
 
   // Fresh sheet every time it opens.
   useEffect(() => {
@@ -103,6 +115,9 @@ export function LoginBottomSheet({
     setStep('phone'); setMobile(''); setOtp(''); setOtpId(null); setIsExisting(false);
     setName(''); setEmail(''); setReferral(''); setConfirmed(false);
     setLoading(false); setError(null); setResendIn(0);
+    setViewingPolicy(null);
+    setIsEditingReferral(false);
+    setReferralStatusMsg(null);
 
     // If user has logged in before on this device, it's 2nd time: don't show tick button and auto-accept
     AsyncStorage.getItem(HAS_LOGGED_IN_KEY)
@@ -115,7 +130,70 @@ export function LoginBottomSheet({
         setIsFirstTime(true);
         setTermsAccepted(false);
       });
+
+    // Detect referral from pending storage or clipboard (Navi pattern)
+    getPendingReferral().then((ref) => {
+      if (ref) {
+        setPendingReferral(ref);
+        setReferral(ref.code);
+        setReferralStatusMsg({ text: `Referred by ${ref.referrerName}`, valid: true });
+      } else {
+        detectReferralFromClipboard().then((clipRef) => {
+          if (clipRef) {
+            setPendingReferral(clipRef);
+            setReferral(clipRef.code);
+            setReferralStatusMsg({ text: `Referred by ${clipRef.referrerName}`, valid: true });
+          }
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }, [visible]);
+
+  // Debounced real-time validation when user types or edits referral code on Profile step
+  useEffect(() => {
+    if (step !== 'profile') return;
+    const clean = referral.trim().toUpperCase();
+    if (!clean) {
+      setReferralStatusMsg(null);
+      setReferralValidating(false);
+      return;
+    }
+    if (pendingReferral && pendingReferral.code === clean) {
+      setReferralStatusMsg({ text: `Referred by ${pendingReferral.referrerName}`, valid: true });
+      setReferralValidating(false);
+      return;
+    }
+    if (clean.length < 4) {
+      setReferralStatusMsg(null);
+      setReferralValidating(false);
+      return;
+    }
+
+    setReferralValidating(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await API.validateReferralCode(clean);
+        if (res && res.valid) {
+          setReferralStatusMsg({ text: `Referred by ${res.referrerName}`, valid: true });
+          setPendingReferral({
+            code: clean,
+            referrerName: res.referrerName,
+            rewardText: res.rewardText,
+            bonusSawariCash: res.bonusSawariCash,
+            detectedAt: Date.now(),
+          });
+        } else {
+          setReferralStatusMsg({ text: 'Referral code not found', valid: false });
+        }
+      } catch (err: any) {
+        setReferralStatusMsg({ text: err?.message || 'Referral code not found', valid: false });
+      } finally {
+        setReferralValidating(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [step, referral, pendingReferral]);
 
   // Resend countdown.
   useEffect(() => {
@@ -126,14 +204,12 @@ export function LoginBottomSheet({
 
   const openTerms = () => {
     Keyboard.dismiss();
-    onClose();
-    router.push('/terms');
+    setViewingPolicy('terms');
   };
 
   const openPrivacy = () => {
     Keyboard.dismiss();
-    onClose();
-    router.push('/privacy');
+    setViewingPolicy('privacy');
   };
 
   const askForNotifications = () => {
@@ -144,6 +220,7 @@ export function LoginBottomSheet({
 
   const finish = () => {
     Keyboard.dismiss();
+    clearPendingReferral().catch(() => {});
     onClose();
     if (onLoginSuccess) setTimeout(() => onLoginSuccess(), 300);
   };
@@ -260,11 +337,30 @@ export function LoginBottomSheet({
   ];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={() => (step === 'otp' ? back() : !loading && !required && onClose())} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
-        <ModalBlur />
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => (step === 'phone' && !loading && !required ? onClose() : Keyboard.dismiss())} accessibilityLabel="Close" />
-        <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: Math.max(insets.bottom, 16) }]}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={() => {
+        if (viewingPolicy) {
+          setViewingPolicy(null);
+        } else if (step === 'otp' || step === 'profile') {
+          back();
+        } else if (!loading && !required) {
+          onClose();
+        }
+      }}
+      statusBarTranslucent
+    >
+      {viewingPolicy ? (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: ui.sheet, zIndex: 999 }]}>
+          <PolicyDocumentScreen policyKey={viewingPolicy} onBack={() => setViewingPolicy(null)} />
+        </View>
+      ) : (
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
+          <ModalBlur />
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => (step === 'phone' && !loading && !required ? onClose() : Keyboard.dismiss())} accessibilityLabel="Close" />
+          <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: Math.max(insets.bottom, 16) }]}>
 
           {step === 'phone' && (
             <>
@@ -272,6 +368,29 @@ export function LoginBottomSheet({
                 <Text style={[styles.title, { color: ui.title, flex: 1 }]}>Get started with My Sawari</Text>
               </View>
               <Text style={[styles.copy, { color: ui.copy }]}>We'll use your phone number to verify your account. No spam, we promise.</Text>
+
+              {!!pendingReferral && (
+                <View style={[styles.naviBanner, { backgroundColor: isDarkMode ? '#1E1B4B' : '#EEF2FF', borderColor: isDarkMode ? '#3730A3' : '#C7D2FE' }]}>
+                  <View style={styles.naviBannerLeft}>
+                    <View style={[styles.naviIconCircle, { backgroundColor: '#4F46E5' }]}>
+                      <Feather name="gift" size={13} color="#FFFFFF" />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.naviBannerTitle, { color: isDarkMode ? '#E0E7FF' : '#1E1B4B' }]} numberOfLines={1}>
+                        Referred by <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{pendingReferral.referrerName}</Text>
+                      </Text>
+                      <Text style={[styles.naviBannerSub, { color: isDarkMode ? '#A5B4FC' : '#4338CA' }]} numberOfLines={1}>
+                        {pendingReferral.rewardText || '100 SawariCash on signup'} • Applied
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.naviPillBadge}>
+                    <Feather name="check" size={11} color="#059669" />
+                    <Text style={styles.naviPillText}>Applied</Text>
+                  </View>
+                </View>
+              )}
+
               <View style={field('phone')}>
                 <Text style={[styles.cc, { color: ui.copy }]}>+91</Text>
                 <TextInput
@@ -412,20 +531,70 @@ export function LoginBottomSheet({
                   </Text>
                 </View>
               </View>
-              <View style={field('ref')}>
-                <TextInput
-                  value={referral}
-                  // Codes are letters and digits only; a pasted space, dash or emoji would make signup fail.
-                  onChangeText={(t) => setReferral(t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20))}
-                  onFocus={() => setFocus('ref')}
-                  onBlur={() => setFocus(null)}
-                  placeholder="Referral Code(Optional)"
-                  placeholderTextColor={ui.copy}
-                  autoCapitalize="characters"
-                  autoCorrect={false}
-                  style={[styles.input, { color: ui.title }]}
-                />
-              </View>
+              {pendingReferral && !isEditingReferral ? (
+                <View style={[styles.naviVerifiedCard, { backgroundColor: isDarkMode ? '#064E3B20' : '#ECFDF5', borderColor: isDarkMode ? '#065F46' : '#A7F3D0' }]}>
+                  <View style={styles.naviCardHeader}>
+                    <View style={[styles.naviCardIconCircle, { backgroundColor: '#059669' }]}>
+                      <Feather name="check" size={14} color="#FFFFFF" />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.naviCardTitle, { color: isDarkMode ? '#D1FAE5' : '#065F46' }]} numberOfLines={1}>
+                        Referred by {pendingReferral.referrerName}
+                      </Text>
+                      <Text style={[styles.naviCardCode, { color: isDarkMode ? '#6EE7B7' : '#047857' }]}>
+                        Code: <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{pendingReferral.code}</Text>
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => { setIsEditingReferral(true); }}
+                      hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel="Change referral code"
+                    >
+                      <Text style={[styles.naviCardChange, { color: ui.navy }]}>Change</Text>
+                    </Pressable>
+                  </View>
+                  <View style={styles.naviCardBonusRow}>
+                    <Text style={[styles.naviCardBonus, { color: isDarkMode ? '#A7F3D0' : '#065F46' }]}>
+                      🎁 100 SawariCash will be added to your wallet upon signup
+                    </Text>
+                  </View>
+                </View>
+              ) : (
+                <View style={{ gap: 4 }}>
+                  <View style={field('ref')}>
+                    <TextInput
+                      value={referral}
+                      // Codes are letters and digits only; a pasted space, dash or emoji would make signup fail.
+                      onChangeText={(t) => {
+                        const clean = t.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20);
+                        setReferral(clean);
+                      }}
+                      onFocus={() => setFocus('ref')}
+                      onBlur={() => setFocus(null)}
+                      placeholder="Referral Code (Optional)"
+                      placeholderTextColor={ui.copy}
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      style={[styles.input, { color: ui.title }]}
+                    />
+                    {referralValidating && (
+                      <ActivityIndicator size="small" color={ui.navy} style={{ marginRight: 6 }} />
+                    )}
+                    {referralStatusMsg?.valid && !referralValidating && (
+                      <Feather name="check-circle" size={18} color="#059669" style={{ marginRight: 6 }} />
+                    )}
+                    {referralStatusMsg && !referralStatusMsg.valid && !referralValidating && (
+                      <Feather name="x-circle" size={18} color={ui.error} style={{ marginRight: 6 }} />
+                    )}
+                  </View>
+                  {referralStatusMsg && (
+                    <Text style={[styles.small, { color: referralStatusMsg.valid ? '#059669' : ui.error, marginLeft: 4 }]}>
+                      {referralStatusMsg.valid ? `✓ ${referralStatusMsg.text} • 100 SawariCash bonus applied` : `✕ ${referralStatusMsg.text}`}
+                    </Text>
+                  )}
+                </View>
+              )}
               <Pressable onPress={() => setConfirmed((v) => !v)} style={styles.checkRow} accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }}>
                 <View style={[styles.check, { borderColor: confirmed ? ui.navy : ui.faint, backgroundColor: confirmed ? ui.navy : 'transparent' }]}>
                   {confirmed && <Feather name="check" size={10} color="#FFFFFF" />}
@@ -454,6 +623,7 @@ export function LoginBottomSheet({
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+      )}
     </Modal>
   );
 }
@@ -555,4 +725,100 @@ const styles = StyleSheet.create({
   checkText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
+
+  // Navi referral banner (Step 1)
+  naviBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    gap: 10,
+    marginTop: -4,
+  },
+  naviBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+  },
+  naviIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  naviBannerTitle: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  naviBannerSub: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
+  naviPillBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  naviPillText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11,
+    color: '#059669',
+  },
+
+  // Navi referral card (Step 3)
+  naviVerifiedCard: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+  },
+  naviCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  naviCardIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  naviCardTitle: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13.5,
+    lineHeight: 19,
+  },
+  naviCardCode: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  naviCardChange: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12,
+    textDecorationLine: 'underline',
+  },
+  naviCardBonusRow: {
+    paddingTop: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(5, 150, 105, 0.25)',
+  },
+  naviCardBonus: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+    lineHeight: 16,
+  },
 });

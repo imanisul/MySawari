@@ -35,7 +35,7 @@ export const OfferCard = React.memo(function OfferCard({ offer, onPress }: { off
           <Image source={offer.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
         )}
         <LinearGradient
-          colors={offer.image ? ['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)'] : offer.gradientColors}
+          colors={offer.image ? ['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)'] : (offer.gradientColors || ['#6152D8', '#8B5CF6'])}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradient}

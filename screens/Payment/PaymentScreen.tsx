@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { Pressable, StyleSheet, Text, View, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
@@ -33,8 +33,17 @@ export default function PaymentScreen() {
     isDeliveryRequested,
     deliveryMode,
     isAuthenticated,
+    isAuthLoading,
     membership
   } = useSawari();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthLoading && isAuthenticated === false) {
+        router.replace('/');
+      }
+    }, [isAuthenticated, isAuthLoading])
+  );
 
   // Same checks the booking screen makes before opening checkout; a direct link here skips that screen.
   const isTripIncomplete = !dateRange || dateRange.includes('Select') || !dropoff?.name || isAuthenticated !== true;

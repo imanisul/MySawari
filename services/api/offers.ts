@@ -13,15 +13,17 @@ function plateSafeOfferImage(image: any) {
 export interface Offer {
   id: string;
   _id?: string;
-  type: 'coupon' | 'special_deal';
+  type: 'coupon' | 'special_deal' | 'banner';
   title: string;
   subtitle: string;
-  discount: string;
-  code: string;
-  expiry: string;
-  gradientColors: [string, string];
-  icon: keyof typeof Feather.glyphMap;
+  discount?: string;
+  code?: string;
+  expiry?: string;
+  gradientColors?: [string, string];
+  icon?: keyof typeof Feather.glyphMap;
   image?: any;
+  displayFormat?: 'image' | 'text' | 'combination';
+  lines?: [string, string] | string[];
   // Special deal fields
   vehicleId?: string;
   originalPrice?: number;
@@ -67,7 +69,26 @@ export async function fetchOffers(): Promise<Offer[]> {
     const json = await res.json();
     if (json.success && Array.isArray(json.data)) {
       return json.data.filter((offer: any) => offer && isOfferLive(offer)).map((offer: any) => {
-        if (offer.type === 'coupon') {
+        if (offer.type === 'banner') {
+          const displayFormat = offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url && offer.title ? 'combination' : 'text');
+          return {
+            id: `banner-${offer._id}`,
+            _id: offer._id,
+            type: 'banner',
+            title: offer.title || '',
+            subtitle: offer.subtitle || '',
+            code: offer.code || '',
+            discount: offer.discount || '',
+            displayFormat,
+            lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
+            gradientColors: offer.gradientColors || ['#6152D8', '#8B5CF6'],
+            icon: offer.icon || 'tag',
+            image: plateSafeOfferImage(offer.image),
+            expiry: offer.expiryDate ? formatExpiry(offer.expiryDate) : '',
+            expiryDate: offer.expiryDate,
+            active: offer.active,
+          };
+        } else if (offer.type === 'coupon') {
           const isFlat = offer.discountType === 'FLAT';
           const discount = isFlat ? `${formatCurrency(offer.discountValue)} OFF` : `${offer.discountValue}% OFF`;
           const subtitle = offer.subtitle || (isFlat
@@ -82,6 +103,8 @@ export async function fetchOffers(): Promise<Offer[]> {
             subtitle,
             discount,
             code: offer.code,
+            displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
+            lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
             expiry: formatExpiry(offer.expiryDate),
             gradientColors: offer.gradientColors || ['#6178D8', '#8B5CF6'],
             icon: offer.icon || 'tag',
@@ -97,6 +120,8 @@ export async function fetchOffers(): Promise<Offer[]> {
             subtitle: offer.subtitle,
             discount: offer.discountPercent ? `${offer.discountPercent}% OFF` : '',
             code: '',
+            displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
+            lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
             expiry: formatExpiry(offer.expiryDate),
             expiryDate: offer.expiryDate,
             gradientColors: offer.gradientColors || ['#FF416C', '#FF4B2B'],

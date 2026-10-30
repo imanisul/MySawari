@@ -46,19 +46,20 @@ export default function CarDetailsScreen() {
   const blurTarget = useRef<View | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id: paramCarId } = useLocalSearchParams<{ id?: string }>();
+  const { id: paramCarId, vehicleId: paramVehicleId } = useLocalSearchParams<{ id?: string; vehicleId?: string }>();
+  const targetCarId = paramCarId || paramVehicleId;
   const { data: fetchedVehicles = [], isLoading: isFleetLoading } = useVehicles();
   const { selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates } = useSawari();
 
   // If a specific car ID was passed or selectedCar is the dummy placeholder, select the real vehicle
   useEffect(() => {
-    if (paramCarId && fetchedVehicles.length > 0) {
-      const match = fetchedVehicles.find((v) => String(v.id) === String(paramCarId));
+    if (targetCarId && fetchedVehicles.length > 0) {
+      const match = fetchedVehicles.find((v) => String(v.id) === String(targetCarId));
       if (match && match.id !== selectedCar?.id) selectCar(match);
     } else if ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && fetchedVehicles.length > 0) {
       selectCar(fetchedVehicles[0]);
     }
-  }, [paramCarId, fetchedVehicles, selectedCar, selectCar]);
+  }, [targetCarId, fetchedVehicles, selectedCar, selectCar]);
 
   // CarListCard already syncs the Explore page's date to dateRange before navigation.
   const effectiveDateRange = dateRange;
@@ -105,12 +106,17 @@ export default function CarDetailsScreen() {
 
   const openDates = () => {
     Haptics.selectionAsync();
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true' } });
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
 
   // Figma flow: Check Availability → date & time → back here with the price → Book Now.
   // Book Now only asks for the trip destination if it is still missing, then opens the booking.
   const handleBookingProceed = () => {
+    if (!isAuthenticated) {
+      setPendingAction(() => handleBookingProceed);
+      setShowLogin(true);
+      return;
+    }
     const isMissingEnd = !endStr || endStr.includes('Select');
     if (!hasTrip || isMissingEnd) {
       openDates();
@@ -290,8 +296,12 @@ export default function CarDetailsScreen() {
       />
       <LoginBottomSheet
         visible={showLogin}
-        onClose={() => setShowLogin(false)}
+        onClose={() => {
+          setShowLogin(false);
+          setPendingAction(null);
+        }}
         onLoginSuccess={() => {
+          setShowLogin(false);
           if (pendingAction) {
             pendingAction();
             setPendingAction(null);

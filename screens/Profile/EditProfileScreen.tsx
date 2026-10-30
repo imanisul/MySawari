@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform, KeyboardAvoidingView, Alert, Linking, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
@@ -26,7 +26,15 @@ function maskMobile(m?: string) {
 export default function EditProfileScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
-  const { customer, saveProfile } = useSawari();
+  const { customer, saveProfile, isAuthenticated, isAuthLoading } = useSawari();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthLoading && isAuthenticated === false) {
+        router.replace('/profile');
+      }
+    }, [isAuthenticated, isAuthLoading])
+  );
 
   const [editing, setEditing] = useState<Field | null>(null);
   const [draft, setDraft] = useState('');

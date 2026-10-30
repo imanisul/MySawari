@@ -1,12 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Image, ImageSourcePropType, ScrollView, useWindowDimensions, Linking, Alert } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, Text as SvgText, TextPath, G, RadialGradient, Stop } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
+import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import { LoadingImage } from '@/components/common/LoadingImage';
+import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { formatCurrency, memberDayPrice, type QuoteParams } from '@/services/backend/pricingEngine';
+import { offersQueryOptions, isOfferLive } from '@/services/api/offers';
 import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
 import LowestPriceIcon from '@/assets/images/benefit_lowest_price.svg';
@@ -25,11 +30,71 @@ export const HOME_PURPLE = '#6152D8';
 
 // ── Top banner ───────────────────────────────────────────────────────────────
 
-// Each slide is something MySawari really offers (the same promises as the Benefits grid).
-const SLIDES: { lines: [string, string]; sub: string[] }[] = [
-  { lines: ['LOWEST PRICE', 'GUARANTEED'], sub: ['Zero security Deposit', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'] },
-  { lines: ['DOORSTEP', 'DELIVERY'], sub: ['Anywhere in Guwahati', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'] },
+interface HeroSlideBase {
+  id: string;
+  code?: string;
+  discount?: string;
+  vehicleId?: string;
+}
+
+interface TextSlide extends HeroSlideBase {
+  kind: 'text';
+  lines: [string, string];
+  sub: string[];
+}
+
+interface ImageSlide extends HeroSlideBase {
+  kind: 'image';
+  imageUrl: string;
+}
+
+interface ComboSlide extends HeroSlideBase {
+  kind: 'combination';
+  imageUrl: string;
+  lines: [string, string];
+  sub: string[];
+}
+
+type HeroSlide = TextSlide | ImageSlide | ComboSlide;
+
+// Default brand slides if no backend offers or to complement active offers.
+const DEFAULT_SLIDES: HeroSlide[] = [
+  { id: 'default-lowest-price', kind: 'text', lines: ['LOWEST PRICE', 'GUARANTEED'], sub: ['Zero security Deposit', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'] },
+  { id: 'default-doorstep', kind: 'text', lines: ['DOORSTEP', 'DELIVERY'], sub: ['Anywhere in Guwahati', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'] },
 ];
+
+function splitTitleIntoTwoLines(title?: string, lines?: [string, string] | string[]): [string, string] {
+  if (lines && Array.isArray(lines) && lines.length >= 2 && lines[0]?.trim() && lines[1]?.trim()) {
+    return [lines[0].trim().toUpperCase(), lines[1].trim().toUpperCase()];
+  }
+  if (lines && Array.isArray(lines) && lines.length === 1 && lines[0]?.trim()) {
+    return splitWords(lines[0].trim());
+  }
+  if (title && title.trim()) {
+    return splitWords(title.trim());
+  }
+  return ['LOWEST PRICE', 'GUARANTEED'];
+}
+
+function splitWords(text: string): [string, string] {
+  const words = text.split(/\s+/);
+  if (words.length === 1) {
+    return [words[0].toUpperCase(), 'OFFER'];
+  }
+  const mid = Math.ceil(words.length / 2);
+  return [words.slice(0, mid).join(' ').toUpperCase(), words.slice(mid).join(' ').toUpperCase()];
+}
+
+function parseSubtitleTags(subtitle?: string): string[] {
+  if (!subtitle || !subtitle.trim()) {
+    return ['Zero security Deposit', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'];
+  }
+  const parts = subtitle
+    .split(/[•|,|\n]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+  return parts.length > 0 ? parts : ['Zero security Deposit', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'];
+}
 
 // Sunburst (Figma): 36 thin wedges from the headline's centre, every other one lighter. The light
 // wedges fade out towards the centre so the rays melt into a soft glow behind the headline.
@@ -60,10 +125,6 @@ function Sunburst({ width, height, cy }: { width: number; height: number; cy: nu
 // copies (SVG filters on text are unreliable on Android). Widths are fixed to the design's.
 const ARC_W = 337.86;
 const ARC_H = 128.95;
-const ARC_LINES = [
-  { y: 62, rise: 10, width: 236, size: 44 },
-  { y: 110, rise: 7, width: 164, size: 31 },
-];
 const SHADOW = { dx: 3, dy: 5, color: '#1E1466' };
 // Rings of offsets around the shadow's centre; inner copies darker, outer fainter → a soft edge.
 const SHADOW_TAPS = [
@@ -77,25 +138,39 @@ const SHADOW_TAPS = [
   o,
 })));
 
-function ArcHeadline({ lines }: { lines: [string, string] }) {
+function ArcHeadline({ lines, idPrefix = 'arc' }: { lines: [string, string]; idPrefix?: string }) {
+  const line0 = lines[0] || 'LOWEST PRICE';
+  const line1 = lines[1] || 'GUARANTEED';
+
+  const width0 = line0.length <= 12 ? 236 : Math.min(310, Math.max(220, line0.length * 19));
+  const size0 = line0.length <= 12 ? 44 : Math.max(22, Math.floor((44 * 12) / line0.length));
+
+  const width1 = line1.length <= 10 ? 164 : Math.min(280, Math.max(160, line1.length * 17));
+  const size1 = line1.length <= 10 ? 31 : Math.max(18, Math.floor((31 * 10) / line1.length));
+
+  const dynamicLines = [
+    { y: 62, rise: 10, width: width0, size: size0, text: line0 },
+    { y: 110, rise: 7, width: width1, size: size1, text: line1 },
+  ];
+
   return (
-    <Svg width={ARC_W} height={ARC_H} accessibilityLabel={lines.join(' ')}>
+    <Svg width={ARC_W} height={ARC_H} accessibilityLabel={`${line0} ${line1}`}>
       <Defs>
-        {ARC_LINES.map((l, i) => {
+        {dynamicLines.map((l, i) => {
           const x0 = (ARC_W - l.width) / 2 - 12, x1 = (ARC_W + l.width) / 2 + 12;
-          return <Path key={i} id={`arc${i}`} d={`M${x0},${l.y} Q${ARC_W / 2},${l.y - l.rise * 2} ${x1},${l.y}`} />;
+          return <Path key={i} id={`${idPrefix}_${i}`} d={`M${x0},${l.y} Q${ARC_W / 2},${l.y - l.rise * 2} ${x1},${l.y}`} />;
         })}
       </Defs>
-      {ARC_LINES.map((l, i) => {
-        const text = (fill: string, opacity = 1) => (
+      {dynamicLines.map((l, i) => {
+        const renderText = (fill: string, opacity = 1) => (
           <SvgText fill={fill} fillOpacity={opacity} fontFamily="Anton_400Regular" fontSize={l.size} textAnchor="middle">
-            <TextPath href={`#arc${i}`} startOffset="50%" textLength={l.width} lengthAdjust="spacingAndGlyphs">{lines[i]}</TextPath>
+            <TextPath href={`#${idPrefix}_${i}`} startOffset="50%" textLength={l.width} lengthAdjust="spacingAndGlyphs">{l.text}</TextPath>
           </SvgText>
         );
         return (
           <G key={i}>
-            {SHADOW_TAPS.map((t, k) => <G key={k} transform={`translate(${t.x} ${t.y})`}>{text(SHADOW.color, t.o)}</G>)}
-            {text('#FFFFFF')}
+            {SHADOW_TAPS.map((t, k) => <G key={k} transform={`translate(${t.x} ${t.y})`}>{renderText(SHADOW.color, t.o)}</G>)}
+            {renderText('#FFFFFF')}
           </G>
         );
       })}
@@ -110,6 +185,7 @@ export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
   sawariCash: number | null;
   onWallet: () => void;
 }) {
+  const router = useRouter();
   // Signed-out customers have no balance to show, but the pill stays in the header at zero so the
   // header keeps its shape and the reward is discoverable before signing in.
   const cash = sawariCash ?? 0;
@@ -119,18 +195,92 @@ export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
   const touching = useRef(false);
   const [height, setHeight] = useState(0);
 
-  // Slides move on their own every 4 s, but never while the customer is swiping them.
+  const { data: offers } = useQuery(offersQueryOptions);
+
+  const slides = useMemo<HeroSlide[]>(() => {
+    if (!offers || !Array.isArray(offers)) return DEFAULT_SLIDES;
+
+    const offerSlides: HeroSlide[] = [];
+
+    offers.forEach((offer) => {
+      if (!isOfferLive(offer)) return;
+
+      const imageUrl = offer.image?.url || (typeof offer.image === 'string' ? offer.image : null);
+      const format = offer.displayFormat || (imageUrl && !offer.title ? 'image' : imageUrl && offer.title ? 'combination' : 'text');
+
+      if (format === 'image' && imageUrl) {
+        offerSlides.push({
+          id: offer.id,
+          kind: 'image',
+          imageUrl,
+          code: offer.code,
+          discount: offer.discount,
+          vehicleId: offer.vehicleId,
+        });
+      } else if (format === 'combination' && imageUrl) {
+        offerSlides.push({
+          id: offer.id,
+          kind: 'combination',
+          imageUrl,
+          lines: splitTitleIntoTwoLines(offer.title, offer.lines),
+          sub: parseSubtitleTags(offer.subtitle),
+          code: offer.code,
+          discount: offer.discount,
+          vehicleId: offer.vehicleId,
+        });
+      } else {
+        // text format
+        offerSlides.push({
+          id: offer.id,
+          kind: 'text',
+          lines: splitTitleIntoTwoLines(offer.title, offer.lines),
+          sub: parseSubtitleTags(offer.subtitle),
+          code: offer.code,
+          discount: offer.discount,
+          vehicleId: offer.vehicleId,
+        });
+      }
+    });
+
+    return offerSlides.length > 0 ? [...offerSlides, ...DEFAULT_SLIDES] : DEFAULT_SLIDES;
+  }, [offers]);
+
+  const cardWidth = Math.min(width - 32, 380);
+
+  const handleSlidePress = useCallback((s: HeroSlide) => {
+    Haptics.selectionAsync();
+    if (s.code) {
+      Clipboard.setStringAsync(s.code);
+      CustomAlert.alert(
+        'Code Copied! 🎟️',
+        `Promo code "${s.code}" has been copied to your clipboard. Paste it at checkout to get your discount!`,
+        [{ text: 'Great!' }]
+      );
+    } else if (s.vehicleId) {
+      router.push({ pathname: '/car-details', params: { id: s.vehicleId, vehicleId: s.vehicleId } });
+    }
+  }, [router]);
+
   useEffect(() => {
+    if (slide >= slides.length && slides.length > 0) {
+      setSlide(0);
+      pager.current?.scrollTo({ x: 0, animated: false });
+    }
+  }, [slides.length, slide]);
+
+  // Slides move on their own every 4.5 s, but never while the customer is swiping them.
+  useEffect(() => {
+    if (slides.length <= 1) return;
     const t = setInterval(() => {
       if (touching.current) return;
       setSlide((s) => {
-        const next = (s + 1) % SLIDES.length;
+        const next = (s + 1) % slides.length;
         pager.current?.scrollTo({ x: next * width, animated: true });
         return next;
       });
-    }, 4000);
+    }, 4500);
     return () => clearInterval(t);
-  }, [width]);
+  }, [slides.length, width]);
 
   return (
     // linear-gradient(180deg, #6152D8 0%, #CEC9F3 100%) — the design's two stops, no mid-tones.
@@ -169,27 +319,108 @@ export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
         onScrollBeginDrag={() => { touching.current = true; }}
         onMomentumScrollEnd={(e) => { touching.current = false; setSlide(Math.round(e.nativeEvent.contentOffset.x / width)); }}
       >
-        {SLIDES.map((s) => (
-          <View key={s.lines[0]} style={{ width, alignItems: 'center' }}>
-            <View style={styles.headlineBlock} accessible accessibilityRole="header" accessibilityLabel={`${s.lines[0]} ${s.lines[1]}`}>
-              <ArcHeadline lines={s.lines} />
-            </View>
-            <View style={styles.subRow}>
-              {s.sub.map((t, i) => (
-                <React.Fragment key={t}>
-                  {i > 0 && <View style={styles.subDot} />}
-                  <Text style={styles.sub}>{t}</Text>
-                </React.Fragment>
-              ))}
-            </View>
+        {slides.map((s, index) => (
+          <View key={`${s.id}-${index}`} style={{ width, alignItems: 'center', justifyContent: 'center' }}>
+            {s.kind === 'image' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Promotional banner"
+                onPress={() => handleSlidePress(s)}
+                style={({ pressed }) => [
+                  styles.imageSlideCard,
+                  { width: cardWidth },
+                  pressed && { opacity: 0.95, transform: [{ scale: 0.99 }] },
+                ]}
+              >
+                <Image source={{ uri: s.imageUrl }} style={styles.imageSlidePhoto} resizeMode="cover" />
+                {!!s.code && (
+                  <View style={styles.bannerCodePill}>
+                    <Feather name="scissors" size={10} color="#6152D8" />
+                    <Text style={styles.bannerCodeText}>CODE: {s.code}</Text>
+                    <Feather name="copy" size={9} color="#6152D8" />
+                  </View>
+                )}
+                {!!s.discount && (
+                  <View style={styles.bannerDiscountBadge}>
+                    <Text style={styles.bannerDiscountText}>{s.discount}</Text>
+                  </View>
+                )}
+              </Pressable>
+            ) : s.kind === 'combination' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${s.lines[0]} ${s.lines[1]}`}
+                onPress={() => handleSlidePress(s)}
+                style={({ pressed }) => [
+                  styles.comboSlideCard,
+                  { width: cardWidth },
+                  pressed && { opacity: 0.95, transform: [{ scale: 0.99 }] },
+                ]}
+              >
+                <Image source={{ uri: s.imageUrl }} style={styles.imageSlidePhoto} resizeMode="cover" />
+                <LinearGradient
+                  colors={['rgba(28, 20, 90, 0.45)', 'rgba(28, 20, 90, 0.85)']}
+                  style={StyleSheet.absoluteFill}
+                />
+                <View style={styles.comboContent}>
+                  <View style={{ transform: [{ scale: 0.84 }], marginTop: -10 }}>
+                    <ArcHeadline lines={s.lines} idPrefix={`combo_${index}`} />
+                  </View>
+                  <View style={styles.comboSubRow}>
+                    {s.sub.map((t, i) => (
+                      <React.Fragment key={`${t}-${i}`}>
+                        {i > 0 && <View style={styles.subDot} />}
+                        <Text style={styles.sub}>{t}</Text>
+                      </React.Fragment>
+                    ))}
+                  </View>
+                  {!!s.code && (
+                    <View style={styles.comboCodePill}>
+                      <Feather name="scissors" size={10} color="#FFE600" />
+                      <Text style={styles.comboCodeText}>CODE: {s.code}</Text>
+                      <Text style={styles.comboCopyHint}>(Tap to copy)</Text>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+            ) : (
+              <Pressable
+                accessibilityRole={s.code || s.vehicleId ? 'button' : undefined}
+                onPress={s.code || s.vehicleId ? () => handleSlidePress(s) : undefined}
+                style={styles.textSlideWrap}
+              >
+                <View style={styles.headlineBlock} accessible accessibilityRole="header" accessibilityLabel={`${s.lines[0]} ${s.lines[1]}`}>
+                  <ArcHeadline lines={s.lines} idPrefix={`hero_${index}`} />
+                </View>
+                <View style={styles.subRow}>
+                  {s.sub.map((t, i) => (
+                    <React.Fragment key={`${t}-${i}`}>
+                      {i > 0 && <View style={styles.subDot} />}
+                      <Text style={styles.sub}>{t}</Text>
+                    </React.Fragment>
+                  ))}
+                </View>
+                {!!s.code && (
+                  <View style={styles.textCodeRow}>
+                    <View style={styles.textCodePill}>
+                      <Feather name="scissors" size={10} color="#FFE600" />
+                      <Text style={styles.textCodeText}>Use code: {s.code} (Tap to copy)</Text>
+                      <Feather name="copy" size={9} color="#FFFFFF" />
+                    </View>
+                  </View>
+                )}
+              </Pressable>
+            )}
           </View>
         ))}
       </ScrollView>
 
       {/* Page indicator: a short white thumb sliding along a faint track */}
-      <View style={styles.pager}>
-        <View style={[styles.thumb, { left: (slide * (36 - 12)) / Math.max(1, SLIDES.length - 1) }]} />
-      </View>
+      {slides.length > 1 && (
+        <View style={styles.pager}>
+          <View style={[styles.thumb, { left: (slide * (36 - 12)) / Math.max(1, slides.length - 1) }]} />
+        </View>
+      )}
       {children}
     </LinearGradient>
   );
@@ -310,7 +541,7 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={({ pressed }) => [styles.pick, { backgroundColor: p.summary, borderColor: p.deliveryBorder }, pressed && { opacity: 0.9 }]}
     >
-      <View style={[styles.pickImageWrap, { backgroundColor: p.iconBg }]}>
+      <View style={[styles.pickImageWrap, { backgroundColor: p.iconBg, borderColor: p.deliveryBorder }]}>
         <LoadingImage source={images[shown]} contentFit="cover" transition={250} recyclingKey={`${car.id}-${shown}`} style={StyleSheet.absoluteFill} />
         {!!tag && (
           <View style={[styles.pickTag, { backgroundColor: p.navy }]}>
@@ -431,8 +662,8 @@ export function DestinationTile({ image, faded, title, blurb, onPress }: { image
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${title}. ${blurb}`} onPress={() => { Haptics.selectionAsync(); onPress(); }} style={({ pressed }) => [styles.destTile, pressed && { opacity: 0.9 }]}>
       <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      {/* Figma: linear-gradient(180deg, rgba(0,0,0,0) 40%, rgba(0,0,0,0.6) 70%, #000 100%) */}
-      {!faded && <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.6)', '#000000']} locations={[0.4, 0.7, 1]} style={StyleSheet.absoluteFill} />}
+      {/* High-contrast gradient vignette ensuring white typography is always readable */}
+      <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0.88)']} locations={[0.3, 0.65, 1]} style={StyleSheet.absoluteFill} />
       <View style={styles.destTileBody}>
         <Text style={styles.destTileTitle}>{title}</Text>
         <Text style={styles.destTileBlurb} numberOfLines={2}>{blurb}</Text>
@@ -584,6 +815,151 @@ const styles = StyleSheet.create({
   pager: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(234,236,241,0.4)', marginTop: 12, marginBottom: 10 },
   thumb: { position: 'absolute', top: 0, width: 12, height: 4, borderRadius: 20, backgroundColor: '#EAECF1' },
 
+  // Hero dynamic offer slides
+  imageSlideCard: {
+    height: 148,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#3E2EA6',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    shadowColor: '#1E1466',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    marginVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageSlidePhoto: {
+    ...StyleSheet.absoluteFill,
+    width: '100%',
+    height: '100%',
+  },
+  bannerCodePill: {
+    position: 'absolute',
+    bottom: 10,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 3,
+  },
+  bannerCodeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 10,
+    lineHeight: 14,
+    color: '#6152D8',
+    letterSpacing: 0.5,
+  },
+  bannerDiscountBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 12,
+    backgroundColor: '#FFE600',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  bannerDiscountText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    lineHeight: 14,
+    color: '#1E1466',
+    textTransform: 'uppercase',
+  },
+  comboSlideCard: {
+    height: 148,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#3E2EA6',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    shadowColor: '#1E1466',
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    marginVertical: 4,
+  },
+  comboContent: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  comboSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: -16,
+    paddingHorizontal: 8,
+  },
+  comboCodePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.35)',
+    marginTop: 6,
+  },
+  comboCodeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 9.5,
+    lineHeight: 13,
+    color: '#FFE600',
+    letterSpacing: 0.4,
+  },
+  comboCopyHint: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 8.5,
+    lineHeight: 12,
+    color: '#FFFFFF',
+    opacity: 0.85,
+  },
+  textSlideWrap: {
+    alignItems: 'center',
+  },
+  textCodeRow: {
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  textCodePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    paddingHorizontal: 9,
+    paddingVertical: 3,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  textCodeText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 10,
+    lineHeight: 14,
+    color: '#FFFFFF',
+  },
+
   // Refer
   refer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 31, paddingLeft: 8, paddingRight: 8, paddingTop: 8, paddingBottom: 24, borderWidth: 1, borderBottomWidth: 0, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   // Figma: 40px circle (Neutral/50) around a 24px icon; title and the "Refer" pill share a row, the sub line sits under them.
@@ -623,7 +999,7 @@ const styles = StyleSheet.create({
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },
   // Figma: 240×144 photo, radius 8, 4px inset for the tag (top) and the dots (bottom).
-  pickImageWrap: { height: 144, borderRadius: 8, overflow: 'hidden' },
+  pickImageWrap: { height: 144, borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
   pickTag: { position: 'absolute', top: 4, left: 4, height: 20, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 20 },
   pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#FFFFFF' },
   // Dots: the current one is a 12×4 white pill, the others 4×4 Neutral/300, 5 apart.

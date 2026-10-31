@@ -7,7 +7,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { LoginBottomSheet } from '@/components';
-import { cars, getAvailability, splitDateRange, parseDayLabel, dayNumToLabel } from '@/utils/sawari';
+import { cars, getAvailability, splitDateRange, parseDayLabel, dayNumToLabel, isHighDemand } from '@/utils/sawari';
 
 import { VehicleHeader } from '@/components/vehicle/details/VehicleHeader';
 import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGallery';
@@ -93,8 +93,8 @@ export default function CarDetailsScreen() {
 
   const unavailableNote = `${availability.reason === 'service' ? 'Under maintenance' : 'Booked'} for ${requestedLabel}`
     + (availability.nextAvailableFrom ? ` · Next available ${availability.nextAvailableFrom}` : '');
-  // Busy car: other bookings already hold it around the chosen dates.
-  const highDemand = (selectedCar?.bookedRanges?.length ?? 0) >= 2;
+  // Busy car: other bookings already hold it around the chosen dates — never before dates are chosen.
+  const highDemand = hasTrip && isHighDemand(selectedCar, requestedStart, requestedEnd);
 
   const hasMembership = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
   const canUpgrade = hasMembership && (membership?.plan === 'starter' || membership?.plan === 'plus');
@@ -107,6 +107,12 @@ export default function CarDetailsScreen() {
   const openDates = () => {
     Haptics.selectionAsync();
     router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
+  };
+
+  // "Check Availability": date & time first, then the location page, then back here with the price.
+  const checkAvailability = () => {
+    Haptics.selectionAsync();
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true' } });
   };
 
   // Figma flow: Check Availability → date & time → back here with the price → Book Now.
@@ -287,7 +293,7 @@ export default function CarDetailsScreen() {
         agreed={agreed}
         onHeight={setBarHeight}
         hasTrip={hasTrip}
-        onCheckAvailability={openDates}
+        onCheckAvailability={checkAvailability}
         onNeedLogin={() => {
           setPendingAction(() => handleBookingProceed);
           setShowLogin(true);

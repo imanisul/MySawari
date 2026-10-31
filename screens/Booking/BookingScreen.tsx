@@ -118,7 +118,6 @@ export default function BookingScreen() {
   const { data: liveVehicles } = useVehicles();
   const liveCar = liveVehicles?.find((v) => v.id === selectedCar.id) || selectedCar;
   const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr);
-  const highDemand = (liveCar?.bookedRanges?.length ?? 0) >= 2;
 
   /** Pickup at the hub or delivered; return at the hub or collected — kept in the context's delivery mode. */
   const setService = (pick: boolean, ret: boolean) => {
@@ -258,12 +257,6 @@ export default function BookingScreen() {
             </Pressable>
           </View>
 
-          {highDemand && (
-            <View style={[styles.demand, { backgroundColor: p.demandBg, borderColor: p.demandBorder }]}>
-              <Text style={[styles.demandText, { color: p.amber }]}>🔥 High Demand for these dates</Text>
-            </View>
-          )}
-
           {/* Car */}
           <View style={[styles.carCard, { borderColor: p.deliveryBorder }]}>
             <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
@@ -288,8 +281,8 @@ export default function BookingScreen() {
               </Pressable>
               {ready && (
                 <View style={styles.priceRow}>
-                  <Text style={[styles.carPrice, { color: p.fg }]}>{formatCurrency(ready.final)}</Text>
-                  {ready.original > ready.final && <Text style={[styles.carStrike, { color: p.muted }]}>{formatCurrency(ready.original)}</Text>}
+                  <Text style={[styles.carPrice, { color: p.fg }]}>{formatCurrency(ready.total)}</Text>
+                  {ready.original > ready.total && <Text style={[styles.carStrike, { color: p.muted }]}>{formatCurrency(ready.original)}</Text>}
                 </View>
               )}
             </View>
@@ -590,8 +583,6 @@ const styles = StyleSheet.create({
   headerTitle: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 20 },
   headerSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
 
-  demand: { borderWidth: 1, borderRadius: 8, height: 38, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  demandText: { fontFamily: FONT.medium, fontSize: 11 },
 
   carCard: { flexDirection: 'row', gap: 12, borderWidth: 1, borderRadius: 12, padding: 8 },
   carImage: { width: 120, minHeight: 100, alignSelf: 'stretch', borderRadius: 8, overflow: 'hidden' },

@@ -297,11 +297,11 @@ const PRIVACY_CLAUSES: Clause[] = [
   {
     title: 'Retention and Deletion',
     points: [
-      'In the app: Profile > Settings > Delete MySawari account. We send a code to your WhatsApp number to confirm it is you. You cannot delete while you have an upcoming or ongoing booking, or a refund or withdrawal in progress.',
+      'In the app: Profile > Settings > Delete MySawari account shows how to reach our support team (call us or email hello@mysawari.in). Our team confirms it is you, then deactivates and deletes the account. It cannot be done while you have an upcoming or ongoing booking, or a refund or withdrawal in progress.',
       'Without the app: see https://mysawari.in/delete-account, or email hello@mysawari.in from your registered number.',
       'Deleted: your profile (name, email, date of birth, gender, licence and Aadhaar numbers), login sessions, device notification tokens, reviews and review photos, app activity, notifications, saved booking enquiries and referral identity.',
       'Kept: booking, payment, refund, membership and wallet records, for accounting, dispute handling and legal obligations. We remove your name, identity document numbers, alternate number and payout details from them. The mobile number stays on the booking record.',
-      'Razorpay keeps its own payment records under its own policies. Security logs used to detect fraud and abuse are also kept.',
+      'Razorpay keeps its own payment records under its own policies. Security logs used to detect fraud and abuse are also kept. A one-way scrambled form of the mobile number (it cannot be turned back into the number) is kept to record that the one-time signup bonus was given, so it cannot be claimed again.',
       'Your wallet balance and SawariCash are lost when the account is deleted.',
     ],
   },

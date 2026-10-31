@@ -89,11 +89,17 @@ export function PriceBreakdownSheet({ visible, onClose, price }: { visible: bool
                     <Text style={[styles.value, { color: green, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>-{formatCurrency(membershipDiscount)}</Text>
                   </View>
                 )}
+                {price.sawariCashUsed > 0 && (
+                  <View style={styles.row}>
+                    <Text style={[styles.label, { color: green }]}>My Sawari Cash used</Text>
+                    <Text style={[styles.value, { color: green, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>-{formatCurrency(price.sawariCashUsed)}</Text>
+                  </View>
+                )}
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />
                 <View style={styles.row}>
                   <Text style={[styles.boldLabel, { color: colors.foreground }]}>Total Trip Price</Text>
                   <Text style={[styles.boldValue, { color: colors.foreground }]}>
-                    {formatCurrency(price.final)}
+                    {formatCurrency(price.total)}
                   </Text>
                 </View>
 
@@ -118,7 +124,7 @@ export function PriceBreakdownSheet({ visible, onClose, price }: { visible: bool
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 40 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
   title: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18 },

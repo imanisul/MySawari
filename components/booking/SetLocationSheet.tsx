@@ -118,7 +118,7 @@ export function SetLocationSheet({
 const styles = StyleSheet.create({
   root: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'flex-end', zIndex: 40 },
   avoider: { width: '100%', justifyContent: 'flex-end', maxHeight: '92%' },
-  scrim: { backgroundColor: 'rgba(38, 38, 38, 0.32)' },
+  scrim: { backgroundColor: 'transparent' },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

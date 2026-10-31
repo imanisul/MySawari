@@ -519,6 +519,22 @@ export function splitDateRange(range?: string | null): [string | undefined, stri
 /** True when the string is an actual chosen date, not a placeholder like "Select Dates". */
 export const isRealDate = (label?: string | null) => parseDayLabel(label ?? undefined) !== null;
 
+/**
+ * "High demand for these dates": at least two other live bookings on, or within `slackDays` of, the chosen trip.
+ * Only meaningful once dates are chosen — without them there is nothing to be in demand for.
+ */
+export function isHighDemand(car: Car | undefined | null, tripStart: number | null, tripEnd: number | null, slackDays = 2): boolean {
+  if (!car || tripStart === null || tripEnd === null) return false;
+  const done = ['cancelled', 'canceled', 'failed', 'rejected', 'completed', 'complete', 'returned', 'closed'];
+  const around = (car.bookedRanges || []).filter((r) => {
+    if (r.status && done.includes(r.status.toLowerCase())) return false;
+    const a = isoToDayNum(r.start);
+    const b = isoToDayNum(r.end);
+    return !isNaN(a) && !isNaN(b) && a <= tripEnd + slackDays && b >= tripStart - slackDays;
+  });
+  return around.length >= 2;
+}
+
 type Block = { start: number; end: number; kind: 'booked' | 'service' | 'rented' };
 
 function buildBlocks(car: Car, today: number): Block[] {

@@ -1,18 +1,16 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { CustomAlert } from '@/components';
 import { useSawari } from '@/context/SawariContext';
-import { API } from '@/services/backend/api';
 import Notifications from '@/utils/notifications';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { getContactPrefs, setContactPrefs, ContactPrefs } from '@/utils/contactPreferences';
-import { ACCOUNT_EMAIL, SUPPORT_PHONE } from '@/constants/support';
+import { ACCOUNT_EMAIL } from '@/constants/support';
 import { Dashes, DesignToggle } from '@/components/profile/ProfileParts';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
@@ -20,50 +18,15 @@ const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_5
 
 /**
  * Figma "Settings": Recommendations & Reminder (SMS / WhatsApp switches with the note), Notifications &
- * Location (the real phone permissions, in the same box style), and Account Deletion (Apple Guideline 5.1.1(v) compliant).
+ * Location (the real phone permissions, in the same box style), and Account Deletion (a popup that points to the support team).
  */
 export default function SettingsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
-  const { isAuthenticated, customer, logout } = useSawari();
+  const { isAuthenticated, customer } = useSawari();
 
   const [prefs, setPrefs] = useState<ContactPrefs>({ sms: true, whatsapp: true });
   const [showDelete, setShowDelete] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  // Deleting needs a code sent to the account's own WhatsApp number, so a stolen session alone can't do it.
-  const [otpId, setOtpId] = useState<string | null>(null);
-  const [code, setCode] = useState('');
-  const closeDelete = () => { setShowDelete(false); setOtpId(null); setCode(''); };
-
-  const sendCode = async () => {
-    try {
-      setIsDeleting(true);
-      setOtpId(await API.sendDeletionCode());
-    } catch (err: any) {
-      CustomAlert.alert('Could not send code', err?.message || 'Please try again.');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const confirmDelete = async () => {
-    const id = customer.id;
-    try {
-      setIsDeleting(true);
-      await API.deleteAccount(otpId || '', code.trim());
-      await logout();
-      // Per-customer copies kept on this phone (profile, rewards, favourites, ...) go too.
-      const keys = await AsyncStorage.getAllKeys();
-      await AsyncStorage.multiRemove(keys.filter((k) => id && k.includes(id)));
-      closeDelete();
-      CustomAlert.alert('Account deleted', 'Your account and personal data have been deleted. Booking and payment records we must keep no longer carry your identity documents.');
-      router.replace('/');
-    } catch (err: any) {
-      CustomAlert.alert('Could not delete account', err?.message || 'Please try again.');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
 
   // Reflect the real OS permissions (re-read when coming back from the system Settings app).
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -174,68 +137,31 @@ export default function SettingsScreen() {
 
       </ScrollView>
 
-      {/* ── Apple Guideline 5.1.1(v) Compliant Account Deletion ── */}
-      <Modal visible={showDelete} transparent animationType="fade" onRequestClose={() => !isDeleting && closeDelete()} statusBarTranslucent navigationBarTranslucent>
+      {/* Account deactivation: handled by the support team, so this only says how to reach them. */}
+      <Modal visible={showDelete} transparent animationType="fade" onRequestClose={() => setShowDelete(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.overlay}>
           <ModalBlur />
-          <View style={[styles.popup, { backgroundColor: p.page, borderColor: p.redBorder }]} accessibilityViewIsModal>
-            <Text style={[styles.popupTitle, { color: p.fg }]}>Delete MySawari Account</Text>
-            <Text style={[styles.popupBody, { color: p.muted }]}>
-              Deleting your account is permanent and cannot be undone. Your profile, saved documents, reviews and photos, notifications and referral details are erased, and you are signed out. Your wallet balance and SawariCash are lost.{'\n\n'}
-              Booking, payment and refund records are kept for accounting and legal reasons, without your identity documents. You can't delete while you have an upcoming or ongoing booking, or a refund or withdrawal in progress.
-            </Text>
-
-            {otpId && (
-              <TextInput
-                accessibilityLabel="Verification code"
-                value={code}
-                onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
-                keyboardType="number-pad"
-                textContentType="oneTimeCode"
-                placeholder="6-digit code from WhatsApp"
-                placeholderTextColor={p.muted}
-                editable={!isDeleting}
-                style={[styles.codeInput, { color: p.fg, borderColor: p.border }]}
-              />
-            )}
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={otpId ? 'Confirm permanent account deletion' : 'Send verification code'}
-              disabled={isDeleting || (!!otpId && code.length < 4)}
-              onPress={otpId ? confirmDelete : sendCode}
-              style={({ pressed }) => [
-                styles.confirmDeleteBtn,
-                { backgroundColor: p.red },
-                pressed && { opacity: 0.85 },
-                (isDeleting || (!!otpId && code.length < 4)) && { opacity: 0.6 },
-              ]}
-            >
-              {isDeleting ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.confirmDeleteText}>{otpId ? 'Permanently Delete Account' : 'Send verification code'}</Text>
-              )}
-            </Pressable>
-
-            <View style={[styles.popupBox, { borderColor: p.border, marginTop: 12 }]}>
+          <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={() => setShowDelete(false)} />
+          <View style={[styles.popup, { backgroundColor: p.page }]} accessibilityViewIsModal>
+            <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Need to deactivate your account?</Text>
+            <Text style={[styles.popupBody, { color: p.muted }]}>Account deactivation requests can only be made through our support team.</Text>
+            <View style={[styles.popupBox, { borderColor: p.segBorder }]}>
               <Text style={[styles.popupBoxText, { color: p.muted }]}>
-                Need help or have an active booking?{' '}
+                Please call us or email{' '}
                 <Text
                   accessibilityRole="link"
-                  onPress={() => Linking.openURL(`mailto:${ACCOUNT_EMAIL}?subject=${encodeURIComponent('Account assistance')}`)}
+                  onPress={() => Linking.openURL(`mailto:${ACCOUNT_EMAIL}?subject=${encodeURIComponent('Account deactivation request')}`)}
                   style={[styles.link, { color: p.navy }]}
                 >
-                  Contact Support
-                </Text>
+                  {ACCOUNT_EMAIL}
+                </Text>{' '}
+                to request account deactivation.
               </Text>
             </View>
           </View>
-          {!isDeleting && (
-            <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={closeDelete} hitSlop={8} style={[styles.close, { backgroundColor: p.iconBg }]}>
-              <Feather name="x" size={17} color={p.sub} />
-            </Pressable>
-          )}
+          <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => setShowDelete(false)} hitSlop={8} style={[styles.close, { backgroundColor: p.iconBg }]}>
+            <Feather name="x" size={18} color={p.sub} />
+          </Pressable>
         </View>
       </Modal>
     </SafeAreaView>
@@ -256,15 +182,13 @@ const styles = StyleSheet.create({
   switchLabel: { fontFamily: FONT.medium, fontSize: 14 },
   deleteRow: { height: 46, borderRadius: 8, borderWidth: 1, justifyContent: 'center', paddingHorizontal: 12 },
   deleteText: { fontFamily: FONT.medium, fontSize: 14 },
-  overlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 36 },
-  popup: { alignSelf: 'stretch', borderRadius: 16, borderWidth: 1, paddingHorizontal: 13, paddingTop: 22, paddingBottom: 13 },
-  popupTitle: { fontFamily: FONT.medium, fontSize: 17, lineHeight: 25, textAlign: 'center' },
-  popupBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 19, textAlign: 'center', marginTop: 10, paddingHorizontal: 10 },
-  popupBox: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 17, marginTop: 17 },
-  popupBoxText: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 19, textAlign: 'center' },
+  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 36, gap: 8 },
+  // Figma "deactivate": 320 wide card (very light pink edge), title 17, grey 12 text, a bordered box with the contact line.
+  popup: { width: '100%', maxWidth: 320, borderRadius: 12, borderWidth: 1, borderColor: '#FCEEEE', paddingHorizontal: 13, paddingTop: 20, paddingBottom: 13 },
+  popupTitle: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26, textAlign: 'center' },
+  popupBody: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8, paddingHorizontal: 12 },
+  popupBox: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 14, marginTop: 14 },
+  popupBoxText: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   link: { textDecorationLine: 'underline', fontFamily: FONT.regular },
-  close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  codeInput: { height: 46, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, marginTop: 14, fontFamily: FONT.medium, fontSize: 15, letterSpacing: 2 },
-  confirmDeleteBtn: { height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginTop: 18, paddingHorizontal: 16 },
-  confirmDeleteText: { fontFamily: FONT.semibold, fontSize: 14, color: '#FFFFFF' },
+  close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
 });

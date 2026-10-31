@@ -114,15 +114,7 @@ export function DropoffSheet() {
   return (
     <View style={[styles.page, { backgroundColor: p.page, paddingTop: insets.top + 12 }]}>
       <View style={[styles.search, { borderColor: p.border }]}>
-        {query ? (
-          <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
-            <Feather name="chevron-left" size={20} color={p.sub} />
-          </Pressable>
-        ) : (
-          <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
-            <Feather name="search" size={18} color={p.sub} />
-          </Pressable>
-        )}
+        <Feather name="search" size={18} color={p.sub} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -135,6 +127,11 @@ export function DropoffSheet() {
           accessibilityLabel="Where are you going?"
         />
         {searching && <ActivityIndicator size="small" color={p.muted} />}
+        {!!query && (
+          <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Clear search">
+            <Feather name="x" size={16} color={p.sub} />
+          </Pressable>
+        )}
       </View>
 
       <FlatList

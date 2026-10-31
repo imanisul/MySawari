@@ -64,7 +64,7 @@ export function StickyBookingBar({
     <>
       <View
         onLayout={(e) => onHeight?.(e.nativeEvent.layout.height)}
-        style={[styles.bar, { backgroundColor: p.page, borderTopColor: p.divider, paddingBottom: Math.max(insets.bottom, 12) }]}
+        style={[styles.bar, { backgroundColor: p.page, paddingBottom: Math.max(insets.bottom, 8) }]}
       >
         {/* Frosted blur above the bar: the page scrolling under it blurs and fades into the bar's white. */}
         <BottomBlur height={64} fadeTo={p.page} style={styles.fade} />
@@ -74,8 +74,8 @@ export function StickyBookingBar({
               {price.state === 'ready' && (
                 <>
                   <View style={styles.priceRow}>
-                    <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(price.final)}</Text>
-                    {price.original > price.final && (
+                    <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(price.total)}</Text>
+                    {price.original > price.total && (
                       <Text style={[styles.strike, { color: p.muted }]}>{formatCurrency(price.original)}</Text>
                     )}
                   </View>
@@ -186,13 +186,13 @@ function Breakup({ price }: { price: ReadyPrice }) {
       {price.dropCharge > 0 && <Row label="Return pickup charges" value={formatCurrency(price.dropCharge)} tone="strong" />}
       {price.membershipDiscount > 0 && <Row label="Membership discount" value={`-${formatCurrency(price.membershipDiscount)}`} tone="green" />}
       {price.couponDiscount > 0 && <Row label={price.couponCode ? `Coupon discount (${price.couponCode})` : 'Coupon discount'} value={`-${formatCurrency(price.couponDiscount)}`} tone="green" />}
+      {price.sawariCashUsed > 0 && <Row label="My Sawari Cash used" value={`-${formatCurrency(price.sawariCashUsed)}`} tone="green" />}
       <Dashes />
       <View style={styles.bRow}>
         <Text style={[styles.bTotal, { color: p.muted }]}>Total trip cost</Text>
-        <Text style={[styles.bTotal, { color: p.muted }]}>{formatCurrency(price.final)}</Text>
+        <Text style={[styles.bTotal, { color: p.muted }]}>{formatCurrency(price.total)}</Text>
       </View>
       <Dashes />
-      {price.sawariCashUsed > 0 && <Row label="My Sawari Cash used" value={`-${formatCurrency(price.sawariCashUsed)}`} tone="green" />}
       <Row label="Booking amount (pay now)" value={formatCurrency(Math.max(0, price.payableNow - price.membershipFee))} />
       {price.membershipFee > 0 && <Row label={`${price.buyingPlan} membership, 1 year (pay now)`} value={formatCurrency(price.membershipFee)} />}
       <Row label="Pay at pickup" value={formatCurrency(atPickup)} />
@@ -215,30 +215,34 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     paddingHorizontal: 16,
-    paddingTop: 11,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    // A faint upward shadow lifts the bar off the page.
-    boxShadow: '0px -6px 18px rgba(47, 62, 117, 0.07)',
+    paddingTop: 16,
+    // Figma "Sticky (Price Detail + CTA)": padding 16 16 8, 16 between the blocks, a 1px #E7EAF4 top edge, and two
+    // very soft navy shadows going up (the second is the visible one) that lift the bar off the page.
+    gap: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E7EAF4',
+    boxShadow: '0px -52px 21px rgba(47, 62, 117, 0.01), 0px -29px 17px rgba(47, 62, 117, 0.05)',
   },
   fade: { top: -64, bottom: undefined },
-  infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16.5 },
+  infoRow: { flexDirection: 'row', alignItems: 'center' },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
   price: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 23, lineHeight: 30, letterSpacing: -0.3 },
   strike: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, lineHeight: 18, textDecorationLine: 'line-through' },
   perDay: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7.5, marginTop: 3, flexWrap: 'wrap' },
-  chip: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 8, height: 17.5, justifyContent: 'center' },
-  chipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8 },
+  // Figma "Membership Tags": 18 high pill (radius 100), 1px #D1CCF9 border, #F0EFFD fill, padding 3 / 8 — so a 10px line.
+  chip: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3, height: 18, justifyContent: 'center', alignItems: 'center' },
+  chipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 10, includeFontPadding: false },
   meta: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11 },
   breakupBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 10, marginTop: 6 },
   breakupText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
-  button: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', borderRadius: 12, height: 53 },
-  buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19 },
-  note: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, lineHeight: 12, textAlign: 'center', marginTop: 9 },
+  button: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', borderRadius: 12, height: 48 },
+  buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, lineHeight: 24 },
+  note: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, lineHeight: 12, textAlign: 'center' },
   pressed: { opacity: 0.85 },
 
   // Breakup card (Figma: #FAFAFA card, 1px #E5E5E5, radius 10, rows 27 apart, dashed dividers).
-  bCard: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, marginTop: -2.5, marginBottom: 16.5 },
+  bCard: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 },
   bRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 27 },
   bLabel: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, lineHeight: 17 },
   bValue: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, lineHeight: 17 },

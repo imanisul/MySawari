@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Keyboard, Modal, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, Keyboard, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
@@ -63,7 +62,7 @@ const group = (m: string) => (m.length <= 5 ? m : `${m.slice(0, 5)} ${m.slice(5)
 const masked = (m: string) => `+91 ${m.slice(0, 5)} ${m.slice(5, 7)}XXX`;
 /** The typed code without the gaps kept for skipped boxes. */
 const digitsOf = (v: string) => v.replace(/\s/g, '');
-const isOtpError = (msg: string) => /otp|code|invalid|incorrect|expired|wrong/i.test(msg);
+const isOtpError = (msg: string) => /\botp\b|incorrect|expired/i.test(msg) && !/referral/i.test(msg);
 
 export function LoginBottomSheet({
   visible, onClose, onLoginSuccess, required = false,
@@ -89,8 +88,11 @@ export function LoginBottomSheet({
       }
     : LIGHT;
 
-  const router = useRouter();
-  const [step, setStep] = useState<'phone' | 'otp' | 'profile'>('phone');
+  // Each step eases in (fade + a short rise); the final "done" step pops its check mark in.
+  const stepAnim = useRef(new Animated.Value(1)).current;
+  const doneScale = useRef(new Animated.Value(0)).current;
+  const [welcomeName, setWelcomeName] = useState('');
+  const [step, setStep] = useState<'phone' | 'otp' | 'profile' | 'done'>('phone');
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
@@ -100,7 +102,6 @@ export function LoginBottomSheet({
   const [email, setEmail] = useState('');
   const [referral, setReferral] = useState('');
   const [pendingReferral, setPendingReferral] = useState<PendingReferral | null>(null);
-  const [isEditingReferral, setIsEditingReferral] = useState(false);
   const [referralValidating, setReferralValidating] = useState(false);
   const [referralStatusMsg, setReferralStatusMsg] = useState<{ text: string; valid: boolean } | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -118,7 +119,6 @@ export function LoginBottomSheet({
     setName(''); setEmail(''); setReferral(''); setConfirmed(false);
     setLoading(false); setError(null); setResendIn(0);
     setViewingPolicy(null);
-    setIsEditingReferral(false);
     setReferralStatusMsg(null);
 
     // If user has logged in before on this device, it's 2nd time: don't show tick button and auto-accept
@@ -197,6 +197,15 @@ export function LoginBottomSheet({
     return () => clearTimeout(timer);
   }, [step, referral, pendingReferral]);
 
+  useEffect(() => {
+    stepAnim.setValue(0);
+    Animated.timing(stepAnim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+    if (step === 'done') {
+      doneScale.setValue(0);
+      Animated.spring(doneScale, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }).start();
+    }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Resend countdown.
   useEffect(() => {
     if (step !== 'otp' || resendIn <= 0) return;
@@ -220,11 +229,18 @@ export function LoginBottomSheet({
       .catch(() => {});
   };
 
-  const finish = () => {
+  const finish = (sessionSaved: Promise<unknown> = Promise.resolve()) => {
     Keyboard.dismiss();
     clearPendingReferral().catch(() => {});
-    onClose();
-    if (onLoginSuccess) setTimeout(() => onLoginSuccess(), 300);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    // A short "you're in" moment instead of the sheet vanishing the instant the code is accepted.
+    setError(null);
+    setStep('done');
+    // Closes once the session is saved and the check mark has had a moment (not a fixed wait after both).
+    Promise.all([sessionSaved.catch(() => {}), new Promise((r) => setTimeout(r, 800))]).then(() => {
+      onClose();
+      if (onLoginSuccess) setTimeout(() => onLoginSuccess(), 300);
+    });
   };
 
   // ── Step 1: phone ──
@@ -272,18 +288,29 @@ export function LoginBottomSheet({
     const code = digitsOf(raw);
     if (code.length !== OTP_LENGTH || loading) return;
     setError(null);
+    setLoading(true);
     if (!isExisting) {
-      // A new customer's account is created together with their name (next step).
-      setStep('profile');
+      // A new customer's code is checked here, once, so a wrong or expired code is found now — not after
+      // they have filled in their name and referral code. The account is created together with the name (next step).
+      try {
+        await API.checkOtp(mobile, code, otpId || undefined);
+        setStep('profile');
+      } catch (e: any) {
+        const msg = String(e?.message || '');
+        setError(isOtpError(msg) || !msg ? 'Invalid code. Please try again' : msg);
+        setOtp('');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
-    setLoading(true);
     try {
       const { token, refreshToken, user } = await API.verifyOtp(mobile, code, '', '', otpId || undefined);
-      await AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
-      await login(token, refreshToken, user);
+      AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+      setWelcomeName(String(user?.name || '').trim().split(/\s+/)[0] || '');
+      // "You're in" shows the moment the server says yes; the session is saved underneath it.
+      finish(login(token, refreshToken, user));
       askForNotifications();
-      finish();
     } catch (e: any) {
       const msg = String(e?.message || '');
       setError(isOtpError(msg) || !msg ? 'Invalid code. Please try again' : msg);
@@ -303,12 +330,13 @@ export function LoginBottomSheet({
     setLoading(true); setError(null);
     try {
       const { token, refreshToken, user } = await API.verifyOtp(mobile, digitsOf(otp), name.trim(), referral, otpId || undefined);
-      await AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
-      await login(token, refreshToken, user);
-      // Email is optional and saved after the account exists; a failure here never blocks sign-in.
-      if (email.trim()) saveProfile({ email: email.trim() }).catch(() => {});
+      AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+      setWelcomeName(name.trim().split(/\s+/)[0]);
+      const sessionSaved = login(token, refreshToken, user);
+      // Email is optional and saved once the session exists; a failure here never blocks sign-in.
+      if (email.trim()) sessionSaved.then(() => saveProfile({ email: email.trim() })).catch(() => {});
       askForNotifications();
-      finish();
+      finish(sessionSaved);
     } catch (e: any) {
       const msg = String(e?.message || '');
       if (isOtpError(msg)) {
@@ -344,6 +372,7 @@ export function LoginBottomSheet({
       transparent
       animationType="slide"
       onRequestClose={() => {
+        if (step === 'done') return;
         if (viewingPolicy) {
           setViewingPolicy(null);
         } else if (step === 'otp' || step === 'profile') {
@@ -366,6 +395,7 @@ export function LoginBottomSheet({
           {/* The white sheet runs down behind the keyboard; its content sits above it. */}
           <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: kb.pad > 0 ? kb.pad + 16 : Math.max(insets.bottom, 16) }]}>
 
+          <Animated.View style={[styles.stepWrap, { opacity: stepAnim, transform: [{ translateY: stepAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }]}>
           {step === 'phone' && (
             <>
               <View style={styles.headRow}>
@@ -529,36 +559,6 @@ export function LoginBottomSheet({
                   </Text>
                 </View>
               </View>
-              {pendingReferral && !isEditingReferral ? (
-                <View style={[styles.naviVerifiedCard, { backgroundColor: isDarkMode ? '#064E3B20' : '#ECFDF5', borderColor: isDarkMode ? '#065F46' : '#A7F3D0' }]}>
-                  <View style={styles.naviCardHeader}>
-                    <View style={[styles.naviCardIconCircle, { backgroundColor: '#059669' }]}>
-                      <Feather name="check" size={14} color="#FFFFFF" />
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={[styles.naviCardTitle, { color: isDarkMode ? '#D1FAE5' : '#065F46' }]} numberOfLines={1}>
-                        Referred by {pendingReferral.referrerName}
-                      </Text>
-                      <Text style={[styles.naviCardCode, { color: isDarkMode ? '#6EE7B7' : '#047857' }]}>
-                        Code: <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{pendingReferral.code}</Text>
-                      </Text>
-                    </View>
-                    <Pressable
-                      onPress={() => { setIsEditingReferral(true); }}
-                      hitSlop={8}
-                      accessibilityRole="button"
-                      accessibilityLabel="Change referral code"
-                    >
-                      <Text style={[styles.naviCardChange, { color: ui.navy }]}>Change</Text>
-                    </Pressable>
-                  </View>
-                  <View style={styles.naviCardBonusRow}>
-                    <Text style={[styles.naviCardBonus, { color: isDarkMode ? '#A7F3D0' : '#065F46' }]}>
-                      🎁 100 SawariCash will be added to your wallet upon signup
-                    </Text>
-                  </View>
-                </View>
-              ) : (
                 <View style={{ gap: 4 }}>
                   <View style={field('ref')}>
                     <TextInput
@@ -587,12 +587,11 @@ export function LoginBottomSheet({
                     )}
                   </View>
                   {referralStatusMsg && (
-                    <Text style={[styles.small, { color: referralStatusMsg.valid ? '#059669' : ui.error, marginLeft: 4 }]}>
-                      {referralStatusMsg.valid ? `✓ ${referralStatusMsg.text} • 100 SawariCash bonus applied` : `✕ ${referralStatusMsg.text}`}
+                    <Text style={[styles.referredBy, { color: referralStatusMsg.valid ? '#059669' : ui.error }]}>
+                      {referralStatusMsg.text}
                     </Text>
                   )}
                 </View>
-              )}
               <Pressable onPress={() => setConfirmed((v) => !v)} style={styles.checkRow} accessibilityRole="checkbox" accessibilityState={{ checked: confirmed }}>
                 <View style={[styles.check, { borderColor: confirmed ? ui.navy : ui.faint, backgroundColor: confirmed ? ui.navy : 'transparent' }]}>
                   {confirmed && <Feather name="check" size={10} color="#FFFFFF" />}
@@ -604,7 +603,18 @@ export function LoginBottomSheet({
               {!!error && <Text style={[styles.error, { color: ui.error, textAlign: 'left' }]}>{error}</Text>}
             </>
           )}
+          {step === 'done' && (
+            <View style={styles.doneWrap}>
+              <Animated.View style={[styles.doneCircle, { backgroundColor: ui.navy, transform: [{ scale: doneScale }] }]}>
+                <Feather name="check" size={34} color={ui.onNavy} />
+              </Animated.View>
+              <Text style={[styles.title, styles.center, { color: ui.title }]}>{welcomeName ? `Welcome, ${welcomeName}!` : "You're all set!"}</Text>
+              <Text style={[styles.copy, styles.center, { color: ui.copy, marginTop: 0 }]}>You're signed in.</Text>
+            </View>
+          )}
+          </Animated.View>
 
+          {step !== 'done' && (
           <Pressable
             disabled={!cta.enabled}
             onPress={cta.onPress}
@@ -619,6 +629,7 @@ export function LoginBottomSheet({
               <Text style={[styles.ctaText, { color: cta.enabled ? ui.onNavy : ui.disabledText }]}>{cta.label}</Text>
             )}
           </Pressable>
+          )}
         </View>
       </View>
       )}
@@ -699,9 +710,14 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.32)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
   // Design: white sheet, 1px #E7EAF4 border (not on the bottom edge), 24 top corners, 16 side padding, 16 between blocks.
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, borderColor: '#E7EAF4', paddingHorizontal: 16, paddingTop: 20, gap: 16 },
+  // The one small line under the referral field: "Referred by <name>".
+  referredBy: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, lineHeight: 18, marginLeft: 4 },
+  stepWrap: { gap: 16 },
+  doneWrap: { alignItems: 'center', gap: 12, paddingVertical: 28 },
+  doneCircle: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   headRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
   center: { textAlign: 'center' },
@@ -776,47 +792,4 @@ const styles = StyleSheet.create({
   },
 
   // Navi referral card (Step 3)
-  naviVerifiedCard: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
-  },
-  naviCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  naviCardIconCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  naviCardTitle: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 13.5,
-    lineHeight: 19,
-  },
-  naviCardCode: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12,
-    lineHeight: 17,
-  },
-  naviCardChange: {
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 12,
-    textDecorationLine: 'underline',
-  },
-  naviCardBonusRow: {
-    paddingTop: 6,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(5, 150, 105, 0.25)',
-  },
-  naviCardBonus: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 11.5,
-    lineHeight: 16,
-  },
 });

@@ -963,9 +963,12 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           // tree (AppGate returns null while booting), losing the user's position
           // (e.g. car-details → booking). Auth loading is only for the initial
           // cold boot session restore.
-          await SecureStore.setItemAsync('auth_token', String(token));
-          if (refreshToken) await SecureStore.setItemAsync('refresh_token', String(refreshToken));
-          await SecureStore.setItemAsync('user_id', String(user.id));
+          // Side by side: each secure-storage write is a slow native call, and they used to run one after another.
+          await Promise.all([
+            SecureStore.setItemAsync('auth_token', String(token)),
+            refreshToken ? SecureStore.setItemAsync('refresh_token', String(refreshToken)) : Promise.resolve(),
+            SecureStore.setItemAsync('user_id', String(user.id)),
+          ]);
           
           const newCustomer = {
             id: user._id || user.id,
@@ -983,7 +986,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           // AsyncStorage is unencrypted on-device storage — a driving license number is a government ID
           // and nothing in the app reads it back from this cache, so it's kept in memory only, never persisted.
           const { license: _license, ...cacheableCustomer } = newCustomer;
-          await AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(cacheableCustomer));
+          AsyncStorage.setItem(`@customer_info_${user.id}`, JSON.stringify(cacheableCustomer)).catch(() => {}); // not waited for: only read at the next launch
 
           const rewards = user.rewards || [];
           setEarnedRewards(rewards);

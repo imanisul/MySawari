@@ -9,6 +9,7 @@ import type { ImageSourcePropType } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useQuery } from '@tanstack/react-query';
+import { PhotoViewer } from '@/components/common/PhotoViewer';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { API } from '@/services/backend/api';
 import { BOOKING_ADVANCE_AMOUNT, formatCurrency } from '@/services/backend/pricingEngine';
@@ -483,6 +484,7 @@ function formatPlace(place: string) {
 export function RealTrips({ car }: { car: Car }) {
   const p = useDetailsPalette();
   const photos = useReviews(car).flatMap((r) => (r.images || []).map((url) => ({ url, place: r.placeVisited })));
+  const [viewing, setViewing] = useState<number | null>(null);
   if (photos.length === 0) return null;
 
   return (
@@ -491,7 +493,13 @@ export function RealTrips({ car }: { car: Car }) {
       <View style={{ paddingHorizontal: 16 }}><SectionTitle>Real trips, real experiences</SectionTitle></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hScroll}>
         {photos.map((ph, i) => (
-          <View key={ph.url + i} style={[styles.tripCard, { backgroundColor: p.soft }]}>
+          <Pressable
+            key={ph.url + i}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`Trip photo ${i + 1} of ${photos.length}${ph.place ? `, ${formatPlace(ph.place)}` : ''}. Tap to view`}
+            onPress={() => { Haptics.selectionAsync(); setViewing(i); }}
+            style={({ pressed }) => [styles.tripCard, { backgroundColor: p.soft }, pressed && { opacity: 0.9 }]}
+          >
             <LoadingImage source={{ uri: ph.url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
             {!!ph.place && (
               <BlurView intensity={25} tint="light" style={styles.placeChip}>
@@ -499,9 +507,10 @@ export function RealTrips({ car }: { car: Car }) {
                 <Text style={styles.placeText} numberOfLines={1}>{formatPlace(ph.place)}</Text>
               </BlurView>
             )}
-          </View>
+          </Pressable>
         ))}
       </ScrollView>
+      {viewing !== null && <PhotoViewer images={photos.map((ph) => ({ uri: ph.url }))} initialIndex={viewing} onClose={() => setViewing(null)} />}
     </View>
   );
 }

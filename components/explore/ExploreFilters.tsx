@@ -47,6 +47,16 @@ const BUDGETS: { key: string; label: string; min: number; max: number }[] = [
   { key: '3000+', label: '3000 and above', min: 3001, max: Infinity },
 ];
 
+// Bikes rent for far less than cars (₹400–1,200 a day), so they get their own, lower ranges.
+const BIKE_BUDGETS: { key: string; label: string; min: number; max: number }[] = [
+  { key: 'bu500', label: 'Under 500', min: 0, max: 499 },
+  { key: 'b500-700', label: '500 to 700', min: 500, max: 700 },
+  { key: 'b700-900', label: '700 to 900', min: 701, max: 900 },
+  { key: 'b900-1100', label: '900 to 1100', min: 901, max: 1100 },
+  { key: 'b1100+', label: '1100 and above', min: 1101, max: Infinity },
+];
+const ALL_BUDGETS = [...BUDGETS, ...BIKE_BUDGETS];
+
 // Body types in the design's order; any other type the fleet has (Luxury, Bike …) is listed after them.
 const BODY_ORDER: { key: string; label: string; test: (c: string) => boolean }[] = [
   { key: 'SUV', label: 'SUV', test: (c) => /suv/i.test(c || '') },
@@ -89,12 +99,23 @@ const FEATURES: { key: keyof Car; label: string }[] = [
   { key: 'absEbd', label: 'ABS with EBD' },
 ];
 
+// What matters on a bike (the car list above is about CarPlay, sunroofs and parking sensors).
+const BIKE_FEATURES: { key: keyof Car; label: string }[] = [
+  { key: 'bikeAbs', label: 'ABS' },
+  { key: 'discBrakes', label: 'Disc Brakes' },
+  { key: 'cbs', label: 'CBS (Combi Brake)' },
+  { key: 'digitalDisplay', label: 'Digital Display' },
+  { key: 'usbCharging', label: 'USB Charging' },
+  { key: 'bluetooth', label: 'Bluetooth' },
+  { key: 'gps', label: 'GPS' },
+];
+
 const brandOf = (c: Car) => (c.manufacturer || c.name.split(' ')[0] || '').trim();
 
 /** Does this vehicle pass every chosen filter? `ratingOf` returns null when the vehicle has no public reviews. */
 export function matchesFilters(car: Car, f: ExploreFilters, ratingOf: (c: Car) => number | null): boolean {
   if (f.budget) {
-    const b = BUDGETS.find((x) => x.key === f.budget);
+    const b = ALL_BUDGETS.find((x) => x.key === f.budget);
     if (b && !(car.perDay >= b.min && car.perDay <= b.max)) return false;
   }
   if (f.body) {
@@ -124,8 +145,8 @@ export function matchesFilters(car: Car, f: ExploreFilters, ratingOf: (c: Car) =
 export function sortCars<T extends Car>(cars: T[], sort: SortKey, ratingOf: (c: Car) => number | null): T[] {
   const list = [...cars];
   const rating = (c: Car) => ratingOf(c) ?? 0;
-  // Availability always comes first, whatever the sort: free vehicles at the top, then busy ones by the
-  // day they are free again (soonest first), and only then the chosen order (price / rating).
+  // Recommended and rating: free vehicles at the top, then busy ones by the day they are free again (soonest
+  // first), and only then the chosen order.
   const busy = (c: Car) => (c.isAvailable === false || (c as any).availability?.available === false ? 1 : 0);
   const freeFrom = (c: Car) => {
     const label = (c as any).availability?.nextAvailableFrom;
@@ -137,7 +158,13 @@ export function sortCars<T extends Car>(cars: T[], sort: SortKey, ratingOf: (c: 
     if (sort === 'rating') return rating(b) - rating(a) || a.perDay - b.perDay;
     return rating(b) - rating(a) || a.perDay - b.perDay;
   };
-  list.sort((a, b) => busy(a) - busy(b) || (busy(a) ? freeFrom(a) - freeFrom(b) : 0) || chosen(a, b));
+  // A price sort is exactly that: cheapest to dearest (or the reverse), whether or not a vehicle is free today —
+  // putting free ones first made the prices look shuffled. Equal prices keep free vehicles first.
+  if (sort === 'price-asc' || sort === 'price-desc') {
+    list.sort((a, b) => chosen(a, b) || busy(a) - busy(b));
+  } else {
+    list.sort((a, b) => busy(a) - busy(b) || (busy(a) ? freeFrom(a) - freeFrom(b) : 0) || chosen(a, b));
+  }
   return list;
 }
 
@@ -296,7 +323,7 @@ export function SortSheet({ visible, onClose, value, onApply }: {
 type Tab = 'budget' | 'car' | 'fuel' | 'ratings' | 'brands' | 'features';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'budget', label: 'Budget' },
-  { key: 'car', label: 'Car Details' },
+  { key: 'car', label: 'Car Details' }, // "Bike Details" when the list is bikes
   { key: 'fuel', label: 'Fuel' },
   { key: 'ratings', label: 'Ratings' },
   { key: 'brands', label: 'Brands' },
@@ -320,9 +347,12 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, rat
   const [tab, setTab] = useState<Tab>(initialTab);
   useEffect(() => { if (visible) { setDraft(value); setTab(initialTab); } }, [visible]);
 
+  // The list is all bikes (Explore's Bikes tab) or not: the options below follow it.
+  const isBike = cars.length > 0 && cars.every((c) => c.type === 'Bike');
+
   const opts = useMemo(() => {
     const count = (test: (c: Car) => boolean) => cars.filter(test).length;
-    const budget: Option[] = BUDGETS.map((b) => ({ key: b.key, label: b.label, count: count((c) => c.perDay >= b.min && c.perDay <= b.max) }));
+    const budget: Option[] = (isBike ? BIKE_BUDGETS : BUDGETS).map((b) => ({ key: b.key, label: b.label, count: count((c) => c.perDay >= b.min && c.perDay <= b.max) }));
     const extraBodies = Array.from(new Set(cars.map((c) => c.category).filter((cat) => cat && !BODY_ORDER.some((b) => b.test(cat)))));
     const body: Option[] = [
       ...BODY_ORDER.map((b) => ({ key: b.key, label: b.label, count: count((c) => b.test(c.category)) })),
@@ -330,15 +360,15 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, rat
     ];
     const transmission: Option[] = TRANSMISSIONS.map((t) => ({ key: t.key, label: t.label, count: count((c) => t.test(c.transmission || '')) }));
     const fuel: Option[] = FUELS.map((f) => ({ key: f.key, label: f.label, count: count((c) => f.test(c.fuel || '')) }))
-      .filter((o) => o.count > 0 || ['Petrol', 'Diesel', 'CNG', 'Hybrid'].includes(o.key));
+      .filter((o) => o.count > 0 || (isBike ? o.key === 'Petrol' : ['Petrol', 'Diesel', 'CNG', 'Hybrid'].includes(o.key)));
     const ratings: Option[] = RATINGS.map((r) => ({ key: r.key, label: r.label, count: count((c) => (ratingOf(c) ?? 0) >= r.min) }));
     const brandCounts = new Map<string, number>();
     cars.forEach((c) => { const b = brandOf(c); if (b) brandCounts.set(b, (brandCounts.get(b) || 0) + 1); });
     const brands = [...brandCounts.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => ({ key: k, label: k, count: n }));
-    const features: Option[] = FEATURES.map((f) => ({ key: f.key as string, label: f.label, count: count((c) => !!(c as any)[f.key]) }))
+    const features: Option[] = (isBike ? BIKE_FEATURES : FEATURES).map((f) => ({ key: f.key as string, label: f.label, count: count((c) => !!(c as any)[f.key]) }))
       .filter((o) => o.count > 0);
     return { budget, body, transmission, fuel, ratings, popularBrands: brands.slice(0, 4), otherBrands: brands.slice(4).sort((a, b) => a.label.localeCompare(b.label)), features };
-  }, [cars, ratingOf]);
+  }, [cars, ratingOf, isBike]);
 
   const pick = (field: Exclude<keyof ExploreFilters, 'features'>, key: string) => {
     Haptics.selectionAsync();
@@ -375,6 +405,7 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, rat
         <View style={[styles.tabs, { borderRightColor: p.border }]}>
           {TABS.map((t) => {
             const on = tab === t.key;
+            const label = t.key === 'car' && isBike ? 'Bike Details' : t.label;
             return (
               <Pressable
                 key={t.key}
@@ -395,7 +426,7 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, rat
     },
   ]}
 >
-  {t.label}
+  {label}
 </Text>
               </Pressable>
             );
@@ -410,9 +441,14 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, rat
           )}
           {tab === 'car' && (
             <>
-              <Text style={[styles.group, { color: p.muted }]}>Body Type</Text>
-              {list('body', opts.body)}
-              <Text style={[styles.group, { color: p.muted, marginTop: 12 }]}>Transmission</Text>
+              {/* Every bike is just "Bike" in the data, so there is no body type to pick for them. */}
+              {!isBike && (
+                <>
+                  <Text style={[styles.group, { color: p.muted }]}>Body Type</Text>
+                  {list('body', opts.body)}
+                </>
+              )}
+              <Text style={[styles.group, { color: p.muted, marginTop: isBike ? 0 : 12 }]}>Transmission</Text>
               {list('transmission', opts.transmission)}
             </>
           )}
@@ -464,7 +500,7 @@ function OptionRow({ p, label, count, on, onPress, square }: { p: DetailsPalette
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.45)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
   closeRow: { alignItems: 'flex-end', paddingHorizontal: 12, marginBottom: 8 },
   closeBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 18, maxHeight: '78%' },
@@ -474,7 +510,7 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 12, paddingVertical: 12 },
   cta: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17 },
-  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
+  dim: { backgroundColor: 'transparent' },
   sortCard: { marginHorizontal: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13 },
   sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 },
   sortText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },

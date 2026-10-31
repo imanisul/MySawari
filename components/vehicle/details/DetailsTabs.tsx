@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, FlatList, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -11,6 +11,7 @@ import { Modal, ScrollView } from 'react-native';
 import { Reveal } from '@/components/common/Reveal';
 import { ReviewListSkeleton } from '@/components/loading/ScreenSkeletons';
 import { useQuery } from '@tanstack/react-query';
+import { PhotoViewer } from '@/components/common/PhotoViewer';
 import { LoadingImage } from '@/components/common/LoadingImage';
 
 type DetailsTab = 'about' | 'gallery' | 'reviews';
@@ -399,47 +400,6 @@ function useCarReviews(carId: string) {
   });
 }
 
-function PhotoViewer({ images, initialIndex, onClose }: { images: any[]; initialIndex: number; onClose: () => void }) {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const width = Dimensions.get('window').width;
-
-  if (images.length === 0) return null;
-
-  return (
-    <Modal visible={true} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <View style={styles.viewerOverlay}>
-        <FlatList
-          data={images}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={initialIndex}
-          getItemLayout={(data: any, index: number) => ({ length: width, offset: width * index, index })}
-          onMomentumScrollEnd={(e: any) => {
-            const index = Math.round(e.nativeEvent.contentOffset.x / width);
-            setCurrentIndex(index);
-          }}
-          renderItem={({ item }: { item: any }) => (
-            <Pressable style={{ width, height: '100%', alignItems: 'center', justifyContent: 'center' }} onPress={onClose}>
-              <View style={{ width: '100%', height: '80%' }}>
-                <LoadingImage source={item} style={StyleSheet.absoluteFill} contentFit="contain" />
-              </View>
-            </Pressable>
-          )}
-        />
-        {images.length > 1 && (
-          <Text style={{ position: 'absolute', bottom: 40, color: 'white', fontFamily: 'Inter_600SemiBold' }}>
-            {currentIndex + 1} / {images.length}
-          </Text>
-        )}
-        <Pressable style={styles.viewerClose} onPress={onClose}>
-          <Feather name="x" size={24} color="#FFF" />
-        </Pressable>
-      </View>
-    </Modal>
-  );
-}
-
 // --- TAB: REVIEWS ---
 export function ReviewsSection({ car }: { car: Car }) {
   const colors = useColors();
@@ -646,7 +606,7 @@ function ReviewCard({ review }: { review: Review }) {
               setViewerImages(review.images!.map(u => ({ uri: u })));
               setViewerIndex(i);
             }}>
-              <View style={{ width: 88, height: 88, borderRadius: 10, overflow: 'hidden' }}>
+              <View style={{ width: 160, height: 120, borderRadius: 10, overflow: 'hidden' }}>
                 <LoadingImage source={{ uri: url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
               </View>
             </Pressable>
@@ -670,8 +630,6 @@ const styles = StyleSheet.create({
   guestPlaceRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 5 },
   guestPlaceName: { flex: 1, fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 17 },
   guestBy: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 3 },
-  viewerOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center' },
-  viewerClose: { position: 'absolute', top: 56, right: 20 },
   container: {
     marginTop: 16,
   },

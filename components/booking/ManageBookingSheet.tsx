@@ -28,7 +28,7 @@ export function ManageBookingSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <View style={[styles.overlay, { backgroundColor: 'rgba(38, 38, 38, 0.32)' }]}>
+      <View style={[styles.overlay, { backgroundColor: 'transparent' }]}>
         <ModalBlur />
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
@@ -75,7 +75,7 @@ export function ManageBookingSheet({
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, justifyContent: 'flex-end' },
-  dim: { backgroundColor: 'rgba(0, 0, 0, 0.18)' },
+  dim: { backgroundColor: 'transparent' },
   wrap: { gap: 8 },
   closeRow: { alignItems: 'flex-end', paddingHorizontal: 10 },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

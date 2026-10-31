@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, ScrollView, Pressable, StyleSheet, Dimensions, Modal, Text, Animated } from 'react-native';
+import { View, ScrollView, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Car } from '@/utils/sawari';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDetailsPalette } from './detailsPalette';
+import { PhotoViewer } from '@/components/common/PhotoViewer';
 
 const { width } = Dimensions.get('window');
 const SLIDE_W = width - 32;
@@ -26,7 +25,6 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
-  const modalScrollRef = useRef<ScrollView>(null);
   const pausedUntil = useRef(0); // a thumbnail tap or swipe pauses the auto-slide for a while
 
   // Auto-slide logic
@@ -113,47 +111,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
         </View>
       )}
 
-      {/* Full Screen Gallery Modal */}
-      <Modal visible={isModalVisible} transparent={false} animationType="fade" statusBarTranslucent navigationBarTranslucent>
-        <View style={[styles.modalContainer, { backgroundColor: '#000' }]}>
-          <SafeAreaView style={styles.modalHeader}>
-            <Text style={styles.modalCounter}>
-              {activeIndex + 1} / {images.length}
-            </Text>
-            <Pressable 
-              onPress={() => setIsModalVisible(false)} 
-              style={styles.closeBtn}
-            >
-              <Feather name="x" size={24} color="#FFF" />
-            </Pressable>
-          </SafeAreaView>
-
-          <ScrollView
-            ref={modalScrollRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            contentOffset={{ x: activeIndex * width, y: 0 }}
-            onMomentumScrollEnd={(e) => {
-              const idx = Math.round(e.nativeEvent.contentOffset.x / width);
-              setActiveIndex(idx);
-            }}
-          >
-            {images.map((img, i) => (
-              <View key={i} style={{ width, flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                <View style={{ width: '100%', height: width * 0.75 }}>
-                  <LoadingImage
-                    source={img}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="contain"
-                    transition={200}
-                  />
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        </View>
-      </Modal>
+      {isModalVisible && <PhotoViewer images={images} initialIndex={activeIndex} onClose={() => setIsModalVisible(false)} />}
     </View>
   );
 }
@@ -207,30 +165,4 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     overflow: 'hidden',
   },
-  modalContainer: {
-    flex: 1,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-  },
-  modalCounter: {
-    color: '#FFF',
-    fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 16,
-  },
-  closeBtn: {
-    width: 44,
-    height: 44,
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-  }
 });

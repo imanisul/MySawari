@@ -33,7 +33,7 @@ export function ReviewModal({ trip, onClose }: { trip: ReviewTrip | null; onClos
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.45)' },
+  overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
   // Figma: 32px #FAFAFA round ✕, 12 from the right, 8 above the sheet.
   close: { alignSelf: 'flex-end', marginRight: 12, marginBottom: 8, width: 32, height: 32, borderRadius: 16, backgroundColor: '#FAFAFA', alignItems: 'center', justifyContent: 'center' },
   // Figma: white sheet, 1px #E7EAF4 border, 24 top corners, padding 20/16.

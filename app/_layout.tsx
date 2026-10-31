@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LogBox, View, Platform, Linking } from 'react-native';
+import { LogBox, View, Linking } from 'react-native';
 
 LogBox.ignoreLogs([
   'ProgressBarAndroid has been extracted from react-native core',
@@ -11,8 +11,8 @@ LogBox.ignoreLogs([
 
 import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
 import { AppState } from 'react-native';
-import { primeVehicles, hasLiveVehicles } from '@/hooks/useVehicles';
-import { loadHomeData, homeLoadSteps, HomeLoadStep } from '@/hooks/useHomeData';
+import { primeVehicles } from '@/hooks/useVehicles';
+import { loadHomeData } from '@/hooks/useHomeData';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
@@ -242,9 +242,7 @@ function AppGate({
   const client = useQueryClient();
 
   const [homeDataReady, setHomeDataReady] = useState(false);
-  const [loadRun, setLoadRun] = useState(0);
-  const [loadSteps, setLoadSteps] = useState<HomeLoadStep[]>([]);
-  
+
   // Prefetch public data immediately to parallelize with auth loading
   useEffect(() => {
     import('@/hooks/useVehicles').then(({ vehiclesQueryOptions }) => client.prefetchQuery(vehiclesQueryOptions));
@@ -267,16 +265,14 @@ function AppGate({
   useEffect(() => {
     if (isAuthLoading || homeDataReady) return;
     let cancelled = false;
-    setLoadSteps(homeLoadSteps(!!isAuthenticated));
     loadHomeData(client, {
       isAuthenticated: !!isAuthenticated, fetchWallet, syncNotifications, userId: customer?.id,
-      onStep: (key) => { if (!cancelled) setLoadSteps((prev) => prev.map((s) => (s.key === key ? { ...s, done: true } : s))); },
     })
       .finally(() => { if (!cancelled) setHomeDataReady(true); });
     return () => { cancelled = true; };
-    // Runs once per launch (and again on Retry); later sign-ins / refreshes are handled by the screens.
+    // Runs once per launch; later sign-ins / refreshes are handled by the screens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthLoading, loadRun]);
+  }, [isAuthLoading]);
   // The app opens straight away; Home and the other screens show their own skeletons while data arrives.
   const colors = useColors();
   const splashHidden = useRef(false);

@@ -16,9 +16,8 @@ import {
 import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
-import { SortLinesIcon, FunnelIcon } from '@/components/common/FilterIcons';
+import { SortArrowsIcon, FunnelIcon } from '@/components/common/FilterIcons';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
-import { rise } from '@/components/common/motion';
 
 /**
  * Explore (Figma "Explore"): title, "Search cars and bike" with the filter button, quick filter chips
@@ -30,13 +29,18 @@ import { rise } from '@/components/common/motion';
 const CAR_CHIPS: QuickChip[] = QUICK_CHIPS;
 const BIKE_CHIPS: QuickChip[] = QUICK_CHIPS.filter((c) => !c.apply || (!c.apply.body && c.apply.fuel !== 'Diesel'));
 
+// The list's first row is the pinned search + chips bar; a message row stands in when there are no cars.
+type Row = Car | { id: string; kind: 'bar' | 'empty' };
+const BAR_ROW: Row = { id: '__bar', kind: 'bar' };
+const EMPTY_ROW: Row = { id: '__empty', kind: 'empty' };
+
 export default function ExploreScreen() {
   const p = useDetailsPalette();
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
   // Cars or bikes, as chosen on Home.
-  const { setBookingSource, vehicleType: homeType } = useSawari();
+  const { setBookingSource, vehicleType: homeType, setVehicleType } = useSawari();
   const isBike = homeType === 'bike';
   const CHIPS = isBike ? BIKE_CHIPS : CAR_CHIPS;
 
@@ -50,12 +54,17 @@ export default function ExploreScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const listRef = useRef<FlatList<Car>>(null);
-  // One stable render function, so scrolling never re-creates every card.
-  const renderCar = useCallback(({ item }: { item: Car }) => <CarListCard car={item} isExplore />, []);
+  const listRef = useRef<FlatList<Row>>(null);
+  // The title scrolls away; the search row and chips under it stay pinned. After a new search / filter / sort the
+  // list goes back to its first car — just under the pinned bar — and stays put if the title is still showing.
+  const offsetY = useRef(0);
+  const titleH = useRef(0);
+  const toFirstCar = useCallback(() => {
+    if (offsetY.current > titleH.current) listRef.current?.scrollToOffset({ offset: titleH.current, animated: false });
+  }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => { setDebouncedQuery(searchQuery); listRef.current?.scrollToOffset({ offset: 0, animated: false }); }, 300);
+    const t = setTimeout(() => { setDebouncedQuery(searchQuery); toFirstCar(); }, 300);
     return () => clearTimeout(t);
   }, [searchQuery]);
 
@@ -110,11 +119,7 @@ export default function ExploreScreen() {
     Haptics.selectionAsync();
     setChip(c.label);
     setFilters({ ...EMPTY_FILTERS, ...(c.apply || {}) });
-    try {
-      requestAnimationFrame(() => {
-        listRef.current?.scrollToOffset({ offset: 0, animated: false });
-      });
-    } catch {}
+    requestAnimationFrame(toFirstCar);
   };
 
   const clearAll = () => {
@@ -122,15 +127,13 @@ export default function ExploreScreen() {
     setChip('All'); setFilters(EMPTY_FILTERS); setSort('recommended');
   };
 
-  const header = (
-    <View style={{ paddingTop: insets.top + 8 }}>
-      <Text style={[styles.title, { color: p.fg, paddingHorizontal: 16 }]}>Explore</Text>
-
+  const bar = (
+    <View style={{ backgroundColor: p.page }}>
       <View style={styles.searchRow}>
         <View style={[styles.search, { borderColor: p.segBorder, backgroundColor: p.page }]}>
           <Feather name="search" size={20} color={p.muted} />
           <TextInput
-            placeholder="Search cars and bike"
+            placeholder={isBike ? 'Search bikes' : 'Search cars'}
             placeholderTextColor={p.muted}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -149,11 +152,27 @@ export default function ExploreScreen() {
           onPress={() => { Haptics.selectionAsync(); setShowSortSheet(true); }}
           style={[styles.sortBtn, { borderColor: sort !== 'recommended' ? p.navy : p.segBorder, backgroundColor: sort !== 'recommended' ? p.navy : p.segOn }]}
         >
-          <SortLinesIcon color={sort !== 'recommended' ? p.onNavy : p.muted} />
+          <SortArrowsIcon color={sort !== 'recommended' ? p.onNavy : p.muted} />
         </Pressable>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        {/* Cars / Bikes: the list below, its quick filters and the Filter sheet all follow this. */}
+        {(['car', 'bike'] as const).map((t) => {
+          const on = homeType === t;
+          return (
+            <Pressable
+              key={t}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              onPress={() => { if (!on) { Haptics.selectionAsync(); setVehicleType(t); } }}
+              style={[styles.chip, { borderColor: on ? p.navy : p.segBorder, backgroundColor: on ? p.navy : p.page }]}
+            >
+              <Text style={[styles.chipText, { color: on ? p.onNavy : p.muted }]}>{t === 'car' ? 'Cars' : 'Bikes'}</Text>
+            </Pressable>
+          );
+        })}
+        <View style={[styles.chipDivider, { backgroundColor: p.segBorder }]} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Filter${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
@@ -209,23 +228,39 @@ export default function ExploreScreen() {
     </View>
   );
 
+  const rows = useMemo<Row[]>(
+    () => [BAR_ROW, ...(isFetchingCars || filteredCars.length === 0 ? [EMPTY_ROW] : filteredCars)],
+    [isFetchingCars, filteredCars],
+  );
+  // New function only when something the bar or the message shows changes (typing, chips, sort, loading state);
+  // the car cards themselves are memoised, so they do not redraw.
+  const renderRow = useCallback(({ item }: { item: Row }) => {
+    if ('kind' in item) return item.kind === 'bar' ? bar : empty;
+    return <CarListCard car={item} isExplore />;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, chip, sort, activeFilterCount, isBike, isFetchingCars, fetchError, debouncedQuery, p]);
+
   return (
+    // The list starts below the status bar, so the pinned bar sticks right under it instead of behind it.
     <Page bottomNav scroll={false}>
-      {/* The whole list at once (the fleet is small, and FlatList only draws what is near the screen). Loading
-          it 3 cards at a time made the list grow in jumps while scrolling — the "shaking". */}
       <FlatList
         ref={listRef}
-        style={{ flex: 1, backgroundColor: p.page }}
-        data={isFetchingCars && filteredCars.length === 0 ? [] : filteredCars}
+        style={{ flex: 1, backgroundColor: p.page, marginTop: insets.top }}
+        data={rows}
         keyExtractor={(c) => c.id}
-        renderItem={renderCar}
-        ListHeaderComponent={header}
-        ListEmptyComponent={empty}
+        renderItem={renderRow}
+        ListHeaderComponent={
+          <Text onLayout={(e) => { titleH.current = e.nativeEvent.layout.height; }} style={[styles.title, { color: p.fg, paddingHorizontal: 16, paddingTop: 8 }]}>Explore</Text>
+        }
+        // Row 0 is the search + chips bar: it stays at the top while the cars scroll under it.
+        stickyHeaderIndices={[0]}
+        onScroll={(e) => { offsetY.current = e.nativeEvent.contentOffset.y; }}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         // The last card must clear the fixed tab bar (+ safe area) and the floating help button.
         contentContainerStyle={{ paddingBottom: bottomNavHeight + 88 }}
         {...scrollHandlers}
-        initialNumToRender={3}
+        initialNumToRender={4}
         maxToRenderPerBatch={4}
         updateCellsBatchingPeriod={60}
         windowSize={9}
@@ -248,7 +283,7 @@ export default function ExploreScreen() {
           setChip(chipFor(f));
         }}
       />
-      <SortSheet visible={showSortSheet} onClose={() => setShowSortSheet(false)} value={sort} onApply={(v) => { setSort(v); listRef.current?.scrollToOffset({ offset: 0, animated: false }); }} />
+      <SortSheet visible={showSortSheet} onClose={() => setShowSortSheet(false)} value={sort} onApply={(v) => { setSort(v); toFirstCar(); }} />
     </Page>
   );
 }
@@ -270,6 +305,7 @@ const styles = StyleSheet.create({
   chip: { height: 36, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4 },
   filterChipFixed: { width: 70 },
+  chipDivider: { width: 1, height: 24, alignSelf: 'center' },
   chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   empty: { borderWidth: 1, borderRadius: 12, marginHorizontal: 16, marginTop: 8, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, marginTop: 6 },

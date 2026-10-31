@@ -616,13 +616,13 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Complete ${target} trips, earn ${formatCurrency(reward)} off. ${done} of ${target} completed.`}
+      accessibilityLabel={`Complete ${target} trips, earn ${formatCurrency(reward)}. ${done} of ${target} completed.`}
       onPress={onPress}
       style={[styles.milestone, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }]}
     >
       <Image source={require('@/assets/images/MySawari_nobg.png')} style={styles.milestoneLogo} resizeMode="contain" />
-      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} trips, earn {formatCurrency(reward)} off</Text>
-      <Text style={[styles.milestoneSub, { color: p.muted }]}>Get {formatCurrency(reward)} off after completing {target} trips.</Text>
+      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} trips, earn {formatCurrency(reward)}</Text>
+      <Text style={[styles.milestoneSub, { color: p.muted }]}>Get {formatCurrency(reward)} after completing {target} trips.</Text>
 
       <View style={styles.track}>
         <View style={styles.trackRail}>

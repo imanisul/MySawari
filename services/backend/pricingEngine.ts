@@ -1,7 +1,7 @@
-// MySawari hub coordinates (Ganesh Turning, Bongshar, Kahilipara, Guwahati).
-// Approximate — update here if the hub location changes; every pickup/drop
-// distance calculation is measured from this single point.
-export const MYSAWARI_HUB_COORDINATES = { latitude: 26.129, longitude: 91.748 };
+// MySawari hub coordinates (Ganesh Turning, Bongshar, Kahilipara, Guwahati) — where Google Maps places that
+// address. Every pickup/drop distance is measured from this single point; the backend's road-distance service
+// (integrations/google-maps/routes.service.js) uses the same one. (It used to be 26.129, 91.748, about 2 km off.)
+export const MYSAWARI_HUB_COORDINATES = { latitude: 26.1412, longitude: 91.7645 };
 
 /** Shown wherever the customer collects/returns the vehicle themselves. */
 export const MYSAWARI_HUB_NAME = 'MySawari, Kahilipara';
@@ -11,6 +11,15 @@ export const PICKUP_DROP_RATE_PER_KM = 20;
 export const BOOKING_ADVANCE_AMOUNT = 500;
 
 export type Coordinates = { latitude: number; longitude: number };
+
+/**
+ * One-way delivery / collection charge for an address: ₹200 + ₹20 per km. `roadKm` is Google's driving distance from
+ * the hub (see API.getRoadDistanceKm); without it (offline, Google down) the straight-line distance × 1.3 is used.
+ */
+function legCharge(loc: Coordinates, roadKm?: number | null): { charge: number; distanceKm: number } {
+  const distanceKm = roadKm && roadKm > 0 ? Math.max(1, Math.round(roadKm)) : calculateDistanceKm(MYSAWARI_HUB_COORDINATES, loc);
+  return { charge: PICKUP_DROP_BASE_FEE + (distanceKm * PICKUP_DROP_RATE_PER_KM), distanceKm };
+}
 
 export type Coupon = {
   code: string;
@@ -52,6 +61,9 @@ export type QuoteParams = {
   dropoffLocation?: { latitude: number, longitude: number, name: string } | null;
   /** Address the vehicle should be collected from (when a drop/return service is requested). */
   returnLocation?: { latitude: number, longitude: number, name: string } | null;
+  /** Google's driving km from the hub to the pickup / return address, when known (else a straight-line estimate). */
+  pickupRoadKm?: number | null;
+  returnRoadKm?: number | null;
   couponCode?: string;
   sawariCashToApply: number;
   availableSawariCash: number;
@@ -260,24 +272,24 @@ export function calculateDriverCharge(driverMode: 'Self Drive' | 'With Driver' |
 export function calculatePickupCharge(
   isDeliveryRequested: boolean | undefined,
   deliveryMode: QuoteParams['deliveryMode'],
-  pickupLocation: Coordinates | null | undefined
+  pickupLocation: Coordinates | null | undefined,
+  roadKm?: number | null
 ): { charge: number; distanceKm: number } {
   const requested = !!isDeliveryRequested && (deliveryMode === 'delivery' || deliveryMode === 'both');
   if (!requested || !pickupLocation) return { charge: 0, distanceKm: 0 };
-  const distanceKm = calculateDistanceKm(MYSAWARI_HUB_COORDINATES, pickupLocation);
-  return { charge: PICKUP_DROP_BASE_FEE + (distanceKm * PICKUP_DROP_RATE_PER_KM), distanceKm };
+  return legCharge(pickupLocation, roadKm);
 }
 
 /** Drop service = MySawari collects the car from the customer's address back to its hub. */
 export function calculateDropCharge(
   isDeliveryRequested: boolean | undefined,
   deliveryMode: QuoteParams['deliveryMode'],
-  returnLocation: Coordinates | null | undefined
+  returnLocation: Coordinates | null | undefined,
+  roadKm?: number | null
 ): { charge: number; distanceKm: number } {
   const requested = !!isDeliveryRequested && (deliveryMode === 'return' || deliveryMode === 'both');
   if (!requested || !returnLocation) return { charge: 0, distanceKm: 0 };
-  const distanceKm = calculateDistanceKm(MYSAWARI_HUB_COORDINATES, returnLocation);
-  return { charge: PICKUP_DROP_BASE_FEE + (distanceKm * PICKUP_DROP_RATE_PER_KM), distanceKm };
+  return legCharge(returnLocation, roadKm);
 }
 
 /**
@@ -389,7 +401,7 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const {
     dailyRate, pickupDateStr, returnDateStr, pickupTime, returnTime,
     pickupLocation, dropoffLocation, returnLocation, couponCode, sawariCashToApply, availableSawariCash,
-    driverMode = 'Self Drive', deliveryMode, isDeliveryRequested, membership,
+    driverMode = 'Self Drive', deliveryMode, isDeliveryRequested, membership, pickupRoadKm, returnRoadKm,
   } = params;
 
   const rentalDays = calculateRentalDays(pickupDateStr, returnDateStr, pickupTime, returnTime);
@@ -398,8 +410,8 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const couponDiscount = calculateCouponDiscount(rentalAmount, driverCharge, couponCode);
   const discountedRentalAmount = Math.max(0, rentalAmount + driverCharge - couponDiscount);
 
-  const pickup = calculatePickupCharge(isDeliveryRequested, deliveryMode, pickupLocation);
-  const drop = calculateDropCharge(isDeliveryRequested, deliveryMode, returnLocation);
+  const pickup = calculatePickupCharge(isDeliveryRequested, deliveryMode, pickupLocation, pickupRoadKm);
+  const drop = calculateDropCharge(isDeliveryRequested, deliveryMode, returnLocation, returnRoadKm);
 
   const totalAmount = calculateTripTotal(discountedRentalAmount, pickup.charge, drop.charge);
 

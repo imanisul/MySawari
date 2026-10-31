@@ -347,7 +347,7 @@ const styles = StyleSheet.create({
   breakup: { fontFamily: PF.semibold, fontSize: 11, lineHeight: 17 },
   cardBody: { padding: 12, gap: 12 },
   bodyTitle: { fontFamily: PF.semibold, fontSize: 15, lineHeight: 23 },
-  sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.45)' },
+  sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 18 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetTitle: { fontFamily: PF.medium, fontSize: 17 },

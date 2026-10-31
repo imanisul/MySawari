@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable, Modal, Image, RefreshControl, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Pressable, Modal, Image, RefreshControl, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -47,6 +47,7 @@ export default function ProfileScreen() {
   const { customer, sawariCash, walletBalance, isAuthenticated, membership, fetchWallet, logout } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const scrollY = useRef(new Animated.Value(0)).current;
   // Figma: the card's top lines up with the ⋮ icon's top and its right edge sits 4px left of the icon.
   const moreRef = useRef<View>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null);
@@ -135,10 +136,12 @@ export default function ProfileScreen() {
   return (
     <Page bottomNav scroll={false}>
       <StatusBar style="light" />
-      <ScrollView
+      <Animated.ScrollView
         style={{ flex: 1, backgroundColor: p.page }}
         contentContainerStyle={{ paddingBottom: bottomNavHeight + 24 }}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
         refreshControl={isAuthenticated ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" progressViewOffset={insets.top} /> : undefined}
       >
         {/* ── Header ── */}
@@ -270,7 +273,16 @@ export default function ProfileScreen() {
             ))}
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Scrolled past the name: a solid purple bar with "My Profile" holds the status bar area, so the clock,
+          battery and notification icons (white) never sit on top of the white page content. */}
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.stickyBar, { height: insets.top + 52, paddingTop: insets.top, opacity: scrollY.interpolate({ inputRange: [70, 120], outputRange: [0, 1], extrapolate: 'clamp' }) }]}
+      >
+        <Text style={styles.stickyTitle}>My Profile</Text>
+      </Animated.View>
       <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
 
       {/* ── ⋮ menu (design: Edit Profile / Settings / Logout) ── */}
@@ -348,7 +360,7 @@ function Dashes({ color }: { color: string }) {
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
+  dim: { backgroundColor: 'transparent' },
   header: { paddingLeft: 16, paddingRight: 16, paddingBottom: 16 + 24 },
   headerTop: { flexDirection: 'row', justifyContent: 'flex-end', height: 24, alignItems: 'center', marginBottom: 32 },
   more: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
@@ -387,6 +399,8 @@ const styles = StyleSheet.create({
   dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3, marginHorizontal: 0 },
   dash: { width: 4, height: 1 },
 
+  stickyBar: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  stickyTitle: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 24, color: '#FFFFFF' },
   guestLogin: { alignSelf: 'flex-start', marginTop: 14, paddingHorizontal: 18, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   guestLoginText: { fontFamily: FONT.semibold, fontSize: 13, color: PURPLE },
 

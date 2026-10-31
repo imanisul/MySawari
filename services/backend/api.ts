@@ -233,6 +233,8 @@ export async function timedFetch(url: string, options: RequestInit = {}, timeout
 // No automatic retry: a retried send could trip the OTP cooldown, a retried verify could find the code already used.
 const OTP_TIMEOUT_MS = 45000;
 
+const roadKmCache = new Map<string, number>();
+
 const PLATE_PROXY_PATH = '/images/blur?target=';
 // Bumped when plate processing changes: a new URL means the phone never reuses an image it cached
 // under the old one (including an unprocessed original from before the backend stopped falling back to it).
@@ -957,6 +959,28 @@ export const API = {
   /**
    * POST /api/bookings/quote
    */
+  /**
+   * Google's driving distance (km) from the MySawari hub to a point, through our server (the Maps key stays there).
+   * Cached per address for the session; null when it can't be had, so the price falls back to the straight-line estimate.
+   */
+  async getRoadDistanceKm(loc: { latitude: number; longitude: number } | null | undefined): Promise<number | null> {
+    if (!loc || !Number.isFinite(loc.latitude) || !Number.isFinite(loc.longitude)) return null;
+    const key = `${loc.latitude.toFixed(4)},${loc.longitude.toFixed(4)}`;
+    if (roadKmCache.has(key)) return roadKmCache.get(key)!;
+    try {
+      const res = await timedFetch(`${BACKEND_URL}/locations/road-distance?lat=${loc.latitude}&lng=${loc.longitude}`, {}, 10000);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const km = Number(data?.data?.distanceKm);
+      // Only Google's own answer is kept; a server-side estimate is not worth remembering.
+      if (!Number.isFinite(km) || km <= 0) return null;
+      if (data.data.source === 'google') roadKmCache.set(key, km);
+      return km;
+    } catch {
+      return null;
+    }
+  },
+
   async quoteBooking(params: Omit<QuoteParams, 'availableSawariCash'>): Promise<PricingQuote> {
     // Fetch wallet and coupons in parallel — they don't depend on each other
     let availableSawariCash = 0;
@@ -984,8 +1008,18 @@ export const API = {
       ? { plan: buyPlan, totalSaved: 0, expiresAt: new Date(Date.now() + 365 * 86400000).toISOString() }
       : membership;
 
+    // Delivery / collection is charged by driving distance: ask Google (via our server) for the addresses in play.
+    const wantsPickup = !!params.isDeliveryRequested && (params.deliveryMode === 'delivery' || params.deliveryMode === 'both');
+    const wantsReturn = !!params.isDeliveryRequested && (params.deliveryMode === 'return' || params.deliveryMode === 'both');
+    const [pickupRoadKm, returnRoadKm] = await Promise.all([
+      wantsPickup ? this.getRoadDistanceKm(params.pickupLocation) : null,
+      wantsReturn ? this.getRoadDistanceKm(params.returnLocation) : null,
+    ]);
+
     const quote = await calculateBookingPrice({
       ...params,
+      pickupRoadKm,
+      returnRoadKm,
       availableSawariCash,
       membership: effectiveMembership,
     });
@@ -1738,6 +1772,20 @@ export const API = {
     } catch (e: any) {
       throw new Error(e.message);
     }
+  },
+
+  /**
+   * POST /api/auth/verify-otp with checkOnly: confirms a sign-up code at the code step without using it up.
+   */
+  async checkOtp(mobile: string, otp: string, otpId?: string, deviceId?: string) {
+    const res = await timedFetch(`${BACKEND_URL}/auth/verify-otp`, {
+      method: 'POST',
+      headers: await withInstallId({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ mobileNumber: mobile, otp, otpId, deviceId, checkOnly: true })
+    }, OTP_TIMEOUT_MS);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to verify OTP');
+    return true;
   },
 
   /**

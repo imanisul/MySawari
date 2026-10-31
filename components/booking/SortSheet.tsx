@@ -86,7 +86,7 @@ export function SortSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(38,38,38,0.32)' },
+  backdrop: { flex: 1, backgroundColor: 'transparent' },
   sheet: {
     backgroundColor: '#FFFFFF',
     borderColor: '#E7EAF4',

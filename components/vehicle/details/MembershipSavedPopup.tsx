@@ -23,16 +23,27 @@ export function clearMembershipPopupShown(carId?: string) {
   }
 }
 
-// Figma "membership applied": the plan's art (the same crown / shield / gem frames as the Membership page,
-// background removed) with a white card on it. Art files are 708 × 502.
+// Figma "membership applied": the plan's art frame (the same crown / shield / gem frames as the Membership page,
+// background removed) with a white card on it. All measures are dp for a 264-wide card, taken from the design.
 const ART_W = 264;
-const ART_H = Math.round((ART_W * 552) / 748);
+type Layout = {
+  /** Whole popup card height. */
+  h: number;
+  /** The frame art (707 × 506 px): where it starts and how tall it is drawn. */
+  artTop: number; artH: number;
+  /** The white card. */
+  cardTop: number; cardH: number;
+  /** Starter only: the design draws its crown box larger than the frame art does, so it is laid over the frame. */
+  crown?: any;
+};
+const STARTER_LAYOUT: Layout = { h: 219, artTop: 0, artH: 219, cardTop: 86, cardH: 120, crown: require('@/assets/images/membership_crown_starter.png') };
+const OTHER_LAYOUT: Layout = { h: 189, artTop: 0, artH: 189, cardTop: 72, cardH: 106 };
 
-type Theme = { art: any; innerBorder: string; dash: string; applied: string; confetti: string[] };
+type Theme = { art: any; layout: Layout; innerBorder: string; dash: string; applied: string; confetti: string[] };
 const THEMES: Record<string, Theme> = {
-  Starter: { art: require('@/assets/images/membership_card_starter.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#2F3E75', confetti: ['#2F3E75', '#6152D8', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
-  Plus: { art: require('@/assets/images/membership_card_plus.png'), innerBorder: '#FFFFFF', dash: '#C9C2F7', applied: '#6152D8', confetti: ['#6152D8', '#F59E0B', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
-  Pro: { art: require('@/assets/images/membership_card_pro.png'), innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
+  Starter: { art: require('@/assets/images/membership_frame_starter.png'), layout: STARTER_LAYOUT, innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#2F3E75', confetti: ['#2F3E75', '#6152D8', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
+  Plus: { art: require('@/assets/images/membership_frame_plus.png'), layout: OTHER_LAYOUT, innerBorder: '#FFFFFF', dash: '#C9C2F7', applied: '#6152D8', confetti: ['#6152D8', '#F59E0B', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
+  Pro: { art: require('@/assets/images/membership_frame_pro.png'), layout: OTHER_LAYOUT, innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
 };
 
 /**
@@ -56,26 +67,39 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
   const { width } = useWindowDimensions();
   const pop = useRef(new Animated.Value(0)).current;
   const [burst, setBurst] = useState(0);
+  // The card stays invisible until its artwork has drawn: the white card used to appear first, as a bare white
+  // box, and the frame popped in a moment later.
+  const [loaded, setLoaded] = useState(0);
+  const [giveUp, setGiveUp] = useState(false);
+
+  const normPlan = plan ? (plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase()) : 'Starter';
+  const t = THEMES[normPlan] ?? THEMES[plan] ?? THEMES.Starter;
+  const ready = loaded >= (t.layout.crown ? 2 : 1) || giveUp;
+  const artLoaded = () => setLoaded((n) => n + 1);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible) { setLoaded(0); setGiveUp(false); pop.setValue(0); return; }
+    // Never wait on a slow image for more than a moment.
+    const timer = setTimeout(() => setGiveUp(true), 700);
+    return () => clearTimeout(timer);
+  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!visible || !ready) return;
     pop.setValue(0);
     // Rises in (no zoom): on some Android phones an image inside a zooming view was drawn far too large.
     Animated.spring(pop, { toValue: 1, useNativeDriver: true, friction: 6, tension: 80 }).start();
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (confetti) setBurst((n) => n + 1);
-  }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [visible, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const close = () => {
     Animated.timing(pop, { toValue: 0, duration: 140, easing: Easing.in(Easing.quad), useNativeDriver: true }).start(() => onClose());
   };
 
-  const normPlan = plan ? (plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase()) : 'Starter';
-  const t = THEMES[normPlan] ?? THEMES[plan] ?? THEMES.Starter;
-
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
-      <ModalBlur sigmaX={2} sigmaY={2} />
+      <ModalBlur />
       <Pressable accessibilityLabel="Close" style={[StyleSheet.absoluteFill, styles.dim]} onPress={close} />
 
       <View style={styles.center} pointerEvents="box-none">
@@ -85,20 +109,25 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
           accessibilityRole="alert"
           accessibilityLabel={`${amount ? `You're saving ${formatCurrency(amount)} on this booking. ` : ''}${title || `${normPlan} Membership Applied!`}${note ? ` ${note}` : ''}`}
         >
-          <View style={{ width: ART_W, height: ART_H, overflow: 'hidden' }}>
-            <Image source={t.art} style={{ position: 'absolute', top: 0, left: 0, width: ART_W, height: ART_H }} resizeMode="center" fadeDuration={0} accessible={false} />
-            <View style={[styles.inner, { borderColor: t.innerBorder }]}>
-              {amount ? (
-                <>
-                  <Text style={styles.saving}>You're saving</Text>
-                  <Text style={styles.amount}>{formatCurrency(amount)}</Text>
-                  <Text style={styles.onThis}>on this booking</Text>
-                </>
-              ) : (
-                <Text style={[styles.onThis, { textAlign: 'center' }]}>{note}</Text>
-              )}
+          <View style={{ width: ART_W, height: t.layout.h }}>
+            <Image source={t.art} style={{ position: 'absolute', left: 0, top: t.layout.artTop, width: ART_W, height: t.layout.artH }} resizeMode="stretch" fadeDuration={0} accessible={false} onLoad={artLoaded} onError={artLoaded} />
+            {!!t.layout.crown && (
+              <Image source={t.layout.crown} style={styles.crown} resizeMode="stretch" fadeDuration={0} accessible={false} onLoad={artLoaded} onError={artLoaded} />
+            )}
+            <View style={[styles.inner, { top: t.layout.cardTop, height: t.layout.cardH, borderColor: t.innerBorder }]}>
+              <View style={styles.saveBlock}>
+                {amount ? (
+                  <>
+                    <Text style={styles.saving}>You're saving</Text>
+                    <Text style={styles.amount}>{formatCurrency(amount)}</Text>
+                    <Text style={styles.onThis}>on this booking</Text>
+                  </>
+                ) : (
+                  <Text style={[styles.onThis, { textAlign: 'center' }]}>{note}</Text>
+                )}
+              </View>
               <View style={styles.dashes}>
-                {Array.from({ length: 40 }, (_, i) => <View key={i} style={[styles.dashBit, { backgroundColor: t.dash }]} />)}
+                {Array.from({ length: 60 }, (_, i) => <View key={i} style={[styles.dashBit, { backgroundColor: t.dash }]} />)}
               </View>
               <Text style={[styles.applied, { color: t.applied }]} numberOfLines={1} adjustsFontSizeToFit>{title || `${normPlan} Membership Applied!`}</Text>
               {!!amount && !!note && <Text style={styles.note} numberOfLines={1} adjustsFontSizeToFit>{note}</Text>}
@@ -106,7 +135,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
           </View>
 
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} hitSlop={10} style={styles.close}>
-            <Feather name="x" size={17} color="#404040" />
+            <Feather name="x" size={18} color="#525252" />
           </Pressable>
         </Animated.View>
       </View>
@@ -203,37 +232,37 @@ export function MembershipSavedPopup({
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
+  dim: { backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  // The white card sits inside the art's frame (fractions of the 708 × 502 art), as in the design.
+  // Starter's crown box (254 × 188 px crop) drawn at half size, centred on the top edge.
+  crown: { position: 'absolute', top: 0, left: (ART_W - 127) / 2, width: 127, height: 94 },
+  // The white card sits inside the frame, 13 in from each side.
   inner: {
     position: 'absolute',
-    left: '5%',
-    right: '5%',
-    top: '38.5%',
-    bottom: '6%',
+    left: 13,
+    right: 13,
     backgroundColor: '#FFFFFF',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal:10,
-    marginHorizontal: 10,
-    marginBottom:10
+    paddingHorizontal: 10,
   },
+  // "You're saving / ₹300 / on this booking": 56 tall, so the dashes and title always land in the same place.
+  saveBlock: { height: 56, alignItems: 'center', justifyContent: 'center' },
   saving: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9.5, lineHeight: 13, color: '#525252' },
-  amount: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 20, lineHeight: 26, color: '#008758', marginTop: 1 },
+  amount: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 22, lineHeight: 28, color: '#008758' },
   onThis: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9.5, lineHeight: 13, color: '#262626' },
-  dashes: { alignSelf: 'stretch', flexDirection: 'row', overflow: 'hidden', gap: 3, marginTop: 8, marginBottom: 9 },
+  dashes: { alignSelf: 'stretch', flexDirection: 'row', overflow: 'hidden', gap: 3, marginTop: 9, marginBottom: 12 },
   dashBit: { width: 4, height: 1 },
-  applied: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11.5, lineHeight: 15 },
+  applied: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11.5, lineHeight: 15 },
   note: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 8.5, lineHeight: 12, color: '#737373', marginTop: 2 },
   close: {
-    marginTop: 14,
+    marginTop: 10,
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F3F3F6',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

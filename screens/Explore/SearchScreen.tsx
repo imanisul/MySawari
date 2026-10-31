@@ -17,7 +17,7 @@ import { calculateRentalDays } from '@/services/backend/pricingEngine';
 import { useHideSupportWhileScrolling } from '@/hooks/useSupportFab';
 import { rise } from '@/components/common/motion';
 import { ActivityAPI } from '@/services/api/activity';
-import { SortLinesIcon, FunnelIcon } from '@/components/common/FilterIcons';
+import { SortArrowsIcon, FunnelIcon } from '@/components/common/FilterIcons';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
   ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, QUICK_CHIPS, QuickChip,
@@ -209,7 +209,7 @@ export default function SearchResultsScreen() {
           accessibilityRole="button"
           accessibilityLabel="Sort"
         >
-          <SortLinesIcon color={sort !== 'recommended' ? p.onNavy : p.muted} />
+          <SortArrowsIcon color={sort !== 'recommended' ? p.onNavy : p.muted} />
         </Pressable>
       </View>
 

@@ -8,6 +8,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { ModalBlur } from '@/components/common/ModalBlur';
 
 const F = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
 const MAX_PHOTOS = 4;
@@ -362,6 +363,7 @@ function PhotoSourceSheet({ visible, left, onPick, onClose }: {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <View style={styles.chooserOverlay}>
+        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} style={styles.chooserClose}>
           <Feather name="x" size={20} color="#737373" />
@@ -420,7 +422,7 @@ const styles = StyleSheet.create({
   doneText: { fontFamily: F.semibold, fontSize: 17 },
 
   // Photo source chooser
-  chooserOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(38,38,38,0.45)' },
+  chooserOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
   chooserClose: { alignSelf: 'flex-end', marginRight: 12, marginBottom: 8, width: 32, height: 32, borderRadius: 16, backgroundColor: '#FAFAFA', alignItems: 'center', justifyContent: 'center' },
   chooserSheet: { backgroundColor: '#FFFFFF', borderWidth: 1, borderBottomWidth: 0, borderColor: '#E7EAF4', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 20, gap: 16 },
   option: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#F4F6FA', borderWidth: 1, borderColor: '#EAECF1', borderRadius: 13, paddingHorizontal: 12, paddingVertical: 12 },

@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
   addButtonText: { fontFamily: 'Inter_700Bold', fontSize: 16, marginLeft: 10 },
   
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
-  modalOverlayBg: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalOverlayBg: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'transparent' },
   modalContent: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, borderTopWidth: 1 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
   modalTitle: { fontFamily: 'Inter_700Bold', fontSize: 20 },

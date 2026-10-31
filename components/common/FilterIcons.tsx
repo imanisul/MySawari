@@ -17,6 +17,15 @@ export function SortLinesIcon({ color = '#737373', width = 16 }: { color?: strin
   );
 }
 
+/** Sort: an up arrow beside a down arrow (Lucide "arrow-up-down"), so it no longer looks like the filter icon. */
+export function SortArrowsIcon({ color = '#737373', size = 18 }: { color?: string; size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path d="m21 16-4 4-4-4M17 20V4M3 8l4-4 4 4M7 4v16" stroke={color} strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function FunnelIcon({ color = '#737373', size = 17 }: { color?: string; size?: number }) {
   // 24-unit Lucide path; strokeWidth scales with size so the line stays 1pt.
   return (

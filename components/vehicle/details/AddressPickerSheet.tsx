@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
+import { ModalBlur } from '@/components/common/ModalBlur';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LocationResult } from '@/utils/sawari';
@@ -73,9 +73,8 @@ export function AddressPickerSheet({ visible, kind, saved, onClose, onPick, onAd
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <BlurView intensity={18} tint="default" style={StyleSheet.absoluteFill}>
-        <Pressable accessibilityLabel="Close" style={[StyleSheet.absoluteFill, styles.dim]} onPress={onClose} />
-      </BlurView>
+      <ModalBlur />
+      <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={onClose} />
 
       <Animated.View
         {...pan.panHandlers}
@@ -120,7 +119,6 @@ export function AddressPickerSheet({ visible, kind, saved, onClose, onPick, onAd
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: 'rgba(0,0,0,0.27)' },
   sheet: {
     position: 'absolute',
     left: 0,

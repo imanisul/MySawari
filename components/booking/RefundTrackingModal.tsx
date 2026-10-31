@@ -639,7 +639,7 @@ export function RefundTrackingModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,

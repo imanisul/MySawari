@@ -20,7 +20,7 @@ Evidence-based; "verified" means checked in code or by running something. Dated 
 Processed by third parties: Razorpay (payment screen in a WebView; card/UPI details never reach MySawari), Google Maps Platform (place search, geocoding; the key ships in the app bundle and must be restricted in Google Cloud), Firebase Cloud Messaging / Expo push, WATI (WhatsApp login codes and booking messages), Cloudinary (review photos), Render (hosting), MongoDB Atlas (database), Expo Updates / EAS (OTA).
 
 ## Account deletion (implemented)
-- In app: Profile > Settings > Delete MySawari account, with a WhatsApp code to the account's own number. Blocked while a booking is upcoming or ongoing, or a refund or withdrawal is in progress.
+- In app: Profile > Settings > Delete MySawari account opens a popup telling the customer to call or email hello@mysawari.in; support then runs `POST /api/customers/admin/delete-account`. **The self-service flow (WhatsApp code → delete) still exists in the backend and `API.deleteAccount`, but the app no longer uses it. Store risk: Apple 5.1.1(v) and Google Play expect deletion to be started inside the app; a "contact support" popup may be rejected. Decide before submitting.**
 - Web: `GET /delete-account` on the backend (verified locally). `https://mysawari.in/delete-account` returned **404** when checked, so it is not live until you publish or redirect that page.
 - Support route for web or email requests: `POST /api/customers/admin/delete-account` (admin key).
 - Erased: profile and documents, sessions, devices, reviews and review photos (Cloudinary), activity, notifications, holds, leads, referral identity.

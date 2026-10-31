@@ -28,7 +28,6 @@ export function VehicleSummary({ car, isAvailable, unavailableNote, highDemand, 
   availableOn?: string;
 }) {
   const p = useDetailsPalette();
-  const router = useRouter();
 
   // Same query key as the reviews section, so this costs no extra request.
   const { data: dbReviews = [] } = useQuery({
@@ -62,17 +61,7 @@ export function VehicleSummary({ car, isAvailable, unavailableNote, highDemand, 
 
       <View style={[styles.summaryCard, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingRight: 4 }}>
-            <Text style={[styles.brand, { color: p.muted }]}>{brand}</Text>
-            <Pressable
-              onPress={() => router.push('/search')}
-              accessibilityRole="button"
-              accessibilityLabel="Change vehicle"
-              hitSlop={8}
-            >
-              <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: p.navy, textDecorationLine: 'underline' }}>Change vehicle</Text>
-            </Pressable>
-          </View>
+          <Text style={[styles.brand, { color: p.muted }]}>{brand}</Text>
           <Text style={[styles.name, { color: p.fg }]} numberOfLines={2}>{modelName}</Text>
           <View style={styles.metaRow}>
             {meta.map((m, i) => (

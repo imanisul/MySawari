@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, color: '#FFFFFF' },
 
   // Popups
-  overlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18 },
+  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18 },
   popup: { width: '100%', maxWidth: 357, borderRadius: 16, paddingHorizontal: 12, paddingTop: 22, paddingBottom: 12, alignItems: 'center' },
   popupIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   popupTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 26, textAlign: 'center', marginTop: 14 },

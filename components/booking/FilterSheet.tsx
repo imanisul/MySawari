@@ -217,7 +217,7 @@ export function FilterSheet({
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(38,38,38,0.32)' },
+  backdrop: { flex: 1, backgroundColor: 'transparent' },
   // The sheet sits 34px above the screen bottom (the home-indicator strip), as in the frame.
   stack: { gap: 8, justifyContent: 'flex-end', paddingBottom: 34 },
   closeRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 12 },

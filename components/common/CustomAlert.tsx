@@ -1,19 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  Pressable,
-  Animated,
-  Dimensions,
-  DeviceEventEmitter,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { useColors } from '@/hooks/useColors';
+import { View, Text, StyleSheet, Modal, Pressable, DeviceEventEmitter } from 'react-native';
+import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ModalBlur } from '@/components/common/ModalBlur';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type AlertButton = {
   text: string;
@@ -36,43 +24,27 @@ export const CustomAlert = {
 };
 
 export function CustomAlertProvider() {
-  const colors = useColors();
+  const p = useDetailsPalette();
   const [visible, setVisible] = useState(false);
   const [config, setConfig] = useState<AlertPayload | null>(null);
-  const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener(ALERT_EVENT, (payload: AlertPayload) => {
       setConfig(payload);
       setVisible(true);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
     });
-
     return () => subscription.remove();
   }, []);
 
   const close = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: true,
-    }).start(() => {
-      setVisible(false);
-      setConfig(null);
-    });
+    setVisible(false);
+    setConfig(null);
   };
 
   const handlePress = (onPress?: () => void) => {
     close();
-    if (onPress) {
-      setTimeout(() => {
-        onPress();
-      }, 200);
-    }
+    // After the popup has faded, so a screen or system dialog the action opens does not appear over it.
+    if (onPress) setTimeout(onPress, 200);
   };
 
   if (!visible || !config) return null;
@@ -80,124 +52,62 @@ export function CustomAlertProvider() {
   const buttons = config.buttons && config.buttons.length > 0
     ? config.buttons
     : [{ text: 'OK', style: 'default' as const }];
+  const hasCancel = buttons.some((b) => b.style === 'cancel');
+  const stacked = buttons.length > 2;
 
+  // The app's popup look (same as Early Pickup and "deactivate"): white card, radius 12, navy primary button,
+  // light secondary one. The Modal's own fade carries the backdrop (ModalBlur) and the card together.
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="fade"
       statusBarTranslucent
       onRequestClose={close}
       navigationBarTranslucent
     >
-      <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
+      <View style={styles.overlay}>
         <ModalBlur />
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          
-          <View style={styles.iconContainer}>
-            <View style={[styles.iconCircle, { backgroundColor: 'rgba(255, 165, 0, 0.1)' }]}>
-              <Feather name="bell" size={26} color="#FFA500" />
-            </View>
-          </View>
+        {hasCancel && <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={close} />}
+        <View style={[styles.card, { backgroundColor: p.page }]} accessibilityViewIsModal>
+          <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header">{config.title}</Text>
 
-          <Text style={[styles.title, { color: colors.foreground }]}>{config.title}</Text>
-          
-          {config.message && (
-            <Text style={[styles.message, { color: colors.mutedForeground }]}>
-              {config.message}
-            </Text>
-          )}
+          {!!config.message && <Text style={[styles.message, { color: p.muted }]}>{config.message}</Text>}
 
-          <View style={styles.buttonContainer}>
+          <View style={[styles.buttons, stacked && { flexDirection: 'column' }]}>
             {buttons.map((btn, index) => {
               const isCancel = btn.style === 'cancel';
               const isDestructive = btn.style === 'destructive';
-              
               return (
                 <Pressable
                   key={index}
+                  accessibilityRole="button"
                   style={({ pressed }) => [
                     styles.button,
-                    isCancel ? { backgroundColor: colors.muted } : 
-                    isDestructive ? { backgroundColor: colors.destructive } :
-                    { backgroundColor: colors.primary },
+                    { backgroundColor: isCancel ? p.soft : isDestructive ? p.red : p.navy },
+                    isCancel && { borderWidth: 1, borderColor: p.segBorder },
+                    !stacked && buttons.length > 1 && { flex: 1 },
                     pressed && { opacity: 0.8 },
-                    buttons.length > 1 && { flex: 1 },
-                    index > 0 && { marginLeft: 12 }
                   ]}
                   onPress={() => handlePress(btn.onPress)}
                 >
-                  <Text style={[
-                    styles.buttonText,
-                    isCancel ? { color: colors.foreground } : { color: '#FFF' }
-                  ]}>
-                    {btn.text}
-                  </Text>
+                  <Text style={[styles.buttonText, { color: isCancel ? p.fg : '#FFFFFF' }]}>{btn.text}</Text>
                 </Pressable>
               );
             })}
           </View>
         </View>
-      </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  card: {
-    width: Math.min(SCREEN_WIDTH - 48, 360),
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  iconContainer: {
-    marginBottom: 16,
-  },
-  iconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontFamily: 'Inter_700Bold',
-    fontSize: 20,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  message: {
-    fontFamily: 'Inter_400Regular',
-    fontSize: 15,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    width: '100%',
-  },
-  button: {
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  buttonText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 16,
-  },
+  overlay: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  card: { width: '100%', maxWidth: 357, borderRadius: 12, paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12 },
+  title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, textAlign: 'center' },
+  message: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 8, paddingHorizontal: 8 },
+  buttons: { flexDirection: 'row', gap: 12, alignSelf: 'stretch', marginTop: 20 },
+  button: { height: 47, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22 },
 });

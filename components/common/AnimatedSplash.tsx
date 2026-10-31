@@ -25,7 +25,7 @@ function markSplashGone() {
 }
 
 // Phase 1 — the brand: "MySawari · Your ride, your way" stays up at least this long.
-const BRAND_MS = 300;
+const BRAND_MS = 1500;
 // After this long without data, say so instead of leaving the customer looking at a spinner.
 const SLOW_LOAD_MS = 12000;
 

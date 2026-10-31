@@ -254,7 +254,7 @@ export function CancelBookingSheet({
 
         {/* Request submitted */}
         {!!done && (
-          <View style={[StyleSheet.absoluteFill, styles.popupOverlay, { backgroundColor: 'rgba(38, 38, 38, 0.32)' }]}>
+          <View style={[StyleSheet.absoluteFill, styles.popupOverlay, { backgroundColor: 'transparent' }]}>
             <ModalBlur />
             <LinearGradient colors={['#FFFFFF', '#EAECF1']} style={styles.popup}>
               <View style={{ alignItems: 'center', gap: 8 }}>

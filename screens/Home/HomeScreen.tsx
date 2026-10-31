@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Location from 'expo-location';
+import Notifications from '@/utils/notifications';
 import { FlatList, Image, StyleSheet, Text, View, RefreshControl, ImageSourcePropType } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
@@ -90,7 +92,7 @@ const DESTINATION_LOCATIONS: Record<string, LocationResult> = {
 };
 
 // The first trip milestone (backend MILESTONES in booking.controller.js) — shown to guests, who have no journey yet.
-const FIRST_MILESTONE = { rides: 4, rewardAmount: 50 };
+const FIRST_MILESTONE = { rides: 4, rewardAmount: 5000 };
 
 // Curated favourites shown as top picks after the vehicles the customer looked at.
 const PICKS = { Car: ['curvv', 'venue', 'brezza', 'innova', 'creta'], Bike: ['xpulse', 'xpluse', 'ntorq', 'hunter', 'jawa'] };
@@ -106,7 +108,7 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const {
     vehicleType, setVehicleType, customer, selectedCar, selectCar, isAuthenticated, isAuthLoading, setBookingSource, dateRange,
-    membership, fetchWallet, syncNotifications, sawariCash, unreadCount, earnSawariCash, isDarkMode,
+    membership, fetchWallet, syncNotifications, sawariCash, unreadCount, earnSawariCash, isDarkMode, hasSeenPermissions, completeOnboarding,
     dropoff, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress,
   } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
@@ -140,6 +142,17 @@ export default function HomeScreen() {
   // No location-permission request here: the app asks once at start-up (SawariContext's GPS
   // auto-detect). Asking again from Home put a second system popup on screen at launch.
 
+  // Asked once per install (the system remembers the answers; Settings can change them later).
+  // (A ref, so finishing it does not re-run the effect below and cancel the login sheet's timer.)
+  const permsSeen = useRef(hasSeenPermissions);
+  permsSeen.current = hasSeenPermissions;
+  const askFirstRunPermissions = useCallback(async () => {
+    if (permsSeen.current !== false) return;
+    try { await Location.requestForegroundPermissionsAsync(); } catch {}
+    try { await Notifications.requestPermissionsAsync(); } catch {}
+    await completeOnboarding();
+  }, [completeOnboarding]);
+
   // A guest gets the phone-number sheet rising over Home, once — never for someone already signed in.
   const phoneSheetShown = useRef(false);
   useEffect(() => {
@@ -151,7 +164,9 @@ export default function HomeScreen() {
     const off = onSplashGone(() => {
       if (phoneSheetShown.current) return;
       phoneSheetShown.current = true;
-      timer = setTimeout(() => setShowPhoneSheet(true), 400);
+      // First launch after install: location, then notifications, then the login sheet (so the system
+      // permission dialogs never sit on top of it).
+      askFirstRunPermissions().finally(() => { timer = setTimeout(() => setShowPhoneSheet(true), 400); });
     });
     // Only consume the one-shot once the sheet is truly on its way, so a re-run of this effect
     // during the wait re-subscribes instead of cancelling the sheet for the whole session.

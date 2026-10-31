@@ -156,7 +156,8 @@ export function DatesSheet() {
   const router = useRouter();
   // fresh: opened right after choosing a destination (or for a trip whose dates have passed) — the
   // customer picks the dates themselves, nothing is pre-filled from an earlier search.
-  const { returnBack, fresh, forSpecificCar, fromDestination } = useLocalSearchParams<{
+  const { returnBack, fresh, forSpecificCar, fromDestination, thenLocation } = useLocalSearchParams<{
+    thenLocation?: string;
     returnBack?: string;
     fresh?: string;
     forSpecificCar?: string;
@@ -169,7 +170,7 @@ export function DatesSheet() {
   // Figma palette in light mode; dark mode keeps the theme tokens.
   const ui = isDarkMode
     ? { page: colors.background, text: colors.foreground, muted: colors.mutedForeground, border: colors.border, card: colors.card, cardBorder: colors.border, calendar: colors.card, month: colors.mutedForeground, band: colors.tintLight, navy: colors.primary, onNavy: colors.primaryForeground, past: colors.mutedForeground, chipText: colors.primaryText, dash: colors.mutedForeground }
-    : { page: '#FFFFFF', text: '#262626', muted: '#737373', border: '#D4D4D4', card: '#F5F6FA', cardBorder: '#E7EAF4', calendar: '#F8F8FA', month: '#525252', band: '#E9EAF1', navy: '#2F3E75', onNavy: '#FFFFFF', past: '#A3A3A3', chipText: '#2F3E75', dash: '#A3A8C3' };
+    : { page: '#FFFFFF', text: '#262626', muted: '#737373', border: '#D4D4D4', card: '#F4F6FA', cardBorder: '#E7EAF4', calendar: '#F9F9FB', month: '#525252', band: '#E9EAF1', navy: '#2F3E75', onNavy: '#FFFFFF', past: '#A3A3A3', chipText: '#2F3E75', dash: '#A3A8C3' };
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -358,7 +359,10 @@ export function DatesSheet() {
       });
     });
 
-    if (returnBack === 'true') {
+    if (thenLocation === 'true') {
+      // Check Availability from a car: after the dates, the location page; choosing there returns to the car.
+      router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+    } else if (returnBack === 'true') {
       router.back();
     } else if (fromDestination === 'true') {
       // Flow from home Top Destination card: destination and car are already selected, proceed directly to car details
@@ -413,11 +417,8 @@ export function DatesSheet() {
 
   return (
     <View style={[styles.page, { backgroundColor: ui.page }]}>
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 8 }]}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* One fixed screen, not a scrolling page: only the month list inside the calendar scrolls. */}
+      <View style={[styles.content, { flex: 1, paddingTop: insets.top + 8 }]}>
         <View style={styles.topNavRow}>
           {/* <Pressable
             accessibilityRole="button"
@@ -457,7 +458,7 @@ export function DatesSheet() {
         {/* Trip summary: start on the left, end on the right, day count on the dashed arc between. */}
         <View style={[styles.summary, { backgroundColor: ui.card, borderColor: ui.cardBorder }]}>
           <View style={styles.summarySide}>
-            <Text style={[styles.summaryText, { color: ui.text }]}>{start ? formatDateStr(start) : 'Start Date'}</Text>
+            <Text style={[styles.summaryText, styles.summaryDate, { color: ui.text }]}>{start ? formatDateStr(start) : 'Start Date'}</Text>
             <Text style={[styles.summaryText, { color: ui.text }]}>{start && tempPickupTime ? padTime(tempPickupTime) : 'Pickup Time'}</Text>
           </View>
           {/* <View style={styles.summaryMid}> */}
@@ -522,7 +523,7 @@ export function DatesSheet() {
             </Text>
           </View>
           <View style={[styles.summarySide, { alignItems: 'flex-end' }]}>
-            <Text style={[styles.summaryText, { color: ui.text }]}>{effectiveEnd ? formatDateStr(effectiveEnd) : 'End Date'}</Text>
+            <Text style={[styles.summaryText, styles.summaryDate, { color: ui.text }]}>{effectiveEnd ? formatDateStr(effectiveEnd) : 'End Date'}</Text>
             <Text style={[styles.summaryText, { color: ui.text }]}>{effectiveEnd && tempReturnTime ? padTime(tempReturnTime) : 'Dropoff Time'}</Text>
           </View>
         </View>
@@ -602,7 +603,7 @@ export function DatesSheet() {
           <TimeWheel title="Pickup Time" times={pickupTimes} value={tempPickupTime || '8:00 AM'} onPick={handlePickupTime} p={wheel} titleColor={ui.month} />
           <TimeWheel title="Dropoff Time" times={returnTimes} value={tempReturnTime || '8:00 AM'} onPick={handleReturnTime} p={wheel} titleColor={ui.month} />
         </View>
-      </ScrollView>
+      </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16, backgroundColor: ui.page }]}>
         <Pressable
@@ -719,13 +720,13 @@ const styles = StyleSheet.create({
   destField: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    height: 48,
+    gap: 9,
+    height: 49,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderRadius: 8,
   },
-  destText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 16 },
+  destText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28.5 },
   clear: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: '#DC2626' },
@@ -734,13 +735,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 61,
+    height: 62,
     marginTop: 12,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderRadius: 8,
   },
-  summaryText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, lineHeight: 17 },
+  summaryText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
+  summaryDate: { fontFamily: 'PlusJakartaSans_600SemiBold' },
   summarySide: { flex: 1 },
   // Dashed arc peaks above the day count; the two navy rings sit level with it.
   summaryMid: { width: 162, height: 34, alignItems: 'center' },
@@ -748,16 +750,17 @@ const styles = StyleSheet.create({
   section: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 24, marginTop: 12 },
   weekHeader: { flexDirection: 'row', marginTop: 4 },
   weekDay: { flex: 1, textAlign: 'center', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5 },
-  calendar: { height: 263, marginTop: 12, borderRadius: 8 },
+  // Takes whatever height is left between the date row and the time wheels.
+  calendar: { flex: 1, minHeight: 180, marginTop: 12, borderRadius: 8 },
   calendarContent: { paddingBottom: 8 },
   monthName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 24, paddingLeft: 8, paddingTop: 4 },
   week: { flexDirection: 'row' },
-  dayCell: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center' },
+  dayCell: { flex: 1, height: 36, alignItems: 'center', justifyContent: 'center' },
   band: { position: 'absolute', top: 1, bottom: 1, left: 0, right: 0 },
   bandLeftEdge: { left: 4, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 },
   bandRightEdge: { right: 4, borderTopRightRadius: 8, borderBottomRightRadius: 8 },
   // opaque by default so a tap can override the platform's press tint with this same colour
-  dayCircle: { width: 34, height: 34, borderRadius: 18,paddingBottom: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent'},
+  dayCircle: { width: 36, height: 36, borderRadius: 18, paddingBottom: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent'},
   dayText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
   struck: { textDecorationLine: 'line-through' },
   wheels: {
@@ -813,10 +816,10 @@ wheelText: {
   ctaDisabled: { opacity: 0.5 },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, textAlign: 'center' },
   // Figma popups: white card (radius 16) over a dimmed page, round close button underneath.
-  popupOverlay: { flex: 1, backgroundColor: 'rgba(38,38,38,0.45)', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18, gap: 12 },
+  popupOverlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 18, gap: 12 },
   // Figma "Early Pickup / Return" (357 wide): badge 30, title 18, body 13/20, WhatsApp 44 tall + Call 47 tall
   // side by side 12 apart, then the round 32 close button 12 under the card.
-  early: { width: '100%', maxWidth: 357, borderRadius: 16, paddingHorizontal: 12, paddingTop: 22, paddingBottom: 12, alignItems: 'center' },
+  early: { width: '100%', maxWidth: 357, borderRadius: 12, paddingHorizontal: 12, paddingTop: 20, paddingBottom: 12, alignItems: 'center' },
   earlyBadge: { width: 31, height: 31, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   earlyBadgeText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, lineHeight: 20, color: '#FFFFFF' },
   earlyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 26, textAlign: 'center', marginTop: 16 },
@@ -827,7 +830,7 @@ wheelText: {
   earlyWaText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: '#25D366' },
   earlyCall: { height: 47, gap: 10 },
   earlyCallText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 16, lineHeight: 22, color: '#FFFFFF' },
-  earlyClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  earlyClose: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAFAFA' },
   // Figma "Late Return": warning 30, title 19, body 13/20 with "1 extra day" in navy, full-width 46 button.
   lateBody: { marginTop: 9 },
   lateExtra: { fontFamily: 'PlusJakartaSans_600SemiBold' },

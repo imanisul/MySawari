@@ -22,6 +22,8 @@ export type TripPrice =
       original: number;
       /** What the trip costs after coupon and membership — the same figure the server checks at booking. */
       final: number;
+      /** `final` less the SawariCash used: the total the customer actually owes (what is shown big and bold). */
+      total: number;
       rentalAmount: number;
       driverCharge: number;
       pickupCharge: number;
@@ -90,6 +92,9 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     perDay: q.dailyRate,
     original,
     final,
+    // SawariCash is a discount on the trip: it comes off the total (it covers the booking amount first, so the
+    // booking amount shrinks and "pay at pickup" stays total − booking amount).
+    total: Math.max(0, final - (q.sawariCashUsed || 0)),
     rentalAmount: q.rentalAmount,
     driverCharge: q.driverCharge,
     pickupCharge: q.pickupCharge,

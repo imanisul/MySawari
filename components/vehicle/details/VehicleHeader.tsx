@@ -1,16 +1,14 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { useDetailsPalette } from './detailsPalette';
 
-/** Back · car name + trip dates (with Edit) · favourite · share. */
+/** Car name + trip dates (tap to edit) · favourite · share. */
 export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string; tripLabel: string; onEditTrip: () => void }) {
   const p = useDetailsPalette();
-  const router = useRouter();
   const { selectedCar, favorites, toggleFavorite } = useSawari();
 
   const isFavorite = favorites.includes(selectedCar.id);
@@ -35,16 +33,14 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: p.page, zIndex: 10 }}>
       <View style={styles.header}>
+        {/* The whole name + dates block opens the trip editor, not just the small "Edit" label. */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
-          style={[styles.iconBtn, { backgroundColor: p.iconBg }]}
+          accessibilityLabel={`${title}, ${tripLabel}. Edit trip`}
+          onPress={onEditTrip}
+          hitSlop={6}
+          style={({ pressed }) => [styles.titleCol, pressed && { opacity: 0.7 }]}
         >
-          <Feather name="chevron-left" size={24} color={p.muted} />
-        </Pressable>
-
-        <View style={styles.titleCol}>
           {/* Semibold/s in a 20px-tall row, vertically centred (the design's box is `display:flex;
               align-items:center`), so the date line below always starts at the same y whatever the
               name is. Long names get an ellipsis instead of wrapping into the trip row. */}
@@ -59,20 +55,14 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
               <Text style={[styles.trip, { color: p.sub }]} numberOfLines={1}>{tripLabel}</Text>
             </View>
             {/* Frame 97: 28×12 -- a 10px pen, 2px, then the underlined label. Fixed width, never wraps. */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Edit trip dates"
-              onPress={onEditTrip}
-              hitSlop={8}
-              style={styles.editBtn}
-            >
+            <View style={styles.editBtn}>
               <Feather name="edit" size={10} color={p.navy} style={styles.editIcon} />
               <View style={styles.editBox}>
                 <Text style={[styles.editText, { color: p.navy }]} numberOfLines={1}>Edit</Text>
               </View>
-            </Pressable>
+            </View>
           </View>
-        </View>
+        </Pressable>
 
         {/* Frame 24: the two 32px circles, right aligned, 8 apart. */}
         <View style={styles.actions}>

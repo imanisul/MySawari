@@ -262,10 +262,10 @@ function DeliveryOptions() {
         )}
       </View>
 
-      <Pressable accessibilityRole="link" onPress={() => router.push('/terms')} hitSlop={8} style={styles.keepRow}>
+      {/* <Pressable accessibilityRole="link" onPress={() => router.push('/terms')} hitSlop={8} style={styles.keepRow}>
         <Text style={[styles.keepText, { color: p.muted }]}>Keep in mind</Text>
         <Feather name="chevron-right" size={13} color={p.muted} />
-      </Pressable>
+      </Pressable> */}
 
       <AddressPickerSheet
         visible={picking !== null}

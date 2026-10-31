@@ -384,8 +384,19 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, rat
                 accessibilityState={{ selected: on }}
               >
                 {on && <View style={[styles.tabBar, { backgroundColor: p.navy }]} />}
-                <Text style={[styles.tabText, { color: on ? p.navy : p.fg, fontFamily: on ? 'PlusJakartaSans_600SemiBold' : 'PlusJakartaSans_500Medium' }]}>{t.label}</Text>
-                {tabActive[t.key] && <View style={[styles.tabDot, { backgroundColor: p.navy }]} />}
+                <Text
+  style={[
+    styles.tabText,
+    {
+      color: on ? p.navy : p.fg,
+      fontFamily: on
+        ? 'PlusJakartaSans_600SemiBold'
+        : 'PlusJakartaSans_500Medium',
+    },
+  ]}
+>
+  {t.label}
+</Text>
               </Pressable>
             );
           })}
@@ -460,13 +471,13 @@ const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingBottom: 14 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 26 },
   clear: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
-  footer: { paddingHorizontal: 16, paddingVertical: 12 },
+  footer: { paddingHorizontal: 12, paddingVertical: 12 },
   cta: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17 },
   dim: { backgroundColor: 'rgba(0, 0, 0, 0.32)' },
   sortCard: { marginHorizontal: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 13 },
   sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 },
-  sortText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
+  sortText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
 
   split: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, height: 420 },
   tabs: { width: 120, borderRightWidth: 1 },

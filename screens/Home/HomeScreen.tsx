@@ -309,7 +309,8 @@ export default function HomeScreen() {
               topInset={insets.top}
               city="Guwahati"
               sawariCash={isAuthenticated ? sawariCash : 0}
-              onWallet={() => router.push('/rewards')}            >
+              onWallet={() => {}}  
+    >
               <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
             </HomeHero>
             <View style={[styles.sheet, { backgroundColor: p.page, borderColor: p.deliveryBorder }]}>

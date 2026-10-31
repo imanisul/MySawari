@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
+import { useKeyboardPad } from '@/hooks/useKeyboardPad';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
@@ -17,6 +18,7 @@ import { ModalBlur } from '@/components/common/ModalBlur';
 type PaymentMethodItem = { id: string; title: string; subtitle?: string; icon: string };
 
 export default function PaymentsScreen() {
+  const kb = useKeyboardPad();
   const colors = useColors();
   const { paymentMethod, setPaymentMethod, sawariCash, customer } = useSawari();
 
@@ -376,14 +378,14 @@ export default function PaymentsScreen() {
       </SafeAreaView>
 
       {/* Add Payment Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide">
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+      <Modal visible={showAddModal} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent>
+        <View ref={kb.ref} collapsable={false} style={styles.modalOverlay}>
           <View style={styles.modalOverlayBg}>
             <ModalBlur />
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowAddModal(false)} />
           </View>
           
-          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, borderColor: colors.border, paddingBottom: 24 + kb.pad }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Payment Method</Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
@@ -485,7 +487,7 @@ export default function PaymentsScreen() {
               )}
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
 
     </View>

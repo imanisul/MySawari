@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView, Image, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TextInput, KeyboardAvoidingView, ActivityIndicator, ScrollView, Image, Alert, Linking } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -192,7 +192,7 @@ export function WriteReviewBottomSheet({
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
       style={[styles.container, { paddingBottom: Math.max(insets.bottom, 20) }]}
     >
       <View style={[styles.header, { borderBottomColor: colors.border }]}>

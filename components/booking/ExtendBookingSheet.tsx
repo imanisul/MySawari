@@ -114,7 +114,7 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
   const dropTimeStr = booking.dropTime ? ` at ${booking.dropTime}` : '';
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
         <ModalBlur />
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />

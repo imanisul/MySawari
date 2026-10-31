@@ -1013,17 +1013,20 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         try {
           invalidateWalletCache();
-          // Logged while the session still exists, so the entry carries the customer's id and number.
-          try {
-            const { ActivityAPI } = await import('@/services/api/activity');
-            // Never holds the logout up for more than 2 s on a slow network.
-            await Promise.race([ActivityAPI.logActivity('AUTH_LOGOUT', 'System'), new Promise((r) => setTimeout(r, 2000))]);
-          } catch {}
-          // Revoke the session server-side too (a copied refresh token stops working right away).
+          // Both calls need the session, so they run before the tokens are deleted — but side by side, and
+          // never for more than 1.5 s in total (they used to run one after the other, up to 5 s on a slow network).
           const refreshToken = await SecureStore.getItemAsync('refresh_token').catch(() => null);
-          // Before the tokens are deleted: this phone must stop receiving this customer's booking pushes.
           const authToken = await SecureStore.getItemAsync('auth_token').catch(() => null);
-          await unregisterDeviceForPushNotifications(authToken);
+          await Promise.race([
+            Promise.allSettled([
+              // Logged while the session still exists, so the entry carries the customer's id and number.
+              import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('AUTH_LOGOUT', 'System')),
+              // This phone must stop receiving this customer's booking pushes.
+              unregisterDeviceForPushNotifications(authToken),
+            ]),
+            new Promise((r) => setTimeout(r, 1500)),
+          ]);
+          // Revoke the session server-side too (a copied refresh token stops working right away).
           API.logoutServer(refreshToken);
           await SecureStore.deleteItemAsync('auth_token');
           await SecureStore.deleteItemAsync('refresh_token');

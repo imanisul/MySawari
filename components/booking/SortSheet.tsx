@@ -33,7 +33,7 @@ export function SortSheet({
   }, [visible, value]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <ModalBlur />
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close sort" />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>

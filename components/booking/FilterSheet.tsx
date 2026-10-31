@@ -86,7 +86,7 @@ export function FilterSheet({
 
   return (
     // Figma Filter sheet: a bottom sheet with a round close button above it (not a full page).
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
       <ModalBlur />
       <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close filters" />
       <Animated.View style={[styles.stack, { transform: [{ translateY: slide }] }]} pointerEvents="box-none">

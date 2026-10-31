@@ -35,7 +35,7 @@ export function PriceBreakdownSheet({ visible, onClose, price }: { visible: bool
   const green = colors.success;
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.overlay}>
           <ModalBlur />

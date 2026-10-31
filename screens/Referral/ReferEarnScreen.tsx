@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
-import { View, Text, StyleSheet, ScrollView, Pressable, Share, Linking, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -142,12 +141,11 @@ export default function ReferEarnScreen() {
               <Text style={[styles.heroTitle, { color: PURPLE }]} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>Invite Friends. Earn {pct} Back.</Text>
               <Text style={[styles.heroSub, { color: p.sub }]}>Get {pct} of your friend’s booking amount as wallet cash when they complete their first trip.</Text>
             </View>
-            <Image
-              source={require('@/assets/images/refer_avatars.svg')}
-              style={[styles.avatars, { top: cardTop - 46 }]}
-              contentFit="contain"
-              accessible={false}
-            />
+            <View accessible={false} style={[styles.avatars, { top: cardTop - 46, left: (width - 152) / 2 }]}>
+              <Image source={require('@/assets/images/refer_avatar_2.jpg')} style={[styles.avatar, { left: 0, top: 10, borderColor: '#D1CCF9' }]} />
+              <Image source={require('@/assets/images/refer_avatar_1.jpg')} style={[styles.avatar, { left: 96, top: 10, borderColor: '#D1CCF9' }]} />
+              <Image source={require('@/assets/images/refer_avatar_3.jpg')} style={[styles.avatarMid, { left: 44 }]} />
+            </View>
           </View>
 
           <View style={styles.body}>
@@ -226,7 +224,10 @@ export default function ReferEarnScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   heroBg: { position: 'absolute', left: 0, right: 0, top: 0, borderBottomLeftRadius: 22, borderBottomRightRadius: 22, overflow: 'hidden' },
-  avatars: { position: 'absolute', alignSelf: 'center', width: 153, height: 65 },
+  avatars: { position: 'absolute', width: 152, height: 66 },
+  // Three overlapping photos from the design: two side ones lower, the centre one larger, on top, white ring.
+  avatar: { position: 'absolute', width: 56, height: 56, borderRadius: 28, borderWidth: 1 },
+  avatarMid: { position: 'absolute', top: 0, width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, borderColor: '#FFFFFF' },
   heroCard: { position: 'absolute', left: 33, right: 33, height: 123, borderWidth: 1, borderRadius: 12, paddingTop: 31, paddingHorizontal: 14, alignItems: 'center' },
   heroTitle: { fontFamily: PF.semibold, fontSize: 20, lineHeight: 28, textAlign: 'center' },
   heroSub: { fontFamily: PF.regular, fontSize: 12.5, lineHeight: 17.5, textAlign: 'center', marginTop: 14 },

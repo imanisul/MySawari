@@ -70,6 +70,7 @@ export function UpdateModal({
       animationType="fade"
       statusBarTranslucent
       onRequestClose={isProcessing ? undefined : onLater}
+      navigationBarTranslucent
     >
       <View style={styles.overlay}>
         <ModalBlur />

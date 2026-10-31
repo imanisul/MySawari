@@ -175,7 +175,7 @@ export default function SettingsScreen() {
       </ScrollView>
 
       {/* ── Apple Guideline 5.1.1(v) Compliant Account Deletion ── */}
-      <Modal visible={showDelete} transparent animationType="fade" onRequestClose={() => !isDeleting && closeDelete()}>
+      <Modal visible={showDelete} transparent animationType="fade" onRequestClose={() => !isDeleting && closeDelete()} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.overlay}>
           <ModalBlur />
           <View style={[styles.popup, { backgroundColor: p.page, borderColor: p.redBorder }]} accessibilityViewIsModal>

@@ -122,155 +122,15 @@ export default function ProfileScreen() {
     { key: 'privacy', icon: 'file-text', title: 'Privacy Policy', onPress: () => go('/privacy') },
   ];
 
-  const guestAccountRows: RowDef[] = [
-    { key: 'fav', icon: 'heart', title: 'Favourite Cars', sub: 'Save cars to view & book anytime' },
-    { key: 'addr', icon: 'map-pin', title: 'Saved Addresses', sub: 'Home, work and other locations' },
-    { key: 'refer', icon: 'credit-card', title: 'Refer & Earn', sub: 'Invite friends and earn 10% cash' },
-    { key: 'cash', icon: 'dollar-sign', title: 'My Sawari Cash', sub: 'Cash rewards for trip discounts' },
-    { key: 'refunds', icon: 'rotate-ccw', title: 'My Refunds', sub: 'Real-time refund status & tracking' },
-    { key: 'offers', icon: 'tag', title: 'Offers & coupons', sub: 'Browse active coupon deals', isPublic: true },
+  // Guest: same page, only what works without an account. Anything personal opens the login sheet.
+  const askLogin = () => { Haptics.selectionAsync(); setShowLogin(true); };
+  const guestRows: RowDef[] = [
+    { key: 'offers', icon: 'tag', title: 'Offers & coupons', sub: 'Choose a coupon to save on your trip', onPress: () => go('/offers') },
+    { key: 'refer', icon: 'credit-card', title: 'Refer & Earn', sub: 'Invite friends and earn 10%', onPress: askLogin },
+    { key: 'fav', icon: 'heart', title: 'Favourite Cars', sub: 'Saved vehicles', onPress: askLogin },
+    { key: 'addr', icon: 'map-pin', title: 'Saved Addresses', sub: 'Home, work and other locations', onPress: askLogin },
   ];
-
-  // ── Logged out ──
-  if (!isAuthenticated) {
-    return (
-      <Page bottomNav scroll={false}>
-        <StatusBar style="light" />
-        <ScrollView
-          style={{ flex: 1, backgroundColor: p.page }}
-          contentContainerStyle={{ paddingBottom: bottomNavHeight + 32 }}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Header ── */}
-          <LinearGradient colors={HEADER} locations={headerStops} style={[styles.header, { paddingTop: insets.top + 16, paddingBottom: 36 }]}>
-            <View style={styles.guestHeaderRow}>
-              <View style={styles.guestAvatarCircle}>
-                <Feather name="user" size={24} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.name}>Hello, Guest 👋</Text>
-                <Text style={styles.contact}>Log in to unlock rewards, exclusive discounts & your trips.</Text>
-              </View>
-            </View>
-          </LinearGradient>
-
-          <View style={[styles.sheet, { backgroundColor: p.page }]}>
-            {/* ── Hero Sign-In Attraction Card ── */}
-            <View style={[styles.guestHeroCard, { backgroundColor: p.summary, borderColor: p.border }]}>
-              <View style={styles.guestBadgeRow}>
-                <View style={[styles.guestBadge, { backgroundColor: '#6B5AED22' }]}>
-                  <Text style={[styles.guestBadgeText, { color: '#6B5AED' }]}>MEMBER PRIVILEGES</Text>
-                </View>
-              </View>
-              <Text style={[styles.guestHeroTitle, { color: p.fg }]}>Sign in to save more on every ride</Text>
-              <Text style={[styles.guestHeroSub, { color: p.muted }]}>
-                Unlock instant Sawari Cash, up to 12.5% membership discounts, and seamless 1-tap bookings.
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setShowLogin(true);
-                }}
-                style={({ pressed }) => [styles.guestCtaBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.88 }]}
-              >
-                <Text style={styles.guestCtaText}>Log In / Sign Up</Text>
-                <Feather name="arrow-right" size={17} color="#FFFFFF" />
-              </Pressable>
-              <Text style={[styles.guestSecurityText, { color: p.muted }]}>
-                ⚡ Instant WhatsApp OTP · No passwords needed
-              </Text>
-            </View>
-
-            {/* ── Why Join MySawari? Perks Grid ── */}
-            <Text style={[styles.guestSectionTitle, { color: p.fg }]}>Why Join MySawari?</Text>
-            <View style={styles.perksGrid}>
-              <View style={[styles.perkCard, { backgroundColor: p.segOn, borderColor: p.border }]}>
-                <Image source={require('@/assets/images/wallet_coins.png')} style={styles.perkIcon} resizeMode="contain" />
-                <Text style={[styles.perkTitle, { color: p.fg }]}>Sawari Cash</Text>
-                <Text style={[styles.perkDesc, { color: p.muted }]}>Earn cash rewards on sign-up & rides to save on trips.</Text>
-              </View>
-              <View style={[styles.perkCard, { backgroundColor: p.segOn, borderColor: p.border }]}>
-                <Image source={require('@/assets/images/benefit_exclusive_discounts.png')} style={styles.perkIcon} resizeMode="contain" />
-                <Text style={[styles.perkTitle, { color: p.fg }]}>Up to 12.5% Off</Text>
-                <Text style={[styles.perkDesc, { color: p.muted }]}>Exclusive member pricing with unlimited km packages.</Text>
-              </View>
-              <View style={[styles.perkCard, { backgroundColor: p.segOn, borderColor: p.border }]}>
-                <Image source={require('@/assets/images/refer_hand_coin.png')} style={styles.perkIcon} resizeMode="contain" />
-                <Text style={[styles.perkTitle, { color: p.fg }]}>Refer & Earn 10%</Text>
-                <Text style={[styles.perkDesc, { color: p.muted }]}>Invite friends & get 10% cashback on their completed trips.</Text>
-              </View>
-              <View style={[styles.perkCard, { backgroundColor: p.segOn, borderColor: p.border }]}>
-                <Image source={require('@/assets/images/milestone_coin.png')} style={styles.perkIcon} resizeMode="contain" />
-                <Text style={[styles.perkTitle, { color: p.fg }]}>1-Tap Bookings</Text>
-                <Text style={[styles.perkDesc, { color: p.muted }]}>Save your favourite cars, home and airport addresses.</Text>
-              </View>
-            </View>
-
-            {/* ── Account Services Teaser ── */}
-            <Text style={[styles.guestSectionTitle, { color: p.fg }]}>Account Services</Text>
-            <View style={[styles.list, { borderColor: p.border, backgroundColor: p.page }]}>
-              {guestAccountRows.map((row, i) => (
-                <React.Fragment key={row.key}>
-                  {i > 0 && <Dashes color={p.border} />}
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      if (row.isPublic) {
-                        router.push('/offers');
-                      } else {
-                        setShowLogin(true);
-                      }
-                    }}
-                    style={({ pressed }) => [styles.row, pressed && { backgroundColor: p.soft }]}
-                  >
-                    <View style={[styles.rowIcon, { backgroundColor: p.iconBg }]}>
-                      <Feather name={row.icon as any} size={17} color={p.navy} />
-                    </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={[styles.rowTitle, { color: p.fg }]}>{row.title}</Text>
-                      <Text style={[styles.rowSub, { color: p.muted }]}>{row.sub}</Text>
-                    </View>
-                    {row.isPublic ? (
-                      <Feather name="chevron-right" size={16} color={p.muted} />
-                    ) : (
-                      <View style={[styles.lockChip, { backgroundColor: p.soft }]}>
-                        <Feather name="lock" size={10} color={p.navy} />
-                        <Text style={[styles.lockChipText, { color: p.navy }]}>Log in</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                </React.Fragment>
-              ))}
-            </View>
-
-            {/* ── Support & Legal ── */}
-            <Text style={[styles.guestSectionTitle, { color: p.fg }]}>Support & Legal</Text>
-            <View style={[styles.list, { borderColor: p.border, backgroundColor: p.page }]}>
-              {infoRows.map((row, i) => (
-                <React.Fragment key={row.key}>
-                  {i > 0 && <Dashes color={p.border} />}
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={row.onPress}
-                    style={({ pressed }) => [styles.row, styles.rowPlain, pressed && { backgroundColor: p.soft }]}
-                  >
-                    <View style={[styles.rowIcon, { backgroundColor: p.iconBg }]}>
-                      <Feather name={row.icon as any} size={17} color={p.navy} />
-                    </View>
-                    <Text style={[styles.rowTitle, { color: p.fg, flex: 1 }]}>{row.title}</Text>
-                    <Feather name="chevron-right" size={16} color={p.muted} />
-                  </Pressable>
-                </React.Fragment>
-              ))}
-            </View>
-          </View>
-        </ScrollView>
-        <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
-      </Page>
-    );
-  }
+  const listRows = isAuthenticated ? rows : guestRows;
 
   return (
     <Page bottomNav scroll={false}>
@@ -279,21 +139,34 @@ export default function ProfileScreen() {
         style={{ flex: 1, backgroundColor: p.page }}
         contentContainerStyle={{ paddingBottom: bottomNavHeight + 24 }}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" progressViewOffset={insets.top} />}
+        refreshControl={isAuthenticated ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" progressViewOffset={insets.top} /> : undefined}
       >
         {/* ── Header ── */}
         <LinearGradient colors={HEADER} locations={headerStops} style={[styles.header, { paddingTop: insets.top + 4 }]}>
-          <View style={styles.headerTop}>
-            <Pressable ref={moreRef} collapsable={false} accessibilityRole="button" accessibilityLabel="More options" hitSlop={10} onPress={() => {
-              Haptics.selectionAsync();
-              moreRef.current?.measureInWindow((x, y) => { setMenuPos({ top: y, right: screenW - x + 4 }); setMenuOpen(true); });
-            }} style={styles.more}>
-              <Feather name="more-vertical" size={24} color="#FFFFFF" />
-            </Pressable>
-          </View>
-          <Text style={styles.name} numberOfLines={1}>{customer.name?.trim() || 'Add your name'}</Text>
-          {!!customer.mobile && <Text style={styles.contact}>{maskMobile(customer.mobile)}</Text>}
-          {!!customer.email && <Text style={styles.contact} numberOfLines={1}>{customer.email}</Text>}
+          {isAuthenticated ? (
+            <>
+              <View style={styles.headerTop}>
+                <Pressable ref={moreRef} collapsable={false} accessibilityRole="button" accessibilityLabel="More options" hitSlop={10} onPress={() => {
+                  Haptics.selectionAsync();
+                  moreRef.current?.measureInWindow((x, y) => { setMenuPos({ top: y, right: screenW - x + 4 }); setMenuOpen(true); });
+                }} style={styles.more}>
+                  <Feather name="more-vertical" size={24} color="#FFFFFF" />
+                </Pressable>
+              </View>
+              <Text style={styles.name} numberOfLines={1}>{customer.name?.trim() || 'Add your name'}</Text>
+              {!!customer.mobile && <Text style={styles.contact}>{maskMobile(customer.mobile)}</Text>}
+              {!!customer.email && <Text style={styles.contact} numberOfLines={1}>{customer.email}</Text>}
+            </>
+          ) : (
+            <>
+              <View style={styles.headerTop} />
+              <Text style={styles.name}>Guest</Text>
+              <Text style={styles.contact}>Log in to see your trips, wallet and rewards.</Text>
+              <Pressable accessibilityRole="button" onPress={askLogin} style={({ pressed }) => [styles.guestLogin, pressed && { opacity: 0.85 }]}>
+                <Text style={styles.guestLoginText}>Log In / Sign Up</Text>
+              </Pressable>
+            </>
+          )}
         </LinearGradient>
 
         <View style={[styles.sheet, { backgroundColor: p.page }]}>
@@ -301,7 +174,7 @@ export default function ProfileScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={plan ? `${plan.name} membership, ${plan.pct} off every trip` : 'Membership, up to 12.5% off every trip'}
-            onPress={() => go(plan?.next ? { pathname: '/membership', params: { plan: plan.next } } : '/membership')}
+            onPress={() => (isAuthenticated ? go(plan?.next ? { pathname: '/membership', params: { plan: plan.next } } : '/membership') : askLogin())}
             style={({ pressed }) => [styles.memberCard, { backgroundColor: p.segOn, borderColor: p.segBorder }, pressed && { opacity: 0.92 }]}
           >
             <View style={styles.memberTop}>
@@ -334,6 +207,7 @@ export default function ProfileScreen() {
           </Pressable>
 
           {/* ── Wallet ── */}
+          {isAuthenticated && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Wallet balance ${inr2(walletBalance)}`}
@@ -342,11 +216,11 @@ export default function ProfileScreen() {
           >
             <Text style={[styles.walletLabel, { color: p.fg }]}>Wallet Balance</Text>
             <Text style={[styles.walletValue, { color: p.navy }]}>{inr2(walletBalance)}</Text>
-          </Pressable>
+          </Pressable>)}
 
           {/* ── Rows ── */}
           <View style={[styles.list, { borderColor: p.segBorder, backgroundColor: p.page }]}>
-            {rows.map((r, i) => (
+            {listRows.map((r, i) => (
               <React.Fragment key={r.key}>
                 {i > 0 && <Dashes color={p.segBorder} />}
                 <Pressable
@@ -397,9 +271,10 @@ export default function ProfileScreen() {
           </View>
         </View>
       </ScrollView>
+      <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
 
       {/* ── ⋮ menu (design: Edit Profile / Settings / Logout) ── */}
-      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+      <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)} statusBarTranslucent navigationBarTranslucent>
         <Pressable style={styles.menuOverlay} onPress={() => setMenuOpen(false)}>
           <View style={[styles.menu, { top: menuPos?.top ?? insets.top + 4, right: menuPos?.right ?? 44, backgroundColor: p.page }]}>
             {[
@@ -421,7 +296,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* ── Logout confirmation ── */}
-      <Modal visible={confirmLogout} transparent animationType="fade" onRequestClose={() => !loggingOut && setConfirmLogout(false)}>
+      <Modal visible={confirmLogout} transparent animationType="fade" onRequestClose={() => !loggingOut && setConfirmLogout(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={[styles.dialogOverlay]}>
           <ModalBlur />
            <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
@@ -512,27 +387,10 @@ const styles = StyleSheet.create({
   dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3, marginHorizontal: 0 },
   dash: { width: 4, height: 1 },
 
-  guestHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  guestAvatarCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255, 255, 255, 0.22)', alignItems: 'center', justifyContent: 'center' },
-  guestHeroCard: { borderRadius: 16, borderWidth: 1, padding: 18, marginTop: 4, overflow: 'hidden' },
-  guestBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  guestBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
-  guestBadgeText: { fontFamily: FONT.bold, fontSize: 10, letterSpacing: 0.5 },
-  guestHeroTitle: { fontFamily: FONT.bold, fontSize: 18, lineHeight: 25, marginBottom: 4 },
-  guestHeroSub: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 19 },
-  guestCtaBtn: { flexDirection: 'row', height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16 },
-  guestCtaText: { fontFamily: FONT.semibold, fontSize: 15, color: '#FFFFFF' },
-  guestSecurityText: { fontFamily: FONT.medium, fontSize: 11, textAlign: 'center', marginTop: 10 },
+  guestLogin: { alignSelf: 'flex-start', marginTop: 14, paddingHorizontal: 18, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  guestLoginText: { fontFamily: FONT.semibold, fontSize: 13, color: PURPLE },
 
-  guestSectionTitle: { fontFamily: FONT.bold, fontSize: 15, marginTop: 22, marginBottom: 12 },
-  perksGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  perkCard: { width: '48.5%', borderRadius: 12, borderWidth: 1, padding: 12, gap: 6 },
-  perkIcon: { width: 34, height: 34, marginBottom: 2 },
-  perkTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 18 },
-  perkDesc: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 15 },
 
-  lockChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 },
-  lockChipText: { fontFamily: FONT.semibold, fontSize: 10 },
 
   menuOverlay: { flex: 1 },
   // Figma: 92×111 white card, radius 8, three 35px rows, 12px side padding.

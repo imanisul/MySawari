@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import { Image as CachedImage } from 'expo-image';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
@@ -661,7 +662,7 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
 export function DestinationTile({ image, faded, title, blurb, onPress }: { image: ImageSourcePropType; faded?: boolean; title: string; blurb: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" accessibilityLabel={`${title}. ${blurb}`} onPress={() => { Haptics.selectionAsync(); onPress(); }} style={({ pressed }) => [styles.destTile, pressed && { opacity: 0.9 }]}>
-      <Image source={image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <CachedImage source={image} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={150} />
       {/* High-contrast gradient vignette ensuring white typography is always readable */}
       <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.45)', 'rgba(0,0,0,0.88)']} locations={[0.3, 0.65, 1]} style={StyleSheet.absoluteFill} />
       <View style={styles.destTileBody}>

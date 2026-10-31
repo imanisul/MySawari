@@ -199,7 +199,7 @@ function SheetFrame({ visible, onClose, title, onClear, children, footer }: {
   const p = useDetailsPalette();
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <View style={styles.overlay}>
         <ModalBlur />
         <View  style={[StyleSheet.absoluteFill, styles.dim]}/>

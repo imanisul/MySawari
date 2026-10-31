@@ -15,7 +15,7 @@ export function ReviewModal({ trip, onClose }: { trip: ReviewTrip | null; onClos
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={!!trip} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={!!trip} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
         <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />

@@ -337,14 +337,20 @@ export function LocationSearchBody({
                 </Text>
               )}
               <Pressable
-                // No press highlight on a location row — tapping selects it and closes the page. The
-                // declared background also blocks Android's own ripple tint from painting over it.
-                style={[
-                  styles.resultItem,
-                  { backgroundColor: hasQuery && index === 0 ? ui.topHit : 'transparent' },
-                ]}
-                onPress={() => handleSelectPlace(item)}
-              >
+  style={({ pressed }) => [
+    styles.resultItem,
+    {
+      backgroundColor: pressed
+        ? (isDarkMode ? '#374151' : '#F0F1F5')
+        : hasQuery && index === 0
+          ? ui.topHit
+          : 'transparent',
+
+      opacity: pressed ? 0.85 : 1,
+    },
+  ]}
+  onPress={() => handleSelectPlace(item)}
+>
                 <View style={[styles.iconBox, { backgroundColor: ui.iconBg }]}>
                   <PinIcon color={ui.pin} hole={ui.hole} />
                 </View>

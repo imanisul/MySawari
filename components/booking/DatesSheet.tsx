@@ -3,9 +3,16 @@ import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation, Alert, 
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather, FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, {
+  Circle,
+  Defs,
+  Path,
+  LinearGradient as SvgLinearGradient,
+  Stop,
+} from 'react-native-svg';
+
+import { LinearGradient as ExpoLinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
@@ -74,7 +81,7 @@ function Chevron({ color }: { color: string }) {
 // Figma wheel: 142pt window, selected row 40pt in the middle, neighbours 30pt rows 2pt apart
 // (centre-to-centre 37pt), faded out towards both edges.
 const ROW = 37;
-const WINDOW = 142;
+const WINDOW = 120;
 const EDGE_PAD = WINDOW / 2 - ROW / 2;
 
 type WheelPalette = { card: string; box: string; boxBorder: string; selected: string; idle: string };
@@ -132,12 +139,12 @@ function TimeWheel({ title, times, value, onPick, p, titleColor }: {
           ))}
         </ScrollView>
         {/* Figma mask (0 → 0.7 → 1 → 0.7 → 0 opacity), drawn as the card colour over the rows. */}
-        <LinearGradient
-          pointerEvents="none"
-          colors={[p.card, `${p.card}4D`, `${p.card}00`, `${p.card}4D`, p.card]}
-          locations={[0, 0.25, 0.5, 0.75, 1]}
-          style={StyleSheet.absoluteFill}
-        />
+        <ExpoLinearGradient
+  pointerEvents="none"
+  colors={[p.card, `${p.card}4D`, `${p.card}00`, `${p.card}4D`, p.card]}
+  locations={[0, 0.25, 0.5, 0.75, 1]}
+  style={StyleSheet.absoluteFill}
+/>
       </View>
     </View>
   );
@@ -412,7 +419,7 @@ export function DatesSheet() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.topNavRow}>
-          <Pressable
+          {/* <Pressable
             accessibilityRole="button"
             accessibilityLabel="Go back"
             hitSlop={10}
@@ -424,15 +431,15 @@ export function DatesSheet() {
             ]}
           >
             <Feather name="chevron-left" size={22} color={ui.text} />
-          </Pressable>
+          </Pressable> */}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Change destination"
             onPress={() => router.push({ pathname: '/dropoff', params: { returnBack: 'true' } })}
             style={[styles.destField, { flex: 1, borderColor: ui.border }]}
           >
-            <PinOutline color={dropoff?.name ? ui.navy : ui.muted} />
-            <Text style={[styles.destText, { color: dropoff?.name ? ui.text : ui.muted }]} numberOfLines={1}>
+            <PinOutline color={dropoff?.name ? ui.muted : ui.muted} />
+            <Text style={[styles.destText, { color: dropoff?.name ? ui.muted : ui.muted }]} numberOfLines={1}>
               {dropoff?.name || 'Select your Destination'}
             </Text>
             <Chevron color={ui.muted} />
@@ -453,12 +460,63 @@ export function DatesSheet() {
             <Text style={[styles.summaryText, { color: ui.text }]}>{start ? formatDateStr(start) : 'Start Date'}</Text>
             <Text style={[styles.summaryText, { color: ui.text }]}>{start && tempPickupTime ? padTime(tempPickupTime) : 'Pickup Time'}</Text>
           </View>
-          <View style={styles.summaryMid}>
-            <Svg width={162} height={34} viewBox="0 0 162 34" style={StyleSheet.absoluteFill}>
+          {/* <View style={styles.summaryMid}> */}
+            {/* <Svg width={162} height={34} viewBox="0 0 162 34" style={StyleSheet.absoluteFill}>
               <Path d="M5 16.5 Q81 0.5 157 16.5" stroke={ui.dash} strokeWidth={1} strokeDasharray="4 3" fill="none" />
               <Circle cx={5} cy={16.5} r={4.25} fill={ui.page} stroke={ui.navy} strokeWidth={2.5} />
               <Circle cx={157} cy={16.5} r={4.25} fill={ui.page} stroke={ui.navy} strokeWidth={2.5} />
-            </Svg>
+            </Svg> */}
+            <View style={styles.summaryMid}>
+  <Svg
+    width={162}
+    height={34}
+    viewBox="0 0 162 34"
+    style={StyleSheet.absoluteFill}
+  >
+    <Defs>
+  <SvgLinearGradient
+    id="dashGradient"
+    x1={0}
+    y1={0}
+    x2={150}
+    y2={0}
+    gradientUnits="userSpaceOnUse"
+  >
+    <Stop offset="0%" stopColor={ui.dash} stopOpacity={0} />
+    <Stop offset="50%" stopColor={ui.dash} stopOpacity={1} />
+    <Stop offset="100%" stopColor={ui.dash} stopOpacity={0} />
+  </SvgLinearGradient>
+</Defs>
+
+    {/* Gradient dashed connecting line */}
+    <Path
+      d="M5 16.5 Q81 0.5 157 16.5"
+      stroke="url(#dashGradient)"
+      strokeWidth={1.5}
+      strokeDasharray="5 4"
+      fill="none"
+    />
+
+    {/* Left circle */}
+    <Circle
+      cx={6}
+      cy={16.5}
+      r={4.25}
+      fill={ui.page}
+      stroke={ui.navy}
+      strokeWidth={2.5}
+    />
+
+    {/* Right circle */}
+    <Circle
+      cx={155}
+      cy={16.5}
+      r={4.25}
+      fill={ui.page}
+      stroke={ui.navy}
+      strokeWidth={2.5}
+    />
+  </Svg>
             <Text style={[styles.summaryText, styles.summaryDays, { color: ui.text }]}>
               {rentalDays} {rentalDays === 1 ? 'day' : 'days'}
             </Text>
@@ -668,10 +726,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   destText: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 16 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 },
-  title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 20, lineHeight: 28 },
-  clear: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, color: '#E5202E' },
-  note: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16, marginTop: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
+  title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28.5 },
+  clear: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, color: '#DC2626' },
+  note: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5},
   summary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -687,31 +745,71 @@ const styles = StyleSheet.create({
   // Dashed arc peaks above the day count; the two navy rings sit level with it.
   summaryMid: { width: 162, height: 34, alignItems: 'center' },
   summaryDays: { marginTop: 14.5 },
-  section: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 16, lineHeight: 24, marginTop: 12 },
-  weekHeader: { flexDirection: 'row', marginTop: 10 },
-  weekDay: { flex: 1, textAlign: 'center', fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, lineHeight: 20 },
+  section: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 24, marginTop: 12 },
+  weekHeader: { flexDirection: 'row', marginTop: 4 },
+  weekDay: { flex: 1, textAlign: 'center', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5 },
   calendar: { height: 263, marginTop: 12, borderRadius: 8 },
   calendarContent: { paddingBottom: 8 },
-  monthName: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 16, lineHeight: 24, paddingLeft: 8, paddingTop: 4, marginBottom: 6 },
+  monthName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 24, paddingLeft: 8, paddingTop: 4 },
   week: { flexDirection: 'row' },
   dayCell: { flex: 1, height: 38, alignItems: 'center', justifyContent: 'center' },
   band: { position: 'absolute', top: 1, bottom: 1, left: 0, right: 0 },
   bandLeftEdge: { left: 4, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 },
   bandRightEdge: { right: 4, borderTopRightRadius: 8, borderBottomRightRadius: 8 },
   // opaque by default so a tap can override the platform's press tint with this same colour
-  dayCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  dayText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15 },
+  dayCircle: { width: 34, height: 34, borderRadius: 18,paddingBottom: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent'},
+  dayText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
   struck: { textDecorationLine: 'line-through' },
-  wheels: { flexDirection: 'row', gap: 12, marginTop: 12, height: 210 },
-  wheelCard: { flex: 1, borderRadius: 8, padding: 4, gap: 12 },
-  wheelTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 23, textAlign: 'center' },
-  wheel: { height: WINDOW, overflow: 'hidden' },
-  wheelBox: { position: 'absolute', left: 0, right: 0, top: WINDOW / 2 - 20, height: 40, borderRadius: 6, borderWidth: 1 },
-  wheelRow: { height: ROW, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
-  wheelText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
-  // Figma CTA bar: 16 padding, 361×54 navy button, radius 12, 19/28 semibold white title.
-  footer: { paddingHorizontal: 16, paddingTop: 16 },
-  cta: { height: 54, padding: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  wheels: {
+  flexDirection: 'row',
+  gap: 12,
+  marginTop: 8,
+  height: 156,
+},
+
+wheelCard: {
+  flex: 1,
+  borderRadius: 8,
+  padding: 4,
+  gap: 8,
+},
+
+wheelTitle: {
+  fontFamily: 'PlusJakartaSans_600SemiBold',
+  fontSize: 15,
+  lineHeight: 22.5,
+  textAlign: 'center',
+},
+
+wheel: {
+  height: WINDOW,
+  overflow: 'hidden',
+},
+
+wheelBox: {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: WINDOW / 2 - 15,
+  height: 30,
+  borderRadius: 6,
+  borderWidth: 1,
+},
+
+wheelRow: {
+  height: ROW,
+  alignItems: 'center',
+  justifyContent: 'center',
+  paddingHorizontal: 6,
+},
+
+wheelText: {
+  fontFamily: 'PlusJakartaSans_600SemiBold',
+  fontSize: 13,
+  lineHeight: 17,
+},
+  footer: { paddingHorizontal: 16 },
+  cta: { height: 54, padding: 4, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaDisabled: { opacity: 0.5 },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, textAlign: 'center' },
   // Figma popups: white card (radius 16) over a dimmed page, round close button underneath.

@@ -1,15 +1,28 @@
 {
   "cli": {
     "version": ">= 14.7.1",
-    "appVersionSource": "remote"
+    "appVersionSource": "local"
   },
   "build": {
     "preview": {
       "node": "20.20.2",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
       }
     },
-    "production": {}
+    "production": {
+      "node": "20.20.2",
+      "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
+      }
+    }
   }
 }

@@ -1,0 +1,63 @@
+import React, { useRef } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { BlurTargetView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useColors } from '@/hooks/useColors';
+import { BottomNavigation } from '../navigation/BottomNavigation';
+import { BlurHost } from './BottomBlur';
+import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
+import { BlurTargetProvider } from './BlurTargetContext';
+
+export function Page({
+  children,
+  scroll = true,
+  bottomNav = false,
+}: {
+  children: React.ReactNode;
+  scroll?: boolean;
+  bottomNav?: boolean;
+}) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const bottomNavHeight = useBottomNavHeight();
+  const blurTarget = useRef<View | null>(null);
+  const content = (
+    <View
+      style={[
+        styles.pageContent,
+        {
+          paddingTop: 0,
+          // If bottomNav is true, we pad exact height of the tab bar (approx 56) + the safe area inset.
+          // We add an extra 24px of breathing room either way.
+          paddingBottom: scroll ? (bottomNav ? bottomNavHeight + 24 : insets.bottom + 24) : 0,
+        },
+      ]}
+    >
+      {children}
+    </View>
+  );
+
+  return (
+    // The tab bar blurs the page under it (BlurTarget = the page content, never the bar itself).
+    <BlurHost style={[styles.screen, { backgroundColor: colors.background }]}>
+      <BlurTargetProvider target={blurTarget}>
+        <BlurTargetView ref={blurTarget} style={styles.screen}>
+          {scroll ? (
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+              {content}
+            </ScrollView>
+          ) : (
+            content
+          )}
+        </BlurTargetView>
+      </BlurTargetProvider>
+      {bottomNav && <BottomNavigation />}
+    </BlurHost>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: { flex: 1 },
+  scrollContent: { flexGrow: 1 },
+  pageContent: { flex: 1 },
+});

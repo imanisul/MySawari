@@ -561,7 +561,7 @@ export function DatesSheet() {
       </View>
 
       {/* Figma "Early Pickup / Return": before 8 AM is arranged with the team. The round close button sits under the card. */}
-      <Modal visible={showEarlyPickupModal} transparent animationType="fade" onRequestClose={() => setShowEarlyPickupModal(false)}>
+      <Modal visible={showEarlyPickupModal} transparent animationType="fade" onRequestClose={() => setShowEarlyPickupModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.popupOverlay}>
           <ModalBlur />
           <View style={[styles.early, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
@@ -606,7 +606,7 @@ export function DatesSheet() {
       </Modal>
 
       {/* Figma "Late Return": returning after 8 AM adds a day. Same card as Early Pickup, round close button under it. */}
-      <Modal visible={showLateReturnModal} transparent animationType="fade" onRequestClose={() => setShowLateReturnModal(false)}>
+      <Modal visible={showLateReturnModal} transparent animationType="fade" onRequestClose={() => setShowLateReturnModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.popupOverlay}>
           <ModalBlur />
           <View style={[styles.early, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>

@@ -46,3 +46,6 @@ yarn-error.*
 
 # Firebase config (has the Android API key) — kept off GitHub; EAS still uploads it (.easignore does not list it)
 google-services.json
+
+# Graphify cache
+graphify-out/cache/

@@ -72,7 +72,7 @@ export function AddressPickerSheet({ visible, kind, saved, onClose, onPick, onAd
   })).current;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <BlurView intensity={18} tint="default" style={StyleSheet.absoluteFill}>
         <Pressable accessibilityLabel="Close" style={[StyleSheet.absoluteFill, styles.dim]} onPress={onClose} />
       </BlurView>

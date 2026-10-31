@@ -130,7 +130,7 @@ export default function SavedAddressesScreen() {
       </SafeAreaView>
 
       {/* ── Select option ── */}
-      <Modal visible={!!menuFor} transparent animationType="slide" onRequestClose={() => setMenuFor(null)}>
+      <Modal visible={!!menuFor} transparent animationType="slide" onRequestClose={() => setMenuFor(null)} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.sheetWrap}>
           <ModalBlur />
           <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
@@ -165,7 +165,7 @@ export default function SavedAddressesScreen() {
       </Modal>
 
       {/* ── Delete this address? ── */}
-      <Modal visible={!!deleteFor} transparent animationType="fade" onRequestClose={() => setDeleteFor(null)}>
+      <Modal visible={!!deleteFor} transparent animationType="fade" onRequestClose={() => setDeleteFor(null)} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.dialogWrap}>
           <ModalBlur />
           <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
@@ -223,7 +223,7 @@ function PhoneSheet({ address, onClose, onSave }: { address: SavedAddress | null
   };
 
   return (
-    <Modal visible={!!address} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={!!address} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetWrap}>
         <ModalBlur />
         <View  style={[StyleSheet.absoluteFill, styles.dim]}/>

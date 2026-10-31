@@ -27,7 +27,7 @@ export function ManageBookingSheet({
   const code = booking.bookingCode || booking.id.slice(-6).toUpperCase();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <View style={[styles.overlay, { backgroundColor: 'rgba(38, 38, 38, 0.32)' }]}>
         <ModalBlur />
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim]} />

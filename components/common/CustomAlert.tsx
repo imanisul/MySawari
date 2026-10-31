@@ -88,6 +88,7 @@ export function CustomAlertProvider() {
       animationType="none"
       statusBarTranslucent
       onRequestClose={close}
+      navigationBarTranslucent
     >
       <Animated.View style={[styles.overlay, { opacity: fadeAnim }]}>
         <ModalBlur />

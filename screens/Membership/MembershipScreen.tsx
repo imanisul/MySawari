@@ -429,7 +429,7 @@ export default function MembershipScreen() {
       />
 
       {/* ── Success ── */}
-      <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => setShowSuccessModal(false)}>
+      <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => setShowSuccessModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.overlay}>
           <ModalBlur />
           <View style={[styles.popup, { backgroundColor: p.page }]}>
@@ -446,7 +446,7 @@ export default function MembershipScreen() {
       </Modal>
 
       {/* ── Error ── */}
-      <Modal visible={showErrorModal} transparent animationType="fade" onRequestClose={() => setShowErrorModal(false)}>
+      <Modal visible={showErrorModal} transparent animationType="fade" onRequestClose={() => setShowErrorModal(false)} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.overlay}>
           <ModalBlur />
           <View style={[styles.popup, { backgroundColor: p.page }]}>

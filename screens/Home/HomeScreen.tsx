@@ -21,13 +21,13 @@ import {
 } from '@/components/home/HomeSections';
 
 const DESTINATIONS: { id: string; title: string; blurb: string; image: ImageSourcePropType; faded?: boolean }[] = [
-  { id: 'shillong', title: 'Shillong', blurb: 'Pine-covered hills, cafe culture, and Scotland of the East vibes.', image: require('../../assets/images/shillong.jpg') },
-  { id: 'tawang', title: 'Tawang', blurb: 'High-altitude passes, majestic monastery, and snow peaks.', image: require('../../assets/images/tawang.jpg') },
-  { id: 'cherrapunji', title: 'Cherrapunji', blurb: 'Living root bridges, roaring waterfalls, and misty cliffs.', image: require('../../assets/images/cherrapunji.jpg') },
-  { id: 'umrangso', title: 'Umrangso', blurb: 'Serene Kapili Lake, scenic golf course, and misty rolling hills.', image: require('../../assets/images/umrangso.jpg') },
-  { id: 'kaziranga', title: 'Kaziranga', blurb: 'Wild safaris, the one-horned rhino, and lush tea estates.', image: require('../../assets/images/kaziranga.jpg') },
-  { id: 'meghalaya', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/meghalaya.jpg') },
-  { id: 'sikkim', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/sikkim.jpg') },
+  { id: 'shillong', title: 'Shillong', blurb: 'Pine-covered hills, cafe culture, and Scotland of the East vibes.', image: require('../../assets/images/dest_shillong.jpg') },
+  { id: 'tawang', title: 'Tawang', blurb: 'High-altitude passes, majestic monastery, and snow peaks.', image: require('../../assets/images/dest_tawang.jpg') },
+  { id: 'cherrapunji', title: 'Cherrapunji', blurb: 'Living root bridges, roaring waterfalls, and misty cliffs.', image: require('../../assets/images/dest_cherrapunji.jpg') },
+  { id: 'umrangso', title: 'Umrangso', blurb: 'Serene Kapili Lake, scenic golf course, and misty rolling hills.', image: require('../../assets/images/dest_umrangso.jpg') },
+  { id: 'kaziranga', title: 'Kaziranga', blurb: 'Wild safaris, the one-horned rhino, and lush tea estates.', image: require('../../assets/images/dest_kaziranga.jpg') },
+  { id: 'meghalaya', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/dest_meghalaya.jpg') },
+  { id: 'sikkim', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/dest_sikkim.jpg') },
 ];
 
 const DESTINATION_LOCATIONS: Record<string, LocationResult> = {

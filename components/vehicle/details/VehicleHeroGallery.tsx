@@ -114,7 +114,7 @@ export function VehicleHeroGallery({ car }: { car: Car }) {
       )}
 
       {/* Full Screen Gallery Modal */}
-      <Modal visible={isModalVisible} transparent={false} animationType="fade">
+      <Modal visible={isModalVisible} transparent={false} animationType="fade" statusBarTranslucent navigationBarTranslucent>
         <View style={[styles.modalContainer, { backgroundColor: '#000' }]}>
           <SafeAreaView style={styles.modalHeader}>
             <Text style={styles.modalCounter}>

@@ -406,7 +406,7 @@ function PhotoViewer({ images, initialIndex, onClose }: { images: any[]; initial
   if (images.length === 0) return null;
 
   return (
-    <Modal visible={true} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={true} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
       <View style={styles.viewerOverlay}>
         <FlatList
           data={images}
@@ -518,7 +518,7 @@ export function ReviewsSection({ car }: { car: Car }) {
           </View>
         )}
 
-        <Modal visible={isWriteModalVisible} animationType="slide" transparent={true}>
+        <Modal visible={isWriteModalVisible} animationType="slide" transparent={true} statusBarTranslucent navigationBarTranslucent>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <WriteReviewBottomSheet
@@ -589,7 +589,7 @@ export function ReviewsSection({ car }: { car: Car }) {
         </Pressable>
       )}
 
-      <Modal visible={isWriteModalVisible} animationType="slide" transparent={true}>
+      <Modal visible={isWriteModalVisible} animationType="slide" transparent={true} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <WriteReviewBottomSheet

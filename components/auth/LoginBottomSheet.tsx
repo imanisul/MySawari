@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Keyboard, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
+import { useKeyboardPad } from '@/hooks/useKeyboardPad';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -77,6 +78,7 @@ export function LoginBottomSheet({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardPad();
   const { login, saveProfile, isDarkMode } = useSawari();
   const ui = isDarkMode
     ? {
@@ -351,16 +353,18 @@ export function LoginBottomSheet({
         }
       }}
       statusBarTranslucent
+      navigationBarTranslucent
     >
       {viewingPolicy ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: ui.sheet, zIndex: 999 }]}>
           <PolicyDocumentScreen policyKey={viewingPolicy} onBack={() => setViewingPolicy(null)} />
         </View>
       ) : (
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.overlay}>
+        <View ref={kb.ref} collapsable={false} style={styles.overlay}>
           <ModalBlur />
           <Pressable style={StyleSheet.absoluteFill} onPress={() => (step === 'phone' && !loading && !required ? onClose() : Keyboard.dismiss())} accessibilityLabel="Close" />
-          <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: Math.max(insets.bottom, 16) }]}>
+          {/* The white sheet runs down behind the keyboard; its content sits above it. */}
+          <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: kb.pad > 0 ? kb.pad + 16 : Math.max(insets.bottom, 16) }]}>
 
           {step === 'phone' && (
             <>
@@ -416,6 +420,7 @@ export function LoginBottomSheet({
                 />
               </View>
               {!!error && <Text style={[styles.error, { color: ui.error, textAlign: 'left' }]}>{error}</Text>}
+              {/* Returning customers already agreed on their first login. */}
               {isFirstTime ? (
                 <View style={styles.checkRow}>
                   <Pressable
@@ -436,14 +441,7 @@ export function LoginBottomSheet({
                     <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={openPrivacy}>Privacy Policy</Text>.
                   </Text>
                 </View>
-              ) : (
-                <Text style={[styles.terms, { color: ui.copy, textAlign: 'center', marginTop: 4 }]}>
-                  By continuing, you agree to our{' '}
-                  <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={openTerms}>Terms &amp; Conditions</Text>
-                  {'  '}and{' '}
-                  <Text style={{ color: ui.navy, textDecorationLine: 'underline' }} onPress={openPrivacy}>Privacy Policy</Text>.
-                </Text>
-              )}
+              ) : null}
             </>
           )}
 
@@ -622,7 +620,7 @@ export function LoginBottomSheet({
             )}
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
       )}
     </Modal>
   );

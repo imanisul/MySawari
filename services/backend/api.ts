@@ -229,6 +229,10 @@ export async function timedFetch(url: string, options: RequestInit = {}, timeout
   }
 }
 
+// The free Render server sleeps when idle and needs up to a minute to wake; 20s ended in "taking too long".
+// No automatic retry: a retried send could trip the OTP cooldown, a retried verify could find the code already used.
+const OTP_TIMEOUT_MS = 45000;
+
 const PLATE_PROXY_PATH = '/images/blur?target=';
 // Bumped when plate processing changes: a new URL means the phone never reuses an image it cached
 // under the old one (including an unprocessed original from before the backend stopped falling back to it).
@@ -1721,7 +1725,7 @@ export const API = {
         method: 'POST',
         headers: await withInstallId({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ mobileNumber: mobile, deviceId })
-      });
+      }, OTP_TIMEOUT_MS);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
       return {
@@ -1752,7 +1756,7 @@ export const API = {
           otpId,
           deviceId
         })
-      });
+      }, OTP_TIMEOUT_MS);
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to verify OTP');
 

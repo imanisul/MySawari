@@ -11,7 +11,7 @@ LogBox.ignoreLogs([
 
 import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
 import { AppState } from 'react-native';
-import { primeVehicles, useVehicles, hasLiveVehicles } from '@/hooks/useVehicles';
+import { primeVehicles, hasLiveVehicles } from '@/hooks/useVehicles';
 import { loadHomeData, homeLoadSteps, HomeLoadStep } from '@/hooks/useHomeData';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
@@ -239,7 +239,6 @@ function AppGate({
   fontError: boolean;
 }) {
   const { isAuthLoading, isAuthenticated, fetchWallet, syncNotifications, customer } = useSawari();
-  const vehicles = useVehicles();
   const client = useQueryClient();
 
   const [homeDataReady, setHomeDataReady] = useState(false);
@@ -278,10 +277,7 @@ function AppGate({
     // Runs once per launch (and again on Retry); later sign-ins / refreshes are handled by the screens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAuthLoading, loadRun]);
-  // Use cached vehicles instantly to avoid long loading screen times (Render backend latency).
-  // On first launch, it will still wait because vehicles.data will be undefined.
-  const liveVehicles = vehicles.data !== undefined;
-  const vehiclesLoaded = liveVehicles;
+  // The app opens straight away; Home and the other screens show their own skeletons while data arrives.
   const colors = useColors();
   const splashHidden = useRef(false);
 
@@ -305,10 +301,6 @@ function AppGate({
     <View style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayout}>
       <AnimatedSplash
         isReady={status === 'ready' || status === 'error'}
-        isDataReady={vehiclesLoaded}
-        loadFailed={homeDataReady && !liveVehicles}
-        onRetry={() => { setHomeDataReady(false); setLoadRun((n) => n + 1); }}
-        steps={loadSteps}
       >
         {children}
       </AnimatedSplash>

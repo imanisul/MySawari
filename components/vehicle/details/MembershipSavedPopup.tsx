@@ -74,7 +74,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
   const t = THEMES[normPlan] ?? THEMES[plan] ?? THEMES.Starter;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
       <ModalBlur sigmaX={2} sigmaY={2} />
       <Pressable accessibilityLabel="Close" style={[StyleSheet.absoluteFill, styles.dim]} onPress={close} />
 

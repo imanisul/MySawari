@@ -115,8 +115,8 @@ export default function ProfileScreen() {
   ];
   // Information and support rows
   const infoRows: RowDef[] = [
-    { key: 'help', icon: 'help-circle', title: 'Help & Support', onPress: () => go('/help') },
-    { key: 'safety', icon: 'shield', title: 'Safety', onPress: () => go('/safety') },
+    // { key: 'help', icon: 'help-circle', title: 'Help & Support', onPress: () => go('/help') },
+    // { key: 'safety', icon: 'shield', title: 'Safety', onPress: () => go('/safety') },
     { key: 'terms', icon: 'file-text', title: 'Terms & Condition', onPress: () => go('/terms') },
     { key: 'cancel', icon: 'x-square', title: 'Cancellation Policy', onPress: () => go('/cancellation-policy') },
     { key: 'privacy', icon: 'file-text', title: 'Privacy Policy', onPress: () => go('/privacy') },

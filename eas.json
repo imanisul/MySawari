@@ -24,5 +24,13 @@
         "simulator": false
       }
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "hello@mysawari.in",
+        "ascAppId": "6829408836"
+      }
+    }
   }
 }

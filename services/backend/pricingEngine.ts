@@ -422,8 +422,10 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   if (isMembershipActive && planKey && MEMBERSHIP_PLANS[planKey]) {
     const { discountRate, tripCap, annualCap } = MEMBERSHIP_PLANS[planKey];
     const remaining = Math.max(0, annualCap - (membership?.totalSaved || 0));
+    // Membership discount = the vehicle's rent × the plan's %, capped per trip and per year. The base is the rent only
+    // (not the driver, delivery or collection charges), the same figure the plan options show as "Save ₹X".
     subscriptionDiscount = Math.min(
-      Math.round(totalAmount * discountRate),
+      Math.round(rentalAmount * discountRate),
       tripCap,
       remaining
     );

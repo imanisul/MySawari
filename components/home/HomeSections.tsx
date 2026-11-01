@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Image, ImageSourcePropType, ScrollVi
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, Text as SvgText, TextPath, G, RadialGradient, Stop } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -179,10 +179,12 @@ function ArcHeadline({ lines, idPrefix = 'arc' }: { lines: [string, string]; idP
   );
 }
 
-export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
+export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, children }: {
   children?: React.ReactNode;
   topInset: number;
   city: string;
+  /** Opens the city picker. */
+  onCityPress?: () => void;
   sawariCash: number | null;
   onWallet: () => void;
 }) {
@@ -294,10 +296,16 @@ export function HomeHero({ topInset, city, sawariCash, onWallet, children }: {
 
       <View style={styles.heroTop}>
         <View style={{ flex: 1, marginRight: 12 }}>
-          <View style={styles.cityRow}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`City: ${city}. Change city`}
+            onPress={() => { Haptics.selectionAsync(); onCityPress?.(); }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.cityRow, pressed && { opacity: 0.7 }]}
+          >
             <Text style={styles.city}>{city}</Text>
             <Feather name="chevron-right" size={15} color="#FFFFFF" />
-          </View>
+          </Pressable>
           <Text style={styles.brandLine} numberOfLines={1}>MySawari - Self Drive Car Rental Guwahati, Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019</Text>
         </View>
         <Pressable
@@ -616,13 +624,13 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Complete ${target} trips, earn ${formatCurrency(reward)}. ${done} of ${target} completed.`}
+      accessibilityLabel={`Complete ${target} trips, get up to ${formatCurrency(reward)} rewards. ${done} of ${target} completed.`}
       onPress={onPress}
       style={[styles.milestone, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }]}
     >
       <Image source={require('@/assets/images/MySawari_nobg.png')} style={styles.milestoneLogo} resizeMode="contain" />
-      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} trips, earn {formatCurrency(reward)}</Text>
-      <Text style={[styles.milestoneSub, { color: p.muted }]}>Get {formatCurrency(reward)} after completing {target} trips.</Text>
+      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} Trips, Get up to {formatCurrency(reward)} Rewards</Text>
+      <Text style={[styles.milestoneSub, { color: p.muted }]}>Rewards are added to your wallet once you complete {target} trips.</Text>
 
       <View style={styles.track}>
         <View style={styles.trackRail}>

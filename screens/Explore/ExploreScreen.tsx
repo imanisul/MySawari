@@ -1,17 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useFocusEffect } from 'expo-router';
-import { Car, getAvailability } from '@/utils/sawari';
+import { Car, getAvailability, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { CarListCard, Page } from '@/components';
 import {
   ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, countActive, matchesFilters, sortCars,
-  QUICK_CHIPS, QuickChip, chipFor, useVehicleRatings,
+  QuickChip, chipOn, toggleChip, chipsFor, useVehicleRatings,
 } from '@/components/explore/ExploreFilters';
 import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
@@ -24,10 +24,6 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
  * (Filter · All · SUV · Diesel · Petrol …) and the vehicle cards. Trip dates are picked on the car details page
  * ("Check Availability"), so this list shows availability for today, as before.
  */
-
-// Bikes have no body types and no diesel: their chips are All · Petrol · Automatic · Manual.
-const CAR_CHIPS: QuickChip[] = QUICK_CHIPS;
-const BIKE_CHIPS: QuickChip[] = QUICK_CHIPS.filter((c) => !c.apply || (!c.apply.body && c.apply.fuel !== 'Diesel'));
 
 // The list's first row is the pinned search + chips bar; a message row stands in when there are no cars.
 type Row = Car | { id: string; kind: 'bar' | 'empty' };
@@ -42,11 +38,10 @@ export default function ExploreScreen() {
   // Cars or bikes, as chosen on Home.
   const { setBookingSource, vehicleType: homeType, setVehicleType } = useSawari();
   const isBike = homeType === 'bike';
-  const CHIPS = isBike ? BIKE_CHIPS : CAR_CHIPS;
+  const CHIPS = chipsFor(isBike);
 
   useFocusEffect(useCallback(() => { setBookingSource('explore'); }, [setBookingSource]));
 
-  const [chip, setChip] = useState('All');
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showSortSheet, setShowSortSheet] = useState(false);
   const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
@@ -70,7 +65,7 @@ export default function ExploreScreen() {
 
   // Switching between cars and bikes starts that list fresh.
   useEffect(() => {
-    setChip('All'); setFilters(EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
   }, [homeType]);
 
   const { data: fetchedCars = [], isLoading: isFetchingCars, isError: fetchError, refetch: fetchVehicles } = useVehicles();
@@ -78,8 +73,7 @@ export default function ExploreScreen() {
   // Only cars or only bikes (Home's choice), without workshop vehicles: the filter options and their counts
   // are built from this list. Sorting puts the ones free now on top, then busy ones by the day they're free.
   const baseCars = useMemo(() => (fetchedCars || []).filter((car: Car) => {
-    const st = car.dbStatus?.toLowerCase();
-    if (st === 'service' || st === 'maintenance') return false;
+    if (isInService(car)) return false;
     return isBike ? car.type === 'Bike' : car.type !== 'Bike';
   }), [fetchedCars, isBike]);
 
@@ -117,14 +111,13 @@ export default function ExploreScreen() {
 
   const pickChip = (c: QuickChip) => {
     Haptics.selectionAsync();
-    setChip(c.label);
-    setFilters({ ...EMPTY_FILTERS, ...(c.apply || {}) });
+    setFilters((cur) => toggleChip(cur, c));
     requestAnimationFrame(toFirstCar);
   };
 
   const clearAll = () => {
     setSearchQuery(''); setDebouncedQuery('');
-    setChip('All'); setFilters(EMPTY_FILTERS); setSort('recommended');
+    setFilters(EMPTY_FILTERS); setSort('recommended');
   };
 
   const bar = (
@@ -183,7 +176,7 @@ export default function ExploreScreen() {
           <Text style={[styles.chipText, { color: p.muted }]}>Filter</Text>
         </Pressable>
         {CHIPS.map((c) => {
-          const on = chip === c.label;
+          const on = chipOn(filters, c);
           return (
             <Pressable
               key={c.label}
@@ -220,7 +213,7 @@ export default function ExploreScreen() {
       <Text style={[styles.emptyCopy, { color: p.sub }]}>
         {debouncedQuery ? `Nothing matches "${debouncedQuery}". Try another search.` : 'Nothing matches these filters right now.'}
       </Text>
-      {(!!debouncedQuery || chip !== 'All' || activeFilterCount > 0) && (
+      {(!!debouncedQuery || activeFilterCount > 0) && (
         <Pressable style={[styles.emptyBtn, { backgroundColor: p.navy }]} onPress={clearAll}>
           <Text style={[styles.emptyBtnText, { color: p.onNavy }]}>Clear all filters</Text>
         </Pressable>
@@ -238,7 +231,7 @@ export default function ExploreScreen() {
     if ('kind' in item) return item.kind === 'bar' ? bar : empty;
     return <CarListCard car={item} isExplore />;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, chip, sort, activeFilterCount, isBike, isFetchingCars, fetchError, debouncedQuery, p]);
+  }, [searchQuery, filters, sort, activeFilterCount, isBike, isFetchingCars, fetchError, debouncedQuery, p]);
 
   return (
     // The list starts below the status bar, so the pinned bar sticks right under it instead of behind it.
@@ -276,12 +269,9 @@ export default function ExploreScreen() {
         onClose={() => setShowFilterSheet(false)}
         value={filters}
         cars={baseCars}
+        bike={isBike}
         ratingOf={reviewRating}
-        onApply={(f) => {
-          setFilters(f);
-          // The quick chip stays lit only while the filters are exactly that chip's.
-          setChip(chipFor(f));
-        }}
+        onApply={setFilters}
       />
       <SortSheet visible={showSortSheet} onClose={() => setShowSortSheet(false)} value={sort} onApply={(v) => { setSort(v); toFirstCar(); }} />
     </Page>

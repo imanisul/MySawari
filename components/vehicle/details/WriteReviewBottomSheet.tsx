@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useQueryClient } from '@tanstack/react-query';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useColors } from '@/hooks/useColors';
 import { API } from '@/services/backend/api';
 import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';

@@ -143,6 +143,7 @@ function placeLabel(place: any): string | undefined {
 }
 
 import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
+import { bikeTransmissionFor } from '../../utils/bikeModels';
 import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hasGoogleMaps, googleSearchPlaces, googleReverseLocation } from '../maps/google';
@@ -840,7 +841,8 @@ export const API = {
         image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,
         images: hasImages ? v.images.map((img: any) => getFullUrl(img.url)) : [fallbackImage],
         seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
-        transmission: v.transmission || 'Manual',
+        // A bike's gearbox follows from its model (scooter / geared); hand-typed records had some wrong.
+        transmission: (isBike ? bikeTransmissionFor(resolvedDisplayName) || bikeTransmissionFor(v.vehicleName) : null) || v.transmission || 'Manual',
         // Never guess the fuel. Defaulting a missing fuelType to 'Petrol' made diesel cars (e.g. the Thar
         // 1.5L AXT Diesel, whose name says Diesel and whose mileage is quoted in km/l) read as petrol —
         // which also feeds Explore's fuel filter and SearchScreen. An unknown fuel simply omits the row.
@@ -901,6 +903,7 @@ export const API = {
         dbStatus: v.status || 'available',
         bookedRanges: v.bookedRanges || [],
         maintenanceUntil: v.maintenanceUntil || null,
+        recentBookings: Number(v.recentBookings) || 0,
       };
     });
   },

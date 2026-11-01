@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useColors } from '@/hooks/useColors';
 import { Car, Review, getCarHighlights, MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { API } from '@/services/backend/api';

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, ScrollView, Pressable, StyleSheet, Dimensions } from 'react-native';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { Car } from '@/utils/sawari';
 import { useDetailsPalette } from './detailsPalette';
 import { PhotoViewer } from '@/components/common/PhotoViewer';

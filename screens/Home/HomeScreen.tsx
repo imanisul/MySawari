@@ -1,12 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CITIES } from '@/constants/cities';
+import { CitySheet } from '@/components/home/CitySheet';
 import Notifications from '@/utils/notifications';
 import { FlatList, Image, StyleSheet, Text, View, RefreshControl, ImageSourcePropType } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, cars, LocationResult } from '@/utils/sawari';
+import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet } from '@/components';
 import { PhoneNumberSheet } from '@/components/auth/PhoneNumberSheet';
@@ -112,6 +115,11 @@ export default function HomeScreen() {
     dropoff, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress,
   } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
+  // The city shown at the top; tapping it opens the picker (one city for now, more later).
+  const [city, setCityState] = useState(CITIES[0].name);
+  const [showCity, setShowCity] = useState(false);
+  useEffect(() => { AsyncStorage.getItem('@selected_city').then((c) => { if (c && CITIES.some((x) => x.name === c)) setCityState(c); }).catch(() => {}); }, []);
+  const setCity = (c: string) => { setCityState(c); AsyncStorage.setItem('@selected_city', c).catch(() => {}); };
   const [showPhoneSheet, setShowPhoneSheet] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [manualRefreshing, setManualRefreshing] = useState(false);
@@ -193,7 +201,8 @@ export default function HomeScreen() {
     const viewed = viewedIds
       .map((item: any) => {
         const v = fetchedVehicles.find((x) => String(x.id) === item.vehicleId);
-        return v && v.type === typeName ? { ...withAvail(v), viewedContext: item } : null;
+        // Everything the customer looked at shows together, cars and bikes, whichever tab is selected.
+        return v && !isInService(v) ? { ...withAvail(v), viewedContext: item } : null;
       })
       .filter(Boolean)
       .slice(0, 4) as any[];
@@ -205,7 +214,7 @@ export default function HomeScreen() {
       return i === -1 ? fav.length + 10 : i;
     };
     const curated = fetchedVehicles
-      .filter((v) => (v?.displayName || v?.name) && v.type === typeName && !viewed.some((w) => w.id === v.id))
+      .filter((v) => (v?.displayName || v?.name) && v.type === typeName && !isInService(v) && !viewed.some((w) => w.id === v.id))
       .map(withAvail)
       .sort((a, b) => {
         if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
@@ -220,6 +229,17 @@ export default function HomeScreen() {
     // Free vehicles first (recently viewed before curated within each group), then by when they're free again.
     return byAvailability([...viewed, ...curated].filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)))).slice(0, 8);
   }, [viewedIds, fetchedVehicles, dateRange, typeName]);
+
+  // ── Trending: the most booked vehicles of this kind over the last 90 days (liked ones win a tie) ──
+  const trending = useMemo(() => {
+    const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
+    return fetchedVehicles
+      .filter((v) => v.type === typeName && !isInService(v) && (v.recentBookings || 0) > 0)
+      .sort((a, b) => (b.recentBookings || 0) - (a.recentBookings || 0)
+        || (b.rating || 0) * Math.log1p(b.reviewCount || 0) - (a.rating || 0) * Math.log1p(a.reviewCount || 0))
+      .slice(0, 6)
+      .map((v) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; });
+  }, [fetchedVehicles, dateRange, typeName]);
 
   const openPick = useCallback((item: any) => {
     selectCar(item);
@@ -300,7 +320,7 @@ export default function HomeScreen() {
     // Ensure a real vehicle matching current vehicle type tab (Car / Bike) is selected
     const activeCar = (selectedCar && selectedCar.type === typeName && selectedCar !== cars[0] && selectedCar.id !== 'seltos')
       ? selectedCar
-      : (picks.find((v) => v.isAvailable) || picks[0] || fetchedVehicles.find((v) => v.type === typeName && v.isAvailable) || fetchedVehicles.find((v) => v.type === typeName) || fetchedVehicles[0]);
+      : (picks.find((v) => v.type === typeName && v.isAvailable) || picks.find((v) => v.type === typeName) || fetchedVehicles.find((v) => v.type === typeName && v.isAvailable) || fetchedVehicles.find((v) => v.type === typeName) || fetchedVehicles[0]);
 
     if (activeCar) {
       selectCar(activeCar);
@@ -312,7 +332,7 @@ export default function HomeScreen() {
     });
   }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 
-  const sections = useMemo(() => ['header', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
+  const sections = useMemo(() => ['header', 'picks', 'trending', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
     let content: React.ReactNode = null;
@@ -322,7 +342,8 @@ export default function HomeScreen() {
           <View>
             <HomeHero
               topInset={insets.top}
-              city="Guwahati"
+              city={city}
+              onCityPress={() => setShowCity(true)}
               sawariCash={isAuthenticated ? sawariCash : 0}
               onWallet={() => {}}  
     >
@@ -344,6 +365,25 @@ export default function HomeScreen() {
               horizontal
               keyExtractor={(v) => `pick-${v.id}`}
               // The real day rate (vehicle pricePerDay), not a member price: no membership passed to the card.
+              renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.row, { gap: 8 }]}
+              snapToInterval={254}
+              decelerationRate="fast"
+              removeClippedSubviews={false}
+            />
+          </>
+        );
+        break;
+      case 'trending':
+        if (trending.length === 0) break;
+        content = (
+          <>
+            <HomeSectionTitle title="Trending vehicles" />
+            <FlatList
+              data={trending}
+              horizontal
+              keyExtractor={(v) => `trend-${v.id}`}
               renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.row, { gap: 8 }]}
@@ -443,6 +483,8 @@ export default function HomeScreen() {
         onClose={() => setShowPhoneSheet(false)}
         // The sheet signs the customer in by itself now (phone → code → profile); nothing else to open.
       />
+
+      <CitySheet visible={showCity} value={city} onSelect={setCity} onClose={() => setShowCity(false)} />
 
       <LoginBottomSheet
         visible={showLogin}

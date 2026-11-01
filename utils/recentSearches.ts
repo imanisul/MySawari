@@ -63,8 +63,10 @@ export async function saveRecentSearch(userId: string | null | undefined, s: Sea
 }
 
 /**
- * Records the page this trip has just reached (results → car → booking → payment). The most recent page
- * wins, so Home resumes exactly where the customer left. Creates the entry if the trip wasn't saved yet.
+ * Records the page an already-searched trip has reached (results → car → booking → payment). The most recent
+ * page wins, so Home resumes exactly where the customer left. It never creates an entry: only an actual search
+ * (the results page) does. It used to, from whatever destination and dates happened to be set — a Top Destination
+ * tile tapped on Home, a car opened with leftover dates — and those showed up as searches nobody made.
  */
 export async function markSearchProgress(
   userId: string | null | undefined,
@@ -76,6 +78,7 @@ export async function markSearchProgress(
   const id = searchIdFor(s.dropoff.name, s.dateRange, s.vehicleType);
   const list = await getRecentSearches(userId);
   const prev = list.find((x) => x.id === id);
+  if (!prev) return;
   const entry: RecentSearch = {
     ...prev, ...s, id, savedAt: Date.now(), stage,
     carId: stage === 'results' ? undefined : extra.carId ?? prev?.carId,

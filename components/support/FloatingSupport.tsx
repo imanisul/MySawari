@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Linking, Pressable, StyleSheet, View, Animated } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { usePathname } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useColors } from '@/hooks/useColors';
 import { shadows } from '@/constants/shadows';
 import { usePressAnimation } from '@/hooks/usePressAnimation';

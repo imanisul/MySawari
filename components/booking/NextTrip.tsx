@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';

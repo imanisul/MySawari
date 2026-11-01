@@ -1,6 +1,6 @@
 import React from 'react';
-import WalletScreen from '@/screens/Wallet/WalletScreen';
+import RewardsScreen from '@/screens/Rewards/RewardsScreen';
 
 export default function Route() {
-  return <WalletScreen />;
+  return <RewardsScreen />;
 }

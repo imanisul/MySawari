@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, Animated, PanResponder } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { ModalBlur } from '@/components/common/ModalBlur';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { LocationResult } from '@/utils/sawari';
 import type { SavedAddress } from '@/utils/savedAddresses';

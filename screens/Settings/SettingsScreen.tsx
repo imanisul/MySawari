@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { CustomAlert } from '@/components';

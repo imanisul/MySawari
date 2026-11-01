@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQueries } from '@tanstack/react-query';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Car, MIN_PUBLIC_REVIEW_RATING, parseDayLabel } from '@/utils/sawari';
 import { API } from '@/services/backend/api';
@@ -183,9 +183,46 @@ export const QUICK_CHIPS: QuickChip[] = [
   { label: 'Manual', apply: { transmission: 'Manual' } },
 ];
 
-/** Which quick chip (if any) exactly matches these filters, so it stays lit after the sheet is used. */
-export const chipFor = (f: ExploreFilters) =>
-  QUICK_CHIPS.find((c) => !c.vehicle && JSON.stringify({ ...EMPTY_FILTERS, ...(c.apply || {}) }) === JSON.stringify(f))?.label ?? '';
+// Bikes have no body types or diesel; what sets them apart is scooter (gearless) or geared, petrol, and ABS.
+export const BIKE_CHIPS: QuickChip[] = [
+  { label: 'All' },
+  { label: 'Scooter', apply: { transmission: 'Automatic' } },
+  { label: 'Geared', apply: { transmission: 'Manual' } },
+  { label: 'Petrol', apply: { fuel: 'Petrol' } },
+  { label: 'ABS', apply: { features: ['bikeAbs'] } },
+];
+
+/**
+ * Quick chips combine: "Automatic" + "Sedan" gives automatic sedans. A chip is lit while its filter is on, tapping it
+ * again turns just that one off, and "All" clears everything. Chips about the same thing (SUV / Sedan, Petrol / Diesel)
+ * replace each other, since a car can only be one of them.
+ */
+export const chipOn = (f: ExploreFilters, c: QuickChip): boolean => {
+  if (c.label === 'All') return countActive(f) === 0;
+  const apply = c.apply;
+  if (!apply) return false;
+  return Object.entries(apply).every(([key, want]) =>
+    key === 'features' ? (want as string[]).every((x) => f.features.includes(x)) : (f as any)[key] === want);
+};
+
+export const toggleChip = (f: ExploreFilters, c: QuickChip): ExploreFilters => {
+  if (c.label === 'All' || !c.apply) return EMPTY_FILTERS;
+  const next: ExploreFilters = { ...f, features: [...f.features] };
+  const on = chipOn(f, c);
+  for (const [key, want] of Object.entries(c.apply)) {
+    if (key === 'features') {
+      const keys = want as string[];
+      next.features = on ? next.features.filter((x) => !keys.includes(x)) : Array.from(new Set([...next.features, ...keys]));
+    } else {
+      (next as any)[key] = on ? null : want;
+    }
+  }
+  return next;
+};
+
+/** The quick chips for the kind of vehicle being browsed. */
+export const chipsFor = (isBike: boolean): QuickChip[] => (isBike ? BIKE_CHIPS : QUICK_CHIPS);
+
 
 /**
  * Ratings for a list of vehicles, from their public reviews (same cache key the cards use).
@@ -332,13 +369,15 @@ const TABS: { key: Tab; label: string }[] = [
 
 type Option = { key: string; label: string; count: number };
 
-export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, ratingOf, initialTab = 'budget' }: {
+export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, bike, ratingOf, initialTab = 'budget' }: {
   visible: boolean;
   onClose: () => void;
   value: ExploreFilters;
   onApply: (f: ExploreFilters) => void;
   /** The vehicles the options and counts are built from (current Cars / Bikes / All selection). */
   cars: Car[];
+  /** Browsing bikes: set by the screen so the options are bike ones even when the list is empty. */
+  bike?: boolean;
   ratingOf: (c: Car) => number | null;
   initialTab?: Tab;
 }) {
@@ -348,7 +387,7 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, rat
   useEffect(() => { if (visible) { setDraft(value); setTab(initialTab); } }, [visible]);
 
   // The list is all bikes (Explore's Bikes tab) or not: the options below follow it.
-  const isBike = cars.length > 0 && cars.every((c) => c.type === 'Bike');
+  const isBike = bike ?? (cars.length > 0 && cars.every((c) => c.type === 'Bike'));
 
   const opts = useMemo(() => {
     const count = (test: (c: Car) => boolean) => cars.filter(test).length;

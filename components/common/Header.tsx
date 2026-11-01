@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, Image, TextStyle } from 'react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
@@ -87,7 +87,7 @@ export function Header({
               accessibilityLabel="SawariCash Wallet"
               onPress={() => {
                 Haptics.selectionAsync();
-                router.push('/rewards');
+                router.push('/wallet');
               }}
               style={({ pressed }) => [
                 styles.cashBadge,

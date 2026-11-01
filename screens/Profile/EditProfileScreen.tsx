@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, Pressable, ScrollView, Platform, KeyboardAvoidingView, Alert, Linking, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';

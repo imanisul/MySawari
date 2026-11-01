@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { useDetailsPalette } from './detailsPalette';

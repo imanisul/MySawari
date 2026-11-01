@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, Alert, Keyboard, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { getDevicePosition, POSITION_FAILURE_MESSAGE } from '@/utils/location';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';

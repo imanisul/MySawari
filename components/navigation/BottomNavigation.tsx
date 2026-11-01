@@ -3,7 +3,7 @@ import { Animated, Linking, Pressable, StyleSheet, Text, View } from 'react-nati
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { BottomBlur } from '@/components/common/BottomBlur';
 import Svg, { Circle, Path } from 'react-native-svg';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';

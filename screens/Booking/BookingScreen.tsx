@@ -6,7 +6,7 @@ import { Alert, LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, TextIn
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { Image } from 'expo-image';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { useSawari } from '@/context/SawariContext';
@@ -168,7 +168,8 @@ export default function BookingScreen() {
   const removeCoupon = () => { applyCoupon(null); setCouponInput(''); setCouponError(null); };
 
   const isMember = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
-  const tripRent = (pricingQuote?.rentalAmount || 0) + (pricingQuote?.driverCharge || 0);
+  // The base of every membership discount: the vehicle rent alone (what the quote applies the plan's % to).
+  const tripRent = pricingQuote?.rentalAmount || 0;
 
   // "Pay & Book" never does nothing silently: a guest gets the login sheet, and a price still loading is
   // waited for (the payment opens by itself once it arrives).

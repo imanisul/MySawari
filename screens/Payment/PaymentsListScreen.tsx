@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useQuery } from '@tanstack/react-query';
 import { Reveal } from '@/components/common/Reveal';
 import { PaymentsSkeleton } from '@/components/loading/ScreenSkeletons';

@@ -4,7 +4,7 @@ import { Header } from '@/components';
 import { useColors } from '@/hooks/useColors';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 // Enable LayoutAnimation for Android on older architecture

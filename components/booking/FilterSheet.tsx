@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Animated } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { Category } from '@/utils/sawari';
 import { ModalBlur } from '@/components/common/ModalBlur';
 

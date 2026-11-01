@@ -74,7 +74,7 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     const { rate, tripCap, annualCap } = PLAN_RATES[planKey];
     const remaining = Math.max(0, annualCap - (membership?.totalSaved || 0));
     membershipDiscount = Math.min(
-      Math.round(original * rate),
+      Math.round(q.rentalAmount * rate),
       tripCap,
       remaining,
     );

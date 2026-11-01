@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, Animated, Easing, Image, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useTripPrice } from './useTripPrice';

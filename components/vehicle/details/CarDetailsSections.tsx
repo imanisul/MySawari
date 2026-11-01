@@ -7,7 +7,7 @@ import Svg, { Defs, RadialGradient, Stop, Rect, Path } from 'react-native-svg';
 import { Image } from 'expo-image';
 import type { ImageSourcePropType } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useQuery } from '@tanstack/react-query';
 import { PhotoViewer } from '@/components/common/PhotoViewer';
 import { LoadingImage } from '@/components/common/LoadingImage';

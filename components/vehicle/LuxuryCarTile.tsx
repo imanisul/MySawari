@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { Feather } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { Car, getAvailability, splitDateRange, dayNumToLabel, todayDayNum } from '@/utils/sawari';

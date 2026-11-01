@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
@@ -17,6 +17,7 @@ import {
   WhyRent, LocationCard, CancellationPolicy, Inclusions, PaymentSchedule, Faqs, HelpCard, PolicyAgreement,
 } from '@/components/vehicle/details/CarDetailsSections';
 import { StickyBookingBar } from '@/components/vehicle/details/StickyBookingBar';
+import { useTripPrice } from '@/components/vehicle/details/useTripPrice';
 import { longAvail } from '@/components/vehicle/CarListCard';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { BlurHost } from '@/components/common/BottomBlur';
@@ -85,6 +86,9 @@ export default function CarDetailsScreen() {
   const tripLabel = hasTrip
     ? `${dayNumToLabel(requestedStart!)}, ${hhmm(pickupTime)} – ${dayNumToLabel(requestedEnd!)}, ${hhmm(returnTime)}`
     : 'Select your trip dates';
+  // Rent for the plan options' "Save ₹X": the quote's own rental amount (it counts the 8 AM-to-8 AM days), so what the
+  // options promise is what the quote then applies. Before the quote arrives, the day rate × days.
+  const tripPrice = useTripPrice(hasTrip);
   const tripDays = hasTrip ? Math.max(1, parseInt(duration, 10) || requestedEnd! - requestedStart!) : 1;
   const freeCancelUntil = requestedStart !== null ? `${dayNumToLabel(requestedStart - 1)}, ${pickupTime}` : null;
 
@@ -264,8 +268,8 @@ export default function CarDetailsScreen() {
 
         <View onLayout={onSectionLayout('benefits')}>
           <Benefits />
-          {!hasMembership && <MembershipPicker tripRent={selectedCar.perDay * tripDays} />}
-          {canUpgrade && <MembershipUpgrade tripRent={selectedCar.perDay * tripDays} currentPlan={membership!.plan as 'starter' | 'plus'} />}
+          {!hasMembership && <MembershipPicker tripRent={tripPrice.state === 'ready' ? tripPrice.rentalAmount : selectedCar.perDay * tripDays} />}
+          {canUpgrade && <MembershipUpgrade tripRent={tripPrice.state === 'ready' ? tripPrice.rentalAmount : selectedCar.perDay * tripDays} currentPlan={membership!.plan as 'starter' | 'plus'} />}
         </View>
 
         <ReviewsStrip car={enrichedCar} />

@@ -3,7 +3,7 @@ import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { Car, dayNumToLabel, getAvailability, parseDayLabel, splitDateRange, todayDayNum } from '@/utils/sawari';
@@ -20,8 +20,8 @@ import { ActivityAPI } from '@/services/api/activity';
 import { SortArrowsIcon, FunnelIcon } from '@/components/common/FilterIcons';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
-  ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, QUICK_CHIPS, QuickChip,
-  chipFor, countActive, matchesFilters, sortCars, useVehicleRatings,
+  ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, QuickChip,
+  chipOn, toggleChip, chipsFor, countActive, matchesFilters, sortCars, useVehicleRatings,
 } from '@/components/explore/ExploreFilters';
 
 /**
@@ -50,7 +50,6 @@ export default function SearchResultsScreen() {
 
   const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortKey>('recommended');
-  const [chip, setChip] = useState('All');
   const [showFilter, setShowFilter] = useState(false);
   const [showSort, setShowSort] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -147,13 +146,12 @@ export default function SearchResultsScreen() {
   }, [pickupTime, returnTime, setDates]);
 
   const clearFilters = useCallback(() => {
-    setFilters(EMPTY_FILTERS); setChip('All'); setSort('recommended'); setSearchQuery(''); setDebouncedQuery('');
+    setFilters(EMPTY_FILTERS); setSort('recommended'); setSearchQuery(''); setDebouncedQuery('');
   }, []);
 
   const pickChip = (c: QuickChip) => {
     Haptics.selectionAsync();
-    setChip(c.label);
-    setFilters({ ...EMPTY_FILTERS, ...(c.apply || {}) });
+    setFilters((cur) => toggleChip(cur, c));
   };
 
   // The first cards rise in once, when results first appear. Cards re-mounted while scrolling (the list
@@ -224,8 +222,8 @@ export default function SearchResultsScreen() {
           <FunnelIcon color={activeFilterCount ? p.navy : p.muted} />
           <Text style={[styles.chipText, { color: activeFilterCount ? p.navy : p.sub }]}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
         </Pressable>
-        {QUICK_CHIPS.map((c) => {
-          const on = chip === c.label;
+        {chipsFor(vehicleType === 'bike').map((c) => {
+          const on = chipOn(filters, c);
           return (
             <Pressable
               key={c.label}
@@ -313,8 +311,9 @@ export default function SearchResultsScreen() {
         onClose={() => setShowFilter(false)}
         value={filters}
         cars={freeCars}
+        bike={vehicleType === 'bike'}
         ratingOf={reviewRating}
-        onApply={(f) => { setFilters(f); setChip(chipFor(f)); }}
+        onApply={setFilters}
       />
       <SortSheet visible={showSort} onClose={() => setShowSort(false)} value={sort} onApply={setSort} />
     </View>

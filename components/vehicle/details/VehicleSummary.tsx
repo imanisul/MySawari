@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useQuery } from '@tanstack/react-query';
 import { Car, MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { API } from '@/services/backend/api';

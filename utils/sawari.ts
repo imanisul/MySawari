@@ -92,6 +92,8 @@ export type Car = {
   bookedRanges?: { start: string; end: string; status?: string }[];
   /** When a vehicle in service is due back (ISO), if known. */
   maintenanceUntil?: string | null;
+  /** Trips taken or under way in the last 90 days (from the server): ranks "Trending vehicles" on Home. */
+  recentBookings?: number;
   /** Availability for the dates the user is currently looking at. */
   availability?: AvailabilityInfo;
 };
@@ -523,6 +525,12 @@ export const isRealDate = (label?: string | null) => parseDayLabel(label ?? unde
  * "High demand for these dates": at least two other live bookings on, or within `slackDays` of, the chosen trip.
  * Only meaningful once dates are chosen — without them there is nothing to be in demand for.
  */
+/** In the workshop right now (status service / maintenance): such vehicles are not offered on Home or Explore. */
+export const isInService = (car: { dbStatus?: string } | undefined | null) => {
+  const st = (car?.dbStatus || '').toLowerCase();
+  return st === 'service' || st === 'maintenance';
+};
+
 export function isHighDemand(car: Car | undefined | null, tripStart: number | null, tripEnd: number | null, slackDays = 2): boolean {
   if (!car || tripStart === null || tripEnd === null) return false;
   const done = ['cancelled', 'canceled', 'failed', 'rejected', 'completed', 'complete', 'returned', 'closed'];
@@ -559,11 +567,12 @@ function buildBlocks(car: Car, today: number): Block[] {
   const dbStatus = (car.dbStatus || '').toLowerCase();
   
   if (dbStatus === 'service' || dbStatus === 'maintenance') {
+    // Unavailable only for the period it was marked in maintenance for. Once that date has passed the vehicle shows
+    // as available again, even if the workshop status was never changed back. With no end date recorded at all
+    // the duration is unknown, so it stays unavailable until someone sets one.
     const until = isoToDayNum(car.maintenanceUntil);
-    // If the maintenance date has passed but the status is STILL 'service', 
-    // it means the maintenance is taking longer than expected. Treat as indefinite until status changes.
-    const endService = isNaN(until) || until < today ? Infinity : until;
-    blocks.push({ start: today, end: endService, kind: 'service' });
+    if (isNaN(until)) blocks.push({ start: today, end: Infinity, kind: 'service' });
+    else if (until >= today) blocks.push({ start: today, end: until, kind: 'service' });
   } else if (
     (dbStatus === 'rent' || dbStatus === 'booked') &&
     !blocks.some(b => b.start <= today && b.end >= today)

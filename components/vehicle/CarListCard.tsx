@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingImage } from '@/components/common/LoadingImage';

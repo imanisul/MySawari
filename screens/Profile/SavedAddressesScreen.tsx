@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, Pressable, Modal, Share, TextInput, K
 import { BlurTargetView } from 'expo-blur';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSawari } from '@/context/SawariContext';
 import { getSavedAddresses, removeSavedAddress, updateSavedAddress, SavedAddress } from '@/utils/savedAddresses';

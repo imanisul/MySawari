@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
 export type SortKey = 'recommended' | 'price_asc' | 'price_desc' | 'rating';

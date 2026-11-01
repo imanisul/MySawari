@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { useColors } from '@/hooks/useColors';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 
 export interface SpecialDeal {
   _id: string;

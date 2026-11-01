@@ -6,7 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import * as Haptics from '@/utils/haptics';
 
 import { Page, Header, LoginBottomSheet } from '@/components';
 import { MembershipSkeleton } from '@/components/loading/ScreenSkeletons';

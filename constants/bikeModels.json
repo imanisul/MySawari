@@ -1,0 +1,5 @@
+{
+  "_note": "Which two-wheeler models are scooters (gearless = Automatic) and which are geared motorcycles (Manual). A model is one or the other, whatever someone typed into the vehicle record. Match is a lowercase 'name contains'. Add a model here when the fleet gets one.",
+  "scooters": ["ntorq", "activa", "fascino", "pleasure", "access", "avenis", "jupiter", "dio", "burgman", "aerox", "ray zr", "destini", "maestro", "xoom", "chetak", "iqube", "ather", "vespa", "zest", "scooty", "ntorq"],
+  "geared": ["jawa", "yezdi", "hunter", "scram", "classic", "bullet", "himalayan", "meteor", "thunderbird", "xpulse", "xtreme", "splendor", "passion", "hf deluxe", "glamour", "apache", "pulsar", "fz", "mt-15", "r15", "dominar", "duke", "unicorn", "shine", "hornet", "gixxer", "avenger", "platina", "ct 100", "super splendor", "sp 125", "raider"]
+}

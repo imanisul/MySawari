@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, BackHandler, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useQuote } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 
 import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWebView';
@@ -14,7 +14,8 @@ const STEPS = ['Reserving your car', 'Opening secure payment', 'Confirming your 
 export default function PaymentProcessingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { isAuthenticated, isAuthLoading, pricingQuote, quoteParams, createBookingSnapshot, confirmBookingPayment, confirmBooking, customer } = useSawari();
+  const { isAuthenticated, isAuthLoading, createBookingSnapshot, confirmBookingPayment, confirmBooking, customer } = useSawari();
+  const { pricingQuote, quoteParams } = useQuote();
 
   useEffect(() => {
     if (!isAuthLoading && isAuthenticated === false) {

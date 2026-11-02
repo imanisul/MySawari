@@ -1,4 +1,5 @@
 import React from 'react';
+import { safeBack } from '@/utils/navigation';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -12,7 +13,7 @@ export function DriverChargesSheet() {
     <SheetFrame centered height={185}>
       <View style={styles.chargesHeader}>
         <Text style={[styles.chargesTitle, { color: colors.foreground }]}>Driver charges</Text>
-        <Pressable onPress={() => router.back()} accessibilityLabel="Close">
+        <Pressable onPress={() => safeBack(router)} accessibilityLabel="Close">
           <Feather name="x" size={20} color={colors.mutedForeground} />
         </Pressable>
       </View>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
 import { View, Text, StyleSheet, ScrollView, Pressable, Animated, ActivityIndicator, Modal, Image, ImageSourcePropType, RefreshControl, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -352,7 +353,7 @@ export default function MembershipScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back"
             hitSlop={8}
-            onPress={() => router.back()}
+            onPress={() => safeBack(router)}
             style={({ pressed }) => [styles.back, lightHeader ? styles.backLight : styles.backDark, pressed && { opacity: 0.8 }]}
           >
             <Feather name="chevron-left" size={18} color={lightHeader ? '#525252' : '#FFFFFF'} />

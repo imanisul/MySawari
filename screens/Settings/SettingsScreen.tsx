@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -99,7 +100,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: p.page }]}>
       <View style={[styles.header, { borderBottomColor: p.border }]}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => safeBack(router)} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
           <Feather name="chevron-left" size={18} color={p.muted} />
         </Pressable>
         <Text style={[styles.title, { color: p.fg }]}>Settings</Text>

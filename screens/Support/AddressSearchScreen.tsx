@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { View, Text, StyleSheet, TextInput, Pressable, FlatList, ActivityIndicator, Keyboard, Alert } from 'react-native';
 import * as Location from 'expo-location';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -113,7 +114,7 @@ export default function AddressSearchScreen() {
   return (
     <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
       <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => safeBack(router)} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
           <Feather name="chevron-left" size={20} color={p.muted} />
         </Pressable>
         <Text style={[styles.headTitle, { color: p.fg }]}>{kind === 'save' ? (editId ? 'Edit address' : 'Add address') : isReturn ? 'Drop-off address' : 'Pickup address'}</Text>

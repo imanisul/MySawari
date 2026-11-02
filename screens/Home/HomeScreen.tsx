@@ -12,8 +12,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet } from '@/components';
-import { PhoneNumberSheet } from '@/components/auth/PhoneNumberSheet';
-import { onSplashGone } from '@/components/common/AnimatedSplash';
 import { API } from '@/services/backend/api';
 import { useVehicles } from '@/hooks/useVehicles';
 import { recentlyViewedQueryOptions } from '@/hooks/useHomeData';
@@ -111,7 +109,7 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const {
     vehicleType, setVehicleType, customer, selectedCar, selectCar, isAuthenticated, isAuthLoading, setBookingSource, dateRange,
-    membership, fetchWallet, syncNotifications, sawariCash, unreadCount, earnSawariCash, isDarkMode, hasSeenPermissions, completeOnboarding,
+    membership, fetchWallet, syncNotifications, sawariCash, unreadCount, earnSawariCash, isDarkMode,
     dropoff, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress,
   } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
@@ -120,7 +118,6 @@ export default function HomeScreen() {
   const [showCity, setShowCity] = useState(false);
   useEffect(() => { AsyncStorage.getItem('@selected_city').then((c) => { if (c && CITIES.some((x) => x.name === c)) setCityState(c); }).catch(() => {}); }, []);
   const setCity = (c: string) => { setCityState(c); AsyncStorage.setItem('@selected_city', c).catch(() => {}); };
-  const [showPhoneSheet, setShowPhoneSheet] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [manualRefreshing, setManualRefreshing] = useState(false);
   const [claiming, setClaiming] = useState(false);
@@ -149,37 +146,6 @@ export default function HomeScreen() {
 
   // No location-permission request here: the app asks once at start-up (SawariContext's GPS
   // auto-detect). Asking again from Home put a second system popup on screen at launch.
-
-  // Asked once per install (the system remembers the answers; Settings can change them later).
-  // (A ref, so finishing it does not re-run the effect below and cancel the login sheet's timer.)
-  const permsSeen = useRef(hasSeenPermissions);
-  permsSeen.current = hasSeenPermissions;
-  const askFirstRunPermissions = useCallback(async () => {
-    if (permsSeen.current !== false) return;
-    try { await Location.requestForegroundPermissionsAsync(); } catch {}
-    try { await Notifications.requestPermissionsAsync(); } catch {}
-    await completeOnboarding();
-  }, [completeOnboarding]);
-
-  // A guest gets the phone-number sheet rising over Home, once — never for someone already signed in.
-  const phoneSheetShown = useRef(false);
-  useEffect(() => {
-    if (isAuthenticated) phoneSheetShown.current = false; // after sign-out the mandatory prompt returns
-    if (isAuthLoading || phoneSheetShown.current || isAuthenticated) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    // Wait for the splash to actually clear. On a cold launch the data load outlasts any fixed
-    // delay, so a sheet on a timer slides up hidden behind the overlay and is never seen opening.
-    const off = onSplashGone(() => {
-      if (phoneSheetShown.current) return;
-      phoneSheetShown.current = true;
-      // First launch after install: location, then notifications, then the login sheet (so the system
-      // permission dialogs never sit on top of it).
-      askFirstRunPermissions().finally(() => { timer = setTimeout(() => setShowPhoneSheet(true), 400); });
-    });
-    // Only consume the one-shot once the sheet is truly on its way, so a re-run of this effect
-    // during the wait re-subscribes instead of cancelling the sheet for the whole session.
-    return () => { off(); clearTimeout(timer); };
-  }, [isAuthLoading, isAuthenticated]);
 
   // No "Set Location" popup on opening the app: the customer picks a destination from the search card
   // ("Select your Destination") when they want to.
@@ -229,17 +195,6 @@ export default function HomeScreen() {
     // Free vehicles first (recently viewed before curated within each group), then by when they're free again.
     return byAvailability([...viewed, ...curated].filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)))).slice(0, 8);
   }, [viewedIds, fetchedVehicles, dateRange, typeName]);
-
-  // ── Trending: the most booked vehicles of this kind over the last 90 days (liked ones win a tie) ──
-  const trending = useMemo(() => {
-    const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
-    return fetchedVehicles
-      .filter((v) => v.type === typeName && !isInService(v) && (v.recentBookings || 0) > 0)
-      .sort((a, b) => (b.recentBookings || 0) - (a.recentBookings || 0)
-        || (b.rating || 0) * Math.log1p(b.reviewCount || 0) - (a.rating || 0) * Math.log1p(a.reviewCount || 0))
-      .slice(0, 6)
-      .map((v) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; });
-  }, [fetchedVehicles, dateRange, typeName]);
 
   const openPick = useCallback((item: any) => {
     selectCar(item);
@@ -332,7 +287,7 @@ export default function HomeScreen() {
     });
   }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 
-  const sections = useMemo(() => ['header', 'picks', 'trending', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
+  const sections = useMemo(() => ['header', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
     let content: React.ReactNode = null;
@@ -365,25 +320,6 @@ export default function HomeScreen() {
               horizontal
               keyExtractor={(v) => `pick-${v.id}`}
               // The real day rate (vehicle pricePerDay), not a member price: no membership passed to the card.
-              renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.row, { gap: 8 }]}
-              snapToInterval={254}
-              decelerationRate="fast"
-              removeClippedSubviews={false}
-            />
-          </>
-        );
-        break;
-      case 'trending':
-        if (trending.length === 0) break;
-        content = (
-          <>
-            <HomeSectionTitle title="Trending vehicles" />
-            <FlatList
-              data={trending}
-              horizontal
-              keyExtractor={(v) => `trend-${v.id}`}
               renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.row, { gap: 8 }]}
@@ -476,12 +412,6 @@ export default function HomeScreen() {
             tintColor="#FFFFFF"
           />
         }
-      />
-
-      <PhoneNumberSheet
-        visible={showPhoneSheet}
-        onClose={() => setShowPhoneSheet(false)}
-        // The sheet signs the customer in by itself now (phone → code → profile); nothing else to open.
       />
 
       <CitySheet visible={showCity} value={city} onSelect={setCity} onClose={() => setShowCity(false)} />

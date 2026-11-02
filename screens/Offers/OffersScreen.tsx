@@ -1,11 +1,12 @@
 import React from 'react';
+import { safeBack } from '@/utils/navigation';
 import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useQuote } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { calculateCouponDiscount, type Coupon } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
@@ -43,7 +44,8 @@ export default function OffersScreen() {
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const applyMode = mode === 'apply';
-  const { applyCoupon, appliedCouponCode, pricingQuote } = useSawari();
+  const { applyCoupon, appliedCouponCode } = useSawari();
+  const { pricingQuote } = useQuote();
   const [toast, setToast] = React.useState(false);
   const { data: coupons = [], isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['coupons'],
@@ -62,7 +64,7 @@ export default function OffersScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Design: a "Coupon Applied" toast, then back to the Payment Option page.
       setToast(true);
-      setTimeout(() => { setToast(false); router.back(); }, 900);
+      setTimeout(() => { setToast(false); safeBack(router); }, 900);
       return;
     }
     applyCoupon(c.code); // checked again against the trip at checkout

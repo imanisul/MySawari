@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -244,7 +245,7 @@ export default function SearchResultsScreen() {
     <View style={[styles.screen, { backgroundColor: p.page }]}>
       {/* Top bar: back · destination + count · trip dates */}
       <View style={[styles.top, { paddingTop: insets.top + 10 }]}>
-        <Pressable onPress={() => router.back()} style={[styles.back, { backgroundColor: p.iconBg }]} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable onPress={() => safeBack(router)} style={[styles.back, { backgroundColor: p.iconBg }]} accessibilityRole="button" accessibilityLabel="Back">
           <Feather name="chevron-left" size={20} color={p.sub} />
         </Pressable>
         <View style={styles.topText}>

@@ -25,9 +25,8 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
  * ("Check Availability"), so this list shows availability for today, as before.
  */
 
-// The list's first row is the pinned search + chips bar; a message row stands in when there are no cars.
-type Row = Car | { id: string; kind: 'bar' | 'empty' };
-const BAR_ROW: Row = { id: '__bar', kind: 'bar' };
+// A message row stands in when there are no cars.
+type Row = Car | { id: string; kind: 'empty' };
 const EMPTY_ROW: Row = { id: '__empty', kind: 'empty' };
 
 export default function ExploreScreen() {
@@ -50,13 +49,9 @@ export default function ExploreScreen() {
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const listRef = useRef<FlatList<Row>>(null);
-  // The title scrolls away; the search row and chips under it stay pinned. After a new search / filter / sort the
-  // list goes back to its first car — just under the pinned bar — and stays put if the title is still showing.
-  const offsetY = useRef(0);
-  const titleH = useRef(0);
-  const toFirstCar = useCallback(() => {
-    if (offsetY.current > titleH.current) listRef.current?.scrollToOffset({ offset: titleH.current, animated: false });
-  }, []);
+  // The title, search box and filters sit above the list and never scroll. After a new search / filter / sort the
+  // list goes back to its first car.
+  const toFirstCar = useCallback(() => { listRef.current?.scrollToOffset({ offset: 0, animated: false }); }, []);
 
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedQuery(searchQuery); toFirstCar(); }, 300);
@@ -222,33 +217,29 @@ export default function ExploreScreen() {
   );
 
   const rows = useMemo<Row[]>(
-    () => [BAR_ROW, ...(isFetchingCars || filteredCars.length === 0 ? [EMPTY_ROW] : filteredCars)],
+    () => (isFetchingCars || filteredCars.length === 0 ? [EMPTY_ROW] : filteredCars),
     [isFetchingCars, filteredCars],
   );
-  // New function only when something the bar or the message shows changes (typing, chips, sort, loading state);
-  // the car cards themselves are memoised, so they do not redraw.
+  // New function only when something the message shows changes; the car cards themselves are memoised.
   const renderRow = useCallback(({ item }: { item: Row }) => {
-    if ('kind' in item) return item.kind === 'bar' ? bar : empty;
+    if ('kind' in item) return empty;
     return <CarListCard car={item} isExplore />;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, filters, sort, activeFilterCount, isBike, isFetchingCars, fetchError, debouncedQuery, p]);
+  }, [filters, activeFilterCount, isBike, isFetchingCars, fetchError, debouncedQuery, p]);
 
   return (
-    // The list starts below the status bar, so the pinned bar sticks right under it instead of behind it.
     <Page bottomNav scroll={false}>
+      {/* Fixed: title, search box and filters stay put however far the list is scrolled. */}
+      <View style={{ paddingTop: insets.top + 8, backgroundColor: p.page }}>
+        <Text style={[styles.title, { color: p.fg, paddingHorizontal: 16 }]}>Explore</Text>
+        {bar}
+      </View>
       <FlatList
         ref={listRef}
-        style={{ flex: 1, backgroundColor: p.page, marginTop: insets.top }}
+        style={{ flex: 1, backgroundColor: p.page }}
         data={rows}
         keyExtractor={(c) => c.id}
         renderItem={renderRow}
-        ListHeaderComponent={
-          <Text onLayout={(e) => { titleH.current = e.nativeEvent.layout.height; }} style={[styles.title, { color: p.fg, paddingHorizontal: 16, paddingTop: 8 }]}>Explore</Text>
-        }
-        // Row 0 is the search + chips bar: it stays at the top while the cars scroll under it.
-        stickyHeaderIndices={[0]}
-        onScroll={(e) => { offsetY.current = e.nativeEvent.contentOffset.y; }}
-        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         // The last card must clear the fixed tab bar (+ safe area) and the floating help button.
         contentContainerStyle={{ paddingBottom: bottomNavHeight + 88 }}

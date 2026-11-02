@@ -5,7 +5,7 @@ import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { DriverMode } from '@/utils/sawari';
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useQuote } from '@/context/SawariContext';
 
 export function SearchCard({
   mode,
@@ -20,7 +20,8 @@ export function SearchCard({
 }) {
   const colors = useColors();
   const router = useRouter();
-  const { vehicleType, setVehicleType, dateRange, duration, pickup, dropoff, pickupTime, returnTime, isAuthenticated, isDeliveryRequested, setIsDeliveryRequested, deliveryMode, setDeliveryMode, returnAddress, pricingQuote } = useSawari();
+  const { vehicleType, setVehicleType, dateRange, duration, pickup, dropoff, pickupTime, returnTime, isAuthenticated, isDeliveryRequested, setIsDeliveryRequested, deliveryMode, setDeliveryMode, returnAddress } = useSawari();
+  const { pricingQuote } = useQuote();
   
   const [startStr, endStr] = dateRange.split(' – ');
   const hasValidDates = startStr && endStr && startStr !== 'Select' && endStr !== 'Select';

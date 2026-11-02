@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { BlurHost, BottomBlur } from '@/components/common/BottomBlur';
 import { BlurTargetView } from 'expo-blur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
@@ -9,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { Image } from 'expo-image';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useQuote } from '@/context/SawariContext';
 import { checkCarAvailability } from '@/utils/sawari';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { API } from '@/services/backend/api';
@@ -69,9 +70,10 @@ export default function BookingScreen() {
   const {
     mode, setMode, selectedCar, pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested,
     deliveryMode, setDeliveryMode, dateRange, pickupTime, returnTime, customer, isAuthenticated,
-    pricingQuote, isQuoteLoading, applyCoupon, appliedCouponCode, sawariCash, sawariCashToApply, applySawariCash, membership,
-    refreshQuote, planToBuy, setPlanToBuy,
+    applyCoupon, appliedCouponCode, sawariCash, sawariCashToApply, applySawariCash, membership,
+    planToBuy, setPlanToBuy,
   } = useSawari();
+  const { pricingQuote, isQuoteLoading, refreshQuote } = useQuote();
   const [celebrate, setCelebrate] = useState<{ name: string; price: number; save: number; pctLabel: string } | null>(null);
   const price = useTripPrice(!!dateRange && !dateRange.includes('Select'));
 
@@ -246,7 +248,7 @@ export default function BookingScreen() {
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: 260 + insets.bottom }]}>
           {/* Header */}
           <View style={styles.header}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => router.back()} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => safeBack(router)} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
               <Feather name="chevron-left" size={18} color={p.sub} />
             </Pressable>
             <View style={{ flex: 1 }}>
@@ -562,7 +564,7 @@ export default function BookingScreen() {
           onClose={() => {
             setShowLogin(false);
             if (isAuthenticated === false) {
-              router.back();
+              safeBack(router);
             }
           }}
           onLoginSuccess={() => setShowLogin(false)}

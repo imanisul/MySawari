@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Keyboard, Modal, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, BackHandler, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
 import { Feather } from '@expo/vector-icons';
@@ -70,9 +70,9 @@ export function LoginBottomSheet({
   visible: boolean;
   onClose: () => void;
   onLoginSuccess?: () => void;
-  /** "SKIP" on the phone step (closes the sheet). */
+  /** Legacy prop (callers still pass it): the sheet shows no SKIP any more. */
   showSkip?: boolean;
-  /** If true, user cannot dismiss without logging in. */
+  /** Mandatory sign-in (first launch): no way to dismiss the sheet. Otherwise tapping outside closes it. */
   required?: boolean;
 }) {
   const colors = useColors();
@@ -89,6 +89,9 @@ export function LoginBottomSheet({
     : LIGHT;
 
   // Each step eases in (fade + a short rise); the final "done" step pops its check mark in.
+  // Focus the number field once the sheet has finished sliding up. With autoFocus the keyboard rose while the sheet
+  // was still moving, and the two motions fought each other (the "shake").
+  const phoneRef = useRef<TextInput>(null);
   const stepAnim = useRef(new Animated.Value(1)).current;
   const doneScale = useRef(new Animated.Value(0)).current;
   const [welcomeName, setWelcomeName] = useState('');
@@ -198,13 +201,21 @@ export function LoginBottomSheet({
   }, [step, referral, pendingReferral]);
 
   useEffect(() => {
+    // The sheet changes height between steps; easing that (and only fading the content in) keeps it from jolting.
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     stepAnim.setValue(0);
-    Animated.timing(stepAnim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+    Animated.timing(stepAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
     if (step === 'done') {
       doneScale.setValue(0);
       Animated.spring(doneScale, { toValue: 1, friction: 5, tension: 90, useNativeDriver: true }).start();
     }
   }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!visible || step !== 'phone') return;
+    const t = setTimeout(() => phoneRef.current?.focus(), 380);
+    return () => clearTimeout(t);
+  }, [visible, step]);
 
   // Resend countdown.
   useEffect(() => {
@@ -244,6 +255,8 @@ export function LoginBottomSheet({
   };
 
   // ── Step 1: phone ──
+  useEffect(() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); }, [error]);
+
   const sendOtp = async () => {
     if (mobile.length !== 10 || (isFirstTime && !termsAccepted) || loading) return;
     Haptics.selectionAsync().catch(() => {});
@@ -379,6 +392,8 @@ export function LoginBottomSheet({
           back();
         } else if (!loading && !required) {
           onClose();
+        } else if (required && step === 'phone') {
+          BackHandler.exitApp();
         }
       }}
       statusBarTranslucent
@@ -395,7 +410,7 @@ export function LoginBottomSheet({
           {/* The white sheet runs down behind the keyboard; its content sits above it. */}
           <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: kb.pad > 0 ? kb.pad + 16 : Math.max(insets.bottom, 16) }]}>
 
-          <Animated.View style={[styles.stepWrap, { opacity: stepAnim, transform: [{ translateY: stepAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] }]}>
+          <Animated.View style={[styles.stepWrap, { opacity: stepAnim }]}>
           {step === 'phone' && (
             <>
               <View style={styles.headRow}>
@@ -441,7 +456,7 @@ export function LoginBottomSheet({
                   textContentType="telephoneNumber"
                   autoComplete="tel"
                   maxLength={11}
-                  autoFocus
+                  ref={phoneRef}
                   editable={!loading}
                   returnKeyType="done"
                   onSubmitEditing={sendOtp}

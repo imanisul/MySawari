@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -14,7 +15,7 @@ export function ScreenHeader({ title, divider, onBack, right }: { title: string;
   const router = useRouter();
   return (
     <View style={[styles.header, divider && { borderBottomWidth: 1, borderBottomColor: p.border }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack ?? (() => router.back())} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack ?? (() => safeBack(router))} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
         <Feather name="chevron-left" size={24} color={p.muted} />
       </Pressable>
       <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header" numberOfLines={1}>{title}</Text>

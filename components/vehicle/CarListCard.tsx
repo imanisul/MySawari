@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
@@ -9,7 +9,7 @@ import { Car, getAvailability, MIN_PUBLIC_REVIEW_RATING, parseDayLabel, bestFor 
 export { bestFor };
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { API } from '@/services/backend/api';
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useFavorites } from '@/context/SawariContext';
 import { ActivityAPI } from '@/services/api/activity';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { clearMembershipPopupShown } from '@/components/vehicle/details/MembershipSavedPopup';
@@ -44,7 +44,7 @@ export const longAvail = (label?: string) => {
 
 const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress }: CarListCardProps & { onCarPress: () => void }) {
   const p = useDetailsPalette();
-  const { favorites, toggleFavorite } = useSawari();
+  const { favorites, toggleFavorite } = useFavorites();
   const { width: windowWidth } = useWindowDimensions();
   // Photo width known synchronously (screen − 16 margins − 4 card padding each side).
   // Calculated once on render without onLayout state jumps so scrolling never stutters.
@@ -194,30 +194,40 @@ export const CarListCard = React.memo(function CarListCard(props: CarListCardPro
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
+  // The press handler must keep one identity: the card underneath is memoised, and a new function on every context
+  // change redrew the whole list (70 cards) at the very moment a car was tapped — the screen stuttered / shook.
+  // It reads the latest values from this ref instead.
+  const latest = useRef({ props, selectCar, globalDateRange, setDateRange, busy });
+  latest.current = { props, selectCar, globalDateRange, setDateRange, busy };
+
   const handleCarPress = React.useCallback(() => {
-    if (busy) return;
+    const { props: pr, selectCar: select, globalDateRange: global, setDateRange: setRange, busy: isBusy } = latest.current;
+    if (isBusy) return;
     setBusy(true);
     setTimeout(() => setBusy(false), 500);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    ActivityAPI.logActivity('click_car', 'CarListCard', { carId: props.car.id, carName: props.car.name });
-    if (props.onPressOverride) {
-      props.onPressOverride();
+    ActivityAPI.logActivity('click_car', 'CarListCard', { carId: pr.car.id, carName: pr.car.name });
+    if (pr.onPressOverride) {
+      pr.onPressOverride();
       return;
     }
-    selectCar(props.car);
-    clearMembershipPopupShown(props.car.id);
-    const dateRange = props.effectiveDateRange ?? globalDateRange;
+    select(pr.car);
+    clearMembershipPopupShown(pr.car.id);
+    const dateRange = pr.effectiveDateRange ?? global;
     const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
 
-    if (!isDateSelected && props.onIntercept) {
-      props.onIntercept();
+    if (!isDateSelected && pr.onIntercept) {
+      pr.onIntercept();
     } else {
-      if (props.isExplore || (props.effectiveDateRange && props.effectiveDateRange !== globalDateRange)) {
-        setDateRange(props.effectiveDateRange || '');
+      const wanted = pr.effectiveDateRange || '';
+      // Only when it actually differs: setting the same value again still re-rendered Explore and the new screen
+      // right as the transition started.
+      if ((pr.isExplore || (pr.effectiveDateRange && pr.effectiveDateRange !== global)) && wanted !== global) {
+        setRange(wanted);
       }
       router.push('/car-details');
     }
-  }, [busy, props.car, selectCar, props.onIntercept, props.onPressOverride, props.effectiveDateRange, globalDateRange, setDateRange, router, props.isExplore]);
+  }, [router]);
 
   return <CarListCardUI {...props} onCarPress={handleCarPress} />;
 });

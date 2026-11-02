@@ -5,6 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { safeBack } from '@/utils/navigation';
 import * as Haptics from '@/utils/haptics';
 import * as Clipboard from 'expo-clipboard';
 import Svg, { Path } from 'react-native-svg';
@@ -137,6 +138,18 @@ export default function ReferEarnScreen() {
             <LinearGradient colors={['#5546D9', '#9A8EF1']} style={[styles.heroBg, { height: heroH }]}>
               <Rays width={width} height={heroH} cy={cardTop - 14} />
             </LinearGradient>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              onPress={() => {
+                Haptics.selectionAsync();
+                safeBack(router);
+              }}
+              hitSlop={8}
+              style={({ pressed }) => [styles.backBtn, { top: insets.top + 8 }, pressed && { opacity: 0.7 }]}
+            >
+              <Feather name="chevron-left" size={22} color="#FFFFFF" />
+            </Pressable>
             <View style={[styles.heroCard, { top: cardTop, backgroundColor: p.page, borderColor: p.purpleBorder }]}>
               <Text style={[styles.heroTitle, { color: PURPLE }]} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>Invite Friends. Earn {pct} Back.</Text>
               <Text style={[styles.heroSub, { color: p.sub }]}>Get {pct} of your friend’s booking amount as wallet cash when they complete their first trip.</Text>
@@ -223,6 +236,17 @@ export default function ReferEarnScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  backBtn: {
+    position: 'absolute',
+    left: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
   heroBg: { position: 'absolute', left: 0, right: 0, top: 0, borderBottomLeftRadius: 22, borderBottomRightRadius: 22, overflow: 'hidden' },
   avatars: { position: 'absolute', width: 152, height: 66 },
   // Three overlapping photos from the design: two side ones lower, the centre one larger, on top, white ring.

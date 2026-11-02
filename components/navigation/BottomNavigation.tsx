@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { Animated, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, BackHandler, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { BottomBlur } from '@/components/common/BottomBlur';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -103,6 +103,16 @@ function HelpButton() {
   const helpColor = isDarkMode ? colors.foreground : HELP_INK;
   const [open, setOpen] = useState(false);
   const anim = useRef(new Animated.Value(0)).current;
+
+  // Intercept Android hardware back when Help menu is open to dismiss it
+  useEffect(() => {
+    if (!open) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      toggle(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [open]);
 
   // The menu sits in layout (not absolutely) so the bar grows upward to hold it:
   // Android drops taps that land outside a parent's bounds.

@@ -3,12 +3,15 @@ import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
 import { useDetailsPalette } from './detailsPalette';
 
 /** Car name + trip dates (tap to edit) · favourite · share. */
 export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string; tripLabel: string; onEditTrip: () => void }) {
   const p = useDetailsPalette();
+  const router = useRouter();
   const { selectedCar, favorites, toggleFavorite } = useSawari();
 
   const isFavorite = favorites.includes(selectedCar.id);
@@ -33,6 +36,20 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
   return (
     <SafeAreaView edges={['top']} style={{ backgroundColor: p.page, zIndex: 10 }}>
       <View style={styles.header}>
+        {/* Back button */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          onPress={() => {
+            Haptics.selectionAsync();
+            safeBack(router);
+          }}
+          hitSlop={8}
+          style={({ pressed }) => [styles.iconBtn, { backgroundColor: p.iconBg }, pressed && { opacity: 0.7 }]}
+        >
+          <Feather name="chevron-left" size={20} color={p.sub} />
+        </Pressable>
+
         {/* The whole name + dates block opens the trip editor, not just the small "Edit" label. */}
         <Pressable
           accessibilityRole="button"

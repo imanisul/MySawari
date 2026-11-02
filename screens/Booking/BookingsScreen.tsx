@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
@@ -85,20 +85,24 @@ export default function BookingsScreen() {
   const tabs = hasCancelled ? TABS : TABS.filter((t) => t !== 'Cancelled');
   useEffect(() => { if (!hasCancelled && tab === 'Cancelled') setTab('All'); }, [hasCancelled, tab]);
 
+  const vehicleMap = useMemo(() => new Map(vehicles.map((v) => [v.id, v])), [vehicles]);
+
   // Active only once the operations app has handed the vehicle over (status mapped to ONGOING).
-  const filtered = bookings
-    .filter((b) => {
-      if (tab === 'All') return true;
-      if (tab === 'Upcoming') return b.status === 'CONFIRMED' || b.status === 'PENDING';
-      if (tab === 'Active') return b.status === 'ONGOING';
-      if (tab === 'Completed') return b.status === 'COMPLETED';
-      return b.status === 'CANCELLED' || b.status === 'FAILED';
-    })
-    .sort(byRecent);
+  const filtered = useMemo<BookingSnapshot[]>(() => {
+    return bookings
+      .filter((b) => {
+        if (tab === 'All') return true;
+        if (tab === 'Upcoming') return b.status === 'CONFIRMED' || b.status === 'PENDING';
+        if (tab === 'Active') return b.status === 'ONGOING';
+        if (tab === 'Completed') return b.status === 'COMPLETED';
+        return b.status === 'CANCELLED' || b.status === 'FAILED';
+      })
+      .sort(byRecent);
+  }, [bookings, tab]);
 
   const bookAgain = (b: BookingSnapshot) => {
     Haptics.selectionAsync();
-    const car = vehicles.find((v) => v.id === b.vehicleId);
+    const car = vehicleMap.get(b.vehicleId);
     if (car) { selectCar(car); router.push('/car-details'); }
     else router.push('/explore');
   };
@@ -208,7 +212,7 @@ export default function BookingsScreen() {
               <TripCard
                 p={p}
                 booking={b}
-                image={vehicles.find((v) => v.id === b.vehicleId)?.image}
+                image={vehicleMap.get(b.vehicleId)?.image}
                 canRate={b.status === 'COMPLETED' && !reviewed(b)}
                 onOpen={() => router.push(`/booking-detail?id=${b.id}` as any)}
                 onRate={() => setReviewTrip({ bookingId: b.id, carId: String(b.vehicleId), vehicleName: b.vehicleName })}

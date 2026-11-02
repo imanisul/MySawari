@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useQuote } from '@/context/SawariContext';
 import { bookingsQueryOptions } from '@/hooks/useHomeData';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { PricingSummary, tripTotal, shortDate } from '@/components/booking/TripDetailParts';
@@ -29,7 +29,8 @@ export default function ConfirmationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { selectedCar, mode, dateRange, duration, pickupTime, returnTime, pricingQuote, lastBooking } = useSawari();
+  const { selectedCar, mode, dateRange, duration, pickupTime, returnTime, lastBooking } = useSawari();
+  const { pricingQuote } = useQuote();
 
   // The new booking shows on Home and in My Trips straight away.
   React.useEffect(() => {

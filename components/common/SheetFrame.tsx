@@ -1,4 +1,5 @@
 import React from 'react';
+import { safeBack } from '@/utils/navigation';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -28,7 +29,7 @@ export function SheetFrame({
       style={[styles.sheetScreen, { backgroundColor: colors.overlay }]}
       {...(fill ? { behavior: Platform.OS === 'ios' ? 'padding' : undefined } : null)}
     >
-      <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} />
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => safeBack(router)} />
       <View
         style={[
           styles.sheet,
@@ -49,7 +50,7 @@ export function SheetFrame({
 export function SheetHeader({
   title,
   subtitle,
-  onClose = () => router.back(),
+  onClose = () => safeBack(router),
 }: {
   title: string;
   subtitle?: string;

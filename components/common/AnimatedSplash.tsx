@@ -12,7 +12,10 @@ const splashGoneListeners = new Set<() => void>();
 
 /** Runs `cb` once the launch splash is off screen — immediately if it already is. */
 export function onSplashGone(cb: () => void): () => void {
-  if (hasShownSplash) return () => {};
+  if (hasShownSplash) {
+    cb();
+    return () => {};
+  }
   splashGoneListeners.add(cb);
   return () => splashGoneListeners.delete(cb);
 }

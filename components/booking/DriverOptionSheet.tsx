@@ -1,4 +1,5 @@
 import React from 'react';
+import { safeBack } from '@/utils/navigation';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -30,7 +31,7 @@ export function DriverOptionSheet() {
         onPress={() => setMode('With Driver')}
       />
       <View style={{ marginTop: 24 }}>
-        <PrimaryButton label="Confirm Option" icon={undefined} onPress={() => router.back()} />
+        <PrimaryButton label="Confirm Option" icon={undefined} onPress={() => safeBack(router)} />
       </View>
     </SheetFrame>
   );

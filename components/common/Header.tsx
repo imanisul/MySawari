@@ -1,4 +1,5 @@
 import React from 'react';
+import { safeBack } from '@/utils/navigation';
 import { Pressable, StyleSheet, Text, View, Image, TextStyle } from 'react-native';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
@@ -43,7 +44,7 @@ export function Header({
           testID={back ? 'back-button' : 'brand-home'}
           onPress={() => {
             Haptics.selectionAsync();
-            if (back) router.back();
+            if (back) safeBack(router);
             else router.replace('/');
           }}
           style={styles.headerTitleWrap}

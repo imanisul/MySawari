@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { Pressable, StyleSheet, Text, View, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useQuote } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { formatCurrency, calculateCouponDiscount } from '@/services/backend/pricingEngine';
 import { Reveal } from '@/components/common/Reveal';
@@ -21,10 +22,6 @@ export default function PaymentScreen() {
     dateRange,
     customer,
     sawariCash,
-    pricingQuote,
-    isQuoteLoading,
-    quoteError,
-    refreshQuote,
     applyCoupon,
     appliedCouponCode,
     applySawariCash,
@@ -36,6 +33,7 @@ export default function PaymentScreen() {
     isAuthLoading,
     membership
   } = useSawari();
+  const { pricingQuote, isQuoteLoading, quoteError, refreshQuote } = useQuote();
 
   useFocusEffect(
     useCallback(() => {
@@ -110,7 +108,7 @@ export default function PaymentScreen() {
         <View style={[styles.topBar, { paddingTop: insets.top }]}>
           <Pressable
             accessibilityLabel="Back"
-            onPress={() => router.back()}
+            onPress={() => safeBack(router)}
             style={[styles.headerIconButton, { backgroundColor: '#f5f5f5' }]}
           >
             <Feather name="chevron-left" size={20} color="#262626" />
@@ -133,7 +131,7 @@ export default function PaymentScreen() {
           {/* YOUR TRIP — read-only summary of choices already made earlier in the funnel */}
           <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
             <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 0 }]}>Your Trip</Text>
-            <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Pressable onPress={() => safeBack(router)} hitSlop={8}>
               <Text style={{ color: colors.blue, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Edit</Text>
             </Pressable>
           </View>

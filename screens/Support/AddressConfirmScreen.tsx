@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { safeBack } from '@/utils/navigation';
 import { View, Text, StyleSheet, TextInput, Pressable, ActivityIndicator, Platform, Keyboard, Alert, Animated, ScrollView } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
@@ -374,7 +375,7 @@ export default function AddressConfirmScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={searchOpen ? 'Close search' : 'Back'}
-          onPress={() => (searchOpen ? closeSearch() : router.back())}
+          onPress={() => (searchOpen ? closeSearch() : safeBack(router))}
           hitSlop={8}
           style={[styles.round, styles.shadow, { backgroundColor: p.page }]}
         >

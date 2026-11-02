@@ -1,4 +1,4 @@
-import { useSawari } from '@/context/SawariContext';
+import { useSawari, useQuote } from '@/context/SawariContext';
 import { BOOKING_ADVANCE_AMOUNT } from '@/services/backend/pricingEngine';
 
 const PLAN_NAMES: Record<string, string> = { starter: 'Starter', plus: 'Plus', pro: 'Pro' };
@@ -53,7 +53,8 @@ export type TripPrice =
  * car and these dates isn't in yet, the state says so.
  */
 export function useTripPrice(hasTrip: boolean): TripPrice {
-  const { selectedCar, pricingQuote: q, isQuoteLoading, quoteError, refreshQuote, membership } = useSawari();
+  const { selectedCar, membership } = useSawari();
+  const { pricingQuote: q, isQuoteLoading, quoteError, refreshQuote } = useQuote();
   const perDay = selectedCar?.perDay || 0;
 
   if (!hasTrip) return { state: 'no-dates', perDay };

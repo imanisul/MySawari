@@ -80,15 +80,10 @@ type SawariContextValue = {
   returnAddress: LocationResult | null;
   setReturnAddress: (loc: LocationResult | null) => void;
   
-  // NEW BOOKING STATE
-  pricingQuote: PricingQuote | null;
-  quoteParams: Omit<QuoteParams, 'availableSawariCash'>;
-  isQuoteLoading: boolean;
-  quoteError: string | null;
+  // NEW BOOKING STATE (the price quote itself lives in QuoteContext — see useQuote)
   appliedCouponCode: string | null;
   sawariCashToApply: number;
   fuelEstimate: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number } | null;
-  refreshQuote: () => Promise<void>;
   
   applyCoupon: (code: string | null) => void;
   applySawariCash: (amount: number) => void;
@@ -153,6 +148,29 @@ type SawariContextValue = {
 };
 
 const SawariContext = createContext<SawariContextValue | null>(null);
+// Two small contexts for what long lists need. SawariContext changes on almost every tap (selected car, price quote,
+// wallet …) and redraws every component that reads it; a list of 70 cards reading it froze for a moment when a car
+// was opened. These two change only when favourites / the theme change.
+export type QuoteValue = {
+  pricingQuote: PricingQuote | null;
+  quoteParams: Omit<QuoteParams, 'availableSawariCash'>;
+  isQuoteLoading: boolean;
+  quoteError: string | null;
+  refreshQuote: () => Promise<void>;
+};
+// The price quote refreshes on almost every booking choice and flips "loading" twice each time. Kept in its own
+// context so those updates reach only the few price screens, not every component in the app.
+const QuoteContext = createContext<QuoteValue | null>(null);
+export function useQuote(): QuoteValue {
+  const q = useContext(QuoteContext);
+  if (!q) throw new Error('useQuote must be used within a SawariProvider');
+  return q;
+}
+const ThemeContext = createContext(false);
+type FavoritesValue = { favorites: string[]; toggleFavorite: (carId: string) => void };
+const FavoritesContext = createContext<FavoritesValue>({ favorites: [], toggleFavorite: () => {} });
+export const useIsDarkMode = () => useContext(ThemeContext);
+export const useFavorites = () => useContext(FavoritesContext);
 
 
 
@@ -237,6 +255,15 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [favorites, setFavorites] = useState<string[]>([]);
+  const toggleFavorite = useCallback((carId: string) => {
+    setFavorites((prev) => {
+      const isRemoving = prev.includes(carId);
+      import('@/services/api/activity').then(({ ActivityAPI }) => {
+        ActivityAPI.logActivity(isRemoving ? 'remove_favorite' : 'add_favorite', 'SawariContext', { carId });
+      });
+      return isRemoving ? prev.filter((id) => id !== carId) : [...prev, carId];
+    });
+  }, []);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   // Favourite cars are kept on the phone per account (there is no favourites endpoint on the server); they
@@ -580,6 +607,13 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     }
   }, [quoteParams]);
 
+  // Read by the booking functions in the main value, so that value does not have to change with every quote.
+  const pricingQuoteRef = useRef(pricingQuote);
+  pricingQuoteRef.current = pricingQuote;
+  const quoteParamsRef = useRef(quoteParams);
+  quoteParamsRef.current = quoteParams;
+  const quoteDays = pricingQuote?.rentalDays || 1;
+
   // "Clear" hides everything up to the newest cleared notification's own (server) time, per account — the
   // old single phone-clock date hid new notifications on a phone whose clock ran fast, and carried one
   // account's clear over to the next person who logged in on the phone.
@@ -740,7 +774,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       bookingSource,
       setBookingSource,
       duration,
-      durationDays: pricingQuote?.rentalDays || 1, // Fallback to 1 if quote not loaded
+      durationDays: quoteDays, // Fallback to 1 if quote not loaded
       pickupTime,
       returnTime,
       paymentMethod,
@@ -757,14 +791,9 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       walletBalance,
       membership,
       totalBookings,
-      pricingQuote,
-      quoteParams,
-      isQuoteLoading,
-      quoteError,
       appliedCouponCode,
       sawariCashToApply,
       fuelEstimate,
-      refreshQuote,
       applyCoupon: setAppliedCouponCode,
       applySawariCash: setSawariCashToApply,
       setFuelEstimate,
@@ -772,10 +801,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       planToBuy,
       setPlanToBuy,
       createBookingSnapshot: async (idempotencyKey?: string) => {
+        const pricingQuote = pricingQuoteRef.current;
         if (!pricingQuote) return null;
         planInPayment.current = pricingQuote.membershipPlanToBuy || null;
         const snapshot = await API.createBooking(
-          quoteParams,
+          quoteParamsRef.current,
           selectedCar.id,
           selectedCar.name,
           customer,
@@ -903,7 +933,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       setBookingStatus,
       completeBooking: async () => {
         setBookingStatus('completed');
-        if (pricingQuote) {
+        if (pricingQuoteRef.current) {
           // Trigger a wallet refresh because backend may have awarded a bonus
           applyWallet(await API.getWallet(true));
         }
@@ -1062,15 +1092,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         }
       },
       favorites,
-      toggleFavorite: (carId: string) => {
-        setFavorites(prev => {
-          const isRemoving = prev.includes(carId);
-          import('@/services/api/activity').then(({ ActivityAPI }) => {
-            ActivityAPI.logActivity(isRemoving ? 'remove_favorite' : 'add_favorite', 'SawariContext', { carId });
-          });
-          return isRemoving ? prev.filter(id => id !== carId) : [...prev, carId];
-        });
-      },
+      toggleFavorite,
       isDarkMode,
       toggleDarkMode: (value: boolean) => {
         setIsDarkMode(value);
@@ -1109,22 +1131,31 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       hasSeenPermissions,
       isAuthenticated,
       isAuthLoading,
-      pricingQuote,
-      isQuoteLoading,
-      quoteError,
+      quoteDays,
       appliedCouponCode,
       sawariCashToApply,
       fuelEstimate,
       lastBooking,
-      refreshQuote,
       vehicleType,
-      quoteParams,
       favorites,
       isDarkMode
     ]
   );
 
-  return <SawariContext.Provider value={contextValue}>{children}</SawariContext.Provider>;
+  const favoritesValue = useMemo(() => ({ favorites, toggleFavorite }), [favorites, toggleFavorite]);
+  const quoteValue = useMemo<QuoteValue>(
+    () => ({ pricingQuote, quoteParams, isQuoteLoading, quoteError, refreshQuote }),
+    [pricingQuote, quoteParams, isQuoteLoading, quoteError, refreshQuote],
+  );
+  return (
+    <SawariContext.Provider value={contextValue}>
+      <QuoteContext.Provider value={quoteValue}>
+        <ThemeContext.Provider value={isDarkMode}>
+          <FavoritesContext.Provider value={favoritesValue}>{children}</FavoritesContext.Provider>
+        </ThemeContext.Provider>
+      </QuoteContext.Provider>
+    </SawariContext.Provider>
+  );
 }
 
 export function useSawari() {

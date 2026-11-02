@@ -1,4 +1,4 @@
-import { useSawari } from '@/context/SawariContext';
+import { useIsDarkMode } from '@/context/SawariContext';
 
 // Car details page colours, taken from the Figma "Car Detail Page" frame (light). Dark keeps the same roles.
 // Type on this page is the design's 'Plus Jakarta Sans' (PlusJakartaSans_* weights, loaded in app/_layout.tsx),
@@ -93,6 +93,5 @@ const dark: typeof light = {
 export type DetailsPalette = typeof light;
 
 export function useDetailsPalette(): DetailsPalette {
-  const { isDarkMode } = useSawari();
-  return isDarkMode ? dark : light;
+  return useIsDarkMode() ? dark : light;
 }

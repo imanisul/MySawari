@@ -15,6 +15,7 @@ import { primeVehicles } from '@/hooks/useVehicles';
 import { loadHomeData } from '@/hooks/useHomeData';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
+import { LoginGate } from '@/components/auth/LoginGate';
 import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
 import {
   Inter_400Regular,
@@ -121,6 +122,8 @@ function RootLayoutNav() {
       <Stack.Screen name="driver-option" options={{ presentation: 'modal' }} />
       <Stack.Screen name="driver-charges" options={{ presentation: 'modal' }} />
       <Stack.Screen name="payment-error" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
+      <Stack.Screen name="payment-processing" options={{ gestureEnabled: false }} />
       <Stack.Screen name="bookings" options={{ animation: 'none' }} />
       <Stack.Screen name="profile" options={{ animation: 'none' }} />
     </Stack>
@@ -300,6 +303,8 @@ function AppGate({
       >
         {children}
       </AnimatedSplash>
+      {/* Mandatory sign-in over every screen (see LoginGate). */}
+      <LoginGate />
       <CustomAlertProvider />
     </View>
   );

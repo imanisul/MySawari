@@ -23,8 +23,6 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { BlurHost } from '@/components/common/BottomBlur';
 import { BlurTargetView } from 'expo-blur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
-import Reanimated from 'react-native-reanimated';
-import { rise } from '@/components/common/motion';
 
 import { ActivityAPI } from '@/services/api/activity';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
@@ -241,7 +239,8 @@ export default function CarDetailsScreen() {
         contentContainerStyle={{ paddingBottom: barHeight }}
       >
         {/* 0 — status, name card, delivery switch, photos, mileage */}
-        <Reanimated.View entering={rise(0)}>
+        {/* No entrance animation here: the screen is already sliding in, and a second motion on top of it read as a shake. */}
+        <View>
           <VehicleSummary car={enrichedCar} isAvailable={isAvailable} unavailableNote={unavailableNote} highDemand={highDemand} availableOn={availability.nextAvailableFrom ? longAvail(availability.nextAvailableFrom) : undefined} />
           <View style={{ height: 16 }} />
           <VehicleHeroGallery car={enrichedCar} />
@@ -255,7 +254,7 @@ export default function CarDetailsScreen() {
             onAddDay={!hasTrip || tripDays === 1 ? handleAddDay : undefined}
           />
           <View style={{ height: 8 }} />
-        </Reanimated.View>
+        </View>
 
         {/* 1 — sticky section pills */}
         <View onLayout={(e) => { pillsHeight.current = e.nativeEvent.layout.height; }} style={{ backgroundColor: p.page }}>

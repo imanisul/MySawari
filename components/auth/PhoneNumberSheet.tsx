@@ -4,6 +4,8 @@ import { LoginBottomSheet } from './LoginBottomSheet';
 /**
  * "Get started with My Sawari" prompt shown on Home for signed-out customers.
  *
+ * Signing in is mandatory here: there is no SKIP and it cannot be dismissed.
+ *
  * It used to be a separate phone-only sheet that sent the OTP and then opened LoginBottomSheet, which started
  * again at an empty phone field (the number had to be typed twice and a second OTP was sent). It now opens the
  * one sign-in sheet, which runs phone → code → profile itself.

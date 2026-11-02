@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, AppState, BackHandler, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, AppState, BackHandler, Dimensions, Easing, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
@@ -36,6 +36,7 @@ import {
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;
 const HAS_LOGGED_IN_KEY = '@mysawari_has_logged_in_before';
+const SHEET_OFFSET = Dimensions.get('window').height;
 
 /** Extracts a 6-digit OTP code from SMS text, WhatsApp messages, or raw clipboard content. */
 export function extractOtpCode(text: string): string | null {

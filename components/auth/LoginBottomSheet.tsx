@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, BackHandler, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, AppState, BackHandler, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
@@ -36,6 +37,20 @@ const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;
 const HAS_LOGGED_IN_KEY = '@mysawari_has_logged_in_before';
 
+/** Extracts a 6-digit OTP code from SMS text, WhatsApp messages, or raw clipboard content. */
+export function extractOtpCode(text: string): string | null {
+  if (!text || typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  if (/^\d{6}$/.test(trimmed)) return trimmed;
+  const kw = trimmed.match(/(?:otp|code|verification|login|mysawari)[\s\w:]*?(\d{6})\b/i);
+  if (kw && kw[1]) return kw[1];
+  const trail = trimmed.match(/\b(\d{6})\b\s+is\s+your/i);
+  if (trail && trail[1]) return trail[1];
+  const matches = trimmed.match(/(?<!\d)\d{6}(?!\d)/g);
+  if (matches && matches.length === 1) return matches[0];
+  return null;
+}
+
 // Design palette (light). Dark mode keeps the app's own tokens.
 const LIGHT = {
   sheet: '#FFFFFF',
@@ -62,7 +77,16 @@ const group = (m: string) => (m.length <= 5 ? m : `${m.slice(0, 5)} ${m.slice(5)
 const masked = (m: string) => `+91 ${m.slice(0, 5)} ${m.slice(5, 7)}XXX`;
 /** The typed code without the gaps kept for skipped boxes. */
 const digitsOf = (v: string) => v.replace(/\s/g, '');
-const isOtpError = (msg: string) => /\botp\b|incorrect|expired/i.test(msg) && !/referral/i.test(msg);
+const isOtpError = (msg: string) => /\botp\b|incorrect|invalid/i.test(msg) && !/referral/i.test(msg);
+
+const formatAuthError = (err: any): string => {
+  const msg = String(err?.message || '');
+  if (!msg) return 'Invalid code. Please try again';
+  if (/expired/i.test(msg)) return 'OTP has expired. Please tap Resend to get a new code.';
+  if (/too many|wait|cooldown|blocked|locked/i.test(msg)) return msg;
+  if (isOtpError(msg)) return 'Invalid code. Please try again';
+  return msg;
+};
 
 export function LoginBottomSheet({
   visible, onClose, onLoginSuccess, required = false,
@@ -241,27 +265,61 @@ export function LoginBottomSheet({
   };
 
   const finish = (sessionSaved: Promise<unknown> = Promise.resolve()) => {
-  Keyboard.dismiss();
-  clearPendingReferral().catch(() => {});
-  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    Keyboard.dismiss();
+    clearPendingReferral().catch(() => {});
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
-  setError(null);
-  setStep('done');
+    setError(null);
+    setStep('done');
 
-  // Close the popup automatically after 2 seconds.
-  setTimeout(() => {
-    onClose();
+    // Smooth auto-dismiss: checkmark pops with spring, then auto-closes after 800ms
+    setTimeout(() => {
+      onClose();
 
-    // Run the success callback after the session has been saved.
-    sessionSaved
-      .catch(() => {})
-      .then(() => {
-        if (onLoginSuccess) {
-          setTimeout(() => onLoginSuccess(), 300);
-        }
-      });
-  }, 1000);
-};
+      // Run the success callback after the session has been saved.
+      sessionSaved
+        .catch(() => {})
+        .then(() => {
+          if (onLoginSuccess) {
+            setTimeout(() => onLoginSuccess(), 200);
+          }
+        });
+    }, 800);
+  };
+
+  // ── Auto-detect OTP from clipboard (SMS / WhatsApp) ──
+  const lastDetectedOtp = useRef<string | null>(null);
+
+  const checkClipboardForOtp = async () => {
+    if (step !== 'otp' || loading) return;
+    try {
+      const hasString = await Clipboard.hasStringAsync();
+      if (!hasString) return;
+      const text = await Clipboard.getStringAsync();
+      if (!text) return;
+      const detected = extractOtpCode(text);
+      if (detected && detected.length === OTP_LENGTH && detected !== lastDetectedOtp.current) {
+        lastDetectedOtp.current = detected;
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        setOtp(detected);
+        verify(detected);
+      }
+    } catch {}
+  };
+
+  useEffect(() => {
+    if (step !== 'otp') return;
+    const timer = setTimeout(checkClipboardForOtp, 350);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        checkClipboardForOtp();
+      }
+    });
+    return () => {
+      clearTimeout(timer);
+      sub.remove();
+    };
+  }, [step, loading]);
 
   // ── Step 1: phone ──
   useEffect(() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); }, [error]);
@@ -318,8 +376,7 @@ export function LoginBottomSheet({
         await API.checkOtp(mobile, code, otpId || undefined);
         setStep('profile');
       } catch (e: any) {
-        const msg = String(e?.message || '');
-        setError(isOtpError(msg) || !msg ? 'Invalid code. Please try again' : msg);
+        setError(formatAuthError(e));
         setOtp('');
       } finally {
         setLoading(false);
@@ -334,8 +391,7 @@ export function LoginBottomSheet({
       finish(login(token, refreshToken, user));
       askForNotifications();
     } catch (e: any) {
-      const msg = String(e?.message || '');
-      setError(isOtpError(msg) || !msg ? 'Invalid code. Please try again' : msg);
+      setError(formatAuthError(e));
       setOtp('');
     } finally {
       setLoading(false);
@@ -361,11 +417,11 @@ export function LoginBottomSheet({
       finish(sessionSaved);
     } catch (e: any) {
       const msg = String(e?.message || '');
-      if (isOtpError(msg)) {
+      if (isOtpError(msg) || /expired/i.test(msg)) {
         // The code turned out to be wrong or expired: back to the code step with the design's error state.
         setOtp('');
         setStep('otp');
-        setError('Invalid code. Please try again');
+        setError(formatAuthError(e));
       } else {
         setError(msg || 'Could not create your account. Please try again.');
       }
@@ -518,7 +574,7 @@ export function LoginBottomSheet({
               <OtpBoxes
                 value={otp}
                 onChange={(v) => { setOtp(v); if (error) setError(null); }}
-                onComplete={(code) => { if (isExisting) verify(code); }}
+                onComplete={(code) => { verify(code); }}
                 editable={!loading}
                 ui={ui}
                 hasError={!!error}
@@ -628,13 +684,21 @@ export function LoginBottomSheet({
             </>
           )}
           {step === 'done' && (
-            <View style={styles.doneWrap}>
+            <Pressable
+              onPress={() => {
+                onClose();
+                if (onLoginSuccess) setTimeout(() => onLoginSuccess(), 100);
+              }}
+              style={styles.doneWrap}
+              accessibilityRole="button"
+              accessibilityLabel="Continue to app"
+            >
               <Animated.View style={[styles.doneCircle, { backgroundColor: ui.navy, transform: [{ scale: doneScale }] }]}>
                 <Feather name="check" size={34} color={ui.onNavy} />
               </Animated.View>
               <Text style={[styles.title, styles.center, { color: ui.title }]}>{welcomeName ? `Welcome, ${welcomeName}!` : "You're all set!"}</Text>
               <Text style={[styles.copy, styles.center, { color: ui.copy, marginTop: 0 }]}>You're signed in.</Text>
-            </View>
+            </Pressable>
           )}
           </Animated.View>
 
@@ -689,6 +753,12 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
     const digits = text.replace(/\D/g, '');
     const next = [...slots];
     if (!digits) { next[i] = ''; commit(next); return; }
+    if (digits.length >= OTP_LENGTH) {
+      const full = digits.slice(0, OTP_LENGTH).split('');
+      commit(full);
+      inputs.current[OTP_LENGTH - 1]?.focus();
+      return;
+    }
     if (digits.length > 1) {
       for (let k = 0; k < digits.length && i + k < OTP_LENGTH; k++) next[i + k] = digits[k];
       commit(next);

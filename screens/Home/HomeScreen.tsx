@@ -248,7 +248,7 @@ export default function HomeScreen() {
   const referEarn = useMemo(() => {
     const rates = fetchedVehicles.map((v) => v.perDay).filter((n) => n > 0);
     if (!rates.length) return '10%';
-    return `₹${Math.floor((Math.min(...rates) * 0.1) / 10) * 10}+`;
+    return `₹50000`;   //previously it was calculating from lowest vehicle daily rate, calculates 10%,
   }, [fetchedVehicles]);
 
   const isMember = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
@@ -347,7 +347,7 @@ export default function HomeScreen() {
       case 'destinations':
         content = (
           <>
-            <HomeSectionTitle title="Top Destination" />
+            <HomeSectionTitle title="Top Destinations" />
             <FlatList
               data={DESTINATIONS}
               horizontal

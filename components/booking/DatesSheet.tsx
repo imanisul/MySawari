@@ -99,9 +99,19 @@ function TimeWheel({ title, times, value, onPick, p, titleColor }: {
   const ref = useRef<ScrollView>(null);
   const index = Math.max(0, times.indexOf(value));
 
-  // Keep the wheel on the current value (first render, Clear, refused picks, same-day list change).
+// Prevent animation on the initial render.
+  const hasMounted = useRef(false);
+
   useEffect(() => {
-    const t = setTimeout(() => ref.current?.scrollTo({ y: index * ROW, animated: false }), 0);
+    const t = setTimeout(() => {
+      ref.current?.scrollTo({
+        y: index * ROW,
+        animated: hasMounted.current,
+      });
+  
+      hasMounted.current = true;
+    }, 50);
+  
     return () => clearTimeout(t);
   }, [index, times.length]);
 
@@ -118,13 +128,17 @@ function TimeWheel({ title, times, value, onPick, p, titleColor }: {
       <View style={styles.wheel}>
         <View pointerEvents="none" style={[styles.wheelBox, { backgroundColor: p.box, borderColor: p.boxBorder }]} />
         <ScrollView
-          ref={ref}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator={false}
-          snapToInterval={ROW}
-          decelerationRate="fast"
-          contentContainerStyle={{ paddingVertical: EDGE_PAD }}
-          onMomentumScrollEnd={(e) => settle(e.nativeEvent.contentOffset.y)}
+         ref={ref}
+         nestedScrollEnabled
+         showsVerticalScrollIndicator={false}
+         snapToInterval={ROW}
+         snapToAlignment="start"
+         decelerationRate="fast"
+         scrollEventThrottle={16}
+         contentContainerStyle={{ paddingVertical: EDGE_PAD }}
+         onMomentumScrollEnd={(e) =>
+           settle(e.nativeEvent.contentOffset.y)
+         }
         >
           {times.map((time, i) => (
             <Pressable

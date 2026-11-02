@@ -409,7 +409,7 @@ const styles = StyleSheet.create({
 
   menuOverlay: { flex: 1 },
   // Figma: 92×111 white card, radius 8, three 35px rows, 12px side padding.
-  menu: { position: 'absolute', width: 92, borderRadius: 8, paddingVertical: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  menu: { position: 'absolute' ,marginTop: 40, width: 92, borderRadius: 8, paddingVertical: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
   menuItem: { paddingHorizontal: 12, height: 35, justifyContent: 'center' },
   menuText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
   dialogOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 18 },

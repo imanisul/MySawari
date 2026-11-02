@@ -155,6 +155,7 @@ export default function AddressSearchScreen() {
         <View style={[styles.pinCircle, { backgroundColor: p.deliveryBorder }]}>
           {locating ? <ActivityIndicator size="small" color={p.navy} /> : <Ionicons name="locate" size={19} color={p.navy} />}
         </View>
+        
         <View style={{ flex: 1 }}>
           <Text style={[styles.name, { color: p.navy }]}>Use my current location</Text>
           <Text style={[styles.addr, { color: p.muted }]}>Set the pin where you are now</Text>

@@ -241,18 +241,27 @@ export function LoginBottomSheet({
   };
 
   const finish = (sessionSaved: Promise<unknown> = Promise.resolve()) => {
-    Keyboard.dismiss();
-    clearPendingReferral().catch(() => {});
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-    // A short "you're in" moment instead of the sheet vanishing the instant the code is accepted.
-    setError(null);
-    setStep('done');
-    // Closes once the session is saved and the check mark has had a moment (not a fixed wait after both).
-    Promise.all([sessionSaved.catch(() => {}), new Promise((r) => setTimeout(r, 800))]).then(() => {
-      onClose();
-      if (onLoginSuccess) setTimeout(() => onLoginSuccess(), 300);
-    });
-  };
+  Keyboard.dismiss();
+  clearPendingReferral().catch(() => {});
+  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+
+  setError(null);
+  setStep('done');
+
+  // Close the popup automatically after 2 seconds.
+  setTimeout(() => {
+    onClose();
+
+    // Run the success callback after the session has been saved.
+    sessionSaved
+      .catch(() => {})
+      .then(() => {
+        if (onLoginSuccess) {
+          setTimeout(() => onLoginSuccess(), 300);
+        }
+      });
+  }, 1000);
+};
 
   // ── Step 1: phone ──
   useEffect(() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); }, [error]);
@@ -414,7 +423,7 @@ export function LoginBottomSheet({
           {step === 'phone' && (
             <>
               <View style={styles.headRow}>
-                <Text style={[styles.title, { color: ui.title, flex: 1 }]}>Get started with My Sawari</Text>
+                <Text style={[styles.title, { color: ui.title, flex: 1 }]}>Get started with MySawari</Text>
               </View>
               <Text style={[styles.copy, { color: ui.copy }]}>We'll use your phone number to verify your account. No spam, we promise.</Text>
 

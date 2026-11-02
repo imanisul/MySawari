@@ -442,7 +442,7 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Refer and earn ${earnText}. Get 10% of your friend's booking payment.`}
+      accessibilityLabel={`Refer and earn ${earnText}. Earn 10% every time your friends complete a trip!`}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={({ pressed }) => [styles.refer, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.9 }]}
     >
@@ -451,13 +451,13 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.referTop}>
-          <Text style={[styles.referTitle, { color: p.fg }]}>Refer & Earn {earnText}</Text>
+          <Text style={[styles.referTitle, { color: p.fg }]}>Refer & Earn Up to  {earnText} /Month!</Text>
           <View style={[styles.referBtn, { backgroundColor: p.navy }]}>
             <Text style={styles.referBtnText}>Refer</Text>
             <Feather name="arrow-right" size={8} color="#FFFFFF" />
           </View>
         </View>
-        <Text style={[styles.referSub, { color: p.muted }]} numberOfLines={1}>Get 10% of your friend’s booking payment.</Text>
+        <Text style={[styles.referSub, { color: p.muted }]} numberOfLines={1}>Earn 10% every time your friends complete a trip!</Text>
       </View>
     </Pressable>
   );
@@ -975,8 +975,8 @@ const styles = StyleSheet.create({
   referIconWrap: { width: 40, height: 40, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
   referIcon: { width: 24, height: 24 },
   referTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  referTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5, flexShrink: 1 },
-  referSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  referTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 19.5, flexShrink: 1 },
+  referSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, lineHeight: 16.5 },
   referBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 20, paddingHorizontal: 8, borderRadius: 31 },
   referBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
 

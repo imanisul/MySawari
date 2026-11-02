@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { safeBack } from '@/utils/navigation';
-import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
@@ -182,94 +182,115 @@ export default function SettingsScreen() {
         )}
       </ScrollView>
 
-      {/* Account deletion flow: complies with Apple App Store Guideline 5.1.1(v) */}
+      {/* Account deletion modal: iOS uses in-app self-service flow (Apple 5.1.1(v)), Android uses Figma support request */}
       <Modal visible={showDelete} transparent animationType="fade" onRequestClose={resetDeleteModal} statusBarTranslucent navigationBarTranslucent>
         <View style={styles.overlay}>
           <ModalBlur />
           <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={resetDeleteModal} />
-          <View style={[styles.popup, { backgroundColor: p.page, maxWidth: 340 }]} accessibilityViewIsModal>
-            {deleteStep === 'confirm' ? (
-              <>
-                <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Delete MySawari Account</Text>
-                <Text style={[styles.popupBody, { color: p.muted }]}>
-                  This action is permanent and cannot be undone. All your profile information, reviews, and active sessions will be erased.
-                </Text>
-                <View style={[styles.popupBox, { borderColor: p.segBorder, backgroundColor: p.redBg }]}>
-                  <Text style={[styles.popupBoxText, { color: p.red }]}>
-                    A verification code will be sent to your registered WhatsApp number (+91 {customer?.mobile || '••••••••••'}) to confirm deletion.
+          <View style={[styles.popup, { backgroundColor: p.page, maxWidth: Platform.OS === 'ios' ? 340 : 320 }]} accessibilityViewIsModal>
+            {Platform.OS === 'ios' ? (
+              deleteStep === 'confirm' ? (
+                <>
+                  <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Delete MySawari Account</Text>
+                  <Text style={[styles.popupBody, { color: p.muted }]}>
+                    This action is permanent and cannot be undone. All your profile information, reviews, and active sessions will be erased.
                   </Text>
-                </View>
+                  <View style={[styles.popupBox, { borderColor: p.segBorder, backgroundColor: p.redBg }]}>
+                    <Text style={[styles.popupBoxText, { color: p.red }]}>
+                      A verification code will be sent to your registered WhatsApp number (+91 {customer?.mobile || '••••••••••'}) to confirm deletion.
+                    </Text>
+                  </View>
 
-                {deleteError && (
-                  <Text style={[styles.errorText, { color: p.red }]}>{deleteError}</Text>
-                )}
+                  {deleteError && (
+                    <Text style={[styles.errorText, { color: p.red }]}>{deleteError}</Text>
+                  )}
 
-                <View style={styles.actionRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={resetDeleteModal}
-                    disabled={isDeleting}
-                    style={[styles.btnOutline, { borderColor: p.segBorder }]}
-                  >
-                    <Text style={[styles.btnOutlineText, { color: p.fg }]}>Cancel</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={handleRequestDeletionCode}
-                    disabled={isDeleting}
-                    style={[styles.btnDanger, { backgroundColor: p.red }]}
-                  >
-                    {isDeleting ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.btnDangerText}>Send Code</Text>
-                    )}
-                  </Pressable>
-                </View>
-              </>
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={resetDeleteModal}
+                      disabled={isDeleting}
+                      style={[styles.btnOutline, { borderColor: p.segBorder }]}
+                    >
+                      <Text style={[styles.btnOutlineText, { color: p.fg }]}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={handleRequestDeletionCode}
+                      disabled={isDeleting}
+                      style={[styles.btnDanger, { backgroundColor: p.red }]}
+                    >
+                      {isDeleting ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.btnDangerText}>Send Code</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </>
+              ) : (
+                <>
+                  <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Enter Verification Code</Text>
+                  <Text style={[styles.popupBody, { color: p.muted }]}>
+                    Please enter the 6-digit verification code sent to your WhatsApp number.
+                  </Text>
+
+                  <TextInput
+                    value={otpCode}
+                    onChangeText={(val) => { setOtpCode(val); setDeleteError(null); }}
+                    placeholder="123456"
+                    placeholderTextColor={p.muted}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    autoFocus
+                    style={[styles.otpInput, { color: p.fg, borderColor: p.segBorder, backgroundColor: '#F8F9FA' }]}
+                  />
+
+                  {deleteError && (
+                    <Text style={[styles.errorText, { color: p.red }]}>{deleteError}</Text>
+                  )}
+
+                  <View style={styles.actionRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => { setDeleteStep('confirm'); setDeleteError(null); }}
+                      disabled={isDeleting}
+                      style={[styles.btnOutline, { borderColor: p.segBorder }]}
+                    >
+                      <Text style={[styles.btnOutlineText, { color: p.fg }]}>Back</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={handleConfirmDelete}
+                      disabled={isDeleting}
+                      style={[styles.btnDanger, { backgroundColor: p.red }]}
+                    >
+                      {isDeleting ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <Text style={styles.btnDangerText}>Delete Account</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </>
+              )
             ) : (
+              /* Android: Figma design support request dialog */
               <>
-                <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Enter Verification Code</Text>
-                <Text style={[styles.popupBody, { color: p.muted }]}>
-                  Please enter the 6-digit verification code sent to your WhatsApp number.
-                </Text>
-
-                <TextInput
-                  value={otpCode}
-                  onChangeText={(val) => { setOtpCode(val); setDeleteError(null); }}
-                  placeholder="123456"
-                  placeholderTextColor={p.muted}
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  autoFocus
-                  style={[styles.otpInput, { color: p.fg, borderColor: p.segBorder, backgroundColor: '#F8F9FA' }]}
-                />
-
-                {deleteError && (
-                  <Text style={[styles.errorText, { color: p.red }]}>{deleteError}</Text>
-                )}
-
-                <View style={styles.actionRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => { setDeleteStep('confirm'); setDeleteError(null); }}
-                    disabled={isDeleting}
-                    style={[styles.btnOutline, { borderColor: p.segBorder }]}
-                  >
-                    <Text style={[styles.btnOutlineText, { color: p.fg }]}>Back</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={handleConfirmDelete}
-                    disabled={isDeleting}
-                    style={[styles.btnDanger, { backgroundColor: p.red }]}
-                  >
-                    {isDeleting ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={styles.btnDangerText}>Delete Account</Text>
-                    )}
-                  </Pressable>
+                <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Need to deactivate your account?</Text>
+                <Text style={[styles.popupBody, { color: p.muted }]}>Account deactivation requests can only be made through our support team.</Text>
+                <View style={[styles.popupBox, { borderColor: p.segBorder }]}>
+                  <Text style={[styles.popupBoxText, { color: p.muted }]}>
+                    Please call us or email{' '}
+                    <Text
+                      accessibilityRole="link"
+                      onPress={() => Linking.openURL(`mailto:${ACCOUNT_EMAIL}?subject=${encodeURIComponent('Account deactivation request')}`)}
+                      style={[styles.link, { color: p.navy }]}
+                    >
+                      {ACCOUNT_EMAIL}
+                    </Text>{' '}
+                    to request account deactivation.
+                  </Text>
                 </View>
               </>
             )}

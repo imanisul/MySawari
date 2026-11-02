@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, BackHandler, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, BackHandler, Dimensions, Easing, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
 import { Feather } from '@expo/vector-icons';
@@ -35,6 +35,7 @@ import {
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;
 const HAS_LOGGED_IN_KEY = '@mysawari_has_logged_in_before';
+const SHEET_OFFSET = Dimensions.get('window').height;
 
 // Design palette (light). Dark mode keeps the app's own tokens.
 const LIGHT = {
@@ -93,6 +94,7 @@ export function LoginBottomSheet({
   // was still moving, and the two motions fought each other (the "shake").
   const phoneRef = useRef<TextInput>(null);
   const stepAnim = useRef(new Animated.Value(1)).current;
+  const sheetAnim = useRef(new Animated.Value(SHEET_OFFSET)).current;
   const doneScale = useRef(new Animated.Value(0)).current;
   const [welcomeName, setWelcomeName] = useState('');
   const [step, setStep] = useState<'phone' | 'otp' | 'profile' | 'done'>('phone');
@@ -152,6 +154,14 @@ export function LoginBottomSheet({
         }).catch(() => {});
       }
     }).catch(() => {});
+
+    sheetAnim.setValue(SHEET_OFFSET);
+    Animated.timing(sheetAnim, {
+      toValue: 0,
+      duration: 420,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   }, [visible]);
 
   // Debounced real-time validation when user types or edits referral code on Profile step
@@ -213,7 +223,11 @@ export function LoginBottomSheet({
 
   useEffect(() => {
     if (!visible || step !== 'phone') return;
-    const t = setTimeout(() => phoneRef.current?.focus(), 380);
+
+    const t = setTimeout(() => {
+      phoneRef.current?.focus();
+    }, 460);
+
     return () => clearTimeout(t);
   }, [visible, step]);
 
@@ -392,7 +406,7 @@ export function LoginBottomSheet({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType="none"
       onRequestClose={() => {
         if (step === 'done') return;
         if (viewingPolicy) {
@@ -417,7 +431,7 @@ export function LoginBottomSheet({
           <ModalBlur />
           <Pressable style={StyleSheet.absoluteFill} onPress={() => (step === 'phone' && !loading && !required ? onClose() : Keyboard.dismiss())} accessibilityLabel="Close" />
           {/* The white sheet runs down behind the keyboard; its content sits above it. */}
-          <View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: kb.pad > 0 ? kb.pad + 16 : Math.max(insets.bottom, 16) }]}>
+          <Animated.View style={[styles.sheet, { backgroundColor: ui.sheet, paddingBottom: kb.pad > 0 ? kb.pad + 16 : Math.max(insets.bottom, 16), transform: [{ translateY: sheetAnim }] }]}>
 
           <Animated.View style={[styles.stepWrap, { opacity: stepAnim }]}>
           {step === 'phone' && (
@@ -654,7 +668,7 @@ export function LoginBottomSheet({
             )}
           </Pressable>
           )}
-        </View>
+        </Animated.View>
       </View>
       )}
     </Modal>

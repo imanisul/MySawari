@@ -33,12 +33,35 @@ function HomeIcon({ color, active }: IconProps) {
   );
 }
 
+// function ExploreIcon({ color, fill, active }: IconProps) {
+//   return (
+//     <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
+//       <Circle cx={12} cy={12} r={10} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
+//       <Path
+//         d="m16.24 7.76-1.8 5.41a2 2 0 0 1-1.27 1.27L7.76 16.24l1.8-5.41a2 2 0 0 1 1.27-1.27z"
+//         stroke={active ? fill : color}
+//         strokeWidth={STROKE}
+//         strokeLinejoin="round"
+//       />
+//     </Svg>
+//   );
+// }
+
 function ExploreIcon({ color, fill, active }: IconProps) {
   return (
     <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
-      <Circle cx={12} cy={12} r={10} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
+      <Circle
+        cx={12}
+        cy={12}
+        r={10}
+        fill={active ? color : 'none'}
+        stroke={color}
+        strokeWidth={STROKE}
+      />
+
       <Path
         d="m16.24 7.76-1.8 5.41a2 2 0 0 1-1.27 1.27L7.76 16.24l1.8-5.41a2 2 0 0 1 1.27-1.27z"
+        fill={active ? fill : 'none'}
         stroke={active ? fill : color}
         strokeWidth={STROKE}
         strokeLinejoin="round"
@@ -46,7 +69,6 @@ function ExploreIcon({ color, fill, active }: IconProps) {
     </Svg>
   );
 }
-
 // Exact Figma "road" (24px frame, 1px stroke): the road outline, then the three centre dashes.
 const ROAD_PATH =
   'M2.0774 18.449C1.99207 18.7467 1.97706 19.0602 2.03355 19.3648C2.09004 19.6693 2.21649 19.9566 2.40293 20.2039C2.58938 20.4512 2.83072 20.6519 3.10794 20.79C3.38515 20.9282 3.69067 21.0001 4.0004 21H20.0004C20.3101 21.0002 20.6156 20.9284 20.8929 20.7904C21.1701 20.6524 21.4115 20.4518 21.598 20.2046C21.7846 19.9574 21.9112 19.6702 21.9678 19.3657C22.0244 19.0612 22.0096 18.7478 21.9244 18.45L17.9244 4.45C17.8049 4.03205 17.5524 3.66443 17.2052 3.40279C16.8581 3.14116 16.4351 2.99976 16.0004 3H8.0004C7.56569 2.99976 7.14273 3.14116 6.79557 3.40279C6.44841 3.66443 6.19594 4.03205 6.0764 4.45L2.0774 18.449Z';

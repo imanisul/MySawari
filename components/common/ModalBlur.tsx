@@ -15,7 +15,7 @@ export const POPUP_DIM = 'rgba(38,38,38,0.32)';
 export function ModalBlur({ sigmaX = 1, sigmaY = 1 }: { sigmaX?: number; sigmaY?: number } = {}) {
   const blurTarget = useBlurTarget();
   // Figma's 1px blur is a light frost: expo-blur's scale is 1–100, so ~6 per px.
-  const intensity = Math.min(100, Math.max(1, Math.round(((Math.abs(sigmaX) + Math.abs(sigmaY)) / 2) * 6)));
+  const intensity = Math.min(100, Math.max(1, Math.round((Math.abs(sigmaX) + Math.abs(sigmaY)) / 2 * 2)));
 
   return (
     <>

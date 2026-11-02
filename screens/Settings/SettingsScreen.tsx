@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { safeBack } from '@/utils/navigation';
 import { View, Text, StyleSheet, ScrollView, AppState, Linking, Pressable, Modal, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -17,6 +17,97 @@ import { Dashes, DesignToggle } from '@/components/profile/ProfileParts';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
 const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
+const DELETION_OTP_LEN = 6;
+
+/**
+ * 6-digit code boxes for in-app deletion verification, matching the app's OTP design system.
+ */
+function DeletionOtpBoxes({
+  value,
+  onChange,
+  onComplete,
+  p,
+  hasError,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  onComplete: (code: string) => void;
+  p: ReturnType<typeof useDetailsPalette>;
+  hasError: boolean;
+}) {
+  const inputs = useRef<(TextInput | null)[]>([]);
+  const [focused, setFocused] = useState<number | null>(null);
+  const slots = Array.from({ length: DELETION_OTP_LEN }, (_, i) => (value[i] && value[i] !== ' ' ? value[i] : ''));
+
+  useEffect(() => {
+    if (!value) setTimeout(() => inputs.current[0]?.focus(), 50);
+  }, [value]);
+
+  const commit = (next: string[]) => {
+    const raw = next.map((d) => d || ' ').join('').replace(/\s+$/, '');
+    onChange(raw);
+    const compact = next.join('');
+    if (compact.length === DELETION_OTP_LEN && next.every(Boolean)) {
+      onComplete(compact);
+    }
+  };
+
+  const change = (text: string, i: number) => {
+    const digits = text.replace(/\D/g, '');
+    const next = [...slots];
+    if (!digits) {
+      next[i] = '';
+      commit(next);
+      return;
+    }
+    if (digits.length > 1) {
+      for (let k = 0; k < digits.length && i + k < DELETION_OTP_LEN; k++) {
+        next[i + k] = digits[k];
+      }
+      commit(next);
+      inputs.current[Math.min(i + digits.length, DELETION_OTP_LEN - 1)]?.focus();
+      return;
+    }
+    next[i] = digits;
+    commit(next);
+    if (i < DELETION_OTP_LEN - 1) inputs.current[i + 1]?.focus();
+  };
+
+  return (
+    <View style={styles.otpRow}>
+      {slots.map((d, i) => (
+        <TextInput
+          key={i}
+          ref={(el) => { inputs.current[i] = el; }}
+          value={d}
+          onChangeText={(t) => change(t, i)}
+          onKeyPress={({ nativeEvent }) => {
+            if (nativeEvent.key === 'Backspace' && !slots[i] && i > 0) {
+              inputs.current[i - 1]?.focus();
+            }
+          }}
+          onFocus={() => setFocused(i)}
+          onBlur={() => setFocused((c) => (c === i ? null : c))}
+          keyboardType="number-pad"
+          textContentType="oneTimeCode"
+          autoComplete={i === 0 ? 'sms-otp' : 'off'}
+          maxLength={DELETION_OTP_LEN}
+          autoFocus={i === 0}
+          selectTextOnFocus
+          accessibilityLabel={`Digit ${i + 1} of ${DELETION_OTP_LEN}`}
+          style={[
+            styles.otpBox,
+            {
+              color: p.fg,
+              backgroundColor: hasError ? p.redBg : p.soft,
+              borderColor: hasError ? p.red : focused === i ? p.red : p.segBorder,
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
 
 /**
  * Settings screen: Recommendations & Reminders, Notifications & Location permissions,
@@ -126,15 +217,16 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (!otpCode.trim()) {
-      setDeleteError('Please enter the verification code.');
+  const handleConfirmDelete = async (codeOverride?: string) => {
+    const code = (codeOverride || otpCode).replace(/\s/g, '');
+    if (code.length < DELETION_OTP_LEN) {
+      setDeleteError('Please enter the complete 6-digit verification code.');
       return;
     }
     setIsDeleting(true);
     setDeleteError(null);
     try {
-      await API.deleteAccount(otpId, otpCode.trim());
+      await API.deleteAccount(otpId, code);
       resetDeleteModal();
       await logout();
       CustomAlert.alert('Account Deleted', 'Your account has been deleted successfully.');
@@ -187,17 +279,17 @@ export default function SettingsScreen() {
         <View style={styles.overlay}>
           <ModalBlur />
           <Pressable accessibilityLabel="Close" style={StyleSheet.absoluteFill} onPress={resetDeleteModal} />
-          <View style={[styles.popup, { backgroundColor: p.page, maxWidth: Platform.OS === 'ios' ? 340 : 320 }]} accessibilityViewIsModal>
+          <View style={[styles.popup, { backgroundColor: p.page }]} accessibilityViewIsModal>
             {Platform.OS === 'ios' ? (
               deleteStep === 'confirm' ? (
                 <>
-                  <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Delete MySawari Account</Text>
+                  <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Delete My Sawari account</Text>
                   <Text style={[styles.popupBody, { color: p.muted }]}>
                     This action is permanent and cannot be undone. All your profile information, reviews, and active sessions will be erased.
                   </Text>
-                  <View style={[styles.popupBox, { borderColor: p.segBorder, backgroundColor: p.redBg }]}>
-                    <Text style={[styles.popupBoxText, { color: p.red }]}>
-                      A verification code will be sent to your registered WhatsApp number (+91 {customer?.mobile || '••••••••••'}) to confirm deletion.
+                  <View style={[styles.popupBox, { borderColor: p.segBorder, backgroundColor: p.soft }]}>
+                    <Text style={[styles.popupBoxText, { color: p.muted }]}>
+                      A 6-digit verification code will be sent to your registered WhatsApp number (+91 {customer?.mobile || '••••••••••'}).
                     </Text>
                   </View>
 
@@ -205,77 +297,72 @@ export default function SettingsScreen() {
                     <Text style={[styles.errorText, { color: p.red }]}>{deleteError}</Text>
                   )}
 
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={resetDeleteModal}
-                      disabled={isDeleting}
-                      style={[styles.btnOutline, { borderColor: p.segBorder }]}
-                    >
-                      <Text style={[styles.btnOutlineText, { color: p.fg }]}>Cancel</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={handleRequestDeletionCode}
-                      disabled={isDeleting}
-                      style={[styles.btnDanger, { backgroundColor: p.red }]}
-                    >
-                      {isDeleting ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={styles.btnDangerText}>Send Code</Text>
-                      )}
-                    </Pressable>
-                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleRequestDeletionCode}
+                    disabled={isDeleting}
+                    style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.red }, pressed && { opacity: 0.85 }]}
+                  >
+                    {isDeleting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.popupBtnText}>Send Verification Code</Text>
+                    )}
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={resetDeleteModal}
+                    disabled={isDeleting}
+                    style={styles.popupSecondaryBtn}
+                  >
+                    <Text style={[styles.popupSecondaryBtnText, { color: p.muted }]}>Cancel</Text>
+                  </Pressable>
                 </>
               ) : (
                 <>
-                  <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Enter Verification Code</Text>
+                  <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Verify Account Deletion</Text>
                   <Text style={[styles.popupBody, { color: p.muted }]}>
-                    Please enter the 6-digit verification code sent to your WhatsApp number.
+                    Please enter the 6-digit code sent to your WhatsApp number (+91 {customer?.mobile || '••••••••••'}).
                   </Text>
 
-                  <TextInput
+                  <DeletionOtpBoxes
                     value={otpCode}
-                    onChangeText={(val) => { setOtpCode(val); setDeleteError(null); }}
-                    placeholder="123456"
-                    placeholderTextColor={p.muted}
-                    keyboardType="number-pad"
-                    maxLength={6}
-                    autoFocus
-                    style={[styles.otpInput, { color: p.fg, borderColor: p.segBorder, backgroundColor: '#F8F9FA' }]}
+                    onChange={(val) => { setOtpCode(val); if (deleteError) setDeleteError(null); }}
+                    onComplete={(code) => handleConfirmDelete(code)}
+                    p={p}
+                    hasError={Boolean(deleteError)}
                   />
 
                   {deleteError && (
                     <Text style={[styles.errorText, { color: p.red }]}>{deleteError}</Text>
                   )}
 
-                  <View style={styles.actionRow}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => { setDeleteStep('confirm'); setDeleteError(null); }}
-                      disabled={isDeleting}
-                      style={[styles.btnOutline, { borderColor: p.segBorder }]}
-                    >
-                      <Text style={[styles.btnOutlineText, { color: p.fg }]}>Back</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={handleConfirmDelete}
-                      disabled={isDeleting}
-                      style={[styles.btnDanger, { backgroundColor: p.red }]}
-                    >
-                      {isDeleting ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={styles.btnDangerText}>Delete Account</Text>
-                      )}
-                    </Pressable>
-                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => handleConfirmDelete(otpCode)}
+                    disabled={isDeleting}
+                    style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.red }, pressed && { opacity: 0.85 }]}
+                  >
+                    {isDeleting ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.popupBtnText}>Delete Account Permanently</Text>
+                    )}
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => { setDeleteStep('confirm'); setDeleteError(null); }}
+                    disabled={isDeleting}
+                    style={styles.popupSecondaryBtn}
+                  >
+                    <Text style={[styles.popupSecondaryBtnText, { color: p.muted }]}>Back</Text>
+                  </Pressable>
                 </>
               )
             ) : (
-              /* Android: Figma design support request dialog */
+              /* Android: Original Figma design support request dialog */
               <>
                 <Text style={[styles.popupTitle, { color: p.fg }]} accessibilityRole="header">Need to deactivate your account?</Text>
                 <Text style={[styles.popupBody, { color: p.muted }]}>Account deactivation requests can only be made through our support team.</Text>
@@ -318,19 +405,20 @@ const styles = StyleSheet.create({
   switchLabel: { fontFamily: FONT.medium, fontSize: 14 },
   deleteRow: { height: 46, borderRadius: 8, borderWidth: 1, justifyContent: 'center', paddingHorizontal: 12 },
   deleteText: { fontFamily: FONT.medium, fontSize: 14 },
-  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, gap: 8 },
-  popup: { width: '100%', borderRadius: 14, borderWidth: 1, borderColor: '#FCEEEE', paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16 },
-  popupTitle: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 24, textAlign: 'center' },
+  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 36, gap: 8 },
+  // Figma design: 320 wide card with light pink edge, 17 semibold title, 12 muted text, bordered box
+  popup: { width: '100%', maxWidth: 320, borderRadius: 12, borderWidth: 1, borderColor: '#FCEEEE', paddingHorizontal: 14, paddingTop: 20, paddingBottom: 16 },
+  popupTitle: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26, textAlign: 'center' },
   popupBody: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8, paddingHorizontal: 8 },
-  popupBox: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, marginTop: 12 },
+  popupBox: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 12, marginTop: 14 },
   popupBoxText: { fontFamily: FONT.regular, fontSize: 12, lineHeight: 18, textAlign: 'center' },
   link: { textDecorationLine: 'underline', fontFamily: FONT.regular },
   close: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  actionRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
-  btnOutline: { flex: 1, height: 42, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  btnOutlineText: { fontFamily: FONT.medium, fontSize: 13 },
-  btnDanger: { flex: 1, height: 42, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  btnDangerText: { fontFamily: FONT.medium, fontSize: 13, color: '#FFFFFF' },
-  errorText: { fontFamily: FONT.regular, fontSize: 12, textAlign: 'center', marginTop: 10 },
-  otpInput: { height: 46, borderRadius: 8, borderWidth: 1, textAlign: 'center', fontFamily: FONT.semibold, fontSize: 20, letterSpacing: 4, marginTop: 14 },
+  popupBtn: { width: '100%', height: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  popupBtnText: { fontFamily: FONT.medium, fontSize: 14, color: '#FFFFFF' },
+  popupSecondaryBtn: { width: '100%', height: 36, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  popupSecondaryBtnText: { fontFamily: FONT.regular, fontSize: 13 },
+  errorText: { fontFamily: FONT.regular, fontSize: 12, textAlign: 'center', marginTop: 8 },
+  otpRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 14 },
+  otpBox: { width: 40, height: 46, borderWidth: 1, borderRadius: 8, textAlign: 'center', fontFamily: FONT.semibold, fontSize: 18, padding: 0 },
 });

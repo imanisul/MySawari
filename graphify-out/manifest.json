@@ -876,9 +876,9 @@
     "semantic_hash": ""
   },
   "screens/Settings/SettingsScreen.tsx": {
-    "mtime": 1793546141.937911,
-    "seen": 1793546229.8507872,
-    "ast_hash": "ada9841dc58a3eb362e4a3c9fa75f35f",
+    "mtime": 1793599187.3249118,
+    "seen": 1793599241.115015,
+    "ast_hash": "493df21ac2dcdb1ec803901193ed9922",
     "semantic_hash": ""
   },
   "screens/Support/AddressConfirmScreen.tsx": {

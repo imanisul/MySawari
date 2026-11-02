@@ -1,17 +1,17 @@
-# Graph Report - MySawari  (2026-11-01)
+# Graph Report - MySawari  (2026-11-02)
 
 ## Corpus Check
-- 223 files · ~1,339,372 words
+- 223 files · ~1,339,723 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 2, .example 1)
 
 ## Summary
-- 1387 nodes · 4458 edges · 74 communities (70 shown, 4 thin omitted)
+- 1387 nodes · 4460 edges · 74 communities (70 shown, 4 thin omitted)
 - Extraction: 100% EXTRACTED · 0% INFERRED · 0% AMBIGUOUS · INFERRED: 8 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `016d4199`
+- Built from commit: `7481652e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -408,7 +408,7 @@ Nodes (14): Route(), Route(), styles, useSawari(), useTrackTripProgress(), expo-
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `react` connect `react` to `LoginBottomSheet`, `useDetailsPalette`, `ErrorBoundary.tsx`, `package.json`, `haptics.ts`, `BottomNavigation.tsx`, `useColors`, `SearchScreen.tsx`, `HomeSections.tsx`, `_layout.tsx`, `BottomNavigation.tsx`, `LocationSearchBody.tsx`, `BookingScreen.tsx`, `useColors.ts`, `TripDetailParts.tsx`, `HomeScreen.tsx`, `BookingDetailScreen.tsx`, `ModalBlur`, `react-native`, `recentSearches.ts`, `AnimatedSplash.tsx`, `sawari.ts`, `useSawari`, `react-native-safe-area-context`, `BookingsScreen.tsx`, `PaymentProcessingScreen.tsx`, `LocationSheet`, `RefundsScreen.tsx`, `ExploreFilters.tsx`, `WishlistScreen.tsx`, `index.ts`, `MembershipScreen.tsx`, `DriverOptionScreen.tsx`, `DetailsTabs.tsx`, `detailsPalette.ts`, `SawariContext.tsx`, `useAppUpdates.ts`, `DriverChargesScreen.tsx`, `Reveal.tsx`, `PushNotificationHandler.tsx`, `PaymentResult.tsx`, `CustomAlert.tsx`, `CitySheet.tsx`, `SearchEmptyState.tsx`, `ReferEarnScreen.tsx`, `API`?**
-  _High betweenness centrality (0.190) - this node is a cross-community bridge._
+  _High betweenness centrality (0.195) - this node is a cross-community bridge._
 - **What connects `@react-native-community/datetimepicker`, `@react-navigation/native`, `@stardazed/streams-text-encoding` to the rest of the system?**
   _29 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `LoginBottomSheet` be split into smaller, more focused modules?**

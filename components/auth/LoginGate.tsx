@@ -24,6 +24,8 @@ export function LoginGate() {
   useEffect(() => {
     if (!isAuthLoading && !isAuthenticated && splashDone) {
       setOpen(true);
+    } else if (isAuthenticated) {
+      setOpen(false);
     }
   }, [isAuthLoading, isAuthenticated, splashDone]);
 
@@ -35,12 +37,9 @@ export function LoginGate() {
 
   return (
     <LoginBottomSheet
-      visible={open || (!isAuthLoading && !isAuthenticated && splashDone)}
+      visible={open && !isAuthenticated ? true : (!isAuthLoading && !isAuthenticated && splashDone)}
       onClose={() => {
-        // Can ONLY close if the user has actually authenticated!
-        if (isAuthenticated) {
-          setOpen(false);
-        }
+        setOpen(false);
       }}
       required
     />

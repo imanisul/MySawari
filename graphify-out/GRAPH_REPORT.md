@@ -1,7 +1,7 @@
 # Graph Report - MySawari  (2026-11-02)
 
 ## Corpus Check
-- 223 files · ~1,341,789 words
+- 223 files · ~1,341,908 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 3 file(s) not represented in the graph (top: (none) 2, .example 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `b99a6164`
+- Built from commit: `50ec1360`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 

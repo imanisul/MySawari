@@ -1051,7 +1051,7 @@ export const API = {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       const key = idempotencyKey || params.idempotencyKey;
       if (key) {
-        headers['Idempotency-Key'] = String(key);
+        headers['Idempotency-Key'] = `${key}-order`; // own key per endpoint: the server replays the first answer for a repeated key
       }
 
       const response = await fetchWithAuth(`${BACKEND_URL}/payments/create-order`, {
@@ -1240,7 +1240,7 @@ export const API = {
 
     const holdHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     if (idempotencyKey) {
-      holdHeaders['Idempotency-Key'] = idempotencyKey;
+      holdHeaders['Idempotency-Key'] = `${idempotencyKey}-hold`;
     }
 
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/hold`, {
@@ -1340,7 +1340,7 @@ export const API = {
   async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string, idempotencyKey?: string): Promise<any> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (idempotencyKey) {
-      headers['Idempotency-Key'] = idempotencyKey;
+      headers['Idempotency-Key'] = `${idempotencyKey}-confirm`;
     }
 
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/confirm`, {

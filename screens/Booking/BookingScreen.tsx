@@ -90,8 +90,9 @@ export default function BookingScreen() {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [coupons, setCoupons] = useState<{ code: string }[]>([]);
-  // Membership plans stay folded until the row is tapped (design).
-  const [showPlans, setShowPlans] = useState(() => !!planToBuy); // open when a plan was already picked on car details
+  // The plans are shown open for a non-member (to offer them) and when one was already picked on car details;
+  // a member's row stays folded until tapped.
+  const [showPlans, setShowPlans] = useState(() => !!planToBuy || !(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date())));
 
   useEffect(() => {
     ActivityAPI.logActivity('initiate_checkout', 'BookingScreen', { carId: selectedCar?.id });
@@ -261,7 +262,7 @@ export default function BookingScreen() {
           </View>
 
           {/* Car */}
-          <View style={[styles.carCard, { borderColor: p.deliveryBorder }]}>
+          <View style={[styles.carCard, { borderColor: '#EAECF1' }]}>
             <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
               <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
             </View>
@@ -292,7 +293,12 @@ export default function BookingScreen() {
           </View>
 
           {/* Rental duration */}
-          <View style={[styles.duration, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={isMissingDates ? 'Select your dates' : `${days} day rental duration. Edit dates`}
+            onPress={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
+            style={({ pressed }) => [styles.duration, { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4' }, pressed && { opacity: 0.7 }]}
+          >
             <View style={{ flex: 1 }}>
               <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
               {!isMissingDates && (
@@ -301,11 +307,11 @@ export default function BookingScreen() {
                 </Text>
               )}
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Edit dates" onPress={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })} hitSlop={8} style={styles.edit}>
-              <Feather name="edit" size={14} color={p.navy} />
+            <View style={styles.edit}>
+              <Feather name="edit" size={17} color={p.navy} />
               <Text style={[styles.editText, { color: p.navy }]}>Edit</Text>
-            </Pressable>
-          </View>
+            </View>
+          </Pressable>
 
           {!isVehicleAvailable && !isMissingDates && (
             <View style={[styles.notice, { backgroundColor: p.redBg, borderColor: p.redBorder }]}>
@@ -401,7 +407,7 @@ export default function BookingScreen() {
               </Pressable>
             </View>
           ) : (
-            <View style={[styles.couponField, { borderColor: couponError ? p.red : p.deliveryBorder }]}>
+            <View style={[styles.couponField, { borderColor: couponError ? p.red : '#EAECF1' }]}>
               <TextInput
                 value={couponInput}
                 onChangeText={(t) => { setCouponInput(t.toUpperCase()); setCouponError(null); }}
@@ -413,8 +419,8 @@ export default function BookingScreen() {
                 onSubmitEditing={() => handleApplyCoupon(couponInput)}
                 style={[styles.couponInput, { color: p.fg }]}
               />
-              <Pressable accessibilityRole="button" onPress={() => handleApplyCoupon(couponInput)} disabled={!couponInput.trim()} hitSlop={8}>
-                <Text style={[styles.apply, { color: couponInput.trim() ? p.navy : p.muted }]}>Apply</Text>
+              <Pressable accessibilityRole="button" onPress={() => handleApplyCoupon(couponInput)} disabled={!couponInput.trim()} style={styles.applyBtn}>
+                <Text style={[styles.apply, { color: couponInput.trim() ? p.navy : '#747EA3' }]}>Apply</Text>
               </Pressable>
             </View>
           )}
@@ -422,7 +428,7 @@ export default function BookingScreen() {
           {!appliedCouponCode && coupons.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
               {coupons.map((c) => (
-                <Pressable key={c.code} accessibilityRole="button" accessibilityLabel={`Apply ${c.code}`} onPress={() => handleApplyCoupon(c.code)} style={({ pressed }) => [styles.chip, { backgroundColor: p.summary, borderColor: p.deliveryBorder }, pressed && { opacity: 0.7 }]}>
+                <Pressable key={c.code} accessibilityRole="button" accessibilityLabel={`Apply ${c.code}`} onPress={() => handleApplyCoupon(c.code)} style={({ pressed }) => [styles.chip, { backgroundColor: '#F9F9FB' }, pressed && { opacity: 0.7 }]}>
                   <Text style={[styles.chipText, { color: p.navy }]}>{c.code}</Text>
                 </Pressable>
               ))}
@@ -431,9 +437,9 @@ export default function BookingScreen() {
 
           {/* Save on your booking */}
           <Text style={[styles.section, { color: p.fg }]}>Save on your booking</Text>
-          <View style={[styles.saveCard, { borderColor: p.deliveryBorder }]}>
+          <View style={[styles.saveCard, { borderColor: '#EAECF1' }]}>
             <View style={styles.saveRow}>
-              <View style={[styles.saveIcon, { backgroundColor: p.iconBg }]}>
+              <View style={[styles.saveIcon, { backgroundColor: '#F9F9FB' }]}>
                 <MaterialCommunityIcons name="cash" size={18} color={p.sub} />
               </View>
               <View style={{ flex: 1 }}>
@@ -458,7 +464,7 @@ export default function BookingScreen() {
             <View style={[styles.divider, { backgroundColor: p.divider }]} />
 
             <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlans }} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowPlans((v) => !v); }} style={styles.saveRow}>
-              <View style={[styles.saveIcon, { backgroundColor: p.iconBg }]}>
+              <View style={[styles.saveIcon, { backgroundColor: '#F9F9FB' }]}>
                 <MaterialCommunityIcons name="crown-outline" size={18} color={p.sub} />
               </View>
               <View style={{ flex: 1 }}>
@@ -542,9 +548,8 @@ export default function BookingScreen() {
         {/* "You're saving ₹X — <Plan> Membership Applied!": highlights member savings on the Payment Option page. */}
         <MembershipSavedPopup
           hasTrip={!isMissingDates}
-          tripKey={`${selectedCar?.id || 'car'}|${dateRange}|${pickupTime}|${returnTime}`}
+          tripKey={`${selectedCar?.id || 'car'}`}
           screen="booking"
-          forceShow={true}
         />
         {celebrate && (
           <MembershipCelebration
@@ -582,60 +587,61 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16 },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
-  circle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 20 },
-  headerSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+  circle: { width: 32, height: 32, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
+  headerSub: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
 
 
   carCard: { flexDirection: 'row', gap: 12, borderWidth: 1, borderRadius: 12, padding: 8 },
-  carImage: { width: 120, minHeight: 100, alignSelf: 'stretch', borderRadius: 8, overflow: 'hidden' },
-  brand: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
-  carName: { fontFamily: FONT.semibold, fontSize: 16, lineHeight: 22 },
-  rating: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 24, paddingHorizontal: 8, borderRadius: 12, marginTop: 6 },
+  carImage: { width: 120, minHeight: 116, alignSelf: 'stretch', borderRadius: 6, overflow: 'hidden' },
+  brand: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
+  carName: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
+  rating: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 28, paddingLeft: 10, paddingRight: 9, borderRadius: 20 },
   ratingText: { fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF' },
-  carMeta: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 17, marginTop: 2 },
+  carMeta: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16, marginTop: 2 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
-  carPrice: { fontFamily: FONT.bold, fontSize: 18, lineHeight: 24 },
-  carStrike: { fontFamily: FONT.regular, fontSize: 12, textDecorationLine: 'line-through' },
+  carPrice: { fontFamily: FONT.bold, fontSize: 19, lineHeight: 24 },
+  carStrike: { fontFamily: FONT.medium, fontSize: 13, textDecorationLine: 'line-through' },
 
-  duration: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 14, marginTop: 16 },
-  durationTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 19 },
-  durationSub: { fontFamily: FONT.regular, fontSize: 10.5, lineHeight: 16, marginTop: 2 },
-  edit: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingLeft: 8 },
-  editText: { fontFamily: FONT.medium, fontSize: 12 },
+  duration: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 16 },
+  durationTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
+  durationSub: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
+  edit: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  editText: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 16 },
 
   notice: { borderWidth: 1, borderRadius: 10, padding: 12, marginTop: 12 },
   noticeTitle: { fontFamily: FONT.semibold, fontSize: 13 },
   noticeText: { fontFamily: FONT.regular, fontSize: 12, marginTop: 2 },
 
-  section: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 22, marginTop: 22, marginBottom: 10 },
-  journeyContainer: { position: 'relative', gap: 10 },
+  section: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 22, marginTop: 20, marginBottom: 12 },
+  journeyContainer: { position: 'relative', gap: 12 },
   journeyLine: { position: 'absolute', left: 5, top: 12, bottom: 12, width: 2, borderRadius: 1 },
   stop: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   ring: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   innerDot: { width: 4, height: 4, borderRadius: 2 },
-  stopTitle: { fontFamily: FONT.medium, fontSize: 11.5, lineHeight: 17 },
-  stopSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
+  stopTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 16 },
+  stopSub: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
   changeText: { fontFamily: FONT.medium, fontSize: 12, paddingLeft: 8 },
 
-  couponField: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, height: 48, paddingHorizontal: 12 },
-  couponInput: { flex: 1, fontFamily: FONT.regular, fontSize: 13, padding: 0 },
-  apply: { fontFamily: FONT.medium, fontSize: 13 },
+  couponField: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, height: 50, paddingLeft: 12, paddingRight: 6 },
+  couponInput: { flex: 1, fontFamily: FONT.medium, fontSize: 13, padding: 0 },
+  apply: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
+  applyBtn: { height: 36, paddingHorizontal: 16, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   couponError: { fontFamily: FONT.medium, fontSize: 11, marginTop: 6 },
   couponApplied: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, minHeight: 48, paddingHorizontal: 12, paddingVertical: 8 },
   couponAppliedTitle: { fontFamily: FONT.semibold, fontSize: 13 },
   couponAppliedSub: { fontFamily: FONT.regular, fontSize: 11, marginTop: 2 },
   chips: { gap: 8, paddingTop: 8 },
-  chip: { borderWidth: 1, borderRadius: 6, height: 26, paddingHorizontal: 10, justifyContent: 'center' },
-  chipText: { fontFamily: FONT.medium, fontSize: 10.5 },
+  chip: { borderRadius: 4, height: 25, paddingHorizontal: 8, justifyContent: 'center' },
+  chipText: { fontFamily: FONT.semibold, fontSize: 11 },
 
   saveCard: { borderWidth: 1, borderRadius: 12, padding: 12 },
   saveRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   saveIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  saveTitle: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 19 },
+  saveTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
   saveSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
-  cashChip: { alignSelf: 'flex-start', borderRadius: 4, paddingHorizontal: 6, height: 18, justifyContent: 'center', marginTop: 2 },
-  cashChipText: { fontFamily: FONT.medium, fontSize: 10.5 },
+  cashChip: { alignSelf: 'flex-start', borderRadius: 2, paddingHorizontal: 4, height: 17, justifyContent: 'center' },
+  cashChipText: { fontFamily: FONT.medium, fontSize: 11 },
   cashNote: { fontFamily: FONT.medium, fontSize: 10.5, marginTop: 6, marginLeft: 48 },
   divider: { height: 1, marginVertical: 12, marginHorizontal: -12 },
 
@@ -648,5 +654,5 @@ const styles = StyleSheet.create({
   planSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
   planPrice: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
 
-  note: { fontFamily: FONT.regular, fontSize: 10.5, lineHeight: 16, textAlign: 'center', marginTop: 18, paddingHorizontal: 8 },
+  note: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 12, paddingHorizontal: 0 },
 });

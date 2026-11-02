@@ -85,9 +85,9 @@ export function StickyBookingBar({
                         <Text style={[styles.chipText, { color: p.navy }]}>{price.planName || price.buyingPlan}</Text>
                       </View>
                     )}
-                    <Text style={[styles.meta, { color: p.muted }]}>
-                      For {price.days} day{price.days === 1 ? '' : 's'}  •  {price.kmText}
-                    </Text>
+                    <Text style={[styles.meta, { color: p.muted }]}>For {price.days} day{price.days === 1 ? '' : 's'}</Text>
+                    <View style={[styles.dot, { backgroundColor: p.muted }]} />
+                    <Text style={[styles.meta, { color: p.muted }]}>{price.kmText}</Text>
                   </View>
                 </>
               )}
@@ -131,7 +131,7 @@ export function StickyBookingBar({
                 style={({ pressed }) => [styles.breakupBtn, pressed && { opacity: 0.7 }]}
               >
                 <Text style={[styles.breakupText, { color: p.navy }]}>View breakup</Text>
-                <Feather name={showBreakup ? 'chevron-up' : 'chevron-down'} size={13} color={p.navy} />
+                <Feather name={showBreakup ? 'chevron-down' : 'chevron-up'} size={12} color={p.navy} />
               </Pressable>
             )}
           </View>
@@ -140,6 +140,8 @@ export function StickyBookingBar({
         {/* Figma "View breakup": the trip's price lines open in the bar, right above Book Now. */}
         {canBook && showBreakup && price.state === 'ready' && <Breakup price={price} />}
 
+        {/* Figma "CTA + Info": the button and its note, 4 apart. */}
+        <View style={{ gap: 4 }}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
@@ -151,13 +153,17 @@ export function StickyBookingBar({
           <Text style={[styles.buttonText, { color: p.onNavy }]}>{label}</Text>
         </Pressable>
 
-        {(
-          <Text style={[styles.note, { color: p.green }]}>
-            {price.state === 'ready' && price.membershipFee > 0
-              ? `${formatCurrency(payableNow)} payable now (incl. ${price.buyingPlan} membership)`
-              : `${formatCurrency(payableNow)} payable now  •  Refundable up to 24h before trip`}
-          </Text>
+        {/* Figma: "₹500 payable now • Refundable up to 24h before trip", 6 apart, centred. */}
+        {price.state === 'ready' && price.membershipFee > 0 ? (
+          <View style={styles.noteRow}><Text style={[styles.note, { color: p.green }]}>{formatCurrency(payableNow)} payable now (incl. {price.buyingPlan} membership)</Text></View>
+        ) : (
+          <View style={styles.noteRow}>
+            <Text style={[styles.note, { color: p.green }]}>{formatCurrency(payableNow)} payable now</Text>
+            <View style={[styles.dot, { backgroundColor: p.green }]} />
+            <Text style={[styles.note, { color: p.green }]}>Refundable up to 24h before trip</Text>
+          </View>
         )}
+        </View>
       </View>
 
     </>
@@ -224,21 +230,23 @@ const styles = StyleSheet.create({
     boxShadow: '0px -52px 21px rgba(47, 62, 117, 0.01), 0px -29px 17px rgba(47, 62, 117, 0.05)',
   },
   fade: { top: -64, bottom: undefined },
-  infoRow: { flexDirection: 'row', alignItems: 'center' },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8 },
-  price: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 23, lineHeight: 30, letterSpacing: -0.3 },
-  strike: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, lineHeight: 18, textDecorationLine: 'line-through' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  price: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 19, lineHeight: 20 },
+  strike: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 16, textDecorationLine: 'line-through' },
   perDay: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 7.5, marginTop: 3, flexWrap: 'wrap' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' },
+  dot: { width: 3, height: 3, borderRadius: 1.5 },
   // Figma "Membership Tags": 18 high pill (radius 100), 1px #D1CCF9 border, #F0EFFD fill, padding 3 / 8 — so a 10px line.
   chip: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3, height: 18, justifyContent: 'center', alignItems: 'center' },
   chipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 10, includeFontPadding: false },
-  meta: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11 },
-  breakupBtn: { flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 10, marginTop: 6 },
+  meta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
+  breakupBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 10 },
   breakupText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
-  button: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', borderRadius: 12, height: 48 },
-  buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, lineHeight: 24 },
+  button: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', borderRadius: 12, height: 54, padding: 12 },
+  buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
   note: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, lineHeight: 12, textAlign: 'center' },
+  noteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 },
   pressed: { opacity: 0.85 },
 
   // Breakup card (Figma: #FAFAFA card, 1px #E5E5E5, radius 10, rows 27 apart, dashed dividers).

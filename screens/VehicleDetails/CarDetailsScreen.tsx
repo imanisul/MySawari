@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager } from 'react-native';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -171,8 +171,16 @@ export default function CarDetailsScreen() {
 
   const mainScrollRef = useRef<ScrollView>(null);
 
+  // Everything under the section pills mounts after the screen has finished sliding in: building the whole long page
+  // during the transition is what made it stutter and jump. Nothing above the fold depends on it, so no layout shifts.
+  const [showRest, setShowRest] = useState(false);
   useEffect(() => {
-    mainScrollRef.current?.scrollTo({ y: 0, animated: true });
+    const task = InteractionManager.runAfterInteractions(() => setShowRest(true));
+    return () => task.cancel();
+  }, []);
+
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo({ y: 0, animated: false });
     setActiveSection('overview');
   }, [selectedCar?.id]);
 
@@ -261,6 +269,8 @@ export default function CarDetailsScreen() {
           <SectionPills sections={SECTIONS} active={activeSection} onPress={scrollToSection} />
         </View>
 
+        {showRest && (
+          <>
         <View onLayout={onSectionLayout('specification')}>
           <MainSpecification car={enrichedCar} />
         </View>
@@ -288,6 +298,8 @@ export default function CarDetailsScreen() {
         <Faqs />
         <HelpCard />
         <PolicyAgreement agreed={agreed} onToggle={() => setAgreed((v) => !v)} />
+          </>
+        )}
       </ScrollView>
       </BlurTargetView>
 

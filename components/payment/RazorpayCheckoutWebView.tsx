@@ -1,5 +1,6 @@
-import React from 'react';
-import { StyleSheet, View, ActivityIndicator, Linking } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, KeyboardAvoidingView, Linking, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 interface RazorpayCheckoutWebViewProps {
@@ -39,6 +40,21 @@ export function RazorpayCheckoutWebView({
   // Encoded as real JS literals (not interpolated into quotes) so a name/description containing a
   // quote or backslash (e.g. an apostrophe in a customer's name) can never break the generated script.
   const jsString = (v: string | undefined) => JSON.stringify(v || '');
+  const insets = useSafeAreaInsets();
+
+  // Checkout must show up within a reasonable time: if Razorpay's page never reports it opened (no network,
+  // blocked script), the customer gets an error and a way back instead of a screen that waits forever.
+  const opened = useRef(false);
+  const failed = useRef(false);
+  const fail = (message: string) => {
+    if (failed.current || opened.current) return;
+    failed.current = true;
+    onFailure({ description: message });
+  };
+  useEffect(() => {
+    const t = setTimeout(() => fail('The secure payment page is taking too long to open. Please check your connection and try again.'), 25000);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const checkoutHtml = `
     <!DOCTYPE html>
@@ -52,8 +68,13 @@ export function RazorpayCheckoutWebView({
         </style>
     </head>
     <body>
-        <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
         <script>
+            var post = function (m) { window.ReactNativeWebView.postMessage(JSON.stringify(m)); };
+            window.onerror = function (msg) { post({ event: 'failure', data: { description: 'Could not open the payment page. Please try again.' } }); };
+        </script>
+        <script src="https://checkout.razorpay.com/v1/checkout.js" onerror="post({ event: 'failure', data: { description: 'Could not load the secure payment page. Please check your connection and try again.' } })"></script>
+        <script>
+            if (typeof Razorpay === 'undefined') { throw new Error('no razorpay'); }
             var options = {
                 "key": ${jsString(razorpayKey)},
                 "amount": ${Number(amount) || 0},
@@ -97,6 +118,7 @@ export function RazorpayCheckoutWebView({
             } catch(e) {
               setTimeout(function(){ rzp1.open(); }, 100);
             }
+            post({ event: 'opened' });
         </script>
     </body>
     </html>
@@ -105,7 +127,9 @@ export function RazorpayCheckoutWebView({
   const onMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.event === 'success') {
+      if (data.event === 'opened') {
+        opened.current = true;
+      } else if (data.event === 'success') {
         onSuccess(data.data);
       } else if (data.event === 'failure') {
         onFailure(data.data);
@@ -114,7 +138,7 @@ export function RazorpayCheckoutWebView({
       }
     } catch (e: any) {
       if (__DEV__) console.warn('Failed to parse webview message');
-      onFailure(e);
+      fail('Something went wrong with the payment page. Please try again.');
     }
   };
 
@@ -146,7 +170,11 @@ export function RazorpayCheckoutWebView({
   };
 
   return (
-    <View style={styles.container}>
+    // Edge-to-edge: keep checkout clear of the status bar, the navigation bar and the keyboard, so its Pay button is always reachable.
+    <KeyboardAvoidingView
+      style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
+      behavior={Platform.OS === 'android' ? 'padding' : undefined}
+    >
       <WebView
         originWhitelist={['*']}
         source={{ html: checkoutHtml, baseUrl: 'https://checkout.razorpay.com' }}
@@ -155,15 +183,18 @@ export function RazorpayCheckoutWebView({
         javaScriptEnabled={true}
         domStorageEnabled={true}
         startInLoadingState={false}
+        javaScriptCanOpenWindowsAutomatically
+        onError={() => fail('Could not open the payment page. Please check your connection and try again.')}
+        onHttpError={() => fail('Could not open the payment page. Please try again.')}
         style={{ flex: 1, backgroundColor: 'transparent' }}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFFFFF',
   },
 });

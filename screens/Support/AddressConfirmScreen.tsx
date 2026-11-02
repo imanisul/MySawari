@@ -16,6 +16,8 @@ import * as Location from 'expo-location';
 import { usePlaceSearch, type SearchPlace } from '@/hooks/usePlaceSearch';
 
 const PRESET_LABELS = ['Home', 'Work', 'Trip'];
+// Figma header: 64 tall under the status bar; the map starts below it.
+const HEADER_H = 64;
 
 /**
  * The map inside the WebView. Google Maps (JavaScript API) when a key is set; if Google fails to load or
@@ -129,12 +131,13 @@ export default function AddressConfirmScreen() {
 
   // The map keeps one fixed height (screen minus the card, measured once): the keyboard or a growing card
   // slides over it instead of resizing it, so the point under the pin never shifts by itself.
+  const headerH = insets.top + HEADER_H;
   const [screenH, setScreenH] = useState(0);
   const [cardH, setCardH] = useState(0);
   const [mapH, setMapH] = useState(0);
   useEffect(() => {
-    if (!mapH && screenH > 0 && cardH > 0) setMapH(Math.max(240, screenH - cardH + 24));
-  }, [screenH, cardH, mapH]);
+    if (!mapH && screenH > 0 && cardH > 0) setMapH(Math.max(240, screenH - cardH + 24 - headerH));
+  }, [screenH, cardH, mapH, headerH]);
   const kb = useRef(new Animated.Value(0)).current;
 
   // ── Search on the map: typing finds places; picking one moves the map there and shows its address ──
@@ -301,7 +304,7 @@ export default function AddressConfirmScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: p.page }]} onLayout={(e) => { if (!screenH) setScreenH(e.nativeEvent.layout.height); }}>
       {/* ── Map (fixed height, under the card) ── */}
-      <View style={[styles.mapWrap, mapH ? { height: mapH } : { bottom: 0 }]}>
+      <View style={[styles.mapWrap, { top: headerH }, mapH ? { height: mapH } : { bottom: 0 }]}>
         {mapFailed ? (
           <View style={[styles.mapMsg, { backgroundColor: p.iconBg }]}>
             <Text style={[styles.mapMsgText, { color: p.muted }]}>Couldn't load the map. You can still save this address.</Text>
@@ -370,42 +373,49 @@ export default function AddressConfirmScreen() {
         )}
       </View>
 
-      {/* ── Top: back + search on the map, with the results under it ── */}
-      <View style={[styles.topBar, { top: insets.top + 8 }]}>
+      {/* ── Header: back + the place under the pin (tap to search); results drop down under it ── */}
+      <View style={[styles.topBar, { height: headerH, paddingTop: insets.top, backgroundColor: p.page }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={searchOpen ? 'Close search' : 'Back'}
           onPress={() => (searchOpen ? closeSearch() : safeBack(router))}
           hitSlop={8}
-          style={[styles.round, styles.shadow, { backgroundColor: p.page }]}
+          style={styles.round}
         >
-          <Feather name={searchOpen ? 'x' : 'chevron-left'} size={searchOpen ? 19 : 22} color={p.fg} />
+          <Feather name={searchOpen ? 'x' : 'chevron-left'} size={searchOpen ? 18 : 20} color="#737373" />
         </Pressable>
-        <View style={[styles.searchBar, styles.shadow, { backgroundColor: p.page, borderColor: searchOpen ? p.muted : p.border }]}>
-          <Feather name="search" size={16} color={p.muted} />
-          <TextInput
-            ref={searchInput}
-            value={search}
-            onChangeText={setSearch}
-            onFocus={() => openSearch(true)}
-            placeholder="Search area, street or landmark"
-            placeholderTextColor={p.muted}
-            selectionColor={p.fg}
-            autoCorrect={false}
-            returnKeyType="search"
-            onSubmitEditing={() => { if (found[0]) jumpTo(found[0]); }}
-            style={[styles.searchInput, { color: p.fg }]}
-            accessibilityLabel="Search an address to move the map"
-          />
-          {searching ? <ActivityIndicator size="small" color={p.muted} /> : search.length > 0 ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearch('')} hitSlop={10}>
-              <Feather name="x-circle" size={16} color={p.muted} />
-            </Pressable>
-          ) : null}
-        </View>
+        {searchOpen ? (
+          <View style={[styles.searchBar, { borderColor: p.muted }]}>
+            <Feather name="search" size={16} color={p.muted} />
+            <TextInput
+              ref={searchInput}
+              value={search}
+              onChangeText={setSearch}
+              autoFocus
+              placeholder="Search area, street or landmark"
+              placeholderTextColor={p.muted}
+              selectionColor={p.fg}
+              autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={() => { if (found[0]) jumpTo(found[0]); }}
+              style={[styles.searchInput, { color: p.fg }]}
+              accessibilityLabel="Search an address to move the map"
+            />
+            {searching ? <ActivityIndicator size="small" color={p.muted} /> : search.length > 0 ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={() => setSearch('')} hitSlop={10}>
+                <Feather name="x-circle" size={16} color={p.muted} />
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <Pressable accessibilityRole="search" accessibilityLabel={`${place.name}. Tap to search another place`} onPress={() => openSearch(true)} style={styles.placeText}>
+            <Text style={styles.placeName} numberOfLines={1}>{resolving ? 'Finding the address…' : place.name}</Text>
+            <Text style={styles.placeAddr} numberOfLines={1}>{place.address || 'Move the map to put the pin on your address.'}</Text>
+          </Pressable>
+        )}
       </View>
       {searchOpen && search.trim().length >= 2 && (
-        <View style={[styles.results, styles.shadow, { top: insets.top + 8 + 48, backgroundColor: p.page, borderColor: p.border }]}>
+        <View style={[styles.results, styles.shadow, { top: headerH, backgroundColor: p.page, borderColor: p.border }]}>
           <ScrollView keyboardShouldPersistTaps="handled" bounces={false}>
             {found.length === 0 ? (
               <Text style={[styles.resultsEmpty, { color: p.muted }]}>
@@ -437,7 +447,7 @@ export default function AddressConfirmScreen() {
       <Animated.View
         pointerEvents={searchOpen ? 'none' : 'auto'}
         onLayout={(e) => { if (!cardH) setCardH(e.nativeEvent.layout.height); }}
-        style={[styles.card, { backgroundColor: p.page, borderColor: p.border, paddingBottom: Math.max(insets.bottom, 16) + 8, transform: [{ translateY: kb }], opacity: searchOpen ? 0 : 1 }]}
+        style={[styles.card, { backgroundColor: p.page, borderColor: '#E7EAF4', paddingBottom: insets.bottom + 16, transform: [{ translateY: kb }], opacity: searchOpen ? 0 : 1 }]}
       >
         <Text style={[styles.title, { color: p.fg }]}>{isSaveOnly ? 'Address Details' : isReturn ? 'Set Drop-off location' : 'Set Pickup location'}</Text>
 
@@ -449,15 +459,10 @@ export default function AddressConfirmScreen() {
           placeholder={resolving ? 'Finding address…' : 'House / flat no., building, area'}
           placeholderTextColor={p.muted}
           selectionColor={p.fg}
-          style={[styles.input, { borderColor: focus === 'details' ? p.muted : p.strongBorder, color: edited ? p.fg : p.sub }]}
+          style={[styles.input, { borderColor: focus === 'details' ? p.muted : '#D4D4D4', color: edited ? p.fg : '#737373' }]}
           accessibilityLabel="Address name, house or flat number"
           returnKeyType="done"
         />
-        {/* The full address under the pin, so the customer can see exactly where it is */}
-        <Text style={[styles.fullAddr, { color: p.muted }]} numberOfLines={2}>
-          {resolving ? 'Finding the address at the pin…' : place.address || 'Move the map to put the pin on your address.'}
-        </Text>
-
         <Text style={[styles.saveAs, { color: p.fg }]}>Save address as</Text>
         <View style={styles.chips}>
           {PRESET_LABELS.map((l) => {
@@ -468,7 +473,7 @@ export default function AddressConfirmScreen() {
                 accessibilityRole="radio"
                 accessibilityState={{ selected: on }}
                 onPress={() => pickLabel(l)}
-                style={[styles.chip, { borderColor: on ? p.navy : p.strongBorder, backgroundColor: p.page }]}
+                style={[styles.chip, { borderColor: on ? p.navy : '#E5E5E5', backgroundColor: p.page }]}
               >
                 <Text style={[styles.chipText, { color: on ? p.navy : customOpen ? p.muted : p.sub }]}>{l}</Text>
               </Pressable>
@@ -483,9 +488,9 @@ export default function AddressConfirmScreen() {
               setLabel('');
               setCustomOpen((o) => !o);
             }}
-            style={[styles.plus, { borderColor: p.strongBorder, backgroundColor: p.page }]}
+            style={[styles.plus, { borderColor: '#E5E5E5', backgroundColor: p.page }]}
           >
-            <Feather name={customOpen ? 'x' : 'plus'} size={18} color={p.fg} />
+            <Feather name={customOpen ? 'x' : 'plus'} size={20} color={p.fg} />
           </Pressable>
         </View>
         {customOpen && (
@@ -526,7 +531,10 @@ const styles = StyleSheet.create({
   // Pin tip on the centre of the part of the map above the card (the card overlaps the map by 24).
   pinLayer: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 24, alignItems: 'center', justifyContent: 'center', paddingBottom: 46 },
   pinShadow: { width: 14, height: 5, borderRadius: 7, backgroundColor: '#000', marginTop: -5 },
-  topBar: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8, zIndex: 5 },
+  topBar: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, zIndex: 5 },
+  placeText: { flex: 1, justifyContent: 'center', gap: 2 },
+  placeName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#262626' },
+  placeAddr: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16, color: '#737373' },
   searchBar: { flex: 1, height: 40, borderRadius: 20, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14 },
   searchInput: { flex: 1, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 14, paddingVertical: 0 },
   results: { position: 'absolute', left: 16, right: 16, maxHeight: 320, borderRadius: 12, borderWidth: 1, overflow: 'hidden', zIndex: 6 },
@@ -535,22 +543,21 @@ const styles = StyleSheet.create({
   resultPin: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   resultName: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13.5 },
   resultAddr: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, marginTop: 2 },
-  round: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+  round: { width: 32, height: 32, borderRadius: 30, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
   shadow: { shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   mapButtons: { position: 'absolute', right: 16, bottom: 24 + 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   locate: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   reset: { height: 34, paddingHorizontal: 13, borderRadius: 17, flexDirection: 'row', alignItems: 'center', gap: 6 },
   resetText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
-  card: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 22 },
-  title: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 18.5 },
-  input: { height: 50, borderWidth: 1, borderRadius: 8, paddingHorizontal: 13, marginTop: 14, fontFamily: 'PlusJakartaSans_400Regular', fontSize: 16 },
-  fullAddr: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11.5, lineHeight: 16, marginTop: 6, paddingHorizontal: 2 },
+  card: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: 1, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 16 },
+  title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
+  input: { height: 50, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, marginTop: 12, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17 },
   customInput: { height: 44, marginTop: 8.5, fontSize: 14 },
-  saveAs: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 14, marginTop: 16 },
-  chips: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  saveAs: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22, marginTop: 16 },
+  chips: { flexDirection: 'row', gap: 8, marginTop: 8 },
   chip: { flex: 1, height: 34, borderWidth: 1, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  chipText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12.5 },
+  chipText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   plus: { width: 38, height: 34, borderWidth: 1, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   button: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
-  buttonText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 17.5 },
+  buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17 },
 });

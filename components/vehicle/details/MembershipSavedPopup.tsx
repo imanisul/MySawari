@@ -16,7 +16,7 @@ export function clearMembershipPopupShown(carId?: string) {
     shown.clear();
   } else {
     for (const key of Array.from(shown)) {
-      if (key.startsWith(`${carId}|`)) {
+      if (key.split("|")[1] === String(carId)) {
         shown.delete(key);
       }
     }
@@ -35,15 +35,20 @@ type Layout = {
   cardTop: number; cardH: number;
   /** Starter only: the design draws its crown box larger than the frame art does, so it is laid over the frame. */
   crown?: any;
+  /** Size of the overlaid crown / gem; default 127 × 94. */
+  crownBox?: { w: number; h: number };
 };
 const STARTER_LAYOUT: Layout = { h: 219, artTop: 0, artH: 219, cardTop: 86, cardH: 120, crown: require('@/assets/images/membership_crown_starter.png') };
-const OTHER_LAYOUT: Layout = { h: 189, artTop: 0, artH: 189, cardTop: 72, cardH: 106 };
+// Plus and Pro use the same measures as Starter; their shield / gem is already part of the frame art.
+const OTHER_LAYOUT: Layout = { h: 219, artTop: 0, artH: 219, cardTop: 86, cardH: 120 };
+// Pro: the design draws its gem about 100 wide, larger than the frame art does, so it is laid over the frame.
+const PRO_LAYOUT: Layout = { ...OTHER_LAYOUT, crown: require('@/assets/images/membership_gem_pro.png'), crownBox: { w: 100, h: 94 } };
 
 type Theme = { art: any; layout: Layout; innerBorder: string; dash: string; applied: string; confetti: string[] };
 const THEMES: Record<string, Theme> = {
   Starter: { art: require('@/assets/images/membership_frame_starter.png'), layout: STARTER_LAYOUT, innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#2F3E75', confetti: ['#2F3E75', '#6152D8', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
   Plus: { art: require('@/assets/images/membership_frame_plus.png'), layout: OTHER_LAYOUT, innerBorder: '#FFFFFF', dash: '#C9C2F7', applied: '#6152D8', confetti: ['#6152D8', '#F59E0B', '#FBBC04', '#C9C2F7', '#FFFFFF'] },
-  Pro: { art: require('@/assets/images/membership_frame_pro.png'), layout: OTHER_LAYOUT, innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
+  Pro: { art: require('@/assets/images/membership_frame_pro.png'), layout: PRO_LAYOUT, innerBorder: '#DCD7FA', dash: '#C9C2F7', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
 };
 
 /**
@@ -112,7 +117,7 @@ export function MembershipCelebration({ visible, plan, amount, title, note, conf
           <View style={{ width: ART_W, height: t.layout.h }}>
             <Image source={t.art} style={{ position: 'absolute', left: 0, top: t.layout.artTop, width: ART_W, height: t.layout.artH }} resizeMode="stretch" fadeDuration={0} accessible={false} onLoad={artLoaded} onError={artLoaded} />
             {!!t.layout.crown && (
-              <Image source={t.layout.crown} style={styles.crown} resizeMode="stretch" fadeDuration={0} accessible={false} onLoad={artLoaded} onError={artLoaded} />
+              <Image source={t.layout.crown} style={[styles.crown, !!t.layout.crownBox && { left: (ART_W - t.layout.crownBox.w) / 2, width: t.layout.crownBox.w, height: t.layout.crownBox.h }]} resizeMode="stretch" fadeDuration={0} accessible={false} onLoad={artLoaded} onError={artLoaded} />
             )}
             <View style={[styles.inner, { top: t.layout.cardTop, height: t.layout.cardH, borderColor: t.innerBorder }]}>
               <View style={styles.saveBlock}>
@@ -170,7 +175,7 @@ export function MembershipSavedPopup({
   // Existing member discount popup should not appear on car details page; it only shows on the payment option page.
   if (screen === 'details') return null;
 
-  const { membership } = useSawari();
+  const { membership, planToBuy } = useSawari();
   const price = useTripPrice(hasTrip);
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState<{ amount: number | null; plan: string; note?: string } | null>(null);
@@ -195,7 +200,8 @@ export function MembershipSavedPopup({
   const key = `${screen}|${tripKey}|${planName}`;
 
   useEffect(() => {
-    if (!isReady || !planName || hasShown.current) return;
+    // A plan picked for this booking was already celebrated when it was picked (car details or this page).
+    if (!isReady || !planName || hasShown.current || planToBuy) return;
     if (!forceShow && shown.has(key)) return;
 
     const t = setTimeout(() => {
@@ -209,7 +215,7 @@ export function MembershipSavedPopup({
       setVisible(true);
     }, 450);
     return () => clearTimeout(t);
-  }, [key, isReady, planName, discount, forceShow]);
+  }, [key, isReady, planName, discount, forceShow, planToBuy]);
 
   // Keep savings amount updated if price calculation resolves after initial popup mount
   useEffect(() => {
@@ -258,7 +264,7 @@ const styles = StyleSheet.create({
   applied: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11.5, lineHeight: 15 },
   note: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 8.5, lineHeight: 12, color: '#737373', marginTop: 2 },
   close: {
-    marginTop: 10,
+    marginTop: 8,
     width: 32,
     height: 32,
     borderRadius: 16,

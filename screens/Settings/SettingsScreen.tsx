@@ -130,8 +130,8 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const refreshPermissions = useCallback(async () => {
-    try { setNotificationsEnabled((await Notifications.getPermissionsAsync()).status === 'granted'); } catch {}
-    try { setLocationEnabled((await Location.getForegroundPermissionsAsync()).status === 'granted'); } catch {}
+    try { setNotificationsEnabled((await Notifications.getPermissionsAsync()).status === 'granted'); } catch { }
+    try { setLocationEnabled((await Location.getForegroundPermissionsAsync()).status === 'granted'); } catch { }
   }, []);
   useEffect(() => {
     refreshPermissions();

@@ -94,6 +94,12 @@ export default function PaymentProcessingScreen() {
       }
       try {
         // Step 1: Secure Vehicle Hold (Atomic OCC + Idempotency)
+        // The payment order does not depend on the hold, so both are requested together (one wait instead of two).
+        const orderRequest = API.createRazorpayOrder(
+          { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
+          idempotencyKey.current
+        );
+        orderRequest.catch(() => {}); // its error is handled below, once the hold is secured
         const snapshot = await createBookingSnapshot(idempotencyKey.current);
         if (!snapshot) throw new Error('Failed to secure vehicle lock. Please try again.');
         holdId.current = snapshot.id;
@@ -102,10 +108,7 @@ export default function PaymentProcessingScreen() {
         setSetupStep(1);
 
         // Step 2: Create Order (Idempotent order creation with gateway receipt key)
-        const order = await API.createRazorpayOrder(
-          { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
-          idempotencyKey.current
-        );
+        const order = await orderRequest;
         if (left.current) { releaseHold(); return; }
         setRazorpayOrder(order);
         setStatus('PAYMENT_PENDING'); 

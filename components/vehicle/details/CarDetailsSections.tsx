@@ -965,7 +965,7 @@ export function PolicyAgreement({ agreed, onToggle }: { agreed: boolean; onToggl
         style={styles.agreeRow}
       >
         <View style={[styles.checkbox, { borderColor: p.navy, backgroundColor: agreed ? p.navy : 'transparent' }]}>
-          {agreed && <Feather name="check" size={9} color="#FFFFFF" />}
+          {agreed && <Feather name="check" size={12} color="#FFFFFF" />}
         </View>
         <Text style={[styles.agreeText, { color: p.muted }]}>I agree to the rental terms, cancellation policy, and vehicle usage guidelines.</Text>
       </Pressable>
@@ -1101,7 +1101,8 @@ const styles = StyleSheet.create({
   helpSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 6 },
   helpBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
-  agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8.5 },
-  checkbox: { width: 13, height: 13, borderRadius: 2.5, borderWidth: 1.2, alignItems: 'center', justifyContent: 'center', marginTop: 3.5 },
+  agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  // 16 × 16 box centred on the first 20px text line.
+  checkbox: { width: 16, height: 16, borderRadius: 3, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   agreeText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
 });

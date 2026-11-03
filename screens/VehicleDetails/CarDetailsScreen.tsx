@@ -160,7 +160,7 @@ export default function CarDetailsScreen() {
         addRecentlyViewed(isAuthenticated ? customer?.id : null, {
           vehicleId: String(selectedCar.id),
           dropoff: dropoff || undefined,
-          dateRange,
+          dateRange, 
           pickupTime,
           returnTime,
           duration,

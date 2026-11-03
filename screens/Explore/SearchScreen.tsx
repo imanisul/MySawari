@@ -273,11 +273,14 @@ export default function SearchResultsScreen() {
         </Pressable>
       </View>
 
+      <View style={[styles.fixedControls, { backgroundColor: p.page }]}>
+        {header}
+      </View> 
+
       <FlatList
         data={isLoading ? [] : filteredCars}
         keyExtractor={(c: Car) => c.id}
         renderItem={renderCar}
-        ListHeaderComponent={<View style={{ paddingHorizontal: 16, marginBottom: 8 }}>{header}</View>}
         ListEmptyComponent={isLoading ? (
           <Reanimated.View entering={FadeIn.duration(200)}>
             {[0, 1, 2].map((i) => <CarCardSkeleton key={i} index={i} />)}
@@ -324,6 +327,7 @@ export default function SearchResultsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingBottom: 12 },
+  fixedControls: { paddingHorizontal: 16, paddingBottom: 8 },
   back: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   topText: { flex: 1, minWidth: 0 },
   dest: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 14, lineHeight: 20 },

@@ -27,7 +27,7 @@ const MAPS_URL = 'https://www.google.com/maps/search/?api=1&query=MySawari+-+Sel
 // 2+ day bookings are unlimited (see screens/Support/PolicyScreen.tsx). The Figma frame's "₹5/km" is a
 // design placeholder and must not be shown as if it were the charged rate.
 const INCLUDED_KM_ONE_DAY = 300;
-const EXTRA_KM_RATE = 75;
+const EXTRA_KM_RATE = 5;
 
 // ── Shared bits ───────────────────────────────────────────────────────────────
 

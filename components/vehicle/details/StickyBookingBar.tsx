@@ -72,7 +72,7 @@ export function StickyBookingBar({
                 <>
                   <View style={styles.priceRow}>
                     <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(price.total)}</Text>
-                    {price.original > price.total && (
+                    {Math.round(price.original) > Math.round(price.total) && (
                       <Text style={[styles.strike, { color: p.muted }]}>{formatCurrency(price.original)}</Text>
                     )}
                   </View>
@@ -118,14 +118,16 @@ export function StickyBookingBar({
               )}
             </View>
 
-            {price.state === 'ready' && (
+            {/* Always there for a bookable trip; dimmed until the price for these dates is in. */}
+            {hasTrip && price.state !== 'error' && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={showBreakup ? 'Hide price breakup' : 'View price breakup'}
-                accessibilityState={{ expanded: showBreakup }}
+                accessibilityState={{ expanded: showBreakup, disabled: price.state !== 'ready' }}
+                disabled={price.state !== 'ready'}
                 onPress={() => { Haptics.selectionAsync(); setShowBreakup((v) => !v); }}
                 hitSlop={8}
-                style={({ pressed }) => [styles.breakupBtn, pressed && { opacity: 0.7 }]}
+                style={({ pressed }) => [styles.breakupBtn, (pressed || price.state !== 'ready') && { opacity: 0.5 }]}
               >
                 <Text style={[styles.breakupText, { color: p.navy }]}>View breakup</Text>
                 <Feather name={showBreakup ? 'chevron-down' : 'chevron-up'} size={12} color={p.navy} />

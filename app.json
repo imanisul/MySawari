@@ -79,8 +79,8 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/transparent.png",
-          "imageWidth": 1,
+          "image": "./assets/images/MySawari_nobg.png",
+          "imageWidth": 160,
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
         }

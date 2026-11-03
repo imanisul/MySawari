@@ -286,7 +286,7 @@ export default function BookingScreen() {
               {ready && (
                 <View style={styles.priceRow}>
                   <Text style={[styles.carPrice, { color: p.fg }]}>{formatCurrency(ready.total)}</Text>
-                  {ready.original > ready.total && <Text style={[styles.carStrike, { color: p.muted }]}>{formatCurrency(ready.original)}</Text>}
+                  {Math.round(ready.original) > Math.round(ready.total) && <Text style={[styles.carStrike, { color: p.muted }]}>{formatCurrency(ready.original)}</Text>}
                 </View>
               )}
             </View>

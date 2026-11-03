@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { startQueryPersistence, hydrateUserQueries } from '@/hooks/queryPersistence';
 import { API } from '@/services/backend/api';
 import { offersQueryOptions } from '@/services/api/offers';
 import { vehiclesQueryOptions, hasLiveVehicles, waitForCardImages } from '@/hooks/useVehicles';
@@ -79,7 +80,16 @@ export async function loadHomeData(
     step('offers', queryClient.fetchQuery(offersQueryOptions)),
   ];
   if (isAuthenticated) {
-    tasks.push(step('trips', queryClient.fetchQuery(bookingsQueryOptions)));
+    // Trips from the last launch show at once (saved per customer, marked stale so they refresh right away);
+    // only a first launch waits for them.
+    let savedTrips = false;
+    if (userId) {
+      startQueryPersistence(queryClient, userId);
+      await hydrateUserQueries(queryClient, userId);
+      savedTrips = queryClient.getQueryData(bookingsQueryOptions.queryKey) !== undefined;
+    }
+    const fresh = queryClient.fetchQuery({ ...bookingsQueryOptions, staleTime: savedTrips ? 0 : bookingsQueryOptions.staleTime });
+    if (savedTrips) { fresh.catch(() => {}); onStep?.('trips'); } else tasks.push(step('trips', fresh));
     tasks.push(step('wallet', fetchWallet()));
   }
   await Promise.race([

@@ -20,8 +20,10 @@ import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
   HomeHero, ReferStrip, HomeSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
-  DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard,
+  DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HOME_PURPLE,
 } from '@/components/home/HomeSections';
+import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
+import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
 
 const DESTINATIONS: { id: string; title: string; blurb: string; image: ImageSourcePropType; faded?: boolean }[] = [
   { id: 'shillong', title: 'Shillong', blurb: 'Pine-covered hills, cafe culture, and Scotland of the East vibes.', image: require('../../assets/images/dest_shillong.jpg') },
@@ -120,7 +122,6 @@ export default function HomeScreen() {
   const setCity = (c: string) => { setCityState(c); AsyncStorage.setItem('@selected_city', c).catch(() => {}); };
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [manualRefreshing, setManualRefreshing] = useState(false);
-  const [claiming, setClaiming] = useState(false);
 
   /** Runs `go` now when signed in, or after logging in. */
   const requireLogin = useCallback((go: () => void) => {
@@ -160,41 +161,34 @@ export default function HomeScreen() {
   }, [queryClient, recentKey]));
 
   const typeName = vehicleType === 'bike' ? 'Bike' : 'Car';
+  const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
+  const withAvail = useCallback((v: any) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; }, [startStr, endStr]);
+
+  // Recent Searches: only what this customer looked at (newest first, with the trip it was viewed for), never filler.
+  const recent = useMemo(() => viewedIds
+    .map((item: any) => {
+      const v = fetchedVehicles.find((x) => String(x.id) === item.vehicleId);
+      // Everything the customer looked at shows together, cars and bikes, whichever tab is selected.
+      return v && !isInService(v) ? { ...withAvail(v), viewedContext: item } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 6) as any[], [viewedIds, fetchedVehicles, withAvail]);
+
+  // Top Picks: the most booked vehicles of the selected type (last 90 days, from the bookings), free ones first;
+  // the curated favourites only break ties.
   const picks = useMemo(() => {
-    const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
-    const withAvail = (v: any) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; };
-
-    const viewed = viewedIds
-      .map((item: any) => {
-        const v = fetchedVehicles.find((x) => String(x.id) === item.vehicleId);
-        // Everything the customer looked at shows together, cars and bikes, whichever tab is selected.
-        return v && !isInService(v) ? { ...withAvail(v), viewedContext: item } : null;
-      })
-      .filter(Boolean)
-      .slice(0, 4) as any[];
-
     const fav = PICKS[typeName];
     const rank = (v: Car) => {
       const n = (v.displayName || v.name || '').toLowerCase();
       const i = fav.findIndex((word) => n.includes(word));
       return i === -1 ? fav.length + 10 : i;
     };
-    const curated = fetchedVehicles
-      .filter((v) => (v?.displayName || v?.name) && v.type === typeName && !isInService(v) && !viewed.some((w) => w.id === v.id))
+    const top = fetchedVehicles
+      .filter((v) => (v?.displayName || v?.name) && v.type === typeName && !isInService(v))
       .map(withAvail)
-      .sort((a, b) => {
-        if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
-        if (!a.isAvailable) {
-          const da = a.availability?.nextAvailableFrom ? parseDayLabel(a.availability.nextAvailableFrom) ?? 999 : 999;
-          const db = b.availability?.nextAvailableFrom ? parseDayLabel(b.availability.nextAvailableFrom) ?? 999 : 999;
-          if (da !== db) return da - db;
-        }
-        return rank(a) - rank(b);
-      });
-    const seen = new Set<string>();
-    // Free vehicles first (recently viewed before curated within each group), then by when they're free again.
-    return byAvailability([...viewed, ...curated].filter((v) => (seen.has(v.id) ? false : (seen.add(v.id), true)))).slice(0, 8);
-  }, [viewedIds, fetchedVehicles, dateRange, typeName]);
+      .sort((a, b) => (b.recentBookings || 0) - (a.recentBookings || 0) || rank(a) - rank(b));
+    return byAvailability(top).slice(0, 8);
+  }, [fetchedVehicles, typeName, withAvail]);
 
   const openPick = useCallback((item: any) => {
     selectCar(item);
@@ -218,31 +212,17 @@ export default function HomeScreen() {
   }, [selectCar, setBookingSource, router, requireLogin, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress]);
 
   // ── Trip milestone (ride journey from the server) ──
-  const { data: journey, refetch: refetchJourney } = useQuery({
-    queryKey: ['ride-journey'],
-    queryFn: () => API.getRideJourney(),
-    enabled: !!isAuthenticated,
-    staleTime: 30_000,
-  });
+  const { data: journey, refetch: refetchJourney, cards } = useRideJourney();
   const claimable = journey?.milestones.find((m) => m.unlocked && !m.claimed) ?? null;
   const next = journey?.milestones.find((m) => !m.unlocked) ?? null;
   const milestone = claimable ?? next ?? (journey ? null : { label: '', rides: FIRST_MILESTONE.rides, rewardAmount: FIRST_MILESTONE.rewardAmount });
 
-  const claim = useCallback(async () => {
-    if (!claimable || claiming) return;
-    setClaiming(true);
-    try {
-      const res = await API.claimMilestoneReward(claimable.label);
-      earnSawariCash(res?.reward.amount ?? claimable.rewardAmount);
-      CustomAlert.alert('Congratulations! 🎊', `You have claimed ₹${res?.reward.amount ?? claimable.rewardAmount} SawariCash!`, [{ text: 'Awesome!' }]);
-    } catch {
-      CustomAlert.alert('Could not claim', 'Please try again in a moment.', [{ text: 'OK' }]);
-    } finally {
-      setClaiming(false);
-      queryClient.invalidateQueries({ queryKey: ['ride-journey'] });
-      fetchWallet();
-    }
-  }, [claimable, claiming, earnSawariCash, queryClient, fetchWallet]);
+  // Reaching a milestone gives a scratch card (opened here, kept in Rewards if left).
+  const [scratch, setScratch] = useState<PendingCard | null>(null);
+  const claim = useCallback(() => {
+    const card = cards.find((c) => c.kind === 'milestone');
+    if (card) setScratch(card);
+  }, [cards]);
 
   // Refer & Earn: 10% of a friend's first booking — at least 10% of the lowest day rate in the fleet.
   const referEarn = useMemo(() => {
@@ -287,7 +267,7 @@ export default function HomeScreen() {
     });
   }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 
-  const sections = useMemo(() => ['header', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
+  const sections = useMemo(() => ['header', 'recent', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
     let content: React.ReactNode = null;
@@ -295,6 +275,8 @@ export default function HomeScreen() {
       case 'header':
         return (
           <View>
+            {/* Pulling the page down (iOS bounce) shows more of the hero's purple instead of a white gap above it. */}
+            <View pointerEvents="none" style={{ position: 'absolute', top: -1200, left: 0, right: 0, height: 1200, backgroundColor: HOME_PURPLE }} />
             <HomeHero
               topInset={insets.top}
               city={city}
@@ -309,12 +291,30 @@ export default function HomeScreen() {
             </View>
           </View>
         );
+      case 'recent':
+        if (!recent.length) break;
+        content = (
+          <>
+            <HomeSectionTitle title="Recent Searches" />
+            <FlatList
+              data={recent}
+              horizontal
+              keyExtractor={(v) => `recent-${v.id}`}
+              renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.row, { gap: 8 }]}
+              snapToInterval={254}
+              decelerationRate="fast"
+              removeClippedSubviews={false}
+            />
+          </>
+        );
+        break;
       case 'picks':
         if (!picks.length) break;
         content = (
           <>
-            {/* Someone who has looked at vehicles sees them first as "Recent Searches"; a new customer sees "Top Picks". */}
-            <HomeSectionTitle title={picks.some((v) => v.viewedContext) ? 'Recent Searches' : 'Top Picks'} />
+            <HomeSectionTitle title="Top Picks" />
             <FlatList
               data={picks}
               horizontal
@@ -338,7 +338,7 @@ export default function HomeScreen() {
             target={milestone.rides}
             reward={milestone.rewardAmount}
             claimable={!!claimable}
-            claiming={claiming}
+            claiming={false}
             onClaim={claim}
             onPress={() => requireLogin(() => router.push('/rewards'))}
           />
@@ -384,7 +384,7 @@ export default function HomeScreen() {
     }
     if (!content) return null;
     return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, openPick, milestone, journey, claimable, claiming, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, recent, openPick, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>
@@ -414,6 +414,7 @@ export default function HomeScreen() {
         }
       />
 
+      <RewardScratchModal card={scratch} onClose={() => setScratch(null)} />
       <CitySheet visible={showCity} value={city} onSelect={setCity} onClose={() => setShowCity(false)} />
 
       <LoginBottomSheet

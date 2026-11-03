@@ -15,7 +15,7 @@ import { checkCarAvailability } from '@/utils/sawari';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { API } from '@/services/backend/api';
 import { ActivityAPI } from '@/services/api/activity';
-import { useVehicles } from '@/hooks/useVehicles';
+import { useVehicles, useLiveCar } from '@/hooks/useVehicles';
 import { calculateCouponDiscount, formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { useTripPrice } from '@/components/vehicle/details/useTripPrice';
@@ -119,7 +119,7 @@ export default function BookingScreen() {
   const [startStr, endStr] = (dateRange || '').split(' – ');
   // Checked against the live fleet, not the copy saved when the car was tapped.
   const { data: liveVehicles } = useVehicles();
-  const liveCar = liveVehicles?.find((v) => v.id === selectedCar.id) || selectedCar;
+  const liveCar = useLiveCar(liveVehicles?.find((v) => v.id === selectedCar.id) || selectedCar);
   const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr);
 
   /** Pickup at the hub or delivered; return at the hub or collected — kept in the context's delivery mode. */

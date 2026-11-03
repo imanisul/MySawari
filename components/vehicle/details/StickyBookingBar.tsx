@@ -44,10 +44,10 @@ export function StickyBookingBar({
   const price = useTripPrice(hasTrip);
   const [showBreakup, setShowBreakup] = useState(false);
 
-  // Figma: "Check Availability" until trip dates are chosen (or when the car is busy for them),
-  // then the trip price with "Book Now".
+  // A car that is free (today, or for the chosen dates) says "Book Now"; with no dates yet the button first opens the
+  // date picker, then Book Now continues. "Check Availability" is only for a car that is busy for the chosen dates.
   const canBook = isAvailable && hasTrip;
-  const label = canBook ? (bookLabel || 'Book Now') : 'Check Availability';
+  const label = isAvailable && (hasTrip || !bookLabel) ? (bookLabel || 'Book Now') : 'Check Availability';
   const onPress = canBook
     ? () => {
         if (isAuthenticated) {
@@ -68,7 +68,7 @@ export function StickyBookingBar({
       >
         {/* Frosted blur above the bar: the page scrolling under it blurs and fades into the bar's white. */}
         <BottomBlur height={64} fadeTo={p.page} style={styles.fade} />
-        {canBook && (
+        {isAvailable && (
           <View style={styles.infoRow}>
             <View style={{ flex: 1 }}>
               {price.state === 'ready' && (
@@ -192,15 +192,15 @@ function Breakup({ price }: { price: ReadyPrice }) {
       {price.dropCharge > 0 && <Row label="Return pickup charges" value={formatCurrency(price.dropCharge)} tone="strong" />}
       {price.membershipDiscount > 0 && <Row label="Membership discount" value={`-${formatCurrency(price.membershipDiscount)}`} tone="green" />}
       {price.couponDiscount > 0 && <Row label={price.couponCode ? `Coupon discount (${price.couponCode})` : 'Coupon discount'} value={`-${formatCurrency(price.couponDiscount)}`} tone="green" />}
-      {price.sawariCashUsed > 0 && <Row label="My Sawari Cash used" value={`-${formatCurrency(price.sawariCashUsed)}`} tone="green" />}
+      {price.sawariCashUsed > 0 && <Row label="SawariCash used" value={`-${formatCurrency(price.sawariCashUsed)}`} tone="green" />}
+      {price.membershipFee > 0 && <Row label={`${price.buyingPlan} membership, 1 year`} value={formatCurrency(price.membershipFee)} tone="strong" />}
       <Dashes />
       <View style={styles.bRow}>
         <Text style={[styles.bTotal, { color: p.muted }]}>Total trip cost</Text>
         <Text style={[styles.bTotal, { color: p.muted }]}>{formatCurrency(price.total)}</Text>
       </View>
       <Dashes />
-      <Row label="Booking amount (pay now)" value={formatCurrency(Math.max(0, price.payableNow - price.membershipFee))} />
-      {price.membershipFee > 0 && <Row label={`${price.buyingPlan} membership, 1 year (pay now)`} value={formatCurrency(price.membershipFee)} />}
+      <Row label={price.membershipFee > 0 ? `Pay now (incl. ${price.buyingPlan} membership)` : 'Booking amount (pay now)'} value={formatCurrency(price.payableNow)} />
       <Row label="Pay at pickup" value={formatCurrency(atPickup)} />
     </View>
   );

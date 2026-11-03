@@ -5,7 +5,7 @@ import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
-import { useVehicles } from '@/hooks/useVehicles';
+import { useVehicles, useLiveCar } from '@/hooks/useVehicles';
 import { LoginBottomSheet } from '@/components';
 import { cars, getAvailability, splitDateRange, parseDayLabel, dayNumToLabel, isHighDemand } from '@/utils/sawari';
 
@@ -65,11 +65,12 @@ export default function CarDetailsScreen() {
 
   // Same rule as the lists: free for the chosen dates (or today if none chosen).
   const [startStr, endStr] = splitDateRange(effectiveDateRange);
-  const availability = getAvailability(selectedCar, startStr, endStr);
+  const liveCar = useLiveCar(selectedCar);
+  const availability = getAvailability(liveCar, startStr, endStr);
   const isAvailable = availability.available;
 
   // Enrich the car with the computed availability so child components can access nextAvailableFrom etc.
-  const enrichedCar = selectedCar ? { ...selectedCar, availability, isAvailable } : selectedCar;
+  const enrichedCar = liveCar ? { ...liveCar, availability, isAvailable } : liveCar;
 
   const requestedStart = parseDayLabel(startStr);
   const requestedEnd = requestedStart !== null ? parseDayLabel(endStr, requestedStart) : null;

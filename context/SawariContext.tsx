@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Car, cars, DriverMode, LocationResult } from '@/utils/sawari';
 import { Offer } from '@/services/api/offers';
 import { API, invalidateWalletCache } from '@/services/backend/api';
+import { startQueryPersistence, clearQueryPersistence } from '@/hooks/queryPersistence';
 import { PricingQuote, QuoteParams } from '@/services/backend/pricingEngine';
 import { BookingSnapshot } from '@/services/backend/api';
 
@@ -519,6 +520,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
               if (storedBookings) setTotalBookings(Number(storedBookings));
             }
 
+            // The wallet from the last launch shows at once; the fresh one replaces it as soon as it arrives.
+            API.readWalletSnapshot(userId).then((snap) => { if (snap && isMounted) applyWallet(snap); });
             // The wallet loads in the background — the app opens without waiting for the network.
             API.getWallet().then((walletData) => {
               if (isMounted) applyWallet(walletData);
@@ -1028,6 +1031,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(true);
 
           invalidateWalletCache();
+          API.setWalletSnapshotUser(user.id); // from now on the wallet is saved for the next launch
+          startQueryPersistence(queryClient, user.id); // and so are the trips / rewards lists
           API.getWallet(true).then(applyWallet).catch(() => {});
 
           const sanitizedMobile = String(newCustomer.mobile || '').replace(/[^a-zA-Z0-9-_.~%]/g, '');
@@ -1085,6 +1090,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setTotalBookings(0);
           setNotifications([]);
           // (Favourites switch to the guest list on their own; clearing them here could save [] over the account's list.)
+          clearQueryPersistence();
+          API.setWalletSnapshotUser(null);
           queryClient.clear();
           setIsAuthenticated(false);
         } catch (e) {

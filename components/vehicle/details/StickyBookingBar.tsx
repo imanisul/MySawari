@@ -4,7 +4,6 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BottomBlur } from '@/components/common/BottomBlur';
 import { useSawari } from '@/context/SawariContext';
 import { BOOKING_ADVANCE_AMOUNT, formatCurrency } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from './detailsPalette';
@@ -66,8 +65,6 @@ export function StickyBookingBar({
         onLayout={(e) => onHeight?.(e.nativeEvent.layout.height)}
         style={[styles.bar, { backgroundColor: p.page, paddingBottom: Math.max(insets.bottom, 8) }]}
       >
-        {/* Frosted blur above the bar: the page scrolling under it blurs and fades into the bar's white. */}
-        <BottomBlur height={64} fadeTo={p.page} style={styles.fade} />
         {isAvailable && (
           <View style={styles.infoRow}>
             <View style={{ flex: 1 }}>
@@ -222,14 +219,9 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 16,
     paddingTop: 16,
-    // Figma "Sticky (Price Detail + CTA)": padding 16 16 8, 16 between the blocks, a 1px #E7EAF4 top edge, and two
-    // very soft navy shadows going up (the second is the visible one) that lift the bar off the page.
+    // Flat bar: no top line, shadow or blur above it.
     gap: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E7EAF4',
-    boxShadow: '0px -52px 21px rgba(47, 62, 117, 0.01), 0px -29px 17px rgba(47, 62, 117, 0.05)',
   },
-  fade: { top: -64, bottom: undefined },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
   price: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 19, lineHeight: 20 },

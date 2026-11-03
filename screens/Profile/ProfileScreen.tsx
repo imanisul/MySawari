@@ -110,7 +110,7 @@ export default function ProfileScreen() {
     { key: 'addr', icon: 'map-pin', title: 'Saved Addresses', sub: 'Home, work and other locations', onPress: () => go('/saved-addresses') },
     { key: 'refer', icon: 'credit-card', title: 'Refer & Earn', sub: 'Invite friends and earn 10%', onPress: () => go('/refer') },
     { key: 'rewards', icon: 'award', title: 'Rewards', sub: 'Trip milestones and rewards earned', onPress: () => go('/rewards') },
-    { key: 'cash', icon: 'dollar-sign', title: 'My Sawari Cash', cash: true },
+    { key: 'cash', icon: 'dollar-sign', title: 'SawariCash', cash: true },
     { key: 'track', icon: 'users', title: 'Referral Tracking', sub: 'Track your referrals', onPress: () => go('/referrals') },
     { key: 'refunds', icon: 'rotate-ccw', title: 'My Refunds', sub: 'Refunds on cancellations', onPress: () => go('/refunds') },
     { key: 'offers', icon: 'tag', title: 'Offers & coupons', sub: 'Choose a coupon to save on your trip', onPress: () => go('/offers') },

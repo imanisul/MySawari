@@ -25,7 +25,7 @@ export function ScreenHeader({ title, divider, onBack, right }: { title: string;
 }
 
 /**
- * The design's switch (Settings, Profile → My Sawari Cash): a navy pill with a white knob on the right when
+ * The design's switch (Settings, Profile → SawariCash): a navy pill with a white knob on the right when
  * on, grey with the knob on the left when off. Drawn by the app so it looks the same on Android and iPhone.
  */
 export function DesignToggle({ value, onValueChange, accessibilityLabel, disabled }: { value: boolean; onValueChange: (v: boolean) => void; accessibilityLabel?: string; disabled?: boolean }) {

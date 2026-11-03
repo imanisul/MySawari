@@ -199,13 +199,30 @@ export function SectionPills<K extends string>({ sections, active, onPress }: {
   onPress: (key: K) => void;
 }) {
   const p = useDetailsPalette();
+  const scrollRef = useRef<ScrollView>(null);
+  const bounds = useRef<Record<string, { x: number; w: number }>>({});
+  const viewW = useRef(0);
+  // Slide the row so the active pill (e.g. Location) is always fully on screen as the page scrolls.
+  const reveal = (key: string) => {
+    const b = bounds.current[key];
+    if (!b || !viewW.current) return;
+    scrollRef.current?.scrollTo({ x: Math.max(0, b.x + b.w / 2 - viewW.current / 2), animated: true });
+  };
+  React.useEffect(() => reveal(active), [active]);
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+    <ScrollView
+      ref={scrollRef}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.pills}
+      onLayout={(e) => { viewW.current = e.nativeEvent.layout.width; reveal(active); }}
+    >
       {sections.map(({ key, label }) => {
         const on = key === active;
         return (
           <Pressable
             key={key}
+            onLayout={(e) => { bounds.current[key] = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width }; }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
             onPress={() => onPress(key)}

@@ -1,8 +1,8 @@
 {
   "app.json": {
-    "mtime": 1793464796.2392623,
-    "seen": 1793517540.210517,
-    "ast_hash": "b3e34d260c811aec8724f6ff974632a3",
+    "mtime": 1793708581.2737327,
+    "seen": 1793708593.2783968,
+    "ast_hash": "03f435b111355b0e50ae4db40fa36fdb",
     "semantic_hash": ""
   },
   "app/+html.tsx": {
@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "components/common/AnimatedSplash.tsx": {
-    "mtime": 1793687373.8967407,
-    "seen": 1793689397.3926039,
-    "ast_hash": "2abe3243433b4a9421b3d87a903f7ee0",
+    "mtime": 1793708581.267859,
+    "seen": 1793708593.278479,
+    "ast_hash": "ed708b21762053575bd3f1a067d56ae6",
     "semantic_hash": ""
   },
   "components/common/CategoryTabs.tsx": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "components/home/HomeSections.tsx": {
-    "mtime": 1793606029.8955774,
-    "seen": 1793610839.445977,
-    "ast_hash": "c487c14a7891d1a9d5b95258d64879f4",
+    "mtime": 1793704947.1813767,
+    "seen": 1793708593.278503,
+    "ast_hash": "cfc0a8b8906d7ffa1f23b7fa5cfdc1ae",
     "semantic_hash": ""
   },
   "components/index.ts": {
@@ -570,9 +570,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/CarDetailsSections.tsx": {
-    "mtime": 1793620536.9600937,
-    "seen": 1793622472.005107,
-    "ast_hash": "3cb2d5262d759e3a05aca254f0b270cb",
+    "mtime": 1793709075.0063972,
+    "seen": 1793709088.951942,
+    "ast_hash": "eeacff17f02d0451f96cd8b7decf51e9",
     "semantic_hash": ""
   },
   "components/vehicle/details/DetailsTabs.tsx": {
@@ -594,9 +594,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/StickyBookingBar.tsx": {
-    "mtime": 1793689370.7700942,
-    "seen": 1793689397.392652,
-    "ast_hash": "9e484873ac86dbc2f4b5ab753f316557",
+    "mtime": 1793708698.454348,
+    "seen": 1793708711.832004,
+    "ast_hash": "2a855ac13526001f1b52a83518d3bdfc",
     "semantic_hash": ""
   },
   "components/vehicle/details/SubPageHeader.tsx": {
@@ -756,9 +756,9 @@
     "semantic_hash": ""
   },
   "screens/Booking/BookingScreen.tsx": {
-    "mtime": 1793689658.882697,
-    "seen": 1793689727.544445,
-    "ast_hash": "6140bae21d3aad777645f429ec2d3be9",
+    "mtime": 1793708810.1872532,
+    "seen": 1793708824.7597618,
+    "ast_hash": "b1a922b5cc315d20f0b2fe0e89a4b932",
     "semantic_hash": ""
   },
   "screens/Booking/BookingsScreen.tsx": {
@@ -870,9 +870,9 @@
     "semantic_hash": ""
   },
   "screens/Profile/ProfileScreen.tsx": {
-    "mtime": 1793606029.896268,
-    "seen": 1793610839.446037,
-    "ast_hash": "10db1eae18be783bf97b18b00a84b699",
+    "mtime": 1793708810.1889093,
+    "seen": 1793708824.759779,
+    "ast_hash": "754e0f7aad59ffacd743acc160b0fecb",
     "semantic_hash": ""
   },
   "screens/Settings/SettingsScreen.tsx": {
@@ -948,15 +948,15 @@
     "semantic_hash": ""
   },
   "services/api/offers.ts": {
-    "mtime": 1793690103.9121382,
-    "seen": 1793703419.943607,
-    "ast_hash": "74f6354f04426034c7bcabf8f0827e63",
+    "mtime": 1793704909.8005512,
+    "seen": 1793708593.278593,
+    "ast_hash": "420f24d10e2b7a6cebb25e0e8be1e3e7",
     "semantic_hash": ""
   },
   "services/backend/api.ts": {
-    "mtime": 1793703402.94852,
-    "seen": 1793703419.943608,
-    "ast_hash": "0cc7ed6657af17fe9413ffcf441c216a",
+    "mtime": 1793704924.535355,
+    "seen": 1793708593.278593,
+    "ast_hash": "a3ca1b2c01afae5801d8c1bd24c64ca1",
     "semantic_hash": ""
   },
   "services/backend/pricingEngine.ts": {
@@ -1746,9 +1746,9 @@
     "semantic_hash": ""
   },
   "components/profile/ProfileParts.tsx": {
-    "mtime": 1793546141.9945858,
-    "seen": 1793546229.850687,
-    "ast_hash": "0848248e9b96e99bf1126b9fd5116145",
+    "mtime": 1793708810.1897368,
+    "seen": 1793708824.759721,
+    "ast_hash": "75eabf44bd1bae35db1555901b6fb328",
     "semantic_hash": ""
   },
   "hooks/usePlaceSearch.ts": {
@@ -1758,9 +1758,9 @@
     "semantic_hash": ""
   },
   "screens/Offers/OffersScreen.tsx": {
-    "mtime": 1793546141.9425514,
-    "seen": 1793546229.850761,
-    "ast_hash": "8d769f328e5fdaa8da522f45c764a583",
+    "mtime": 1793704995.8577719,
+    "seen": 1793708593.278568,
+    "ast_hash": "8714b81bf61adcc12a90b585ae83dccd",
     "semantic_hash": ""
   },
   "screens/Profile/RefundsScreen.tsx": {

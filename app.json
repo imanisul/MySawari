@@ -18,7 +18,7 @@
     "ios": {
       "bundleIdentifier": "com.mysawari.customer",
       "buildNumber": "6",
-      "backgroundColor": "#FAFAF9",
+      "backgroundColor": "#FFFFFF",
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
       "infoPlist": {
@@ -32,7 +32,7 @@
       }
     },
     "android": {
-      "backgroundColor": "#FAFAF9",
+      "backgroundColor": "#FFFFFF",
       "package": "com.mysawari.customer",
       "allowBackup": false,
       "blockedPermissions": [
@@ -82,7 +82,7 @@
           "image": "./assets/images/transparent.png",
           "imageWidth": 1,
           "resizeMode": "contain",
-          "backgroundColor": "#FAFAF9"
+          "backgroundColor": "#FFFFFF"
         }
       ],
       "expo-font",

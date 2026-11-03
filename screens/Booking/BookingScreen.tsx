@@ -79,7 +79,7 @@ export default function BookingScreen() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Profile → "My Sawari Cash" switched on: start this checkout with the cash applied (once; the switch
+  // Profile → "SawariCash" switched on: start this checkout with the cash applied (once; the switch
   // below still turns it off for this trip).
   const cashPrefDone = React.useRef(false);
   useEffect(() => {
@@ -443,13 +443,13 @@ export default function BookingScreen() {
                 <MaterialCommunityIcons name="cash" size={18} color={p.sub} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.saveTitle, { color: p.fg }]}>My Sawari Cash</Text>
+                <Text style={[styles.saveTitle, { color: p.fg }]}>SawariCash</Text>
                 <View style={[styles.cashChip, { backgroundColor: p.chipBg }]}>
                   <Text style={[styles.cashChipText, { color: p.navy }]}>{formatCurrency(sawariCash)} available</Text>
                 </View>
               </View>
               <DesignToggle
-                accessibilityLabel="Use My Sawari Cash"
+                accessibilityLabel="Use SawariCash"
                 value={sawariCashToApply > 0}
                 disabled={sawariCash <= 0}
                 onValueChange={(on) => { Haptics.selectionAsync(); applySawariCash(on ? sawariCash : 0); }}

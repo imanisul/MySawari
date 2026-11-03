@@ -29,6 +29,7 @@ import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_
 import { Feather, FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { Stack, DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { RewardCardGate } from '@/components/rewards/RewardCardGate';
 import { StatusBar } from 'expo-status-bar';
 import Notifications from '@/utils/notifications';
 import { SawariProvider, useSawari } from '@/context/SawariContext';
@@ -217,6 +218,7 @@ export default function RootLayout() {
                 <FloatingSupport />
                 <OTAUpdateChecker />
                 <PostTripReviewPrompt />
+                <RewardCardGate />
                 <LocationTracker />
                 <PushNotificationHandler />
                 <ThemedStatusBar />

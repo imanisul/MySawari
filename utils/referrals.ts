@@ -74,7 +74,7 @@ const ORDER: RefStage[] = ['registered', 'booked', 'ongoing', 'processing', 'cre
 /** Design "Referral Status" timeline for one referral. */
 export function referralSteps(ref: Referral): Step[] {
   const reached = ref.stage === 'not_joined' ? -1 : ref.stage === 'cancelled' ? 1 : ORDER.indexOf(ref.stage);
-  const reward = ref.amount > 0 ? `₹${ref.amount.toLocaleString('en-IN')} has been added to your MySawari Cash.` : 'Your reward has been added to your MySawari Cash.';
+  const reward = ref.amount > 0 ? `₹${ref.amount.toLocaleString('en-IN')} has been added to your SawariCash.` : 'Your reward has been added to your SawariCash.';
   const base: Step[] = [
     { title: 'Registered', sub: 'Your friend joined MySawari. Their reward unlocks after they complete their first eligible trip.', state: reached >= 0 ? 'done' : 'todo' },
     { title: 'Trip booked', sub: 'Your friend has booked a trip. Your reward is pending trip completion.', state: reached >= 1 ? 'done' : 'todo' },
@@ -94,7 +94,7 @@ export function referralSteps(ref: Referral): Step[] {
 export function referralNote(ref: Referral): { text: string; tone: 'green' | 'muted' } | null {
   switch (ref.stage) {
     case 'processing': return { text: 'Reward arriving in 1–2 working days', tone: 'green' };
-    case 'credited': return { text: ref.amount > 0 ? `₹${ref.amount.toLocaleString('en-IN')} added to your MySawari Cash` : 'Reward added to your MySawari Cash', tone: 'green' };
+    case 'credited': return { text: ref.amount > 0 ? `₹${ref.amount.toLocaleString('en-IN')} added to your SawariCash` : 'Reward added to your SawariCash', tone: 'green' };
     case 'registered': return { text: "Hasn't booked a trip yet.", tone: 'muted' };
     case 'booked':
     case 'ongoing': return { text: 'Reward unlocks after trip completion.', tone: 'muted' };

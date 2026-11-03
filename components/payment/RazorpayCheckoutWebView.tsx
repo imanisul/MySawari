@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, KeyboardAvoidingView, Linking, Platform } from 'react-native';
+import { StyleSheet, View, KeyboardAvoidingView, Linking, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
@@ -170,25 +170,26 @@ export function RazorpayCheckoutWebView({
   };
 
   return (
-    // Edge-to-edge: keep checkout clear of the status bar, the navigation bar and the keyboard, so its Pay button is always reachable.
-    <KeyboardAvoidingView
-      style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}
-      behavior={Platform.OS === 'android' ? 'padding' : undefined}
-    >
-      <WebView
-        originWhitelist={['*']}
-        source={{ html: checkoutHtml, baseUrl: 'https://checkout.razorpay.com' }}
-        onMessage={onMessage}
-        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        startInLoadingState={false}
-        javaScriptCanOpenWindowsAutomatically
-        onError={() => fail('Could not open the payment page. Please check your connection and try again.')}
-        onHttpError={() => fail('Could not open the payment page. Please try again.')}
-        style={{ flex: 1, backgroundColor: 'transparent' }}
-      />
-    </KeyboardAvoidingView>
+    // Edge-to-edge: keep checkout clear of the status bar and the navigation bar (3-button, gesture bar, iPhone home
+    // indicator). The inset padding sits on the outer View: KeyboardAvoidingView overwrites its own paddingBottom
+    // with the keyboard height (0 when closed), which used to hide the bottom of checkout behind the navigation bar.
+    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'android' ? 'padding' : undefined}>
+        <WebView
+          originWhitelist={['*']}
+          source={{ html: checkoutHtml, baseUrl: 'https://checkout.razorpay.com' }}
+          onMessage={onMessage}
+          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          startInLoadingState={false}
+          javaScriptCanOpenWindowsAutomatically
+          onError={() => fail('Could not open the payment page. Please check your connection and try again.')}
+          onHttpError={() => fail('Could not open the payment page. Please try again.')}
+          style={{ flex: 1, backgroundColor: 'transparent' }}
+        />
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 

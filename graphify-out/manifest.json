@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "app/_layout.tsx": {
-    "mtime": 1793546208.2964835,
-    "seen": 1793546229.850579,
-    "ast_hash": "f28ad35e11ef14993e6d34887fe89b04",
+    "mtime": 1793626044.8696666,
+    "seen": 1793626111.2796092,
+    "ast_hash": "9c8ec840b50456526bf09be5144107fc",
     "semantic_hash": ""
   },
   "app/address-confirm.tsx": {
@@ -522,9 +522,9 @@
     "semantic_hash": ""
   },
   "components/payment/RazorpayCheckoutWebView.tsx": {
-    "mtime": 1793620536.9595191,
-    "seen": 1793622472.005099,
-    "ast_hash": "31c18de91ab9c454d74cde43758a27d1",
+    "mtime": 1793624344.0088744,
+    "seen": 1793624359.761983,
+    "ast_hash": "a1bf1bf6e1f8464707a108723bb6b7f6",
     "semantic_hash": ""
   },
   "components/search/SearchEmptyState.tsx": {
@@ -846,9 +846,9 @@
     "semantic_hash": ""
   },
   "screens/Payment/PaymentProcessingScreen.tsx": {
-    "mtime": 1793620536.9719183,
-    "seen": 1793622472.0051498,
-    "ast_hash": "e403e122fbe9d0310d6e6541f0c9c034",
+    "mtime": 1793624936.5930207,
+    "seen": 1793624996.9220428,
+    "ast_hash": "0f3948b90e29c1a5f0c7c11af826920d",
     "semantic_hash": ""
   },
   "screens/Payment/PaymentScreen.tsx": {
@@ -954,9 +954,9 @@
     "semantic_hash": ""
   },
   "services/backend/api.ts": {
-    "mtime": 1793622440.3456388,
-    "seen": 1793622472.005171,
-    "ast_hash": "76ecdc5f5179d8e446aeb90597d18516",
+    "mtime": 1793625959.239591,
+    "seen": 1793626111.279804,
+    "ast_hash": "4d7ca488f05b72012330621b86cf6b5b",
     "semantic_hash": ""
   },
   "services/backend/pricingEngine.ts": {
@@ -1782,15 +1782,15 @@
     "semantic_hash": ""
   },
   "screens/Referral/ReferEarnScreen.tsx": {
-    "mtime": 1793547204.4718773,
-    "seen": 1793547519.096079,
-    "ast_hash": "98fd8bccd98a878496f135a5605b1b6f",
+    "mtime": 1793626116.6155288,
+    "seen": 1793626138.1448681,
+    "ast_hash": "8d879df61f8676f0b43f4d7cd373c4ec",
     "semantic_hash": ""
   },
   "screens/Referral/ReferralRewardScreen.tsx": {
-    "mtime": 1792928074.121895,
-    "seen": 1792928419.278506,
-    "ast_hash": "b8b59a6dc898d53f6554ea83dcbcfcac",
+    "mtime": 1793626116.6137645,
+    "seen": 1793626138.144874,
+    "ast_hash": "9d41a5e244629336bdf5c799c6ed3f81",
     "semantic_hash": ""
   },
   "screens/Wallet/MyWalletScreen.tsx": {
@@ -1818,9 +1818,9 @@
     "semantic_hash": ""
   },
   "utils/referrals.ts": {
-    "mtime": 1793010722.4608843,
-    "seen": 1793011517.9836311,
-    "ast_hash": "ccca801f6e78bf187033e871f272aa7d",
+    "mtime": 1793626116.6145875,
+    "seen": 1793626138.144908,
+    "ast_hash": "34050e1d64245137e71a2e512d92b8e2",
     "semantic_hash": ""
   },
   "assets/images/benefit_lowest_price.png": {
@@ -2310,9 +2310,9 @@
     "semantic_hash": ""
   },
   "screens/Rewards/RewardsScreen.tsx": {
-    "mtime": 1793546141.9566019,
-    "seen": 1793546229.850786,
-    "ast_hash": "c455e1cadee0b0a0f97b79f119d63dc4",
+    "mtime": 1793626063.2889037,
+    "seen": 1793626111.279791,
+    "ast_hash": "d59f4bcecf59a9472e7b1e9610a54d9f",
     "semantic_hash": ""
   },
   "components/auth/LoginGate.tsx": {
@@ -2331,6 +2331,30 @@
     "mtime": 1793620536.9591434,
     "seen": 1793622472.0052521,
     "ast_hash": "ad3bdb62090087ff1be1c32254887a3e",
+    "semantic_hash": ""
+  },
+  "components/rewards/RewardCardGate.tsx": {
+    "mtime": 1793626063.2881334,
+    "seen": 1793626111.279726,
+    "ast_hash": "aa2eb5d238dc8d2d0debf49a2f5062d4",
+    "semantic_hash": ""
+  },
+  "components/rewards/RewardScratchModal.tsx": {
+    "mtime": 1793626063.2883365,
+    "seen": 1793626111.2797272,
+    "ast_hash": "5d3280f43e74da33907a73a2d3d4e113",
+    "semantic_hash": ""
+  },
+  "components/rewards/ScratchCard.tsx": {
+    "mtime": 1793626079.1240275,
+    "seen": 1793626111.2797282,
+    "ast_hash": "a85658ea4549fa81451a80f964e1c2dc",
+    "semantic_hash": ""
+  },
+  "hooks/useRideJourney.ts": {
+    "mtime": 1793625959.2479367,
+    "seen": 1793626111.2797608,
+    "ast_hash": "4c48d995e3422bd01efce907b8592c5d",
     "semantic_hash": ""
   }
 }

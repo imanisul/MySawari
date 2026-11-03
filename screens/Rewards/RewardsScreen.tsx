@@ -1,54 +1,31 @@
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { safeBack } from '@/utils/navigation';
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Haptics from '@/utils/haptics';
 import { useSawari } from '@/context/SawariContext';
-import { API } from '@/services/backend/api';
 import { formatCurrency } from '@/services/backend/pricingEngine';
-import { CustomAlert } from '@/components/common/CustomAlert';
+import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
+import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 
 const F = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold' };
 
 /**
- * Profile → Rewards: the trip milestones (complete N trips, get a reward), how far along the customer is, a Claim button
- * once a milestone is reached, and the rewards already received. A claimed reward is credited as SawariCash.
+ * Profile → Rewards: scratch cards waiting to be opened (the welcome gift, and one for each trip milestone reached),
+ * progress to the next milestone, and the rewards already received. Scratching credits the prize as SawariCash.
  */
 export default function RewardsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { isAuthenticated, earnSawariCash, fetchWallet } = useSawari();
-  const [claiming, setClaiming] = useState<string | null>(null);
+  const { isAuthenticated } = useSawari();
+  const [open, setOpen] = useState<PendingCard | null>(null);
 
-  const { data: journey, isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['ride-journey'],
-    queryFn: () => API.getRideJourney(),
-    enabled: !!isAuthenticated,
-    staleTime: 30_000,
-  });
+  const { data: journey, isLoading, refetch, isRefetching, cards } = useRideJourney();
 
-  const claim = useCallback(async (label: string, amount: number) => {
-    if (claiming) return;
-    Haptics.selectionAsync();
-    setClaiming(label);
-    try {
-      const res = await API.claimMilestoneReward(label);
-      earnSawariCash(res?.reward.amount ?? amount);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      CustomAlert.alert('Reward claimed 🎉', `${formatCurrency(res?.reward.amount ?? amount)} SawariCash has been added to your wallet.`, [{ text: 'Great!' }]);
-    } catch (e: any) {
-      CustomAlert.alert('Could not claim', e?.message || 'Please try again in a moment.', [{ text: 'OK' }]);
-    } finally {
-      setClaiming(null);
-      queryClient.invalidateQueries({ queryKey: ['ride-journey'] });
-      fetchWallet().catch(() => {});
-    }
-  }, [claiming, earnSawariCash, queryClient, fetchWallet]);
+  const openCard = (c: PendingCard) => { Haptics.selectionAsync(); setOpen(c); };
 
   const done = journey?.totalRides ?? 0;
   const milestones = journey?.milestones ?? [];
@@ -56,6 +33,8 @@ export default function RewardsScreen() {
   const target = next?.rides ?? milestones[milestones.length - 1]?.rides ?? 4;
   const pct = Math.min(1, target ? done / target : 0);
   const firstMilestone = milestones[0];
+  const welcome = journey?.signupBonus?.scratched ? [{ type: 'SAWARI_CASH', label: 'Welcome Bonus', amount: journey.signupBonus.amount, earnedAt: journey.signupBonus.earnedAt }] : [];
+  const received = [...(journey?.earnedRewards ?? []), ...welcome];
 
   return (
     <SafeAreaView edges={['top', 'bottom']} style={[styles.screen, { backgroundColor: p.page }]}>
@@ -76,6 +55,23 @@ export default function RewardsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} tintColor={p.navy} />}
         >
+          {/* Scratch cards waiting to be opened */}
+          {cards.length > 0 && (
+            <>
+              <Text style={[styles.section, { color: p.muted, marginTop: 0 }]}>Scratch cards</Text>
+              <View style={styles.cardsRow}>
+                {cards.map((c) => (
+                  <Pressable key={c.label} accessibilityRole="button" accessibilityLabel={`Scratch card: ${c.title}`} onPress={() => openCard(c)}
+                    style={({ pressed }) => [styles.scratchTile, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+                    <Feather name="gift" size={22} color={p.onNavy} />
+                    <Text style={[styles.tileTitle, { color: p.onNavy }]} numberOfLines={2}>{c.kind === 'signup' ? 'Welcome gift' : c.label}</Text>
+                    <Text style={[styles.tileSub, { color: p.onNavy }]}>Tap to scratch</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
           {/* Progress to the next reward */}
           <View style={[styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
             <Text style={[styles.cardTitle, { color: p.fg }]}>
@@ -102,20 +98,19 @@ export default function RewardsScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowTitle, { color: p.fg }]}>{m.rides} trips · {formatCurrency(m.rewardAmount)}</Text>
                     <Text style={[styles.rowSub, { color: p.muted }]}>
-                      {m.claimed ? 'Claimed' : ready ? 'Reached — claim your reward' : `${Math.max(0, m.rides - done)} more trip${m.rides - done === 1 ? '' : 's'} to go`}
+                      {m.claimed ? 'Scratched' : ready ? 'Reached — scratch your card' : `${Math.max(0, m.rides - done)} more trip${m.rides - done === 1 ? '' : 's'} to go`}
                     </Text>
                   </View>
                   {m.claimed ? (
-                    <View style={[styles.chip, { backgroundColor: p.greenBg }]}><Feather name="check" size={12} color={p.green} /><Text style={[styles.chipText, { color: p.green }]}>Claimed</Text></View>
+                    <View style={[styles.chip, { backgroundColor: p.greenBg }]}><Feather name="check" size={12} color={p.green} /><Text style={[styles.chipText, { color: p.green }]}>Scratched</Text></View>
                   ) : ready ? (
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={`Claim ${formatCurrency(m.rewardAmount)}`}
-                      disabled={!!claiming}
-                      onPress={() => claim(m.label, m.rewardAmount)}
-                      style={({ pressed }) => [styles.claimBtn, { backgroundColor: p.navy }, (pressed || !!claiming) && { opacity: 0.8 }]}
+                      accessibilityLabel={`Scratch card, ${formatCurrency(m.rewardAmount)}`}
+                      onPress={() => openCard({ kind: 'milestone', label: m.label, title: `${m.rides} rides completed`, amount: m.rewardAmount })}
+                      style={({ pressed }) => [styles.claimBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.8 }]}
                     >
-                      {claiming === m.label ? <ActivityIndicator size="small" color={p.onNavy} /> : <Text style={[styles.claimText, { color: p.onNavy }]}>Claim</Text>}
+                      <Text style={[styles.claimText, { color: p.onNavy }]}>Scratch</Text>
                     </Pressable>
                   ) : (
                     <Feather name="lock" size={15} color={p.muted} />
@@ -126,13 +121,13 @@ export default function RewardsScreen() {
           </View>
 
           <Text style={[styles.section, { color: p.muted }]}>Rewards received</Text>
-          {(journey?.earnedRewards?.length ?? 0) === 0 ? (
+          {received.length === 0 ? (
             <Text style={[styles.note, { color: p.muted, textAlign: 'left' }]}>
               Nothing yet. {firstMilestone ? `Finish ${firstMilestone.rides} trips to earn your first reward.` : ''}
             </Text>
           ) : (
             <View style={[styles.list, { borderColor: p.segBorder }]}>
-              {journey!.earnedRewards.map((r, i) => (
+              {received.map((r, i) => (
                 <View key={r.label + i} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: p.segBorder }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowTitle, { color: p.fg }]}>{r.label}</Text>
@@ -143,9 +138,10 @@ export default function RewardsScreen() {
               ))}
             </View>
           )}
-          <Text style={[styles.foot, { color: p.muted }]}>Rewards are added to your wallet as SawariCash. Only completed trips count.</Text>
+          <Text style={[styles.foot, { color: p.muted }]}>Scratch a card and the reward is added to your wallet as SawariCash. Only completed trips count.</Text>
         </ScrollView>
       )}
+      <RewardScratchModal card={open} onClose={() => setOpen(null)} />
     </SafeAreaView>
   );
 }
@@ -171,6 +167,10 @@ const styles = StyleSheet.create({
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, height: 26, borderRadius: 13 },
   chipText: { fontFamily: F.semibold, fontSize: 11.5 },
   claimBtn: { minWidth: 74, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  cardsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  scratchTile: { width: 132, borderRadius: 12, padding: 12, gap: 6 },
+  tileTitle: { fontFamily: F.semibold, fontSize: 13, lineHeight: 18 },
+  tileSub: { fontFamily: F.medium, fontSize: 11, opacity: 0.8 },
   claimText: { fontFamily: F.semibold, fontSize: 13 },
   note: { fontFamily: F.medium, fontSize: 13, lineHeight: 20, textAlign: 'center' },
   foot: { fontFamily: F.regular, fontSize: 11.5, lineHeight: 17, marginTop: 18 },

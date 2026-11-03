@@ -1395,6 +1395,8 @@ export const API = {
     milestones: Array<{ rides: number; label: string; rewardAmount: number; type: string; unlocked: boolean; claimed: boolean }>;
     nextMilestone: { label: string; ridesNeeded: number; rewardAmount: number } | null;
     earnedRewards: Array<{ type: string; label: string; amount: number; earnedAt: string }>;
+    /** The welcome scratch card: `scratched` false while it waits to be opened. */
+    signupBonus?: { amount: number; scratched: boolean; earnedAt: string } | null;
     recentRides: Array<{ id: string; vehicleName: string; status: string; fromDate: string; toDate: string; totalDays: number; amount: number; createdAt: string }>;
   } | null> {
     try {
@@ -1406,6 +1408,14 @@ export const API = {
       if (__DEV__) console.warn('getRideJourney error:', e?.message);
       return null;
     }
+  },
+
+  async scratchSignupBonus(): Promise<{ reward: { label: string; amount: number } }> {
+    const response = await fetchWithAuth(`${BACKEND_URL}/bookings/scratch-signup-bonus`, { method: 'POST' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || 'Could not open the scratch card');
+    invalidateWalletCache();
+    return data.data;
   },
 
   async claimMilestoneReward(milestoneLabel: string): Promise<{ message: string; reward: { type: string; label: string; amount: number } } | null> {

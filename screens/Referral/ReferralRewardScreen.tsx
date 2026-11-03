@@ -20,7 +20,7 @@ export default function ReferralRewardScreen() {
 
   const note = !ref ? null
     : ref.stage === 'processing' ? { text: 'Your reward is being processed and will be credited within 1–2 working days.', green: true }
-      : ref.stage === 'credited' ? { text: `${ref.amount > 0 ? rupees(ref.amount) : 'Your reward'} has been added to your MySawari Cash.`, green: true }
+      : ref.stage === 'credited' ? { text: `${ref.amount > 0 ? rupees(ref.amount) : 'Your reward'} has been added to your SawariCash.`, green: true }
         : ref.stage === 'registered' ? { text: "Hasn't booked a trip yet.", green: false }
           : ref.stage === 'booked' || ref.stage === 'ongoing' ? { text: 'Reward unlocks after trip completion.', green: false }
             : ref.stage === 'cancelled' ? { text: 'No reward earned  •  Trip cancelled', green: false }

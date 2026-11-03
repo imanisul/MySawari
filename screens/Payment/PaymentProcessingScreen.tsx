@@ -180,7 +180,7 @@ export default function PaymentProcessingScreen() {
         // Money has moved. The app never cancels this booking itself: when the car was lost or the checkout
         // had closed, the server has already cancelled the hold and handled the refund (its message says
         // so), and when the server simply couldn't be reached the booking may well be confirmed.
-        import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_failed', 'PaymentProcessingScreen', { reason, paymentId: paymentDetails?.razorpayPaymentId }));
+        import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_unconfirmed', 'PaymentProcessingScreen', { reason, paymentId: paymentDetails?.razorpayPaymentId })); // not 'payment_failed': that sends a "try again" push, wrong once money has moved
 
         setErrorMsg(isConnectionError(e)
           ? `Your payment (${paymentDetails.razorpayPaymentId}) was received, but we couldn't reach our server to confirm the booking. Please check My Bookings in a minute — if it isn't there, contact support with this payment ID.`

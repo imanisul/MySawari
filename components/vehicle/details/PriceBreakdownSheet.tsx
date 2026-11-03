@@ -91,8 +91,14 @@ export function PriceBreakdownSheet({ visible, onClose, price }: { visible: bool
                 )}
                 {price.sawariCashUsed > 0 && (
                   <View style={styles.row}>
-                    <Text style={[styles.label, { color: green }]}>My Sawari Cash used</Text>
+                    <Text style={[styles.label, { color: green }]}>SawariCash used</Text>
                     <Text style={[styles.value, { color: green, fontFamily: 'PlusJakartaSans_600SemiBold' }]}>-{formatCurrency(price.sawariCashUsed)}</Text>
+                  </View>
+                )}
+                {price.membershipFee > 0 && (
+                  <View style={styles.row}>
+                    <Text style={[styles.label, { color: colors.mutedForeground }]}>{price.buyingPlan} membership (1 year)</Text>
+                    <Text style={[styles.value, { color: colors.foreground }]}>{formatCurrency(price.membershipFee)}</Text>
                   </View>
                 )}
                 <View style={[styles.divider, { backgroundColor: colors.border }]} />

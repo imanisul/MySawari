@@ -337,6 +337,7 @@ const COUPON_TTL_MS = 5 * 60 * 1000;
 
 // Wallet balance cache (cleared whenever the balance can change: booking, cancel, reward).
 let walletCache: { at: number; data: any } | null = null;
+let walletSnapshotKey: string | null = null;
 const WALLET_TTL_MS = 3 * 60 * 1000; // 3 min — wallet doesn't need sub-second freshness on the checkout page
 export function invalidateWalletCache() {
   walletCache = null;
@@ -908,6 +909,18 @@ export const API = {
     });
   },
 
+  /** GET /api/vehicles/:id/availability: this car's bookings and status read live (the list above can be a minute or more old). */
+  async getVehicleAvailability(vehicleId: string): Promise<{ status: string; maintenanceUntil: string | null; bookedRanges: Array<{ start: string; end: string; status?: string }> } | null> {
+    try {
+      const res = await timedFetch(`${BACKEND_URL}/vehicles/${encodeURIComponent(vehicleId)}/availability`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      return json?.data ?? null;
+    } catch {
+      return null; // the list's copy is used instead
+    }
+  },
+
   /**
    * GET /api/offers?type=coupon
    * Fetches active coupon offers from the backend, falling back to the local
@@ -924,8 +937,9 @@ export const API = {
           // falling back to the built-in list here would offer codes the server then rejects.
           const now = Date.now();
           const list: Coupon[] = json.data
-            // Expired or switched-off codes are refused at checkout, so they are not offered either.
+            // Expired, unapproved, or switched-off codes are refused at checkout, so they are not offered either.
             .filter((o: any) => typeof o?.code === 'string' && o.code.trim() && o.active !== false
+              && (!o.approvalStatus || o.approvalStatus === 'approved')
               && Number.isFinite(new Date(o.expiryDate).getTime()) && new Date(o.expiryDate).getTime() >= now)
             .map((o: any) => ({
               code: o.code.trim().toUpperCase(),
@@ -1435,6 +1449,24 @@ export const API = {
     }
   },
 
+  /** The wallet from the last launch (SawariCash, membership), shown at once while the fresh one loads. Saved per customer. */
+  async readWalletSnapshot(customerId: string): Promise<any | null> {
+    walletSnapshotKey = customerId ? `@wallet_snapshot_${customerId}` : null;
+    if (!walletSnapshotKey) return null;
+    try {
+      const saved = await AsyncStorage.getItem(walletSnapshotKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  /** Starts saving wallet snapshots for this customer (after login) / removes the saved one (logout). */
+  setWalletSnapshotUser(customerId: string | null) {
+    if (!customerId && walletSnapshotKey) AsyncStorage.removeItem(walletSnapshotKey).catch(() => {});
+    walletSnapshotKey = customerId ? `@wallet_snapshot_${customerId}` : null;
+  },
+
   /**
    * GET /api/customers/wallet
    */
@@ -1457,6 +1489,7 @@ export const API = {
         data.data.membership = { ...m, plan: m.plan.trim().toLowerCase(), totalSaved: Math.max(0, Number(m.totalSaved) || 0) };
       }
       walletCache = { at: Date.now(), data: data.data };
+      if (walletSnapshotKey) AsyncStorage.setItem(walletSnapshotKey, JSON.stringify(data.data)).catch(() => {});
       return data.data;
     } catch (e: any) {
       // An expired session is already handled (logout) by fetchWithAuth — not an error here.

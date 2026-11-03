@@ -209,6 +209,10 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
       if (!isOfferLive(offer)) return;
 
       const imageUrl = offer.image?.url || (typeof offer.image === 'string' ? offer.image : null);
+      // Hero top carousel features banners, plus image promotions and special deals. Plain text coupon codes stay in Offers & Checkout.
+      const isBanner = offer.type === 'banner';
+      if (!isBanner && !imageUrl && offer.type === 'coupon') return;
+
       const format = offer.displayFormat || (imageUrl && !offer.title ? 'image' : imageUrl && offer.title ? 'combination' : 'text');
 
       if (format === 'image' && imageUrl) {
@@ -248,7 +252,8 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
     return offerSlides.length > 0 ? [...offerSlides, ...DEFAULT_SLIDES] : DEFAULT_SLIDES;
   }, [offers]);
 
-  const cardWidth = Math.min(width - 32, 380);
+  // Adaptive width across compact phones (360dp), modern phones (390-430dp), and tablets (460dp max)
+  const cardWidth = Math.min(width - 32, 460);
 
   const handleSlidePress = useCallback((s: HeroSlide) => {
     Haptics.selectionAsync();

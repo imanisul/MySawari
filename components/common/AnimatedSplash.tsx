@@ -1,7 +1,25 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Image, Pressable, Easing } from 'react-native';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  Image,
+  Pressable,
+  Easing,
+  useWindowDimensions,
+  Platform,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
+import {
+  DEFAULT_FLASH_SCREEN_CONFIG,
+  FlashScreenConfig,
+  getCachedFlashScreenConfig,
+  fetchRemoteFlashScreenConfig,
+} from '@/services/api/flashScreen';
 
 // Module-level flag: the splash only shows on the very first cold app launch.
 // After login or any navigation within the same session, it is skipped entirely.
@@ -14,7 +32,7 @@ const splashGoneListeners = new Set<() => void>();
 export function onSplashGone(cb: () => void): () => void {
   if (hasShownSplash) {
     cb();
-    return () => {};
+    return () => { };
   }
   splashGoneListeners.add(cb);
   return () => splashGoneListeners.delete(cb);
@@ -27,21 +45,17 @@ function markSplashGone() {
   pending.forEach((cb) => cb());
 }
 
-// Phase 1 — the brand: "MySawari · Your ride, your way" stays up at least this long.
-const BRAND_MS = 1500;
-// After this long without data, say so instead of leaving the customer looking at a spinner.
-const SLOW_LOAD_MS = 12000;
-
-const BAR_WIDTH = 120;
+// After this long without data, show retry action
+const SLOW_LOAD_MS = 14000;
 
 export type SplashStep = { key: string; label: string; done: boolean };
 
 /**
- * Launch sequence, shown over the app while it gets ready underneath:
- *  1. Brand  — logo, "MySawari", "Your ride, your way."
- *  2. Loading — a minimal MySawari page (no text): the mark breathing gently over a thin line that
- *               fills as this person's data actually arrives (vehicles, offers, trips, wallet).
- * Skipped straight to the app when everything is already there by the end of the brand phase.
+ * High-End Dynamic Flash Screen:
+ *  - Displays "MySawari · Your ride, your way."
+ *  - Default duration: exactly 4 seconds (4000ms), controllable dynamically from the Operation App.
+ *  - Supports festive / occasion themes (Diwali, Bihu, New Year, Puja, etc.) configured via Operation App.
+ *  - Responsive & adaptive layout across all mobile devices, tablets, and screen aspect ratios.
  */
 export function AnimatedSplash({
   isReady,
@@ -52,87 +66,140 @@ export function AnimatedSplash({
   children,
 }: {
   isReady: boolean;
-  /** Everything Home shows for this person has arrived from the server. */
   isDataReady?: boolean;
-  /** Loading that data failed after retries. */
   loadFailed?: boolean;
   onRetry?: () => void;
-  /** What is being loaded, ticked off as each part arrives. */
   steps?: SplashStep[];
   children: React.ReactNode;
 }) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+
   const skipSplash = useRef(hasShownSplash).current;
   const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash);
-  const [phase, setPhase] = useState<'brand' | 'loading'>('brand');
+  const [config, setConfig] = useState<FlashScreenConfig>(DEFAULT_FLASH_SCREEN_CONFIG);
   const [brandDone, setBrandDone] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
-  // The customer chose to go in without waiting (the screens show their own loading / error states).
   const [skipWaiting, setSkipWaiting] = useState(false);
 
+  // Animated values
   const overlayOpacity = useRef(new Animated.Value(1)).current;
-  const brandOpacity = useRef(new Animated.Value(1)).current;
-  const loadingOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const brandOpacity = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const titleY = useRef(new Animated.Value(20)).current;
+  const titleY = useRef(new Animated.Value(18)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
-  const taglineY = useRef(new Animated.Value(20)).current;
+  const taglineY = useRef(new Animated.Value(18)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
-  const breathe = useRef(new Animated.Value(0)).current;
-  const progress = useRef(new Animated.Value(0)).current;
+  const occasionOpacity = useRef(new Animated.Value(0)).current;
+  const progressAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Phase 1: brand entrance.
+  // Load cached config immediately on mount, then sync in background
   useEffect(() => {
-    if (skipSplash) return;
-    Animated.stagger(50, [
-      Animated.parallel([
-        Animated.timing(logoOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.spring(logoScale, { toValue: 1, tension: 12, friction: 5, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(taglineOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-        Animated.timing(taglineY, { toValue: 0, duration: 200, useNativeDriver: true }),
-      ]),
-    ]).start();
-    const t = setTimeout(() => setBrandDone(true), BRAND_MS);
-    return () => clearTimeout(t);
+    let active = true;
+    getCachedFlashScreenConfig().then((cached) => {
+      if (active && cached) {
+        setConfig(cached);
+      }
+    });
+
+    fetchRemoteFlashScreenConfig().then((fresh) => {
+      if (active && fresh) {
+        setConfig(fresh);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
-  const canExit = isReady && (isDataReady || skipWaiting);
+  // Compute actual duration in ms: default 4 seconds (4000ms)
+  const durationMs = useMemo(() => {
+    const sec = Number(config?.durationSeconds);
+    if (!isNaN(sec) && sec >= 1 && sec <= 15) {
+      return sec * 1000;
+    }
+    return 4000; // 4 seconds default
+  }, [config?.durationSeconds]);
 
-  // After the brand: straight into the app when ready, otherwise cross-fade to the loading page.
+  // If flash screen is disabled by admin, complete immediately
   useEffect(() => {
-    if (skipSplash || !brandDone || phase !== 'brand' || canExit) return;
-    setPhase('loading');
-    Animated.parallel([
-      Animated.timing(brandOpacity, { toValue: 0, duration: 250, useNativeDriver: true }),
-      Animated.timing(loadingOpacity, { toValue: 1, duration: 300, delay: 120, useNativeDriver: true }),
+    if (config?.isEnabled === false && !skipSplash) {
+      markSplashGone();
+      setIsAnimationComplete(true);
+    }
+  }, [config?.isEnabled, skipSplash]);
+
+  // Entrance animations and timer
+  useEffect(() => {
+    if (skipSplash || config?.isEnabled === false) return;
+
+    // Fade in brand container
+    Animated.timing(brandOpacity, {
+      toValue: 1,
+      duration: 350,
+      useNativeDriver: true,
+    }).start();
+
+    // Staggered entrance
+    Animated.stagger(120, [
+      Animated.parallel([
+        Animated.timing(logoOpacity, { toValue: 1, duration: 450, useNativeDriver: true }),
+        Animated.spring(logoScale, { toValue: 1, tension: 20, friction: 6, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(titleY, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.timing(taglineOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(taglineY, { toValue: 0, duration: 350, useNativeDriver: true }),
+      ]),
+      Animated.timing(occasionOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
-  }, [brandDone, canExit, phase]);
 
-  // Loading page: the mark breathes gently while waiting.
-  useEffect(() => {
-    if (phase !== 'loading') return;
-    const loop = Animated.loop(Animated.sequence([
-      Animated.timing(breathe, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      Animated.timing(breathe, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-    ]));
-    loop.start();
-    return () => loop.stop();
-  }, [phase]);
+    // Gentle pulse loop for the logo mark
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.03,
+          duration: 1200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.98,
+          duration: 1200,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
 
-  // Progress bar follows the real steps (never quite full until everything is in).
-  const doneCount = steps.filter((s) => s.done).length;
-  useEffect(() => {
-    const target = isDataReady ? 1 : steps.length ? Math.min(0.92, 0.12 + (doneCount / steps.length) * 0.8) : 0.3;
-    Animated.timing(progress, { toValue: target, duration: 350, useNativeDriver: false }).start();
-  }, [doneCount, steps.length, isDataReady]);
+    // Progress bar fills over the configured duration
+    Animated.timing(progressAnim, {
+      toValue: 1,
+      duration: durationMs,
+      easing: Easing.linear,
+      useNativeDriver: false,
+    }).start();
 
+    // Timer completes after exactly durationMs
+    const t = setTimeout(() => {
+      setBrandDone(true);
+    }, durationMs);
+
+    return () => {
+      clearTimeout(t);
+      pulseLoop.stop();
+    };
+  }, [durationMs, skipSplash, config?.isEnabled]);
+
+  // Handle slow loads
   useEffect(() => {
     if (skipSplash || isDataReady) return;
     setIsSlow(false);
@@ -140,76 +207,271 @@ export function AnimatedSplash({
     return () => clearTimeout(t);
   }, [isDataReady, skipSplash, loadFailed]);
 
-  // Exit: once the brand has played and the data is in (a beat on the loading page to show it completed).
+  const canExit = (isReady && isDataReady) || skipWaiting || brandDone;
+
+  // Exit transition: when configured duration has played and app is ready
   useEffect(() => {
     if (skipSplash || !brandDone || !canExit) return;
-    const t = setTimeout(() => {
-      Animated.timing(overlayOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() => {
-        markSplashGone();
-        setIsAnimationComplete(true);
-      });
-    }, phase === 'loading' ? 350 : 0);
-    return () => clearTimeout(t);
-  }, [brandDone, canExit]);
+
+    Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 450,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      markSplashGone();
+      setIsAnimationComplete(true);
+    });
+  }, [brandDone, canExit, skipSplash]);
+
+  // Responsive device metrics
+  const isSmallDevice = windowWidth < 375;
+  const isTablet = windowWidth >= 768;
+  const logoWidth = Math.min(windowWidth * (isTablet ? 0.35 : 0.62), 250);
+  const logoHeight = Math.round(logoWidth * 0.48);
+  const progressBarWidth = Math.min(windowWidth * 0.45, 160);
+
+  // Dynamic occasion content
+  const isOccasionActive = config?.isOccasionActive && Boolean(config?.occasionName || config?.occasionBadge);
+  const occasionBadgeText = config?.occasionBadge || '✨ Festive Special';
+  const displayTitle = isOccasionActive && config?.occasionName ? config.occasionName : (config?.brandTitle || 'MySawari');
+  const displayTagline = isOccasionActive && config?.occasionGreeting ? config.occasionGreeting : (config?.brandTagline || 'Your ride, your way.');
+  const displaySubtext = isOccasionActive && config?.occasionSubtext ? config.occasionSubtext : null;
+
+  // Background gradient: fallback to premium deep royal navy
+  const activeGradients = (config?.gradientColors && config.gradientColors.length >= 2)
+    ? config.gradientColors
+    : ['#08142E', '#0A1F4F'];
+  const accentColor = config?.accentColor || '#F59E0B';
 
   const showProblem = !isDataReady && (loadFailed || isSlow);
-  const markScale = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1.04] });
-  const markOpacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.75, 1] });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* The real app is mounted underneath from the start, so the splash fading away reveals the
-          already-painted screen directly — no blank/white frame in between. */}
+    <View style={[styles.container, { backgroundColor: activeGradients[0] }]}>
+      {/* App renders underneath directly to prevent white blink on transition */}
       {children}
-      {!isAnimationComplete && (
-        <Animated.View pointerEvents="auto" style={[styles.overlay, { backgroundColor: colors.background, opacity: overlayOpacity }]}>
-          {/* Phase 1 — brand */}
-          <Animated.View pointerEvents="none" style={[styles.center, { opacity: brandOpacity }]}>
-            <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
-              <Image source={require('@/assets/images/MySawari_nobg.png')} style={styles.logoImage} resizeMode="contain" />
-            </Animated.View>
-            <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 4 }}>
-              <Text style={[styles.titleText, { color: colors.foreground }]}>MySawari</Text>
-            </Animated.View>
-            <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 6 }}>
-              <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Your ride, your way.</Text>
-            </Animated.View>
-          </Animated.View>
 
-          {/* Phase 2 — minimal MySawari loading page */}
-          {phase === 'loading' && (
-            <Animated.View style={[styles.center, { opacity: loadingOpacity }]}>
-              <Animated.Image
+      {!isAnimationComplete && config?.isEnabled !== false && (
+        <Animated.View
+          pointerEvents="auto"
+          style={[
+            styles.overlay,
+            {
+              opacity: overlayOpacity,
+            },
+          ]}
+        >
+          {/* Background Gradient */}
+          <LinearGradient
+            colors={activeGradients as any}
+            style={StyleSheet.absoluteFill}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+          />
+
+          {/* Optional Occasion Poster Image with dark vignette */}
+          {config?.bgImageUrl ? (
+            <Image
+              source={{ uri: config.bgImageUrl }}
+              style={[
+                StyleSheet.absoluteFill,
+                { opacity: config.bgImageOpacity ?? 0.3 },
+              ]}
+              resizeMode="cover"
+            />
+          ) : null}
+
+          {/* Optional Skip Button (Top Right) */}
+          {config?.showSkipButton !== false && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Skip intro"
+              onPress={() => {
+                setSkipWaiting(true);
+                Animated.timing(overlayOpacity, {
+                  toValue: 0,
+                  duration: 280,
+                  easing: Easing.out(Easing.cubic),
+                  useNativeDriver: true,
+                }).start(() => {
+                  markSplashGone();
+                  setIsAnimationComplete(true);
+                });
+              }}
+              style={({ pressed }) => [
+                styles.skipButton,
+                {
+                  top: Math.max(insets.top + 12, 18),
+                  borderColor: 'rgba(255, 255, 255, 0.28)',
+                },
+                pressed && { opacity: 0.65 },
+              ]}
+            >
+              <Text style={styles.skipButtonText}>Skip</Text>
+              <Feather name="chevron-right" size={13} color="#CBD5E1" />
+            </Pressable>
+          )}
+
+          {/* Safe Area Container */}
+          <Animated.View
+            style={[
+              styles.centerContent,
+              {
+                paddingTop: insets.top + 20,
+                paddingBottom: insets.bottom + 20,
+                opacity: brandOpacity,
+              },
+            ]}
+          >
+            {/* Occasion Badge (e.g. 🪔 Happy Diwali / 🌸 Rongali Bihu) */}
+            {isOccasionActive && (
+              <Animated.View
+                style={[
+                  styles.occasionBadgePill,
+                  {
+                    borderColor: accentColor,
+                    opacity: occasionOpacity,
+                  },
+                ]}
+              >
+                <Text style={[styles.occasionBadgeText, { color: accentColor }]}>
+                  {occasionBadgeText}
+                </Text>
+              </Animated.View>
+            )}
+
+            {/* Brand Logo with Spring Scale & Gentle Pulse */}
+            <Animated.View
+              style={{
+                opacity: logoOpacity,
+                transform: [
+                  { scale: Animated.multiply(logoScale, pulseAnim) },
+                ],
+              }}
+            >
+              <Image
                 source={require('@/assets/images/MySawari_nobg.png')}
-                style={[styles.mark, { opacity: markOpacity, transform: [{ scale: markScale }] }]}
+                style={[styles.logoImage, { width: logoWidth, height: logoHeight }]}
                 resizeMode="contain"
-                accessibilityLabel="Loading MySawari"
               />
-              <View style={[styles.bar, { backgroundColor: colors.border }]}>
+            </Animated.View>
+
+            {/* Brand Title: MySawari */}
+            {config?.showLogo !== false && (
+              <Animated.View
+                style={{
+                  opacity: titleOpacity,
+                  transform: [{ translateY: titleY }],
+                  marginTop: isSmallDevice ? 4 : 8,
+                }}
+              >
+                <Text
+                  style={[
+                    styles.titleText,
+                    {
+                      fontSize: isSmallDevice ? 26 : isTablet ? 38 : 32,
+                    },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {displayTitle}
+                </Text>
+              </Animated.View>
+            )}
+
+            {/* Tagline: Your ride, your way. */}
+            {config?.showTagline !== false && (
+              <Animated.View
+                style={{
+                  opacity: taglineOpacity,
+                  transform: [{ translateY: taglineY }],
+                  marginTop: isSmallDevice ? 4 : 8,
+                  paddingHorizontal: 24,
+                }}
+              >
+                <Text
+                  style={[
+                    styles.taglineText,
+                    {
+                      fontSize: isSmallDevice ? 13 : isTablet ? 17 : 15,
+                    },
+                  ]}
+                  numberOfLines={2}
+                >
+                  {displayTagline}
+                </Text>
+              </Animated.View>
+            )}
+
+            {/* Occasion Subtext (e.g. Special festive discount) */}
+            {displaySubtext && (
+              <Animated.View style={{ opacity: occasionOpacity, marginTop: 6, paddingHorizontal: 28 }}>
+                <Text style={[styles.occasionSubtext, { color: accentColor }]}>
+                  {displaySubtext}
+                </Text>
+              </Animated.View>
+            )}
+
+            {/* Dynamic Progress Indicator Bar (lasting configured duration) */}
+            {config?.showProgressBar !== false && (
+              <View
+                style={[
+                  styles.progressBarTrack,
+                  {
+                    width: progressBarWidth,
+                    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+                  },
+                ]}
+              >
                 <Animated.View
-                  style={[styles.barFill, { backgroundColor: colors.primary, width: progress.interpolate({ inputRange: [0, 1], outputRange: [0, BAR_WIDTH] }) }]}
+                  style={[
+                    styles.progressBarFill,
+                    {
+                      backgroundColor: accentColor,
+                      width: progressAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0, progressBarWidth],
+                      }),
+                    },
+                  ]}
                 />
               </View>
+            )}
 
-              {/* Only when something is wrong: icon actions, no paragraphs. */}
-              {showProblem && (
-                <View style={styles.actions}>
-                  {loadFailed && !!onRetry && (
-                    <Pressable accessibilityRole="button" accessibilityLabel="Retry" onPress={onRetry}
-                      style={({ pressed }) => [styles.btn, { backgroundColor: colors.primary }, pressed && { opacity: 0.7 }]}>
-                      <Feather name="refresh-cw" size={15} color={colors.primaryForeground} />
-                      <Text style={[styles.btnText, { color: colors.primaryForeground }]}>Retry</Text>
-                    </Pressable>
-                  )}
-                  <Pressable accessibilityRole="button" accessibilityLabel="Continue" onPress={() => setSkipWaiting(true)}
-                    style={({ pressed }) => [styles.btn, { borderColor: colors.border, borderWidth: 1 }, pressed && { opacity: 0.7 }]}>
-                    <Text style={[styles.btnText, { color: colors.foreground }]}>Continue</Text>
-                    <Feather name="arrow-right" size={15} color={colors.foreground} />
+            {/* Fallback actions if connection is slow */}
+            {showProblem && (
+              <View style={styles.troubleActions}>
+                {loadFailed && !!onRetry && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Retry"
+                    onPress={onRetry}
+                    style={({ pressed }) => [
+                      styles.actionBtn,
+                      { backgroundColor: accentColor },
+                      pressed && { opacity: 0.75 },
+                    ]}
+                  >
+                    <Feather name="refresh-cw" size={14} color="#08142E" />
+                    <Text style={[styles.actionBtnText, { color: '#08142E' }]}>Retry</Text>
                   </Pressable>
-                </View>
-              )}
-            </Animated.View>
-          )}
+                )}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue"
+                  onPress={() => setSkipWaiting(true)}
+                  style={({ pressed }) => [
+                    styles.actionBtn,
+                    { borderColor: 'rgba(255, 255, 255, 0.4)', borderWidth: 1 },
+                    pressed && { opacity: 0.75 },
+                  ]}
+                >
+                  <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>Continue</Text>
+                  <Feather name="arrow-right" size={14} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            )}
+          </Animated.View>
         </Animated.View>
       )}
     </View>
@@ -217,16 +479,109 @@ export function AnimatedSplash({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  overlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, zIndex: 9999 },
-  center: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  logoImage: { width: 220, height: 110 },
-  titleText: { fontFamily: 'Inter_700Bold', fontSize: 32, letterSpacing: -0.5 },
-  tagline: { fontFamily: 'Inter_500Medium', fontSize: 15, letterSpacing: 0.3 },
-  mark: { width: 140, height: 70 },
-  bar: { width: BAR_WIDTH, height: 3, borderRadius: 2, overflow: 'hidden', marginTop: 22 },
-  barFill: { height: 3, borderRadius: 2 },
-  actions: { flexDirection: 'row', gap: 12, marginTop: 28 },
-  btn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
-  btnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  container: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFill,
+    zIndex: 99999,
+  },
+  skipButton: {
+    position: 'absolute',
+    right: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0, 0, 0, 0.42)',
+    borderWidth: 1,
+    zIndex: 100000,
+  },
+  skipButtonText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    color: '#E2E8F0',
+    letterSpacing: 0.3,
+  },
+  centerContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
+    paddingHorizontal: 20,
+  },
+  occasionBadgePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1.2,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    marginBottom: 16,
+  },
+  occasionBadgeText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 12,
+    letterSpacing: 0.4,
+    textAlign: 'center',
+  },
+  logoImage: {
+    maxWidth: 260,
+  },
+  titleText: {
+    fontFamily: 'Inter_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: -0.6,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  taglineText: {
+    fontFamily: 'Inter_500Medium',
+    color: '#CBD5E1',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  occasionSubtext: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    letterSpacing: 0.2,
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+  progressBarTrack: {
+    height: 3,
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginTop: 24,
+  },
+  progressBarFill: {
+    height: 3,
+    borderRadius: 2,
+  },
+  troubleActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  actionBtnText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
 });

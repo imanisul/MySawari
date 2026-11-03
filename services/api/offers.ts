@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { BACKEND_URL, plateSafeImageUrl, timedFetch } from '@/services/backend/api';
@@ -31,6 +32,7 @@ export interface Offer {
   discountPercent?: number;
   expiryDate?: string;
   active?: boolean;
+  approvalStatus?: 'approved' | 'pending_approval' | 'rejected' | string;
 }
 
 function formatExpiry(dateStr: string): string {
@@ -45,19 +47,25 @@ function formatExpiry(dateStr: string): string {
  */
 
 /**
- * Still usable right now: switched on and not past its expiry date. The server lists expired offers too,
- * but checkout only accepts an in-date coupon, so an expired one would be a card the customer can't use.
+ * Still usable right now: switched on, approved by admin, and not past its expiry date.
  */
-export function isOfferLive(offer: { active?: boolean; expiryDate?: string | Date }, now = Date.now()): boolean {
+export function isOfferLive(offer: { active?: boolean; expiryDate?: string | Date; approvalStatus?: string }, now = Date.now()): boolean {
   if (offer.active === false) return false;
+  if (offer.approvalStatus && offer.approvalStatus !== 'approved') return false;
   const expires = offer.expiryDate ? new Date(offer.expiryDate).getTime() : NaN;
   return Number.isFinite(expires) && expires >= now;
 }
 
 /** One shared query, so the home screen and the app-start prefetch use the same cached offers. */
+const OFFERS_CACHE_KEY = '@offers_cache_v1';
+
 export const offersQueryOptions = {
   queryKey: ['offers'] as const,
-  queryFn: () => fetchOffers(),
+  queryFn: async () => {
+    const offers = await fetchOffers();
+    AsyncStorage.setItem(OFFERS_CACHE_KEY, JSON.stringify(offers)).catch(() => {});
+    return offers;
+  },
   staleTime: 5 * 60 * 1000,
   refetchInterval: 5 * 60 * 1000,
   refetchOnWindowFocus: false,
@@ -87,6 +95,7 @@ export async function fetchOffers(): Promise<Offer[]> {
             expiry: offer.expiryDate ? formatExpiry(offer.expiryDate) : '',
             expiryDate: offer.expiryDate,
             active: offer.active,
+            approvalStatus: offer.approvalStatus,
           };
         } else if (offer.type === 'coupon') {
           const isFlat = offer.discountType === 'FLAT';
@@ -109,6 +118,8 @@ export async function fetchOffers(): Promise<Offer[]> {
             gradientColors: offer.gradientColors || ['#6178D8', '#8B5CF6'],
             icon: offer.icon || 'tag',
             image: plateSafeOfferImage(offer.image),
+            active: offer.active,
+            approvalStatus: offer.approvalStatus,
           };
         } else {
           // special_deal — pass through as-is with minimal transforms
@@ -132,10 +143,24 @@ export async function fetchOffers(): Promise<Offer[]> {
             dealPrice: offer.dealPrice,
             discountPercent: offer.discountPercent,
             active: offer.active,
+            approvalStatus: offer.approvalStatus,
           };
         }
       });
     }
   }
   throw new Error(`Could not load offers (${res.status})`);
+}
+
+/**
+ * Puts the offers from the last launch into the cache (marked stale, so they refresh straight away): Home shows its
+ * offer sections at once instead of after the network. Ones past their expiry date are dropped.
+ */
+export async function hydrateOffers(queryClient: { getQueryData: (k: readonly unknown[]) => unknown; setQueryData: (k: readonly unknown[], d: unknown, o?: { updatedAt: number }) => unknown }) {
+  try {
+    const saved = await AsyncStorage.getItem(OFFERS_CACHE_KEY);
+    if (!saved || queryClient.getQueryData(offersQueryOptions.queryKey)) return;
+    const list = (JSON.parse(saved) as any[]).filter((o) => o && (!o.expiryDate || isOfferLive(o)));
+    queryClient.setQueryData(offersQueryOptions.queryKey, list, { updatedAt: 0 });
+  } catch {}
 }

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, useQuery } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
-import { offersQueryOptions } from '@/services/api/offers';
+import { offersQueryOptions, hydrateOffers } from '@/services/api/offers';
 
 import { Image } from 'expo-image';
 
@@ -76,6 +76,23 @@ export function useVehicles() {
 }
 
 /**
+ * The car with its bookings read live from the server for this one vehicle (refreshed every 20 s while open), so the
+ * car page and checkout agree with the bookings table. Until that arrives — or if it fails — the list's copy is used.
+ */
+export function useLiveCar<T extends { id: string } | null | undefined>(car: T): T {
+  const id = car?.id ? String(car.id) : '';
+  const { data } = useQuery({
+    queryKey: ['vehicle-availability', id],
+    queryFn: () => API.getVehicleAvailability(id),
+    enabled: /^[a-f0-9]{24}$/i.test(id),
+    staleTime: 15 * 1000,
+    refetchInterval: 20 * 1000,
+  });
+  if (!car || !data) return car;
+  return { ...car, bookedRanges: data.bookedRanges, dbStatus: data.status || (car as any).dbStatus, maintenanceUntil: data.maintenanceUntil } as T;
+}
+
+/**
  * Called once at app start: loads the last known vehicles from disk instantly,
  * then starts the live fetch from the database so Home updates with real data.
  */
@@ -83,7 +100,7 @@ export function primeVehicles(queryClient: QueryClient) {
   AsyncStorage.removeItem(LEGACY_STORAGE_KEY).catch(() => {});
   // Offers start loading now too, so Exclusive Offers / Special Deals are already there when Home
   // appears instead of popping in (and pushing the page down) a moment later.
-  queryClient.prefetchQuery(offersQueryOptions).catch(() => {});
+  hydrateOffers(queryClient).finally(() => queryClient.prefetchQuery({ ...offersQueryOptions, staleTime: 0 }).catch(() => {}));
   
   AsyncStorage.getItem(STORAGE_KEY).then((cached) => {
     if (cached) {

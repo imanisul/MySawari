@@ -22,7 +22,7 @@ export type TripPrice =
       original: number;
       /** What the trip costs after coupon and membership — the same figure the server checks at booking. */
       final: number;
-      /** `final` less the SawariCash used: the total the customer actually owes (what is shown big and bold). */
+      /** `final` less the SawariCash used, plus the plan being bought: the total the customer actually owes (shown big and bold). */
       total: number;
       rentalAmount: number;
       driverCharge: number;
@@ -62,7 +62,10 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
   // The quote is shared app-wide; one priced for a different car must not show here.
   if (!q || isQuoteLoading || q.dailyRate !== perDay) return { state: 'loading' };
 
-  const original = q.rentalAmount + q.driverCharge + q.pickupCharge + q.dropCharge;
+  // A plan bought with this booking is part of what the customer pays, so it is part of the total (and of the
+  // struck-through "before discounts" price, so the saving still reads right).
+  const membershipFee = q.membershipFee || 0;
+  const original = q.rentalAmount + q.driverCharge + q.pickupCharge + q.dropCharge + membershipFee;
 
   // If the quote already includes a subscription discount, use it. Otherwise, if the context
   // knows the user has an active membership (e.g. wallet was fetched earlier but the current
@@ -95,7 +98,7 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     final,
     // SawariCash is a discount on the trip: it comes off the total (it covers the booking amount first, so the
     // booking amount shrinks and "pay at pickup" stays total − booking amount).
-    total: Math.max(0, final - (q.sawariCashUsed || 0)),
+    total: Math.max(0, final - (q.sawariCashUsed || 0)) + membershipFee,
     rentalAmount: q.rentalAmount,
     driverCharge: q.driverCharge,
     pickupCharge: q.pickupCharge,
@@ -108,7 +111,7 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     membershipDiscount,
     planName,
     buyingPlan: q.membershipPlanToBuy ? (PLAN_NAMES[q.membershipPlanToBuy.toLowerCase()] ?? q.membershipPlanToBuy) : null,
-    membershipFee: q.membershipFee || 0,
+    membershipFee,
     payableNow: q.onlinePayableNow ?? Math.min(BOOKING_ADVANCE_AMOUNT, final),
     sawariCashUsed: q.sawariCashUsed || 0,
     balance: q.remainingRentalAmount,

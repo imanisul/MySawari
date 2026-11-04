@@ -339,8 +339,8 @@ export function PricingSummary({ booking }: { booking: BookingSnapshot }) {
       <View style={{ gap: 10 }}>
         <Row label={`Rental charges (${b.dailyRate.toLocaleString('en-IN')} x ${b.rentalDays} day${b.rentalDays === 1 ? '' : 's'})`} value={rupees(b.rentalAmount)} />
         {(b.driverCharge || 0) > 0 && <Row label="Driver charges" value={rupees(b.driverCharge)} />}
-        {(b.pickupCharge || 0) > 0 && <Row label={`Pickup service${b.pickupDistanceKm ? ` (${b.pickupDistanceKm} km)` : ''}`} value={rupees(b.pickupCharge)} />}
-        {(b.dropCharge || 0) > 0 && <Row label={`Drop service${b.dropDistanceKm ? ` (${b.dropDistanceKm} km)` : ''}`} value={rupees(b.dropCharge)} />}
+        {(b.pickupCharge || 0) > 0 && <Row label={`Delivery charges${b.pickupDistanceKm ? ` (${b.pickupDistanceKm} km)` : ''} · pay at handover`} value={rupees(b.pickupCharge)} />}
+        {(b.dropCharge || 0) > 0 && <Row label={`Return pickup charges${b.dropDistanceKm ? ` (${b.dropDistanceKm} km)` : ''} · pay at handover`} value={rupees(b.dropCharge)} />}
         {(b.fastagAmount || 0) > 0 && <Row label="FASTag" value={rupees(b.fastagAmount)} />}
         {(b.securityDeposit || 0) > 0 && <Row label="Security deposit" value={rupees(b.securityDeposit)} />}
         {(b.membershipDiscount || 0) > 0 && <Row label="Membership discount" value={minus(b.membershipDiscount)} accent />}
@@ -368,7 +368,7 @@ export function PricingSummary({ booking }: { booking: BookingSnapshot }) {
               <Text style={[styles.payBadgeText, { color: c.foreground }]}>Payment due at pickup</Text>
             </View>
             <Text style={[styles.payNote, { color: c.mutedForeground }]}>
-              Pay {rupees(b.remainingRentalAmount)} when you collect your vehicle.
+              Pay {rupees(b.remainingRentalAmount)} when you collect your vehicle{(b.pickupCharge || 0) + (b.dropCharge || 0) > 0 ? `, including ${rupees((b.pickupCharge || 0) + (b.dropCharge || 0))} delivery and return charges` : ''}.
             </Text>
           </>
         ) : (

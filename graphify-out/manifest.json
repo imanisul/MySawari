@@ -1710,9 +1710,9 @@
     "semantic_hash": ""
   },
   "components/booking/TripDetailParts.tsx": {
-    "mtime": 1793772620.3035514,
-    "seen": 1793772629.982249,
-    "ast_hash": "b9ab07903e4f8b121767ff4bff649f7a",
+    "mtime": 1793786435.3018415,
+    "seen": 1793786448.702752,
+    "ast_hash": "1788171d68f9058a3d0d656c1f2545b1",
     "semantic_hash": ""
   },
   "components/booking/TripReviewSheet.tsx": {

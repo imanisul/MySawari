@@ -1,5 +1,6 @@
+import { DesignToggle } from '@/components/profile/ProfileParts';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, Switch, LayoutAnimation } from 'react-native';
+import { Pressable, StyleSheet, Text, View, LayoutAnimation } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
@@ -147,12 +148,7 @@ export function SearchCard({
           <Text style={[styles.deliveryToggleTitle, { color: colors.foreground }]}>Get car delivered?</Text>
           <Text style={[styles.deliveryToggleDesc, { color: colors.mutedForeground }]}>We will drop and pick up the car at your location</Text>
         </View>
-        <Switch 
-          value={isDeliveryRequested} 
-          onValueChange={toggleDelivery}
-          trackColor={{ false: colors.border, true: colors.primary }}
-          thumbColor={isDeliveryRequested ? '#FFF' : '#FFF'}
-        />
+        <DesignToggle accessibilityLabel="Get car delivered" value={isDeliveryRequested} onValueChange={toggleDelivery} />
       </View>
 
       {/* Conditional Delivery Fields */}

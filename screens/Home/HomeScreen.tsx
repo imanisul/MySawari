@@ -13,7 +13,7 @@ import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, ca
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet } from '@/components';
 import { API } from '@/services/backend/api';
-import { isPastSearch, RecentSearch } from '@/utils/recentSearches';
+import { isPastSearch, removeRecentSearch, RecentSearch } from '@/utils/recentSearches';
 import { useVehicles } from '@/hooks/useVehicles';
 import { recentlyViewedQueryOptions, recentSearchesQueryOptions } from '@/hooks/useHomeData';
 import { Reveal } from '@/components/common/Reveal';
@@ -98,8 +98,15 @@ const DESTINATION_LOCATIONS: Record<string, LocationResult> = {
 // The first trip milestone (backend MILESTONES in booking.controller.js) — shown to guests, who have no journey yet.
 const FIRST_MILESTONE = { rides: 4, rewardAmount: 5000 };
 
-// Curated favourites shown as top picks after the vehicles the customer looked at.
+// Curated favourites for the bike tab's ties.
 const PICKS = { Car: ['curvv', 'venue', 'brezza', 'innova', 'creta'], Bike: ['xpulse', 'xpluse', 'ntorq', 'hunter', 'jawa'] };
+
+// Top Picks for cars, in this order: the model name and, where it matters, the colour.
+const TOP_CARS: { model: string; color?: string }[] = [
+  { model: 'innova' }, { model: 'curvv' }, { model: 'ertiga' }, { model: 'rumion', color: 'white' },
+  { model: 'taisor' }, { model: 'xuv300' }, { model: 'brezza', color: 'red' },
+  { model: 'venue', color: 'black' }, { model: 'venue', color: 'white' }, { model: 'creta', color: 'black' },
+];
 
 /**
  * Home (Figma "Home"): banner, refer strip, Cars / Bikes + destination, top picks (recently viewed first),
@@ -178,6 +185,19 @@ export default function HomeScreen() {
   // Top Picks: the most booked vehicles of the selected type (last 90 days, from the bookings), free ones first;
   // the curated favourites only break ties.
   const picks = useMemo(() => {
+    if (typeName === 'Car') {
+      const pool = fetchedVehicles.filter((v) => (v?.displayName || v?.name) && v.type === 'Car' && !isInService(v));
+      const text = (v: Car) => `${v.displayName || ''} ${v.name || ''}`.toLowerCase().replace(/\s+/g, '');
+      const used = new Set<string>();
+      const out: Car[] = [];
+      for (const t of TOP_CARS) {
+        const models = pool.filter((v) => text(v).includes(t.model) && !used.has(String(v.id)));
+        // The right colour if we have it, otherwise the same model in any colour.
+        const hit = (t.color && models.find((v) => (v.color || text(v)).toLowerCase().includes(t.color!))) || models[0];
+        if (hit) { used.add(String(hit.id)); out.push(withAvail(hit)); }
+      }
+      if (out.length) return out;
+    }
     const fav = PICKS[typeName];
     const rank = (v: Car) => {
       const n = (v.displayName || v.name || '').toLowerCase();
@@ -197,6 +217,9 @@ export default function HomeScreen() {
     queryClient.invalidateQueries({ queryKey: ['recentSearches', recentKey || 'guest'] });
   }, [queryClient, recentKey]));
   const tripSearches = useMemo(() => savedSearches.filter((t) => !isPastSearch(t)), [savedSearches]);
+  const removeTripSearch = useCallback((id: string) => {
+    removeRecentSearch(recentKey, id).then((next) => queryClient.setQueryData(['recentSearches', recentKey || 'guest'], next));
+  }, [recentKey, queryClient]);
   const openTripSearch = useCallback((t: RecentSearch) => {
     setBookingSource('home');
     setVehicleType(t.vehicleType);
@@ -355,7 +378,7 @@ export default function HomeScreen() {
               data={tripSearches}
               horizontal
               keyExtractor={(t) => `trip-${t.id}`}
-              renderItem={({ item: t }) => <TripSearchCard search={t} onPress={() => openTripSearch(t)} />}
+              renderItem={({ item: t }) => <TripSearchCard search={t} onPress={() => openTripSearch(t)} onRemove={() => removeTripSearch(t.id)} />}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.row, { gap: 8 }]}
               snapToInterval={254}
@@ -419,7 +442,7 @@ export default function HomeScreen() {
     }
     if (!content) return null;
     return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, openPick, milestone, journey, claimable, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>

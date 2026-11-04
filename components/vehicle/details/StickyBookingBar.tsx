@@ -22,11 +22,14 @@ export function StickyBookingBar({
   onBookNow,
   onCheckAvailability,
   bookLabel,
+  agreeHint,
   onHeight,
 }: {
   /** Button text once the trip can be booked (default "Book Now"; the payment page uses "Pay ₹500 & Book"). */
   bookLabel?: string;
   isAvailable?: boolean;
+  /** Shown instead of the payable note while the policy agreement is still unticked. */
+  agreeHint?: string;
   /** Policy Agreement checkbox on the page. */
   agreed?: boolean;
   /** Whether pickup and return dates are chosen (needed for a trip price). */
@@ -46,7 +49,8 @@ export function StickyBookingBar({
   // A car that is free (today, or for the chosen dates) says "Book Now"; with no dates yet the button first opens the
   // date picker, then Book Now continues. "Check Availability" is only for a car that is busy for the chosen dates.
   const canBook = isAvailable && hasTrip;
-  const label = isAvailable && (hasTrip || !bookLabel) ? (bookLabel || 'Book Now') : 'Check Availability';
+  const isBook = !!isAvailable && (hasTrip || !bookLabel);
+  const label = isBook ? (bookLabel || 'Book Now') : 'Check Availability';
   const onPress = canBook
     ? () => {
         if (isAuthenticated) {
@@ -56,7 +60,9 @@ export function StickyBookingBar({
         }
       }
     : onCheckAvailability;
-  const disabled = !onPress || (canBook && !agreed);
+  // Book Now needs the policy tick even before dates are picked (then it opens the date picker); only a busy car's
+  // "Check Availability" is free of it.
+  const disabled = !onPress || (isBook && !agreed);
   const payableNow = price.state === 'ready' ? price.payableNow : BOOKING_ADVANCE_AMOUNT;
 
   return (
@@ -144,7 +150,7 @@ export function StickyBookingBar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
-          accessibilityHint={canBook && !agreed ? 'Tick the policy agreement first' : undefined}
+          accessibilityHint={isBook && !agreed ? 'Tick the policy agreement first' : undefined}
           onPress={onPress}
           disabled={disabled}
           style={({ pressed }) => [styles.button, { backgroundColor: p.navy }, pressed && styles.pressed, disabled && { opacity: 0.5 }]}
@@ -153,7 +159,9 @@ export function StickyBookingBar({
         </Pressable>
 
         {/* Figma: "₹500 payable now • Refundable up to 24h before trip", 6 apart, centred. */}
-        {price.state === 'ready' && price.membershipFee > 0 ? (
+        {isBook && !agreed && agreeHint ? (
+          <View style={styles.noteRow}><Text style={[styles.note, { color: p.red }]}>{agreeHint}</Text></View>
+        ) : price.state === 'ready' && price.membershipFee > 0 ? (
           <View style={styles.noteRow}><Text style={[styles.note, { color: p.green }]}>{formatCurrency(payableNow)} payable now (incl. {price.buyingPlan} membership)</Text></View>
         ) : (
           <View style={styles.noteRow}>

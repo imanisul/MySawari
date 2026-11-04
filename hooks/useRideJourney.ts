@@ -18,7 +18,7 @@ export function useRideJourney() {
   const cards: PendingCard[] = [];
   if (j?.signupBonus && !j.signupBonus.scratched) cards.push({ kind: 'signup', label: 'Welcome Bonus', title: 'Welcome gift', amount: j.signupBonus.amount });
   for (const m of j?.milestones ?? []) {
-    if (m.unlocked && !m.claimed) cards.push({ kind: 'milestone', label: m.label, title: `${m.rides} rides completed`, amount: m.rewardAmount });
+    if (m.unlocked && !m.claimed) cards.push({ kind: 'milestone', label: m.label, title: `${m.rides} rides completed`, amount: m.scratchAmount || (m.rides === 4 ? 200 : 350) });
   }
   return { ...query, cards };
 }

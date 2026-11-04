@@ -1,7 +1,8 @@
+import { DesignToggle } from '@/components/profile/ProfileParts';
 import React, { useState, useEffect, useCallback } from 'react';
 import { safeBack } from '@/utils/navigation';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { Pressable, StyleSheet, Text, View, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform, Switch } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -291,11 +292,11 @@ export default function PaymentScreen() {
               <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>Apply SawariCash</Text>
               <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>Balance: ₹{sawariCash.toFixed(0)}</Text>
             </View>
-            <Switch
+            <DesignToggle
+              accessibilityLabel="Apply SawariCash"
               value={useCash}
               onValueChange={toggleSawariCash}
               disabled={sawariCash <= 0 || (!!pricingQuote && pricingQuote.bookingAdvance <= 0)}
-              trackColor={{ false: colors.border, true: colors.primary }}
             />
           </View>
 

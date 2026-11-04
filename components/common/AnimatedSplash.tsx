@@ -288,10 +288,16 @@ export function AnimatedSplash({
   const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const spinReverse = spinReverseAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
 
-  // Background and text colors
-  const activeBg = FESTIVE_BG;
-  const brandTextColor = FESTIVE_INK;
-  const brandTaglineColor = FESTIVE_SUB;
+  // Determine mode
+  const isSpecialMedia = Boolean(config?.bgImageUrl);
+  const isFestiveMode = !isSpecialMedia && Boolean(config?.isOccasionActive && (config?.occasionTheme?.includes('diwali') || config?.occasionTheme === 'festive_glow'));
+  const activeBg = isSpecialMedia 
+    ? (config?.backgroundColor || '#FFFFFF') 
+    : isFestiveMode 
+      ? FESTIVE_BG 
+      : (config?.backgroundColor || '#FFFFFF');
+  const brandTextColor = isFestiveMode ? FESTIVE_INK : (config?.primaryColor || '#1C2A53');
+  const brandTaglineColor = isFestiveMode ? FESTIVE_SUB : '#6B7280';
 
   const showProblem = !isDataReady && (loadFailed || isSlow);
 
@@ -314,178 +320,218 @@ export function AnimatedSplash({
           {/* Status bar with dark icons for crisp clarity */}
           <StatusBar barStyle="dark-content" backgroundColor={activeBg} />
 
-          {/* Optional Occasion Poster or Animated Media if uploaded */}
-          {config?.bgImageUrl ? (
-            <ExpoImage
-              source={{ uri: config.bgImageUrl }}
+          {/* ======================================================== */}
+          {/* MODE 1: CUSTOM SPECIAL MEDIA (THE SPECIAL ONE) */}
+          {/* ======================================================== */}
+          {isSpecialMedia ? (
+            <Animated.View
               style={[
                 StyleSheet.absoluteFill,
-                { opacity: config.bgImageOpacity ?? 0.35 },
+                {
+                  opacity: brandOpacity,
+                },
               ]}
-              contentFit="cover"
-              autoplay
-              onError={() => {}}
-            />
-          ) : null}
-
-          {/* ======================================================== */}
-          {/* MYSAWARI SIGNATURE ANIMATED FLASH SCREEN */}
-          {/* ======================================================== */}
-          <Animated.View
-            style={[
-              styles.diwaliContainer,
-              {
-                paddingTop: insets.top,
-                paddingBottom: insets.bottom,
-                opacity: brandOpacity,
-              },
-            ]}
-          >
-            {/* 1. Top Decorative Garland String Lights */}
-            <View pointerEvents="none" style={styles.garlandWrap}>
-              <Svg viewBox="0 0 400 70" width="100%" height={Math.min(windowHeight * 0.12, 72)} preserveAspectRatio="xMidYMin meet">
-                <Path d="M0 4 Q100 40 200 14 Q300 -8 400 26" fill="none" stroke={FESTIVE_LINE} strokeWidth={1.2} />
-                <AnimatedG opacity={twinkle1} fill={FESTIVE_GOLD}>
-                  <Path d="M30 15 l4 7 l-4 7 l-4 -7 Z" />
-                  <Path d="M255 6 l4 7 l-4 7 l-4 -7 Z" />
-                </AnimatedG>
-                <AnimatedG opacity={twinkle2} fill={FESTIVE_GOLD}>
-                  <Path d="M165 20 l4 7 l-4 7 l-4 -7 Z" />
-                  <Path d="M388 22 l4 7 l-4 7 l-4 -7 Z" />
-                </AnimatedG>
-                <AnimatedG opacity={twinkle3} fill={FESTIVE_GOLD}>
-                  <Path d="M75 25 l4 7 l-4 7 l-4 -7 Z" />
-                  <Path d="M300 6 l4 7 l-4 7 l-4 -7 Z" />
-                </AnimatedG>
-                <AnimatedG opacity={twinkle4} fill={FESTIVE_GOLD}>
-                  <Path d="M120 27 l4 7 l-4 7 l-4 -7 Z" />
-                  <Path d="M210 12 l4 7 l-4 7 l-4 -7 Z" />
-                  <Path d="M345 12 l4 7 l-4 7 l-4 -7 Z" />
-                </AnimatedG>
-              </Svg>
-            </View>
-
-            {/* 2. Twinkling 4-Point Sparkle Stars */}
-            <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '22%', left: '11%', opacity: twinkle2 }]}>
-              <Svg viewBox="0 0 10 10" width={13} height={13}>
-                <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
-              </Svg>
+            >
+              <ExpoImage
+                source={{ uri: config.bgImageUrl }}
+                style={StyleSheet.absoluteFill}
+                contentFit="cover"
+                autoplay
+                onError={() => {}}
+              />
             </Animated.View>
-            <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '30%', right: '12%', opacity: twinkle4 }]}>
-              <Svg viewBox="0 0 10 10" width={16} height={16}>
-                <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
-              </Svg>
-            </Animated.View>
-            <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '26%', left: '14%', opacity: twinkle1 }]}>
-              <Svg viewBox="0 0 10 10" width={12} height={12}>
-                <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
-              </Svg>
-            </Animated.View>
-            <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '33%', right: '11%', opacity: twinkle3 }]}>
-              <Svg viewBox="0 0 10 10" width={14} height={14}>
-                <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
-              </Svg>
-            </Animated.View>
-
-            {/* 3. Center Orbiting Celestial Rings, Halo & Brand Typography */}
-            <View style={styles.diwaliCenterBlock}>
-              <View style={[styles.ringsWrap, { width: ringSize, height: ringSize }]}>
-                {/* Soft Radial Halo */}
-                <Animated.View
-                  style={[
-                    styles.haloGlow,
-                    {
-                      width: ringSize * 0.94,
-                      height: ringSize * 0.94,
-                      borderRadius: ringSize * 0.47,
-                      transform: [{ scale: glowScale }],
-                    },
-                  ]}
-                />
-
-                {/* Outer Clockwise Dashed Golden Ring with Markers */}
-                <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', transform: [{ rotate: spin }] }]}>
-                  <Svg viewBox="0 0 200 200" width={ringSize} height={ringSize}>
-                    <Circle cx="100" cy="100" r="96" fill="none" stroke={FESTIVE_GOLD} strokeWidth={1.6} strokeDasharray="1.5 8" strokeLinecap="round" />
-                    <G fill={FESTIVE_GOLD}>
-                      <Path d="M100 0 l3 6 l-3 6 l-3 -6 Z" />
-                      <Path d="M200 100 l-6 3 l-6 -3 l6 -3 Z" />
-                      <Path d="M100 200 l3 -6 l-3 -6 l-3 6 Z" />
-                      <Path d="M0 100 l6 3 l6 -3 l-6 -3 Z" />
-                    </G>
-                  </Svg>
-                </Animated.View>
-
-                {/* Inner Counter-Clockwise Dot Ring */}
-                <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', transform: [{ rotate: spinReverse }] }]}>
-                  <Svg viewBox="0 0 200 200" width={ringSize * 0.86} height={ringSize * 0.86}>
-                    <Circle cx="100" cy="100" r="97" fill="none" stroke={FESTIVE_LINE} strokeWidth={1} />
-                    <G fill={FESTIVE_LINE}>
-                      <Circle cx="100" cy="3" r="2.5" />
-                      <Circle cx="197" cy="100" r="2.5" />
-                      <Circle cx="100" cy="197" r="2.5" />
-                      <Circle cx="3" cy="100" r="2.5" />
-                      <Circle cx="168.6" cy="31.4" r="2" />
-                      <Circle cx="168.6" cy="168.6" r="2" />
-                      <Circle cx="31.4" cy="168.6" r="2" />
-                      <Circle cx="31.4" cy="31.4" r="2" />
-                    </G>
-                  </Svg>
-                </Animated.View>
-
-                {/* MySawari Brand Emblem Logo */}
-                <Animated.Image
-                  source={require('@/assets/images/diwali_splash/e4dbf1fccac9f7627d383d6daa9ade36.png')}
-                  style={[
-                    styles.diwaliEmblem,
-                    {
-                      width: ringSize * 0.48,
-                      height: ringSize * 0.48,
-                      opacity: logoOpacity,
-                      transform: [{ scale: logoScale }],
-                    },
-                  ]}
-                  resizeMode="contain"
-                />
+          ) : isFestiveMode ? (
+            /* ======================================================== */
+            /* MODE 2: FESTIVE OCCASION / DIWALI ANIMATED MODE */
+            /* ======================================================== */
+            <Animated.View
+              style={[
+                styles.diwaliContainer,
+                {
+                  paddingTop: insets.top,
+                  paddingBottom: insets.bottom,
+                  opacity: brandOpacity,
+                },
+              ]}
+            >
+              {/* 1. Top Decorative Garland String Lights */}
+              <View pointerEvents="none" style={styles.garlandWrap}>
+                <Svg viewBox="0 0 400 70" width="100%" height={Math.min(windowHeight * 0.12, 72)} preserveAspectRatio="xMidYMin meet">
+                  <Path d="M0 4 Q100 40 200 14 Q300 -8 400 26" fill="none" stroke={FESTIVE_LINE} strokeWidth={1.2} />
+                  <AnimatedG opacity={twinkle1} fill={FESTIVE_GOLD}>
+                    <Path d="M30 15 l4 7 l-4 7 l-4 -7 Z" />
+                    <Path d="M255 6 l4 7 l-4 7 l-4 -7 Z" />
+                  </AnimatedG>
+                  <AnimatedG opacity={twinkle2} fill={FESTIVE_GOLD}>
+                    <Path d="M165 20 l4 7 l-4 7 l-4 -7 Z" />
+                    <Path d="M388 22 l4 7 l-4 7 l-4 -7 Z" />
+                  </AnimatedG>
+                  <AnimatedG opacity={twinkle3} fill={FESTIVE_GOLD}>
+                    <Path d="M75 25 l4 7 l-4 7 l-4 -7 Z" />
+                    <Path d="M300 6 l4 7 l-4 7 l-4 -7 Z" />
+                  </AnimatedG>
+                  <AnimatedG opacity={twinkle4} fill={FESTIVE_GOLD}>
+                    <Path d="M120 27 l4 7 l-4 7 l-4 -7 Z" />
+                    <Path d="M210 12 l4 7 l-4 7 l-4 -7 Z" />
+                    <Path d="M345 12 l4 7 l-4 7 l-4 -7 Z" />
+                  </AnimatedG>
+                </Svg>
               </View>
 
-              {/* 4. Brand Typography */}
-              <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 18 }}>
-                <Text style={[styles.diwaliBrandTitle, { fontSize: isSmallDevice ? 34 : isTablet ? 46 : 40 }]}>
+              {/* 2. Twinkling 4-Point Sparkle Stars */}
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '22%', left: '11%', opacity: twinkle2 }]}>
+                <Svg viewBox="0 0 10 10" width={13} height={13}>
+                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+                </Svg>
+              </Animated.View>
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '30%', right: '12%', opacity: twinkle4 }]}>
+                <Svg viewBox="0 0 10 10" width={16} height={16}>
+                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+                </Svg>
+              </Animated.View>
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '26%', left: '14%', opacity: twinkle1 }]}>
+                <Svg viewBox="0 0 10 10" width={12} height={12}>
+                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+                </Svg>
+              </Animated.View>
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '33%', right: '11%', opacity: twinkle3 }]}>
+                <Svg viewBox="0 0 10 10" width={14} height={14}>
+                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+                </Svg>
+              </Animated.View>
+
+              {/* 3. Center Orbiting Celestial Rings, Halo & Brand Typography */}
+              <View style={styles.diwaliCenterBlock}>
+                <View style={[styles.ringsWrap, { width: ringSize, height: ringSize }]}>
+                  {/* Soft Radial Halo */}
+                  <Animated.View
+                    style={[
+                      styles.haloGlow,
+                      {
+                        width: ringSize * 0.94,
+                        height: ringSize * 0.94,
+                        borderRadius: ringSize * 0.47,
+                        transform: [{ scale: glowScale }],
+                      },
+                    ]}
+                  />
+
+                  {/* Outer Clockwise Dashed Golden Ring with Markers */}
+                  <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', transform: [{ rotate: spin }] }]}>
+                    <Svg viewBox="0 0 200 200" width={ringSize} height={ringSize}>
+                      <Circle cx="100" cy="100" r="96" fill="none" stroke={FESTIVE_GOLD} strokeWidth={1.6} strokeDasharray="1.5 8" strokeLinecap="round" />
+                      <G fill={FESTIVE_GOLD}>
+                        <Path d="M100 0 l3 6 l-3 6 l-3 -6 Z" />
+                        <Path d="M200 100 l-6 3 l-6 -3 l6 -3 Z" />
+                        <Path d="M100 200 l3 -6 l-3 -6 l-3 6 Z" />
+                        <Path d="M0 100 l6 3 l6 -3 l-6 -3 Z" />
+                      </G>
+                    </Svg>
+                  </Animated.View>
+
+                  {/* Inner Counter-Clockwise Dot Ring */}
+                  <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', transform: [{ rotate: spinReverse }] }]}>
+                    <Svg viewBox="0 0 200 200" width={ringSize * 0.86} height={ringSize * 0.86}>
+                      <Circle cx="100" cy="100" r="97" fill="none" stroke={FESTIVE_LINE} strokeWidth={1} />
+                      <G fill={FESTIVE_LINE}>
+                        <Circle cx="100" cy="3" r="2.5" />
+                        <Circle cx="197" cy="100" r="2.5" />
+                        <Circle cx="100" cy="197" r="2.5" />
+                        <Circle cx="3" cy="100" r="2.5" />
+                        <Circle cx="168.6" cy="31.4" r="2" />
+                        <Circle cx="168.6" cy="168.6" r="2" />
+                        <Circle cx="31.4" cy="168.6" r="2" />
+                        <Circle cx="31.4" cy="31.4" r="2" />
+                      </G>
+                    </Svg>
+                  </Animated.View>
+
+                  {/* MySawari Brand Emblem Logo */}
+                  <Animated.Image
+                    source={require('@/assets/images/diwali_splash/e4dbf1fccac9f7627d383d6daa9ade36.png')}
+                    style={[
+                      styles.diwaliEmblem,
+                      {
+                        width: ringSize * 0.48,
+                        height: ringSize * 0.48,
+                        opacity: logoOpacity,
+                        transform: [{ scale: logoScale }],
+                      },
+                    ]}
+                    resizeMode="contain"
+                  />
+                </View>
+
+                {/* 4. Brand Typography */}
+                <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 18 }}>
+                  <Text style={[styles.diwaliBrandTitle, { fontSize: isSmallDevice ? 34 : isTablet ? 46 : 40 }]}>
+                    {displayTitle}
+                  </Text>
+                </Animated.View>
+
+                <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 8 }}>
+                  <Text style={[styles.diwaliBrandTagline, { fontSize: isSmallDevice ? 15 : isTablet ? 19 : 17 }]}>
+                    {displayTagline}
+                  </Text>
+                </Animated.View>
+              </View>
+            </Animated.View>
+          ) : (
+            /* ======================================================== */
+            /* MODE 3: SIGNATURE CLASSIC MODE (CLEAN, NO DOUBLE FLASH) */
+            /* ======================================================== */
+            <Animated.View
+              style={[
+                styles.classicContainer,
+                {
+                  paddingTop: insets.top,
+                  paddingBottom: insets.bottom,
+                  opacity: brandOpacity,
+                },
+              ]}
+            >
+              <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
+                <Image
+                  source={require('@/assets/images/MySawari_nobg.png')}
+                  style={styles.classicLogoImage}
+                  resizeMode="contain"
+                />
+              </Animated.View>
+              <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 14 }}>
+                <Text style={[styles.classicTitle, { color: brandTextColor }]}>
                   {displayTitle}
                 </Text>
               </Animated.View>
-
-              <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 8 }}>
-                <Text style={[styles.diwaliBrandTagline, { fontSize: isSmallDevice ? 15 : isTablet ? 19 : 17 }]}>
+              <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 6 }}>
+                <Text style={[styles.classicTagline, { color: brandTaglineColor }]}>
                   {displayTagline}
                 </Text>
               </Animated.View>
-            </View>
+            </Animated.View>
+          )}
 
-            {/* Fallback actions if connection is slow */}
-            {showProblem && (
-              <View style={[styles.troubleActions, { position: 'absolute', bottom: Math.max(insets.bottom, 16) + 16 }]}>
-                {loadFailed && !!onRetry && (
-                  <Pressable accessibilityRole="button" onPress={onRetry} style={styles.actionBtn}>
-                    <Feather name="refresh-cw" size={13} color="#323E71" />
-                    <Text style={styles.actionBtnText}>Retry</Text>
-                  </Pressable>
-                )}
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => {
-                    markSplashGone();
-                    setIsAnimationComplete(true);
-                  }}
-                  style={styles.actionBtn}
-                >
-                  <Text style={styles.actionBtnText}>Continue</Text>
-                  <Feather name="arrow-right" size={13} color="#323E71" />
+          {/* Fallback actions if connection is slow */}
+          {showProblem && (
+            <View style={[styles.troubleActions, { position: 'absolute', bottom: Math.max(insets.bottom, 16) + 16 }]}>
+              {loadFailed && !!onRetry && (
+                <Pressable accessibilityRole="button" onPress={onRetry} style={styles.actionBtn}>
+                  <Feather name="refresh-cw" size={13} color="#323E71" />
+                  <Text style={styles.actionBtnText}>Retry</Text>
                 </Pressable>
-              </View>
-            )}
-          </Animated.View>
+              )}
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  markSplashGone();
+                  setIsAnimationComplete(true);
+                }}
+                style={styles.actionBtn}
+              >
+                <Text style={styles.actionBtnText}>Continue</Text>
+                <Feather name="arrow-right" size={13} color="#323E71" />
+              </Pressable>
+            </View>
+          )}
         </Animated.View>
       )}
     </View>
@@ -501,6 +547,30 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     backgroundColor: '#FFFFFF',
     zIndex: 99999,
+  },
+  // Classic Layout Styles (Clean signature branding)
+  classicContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    width: '100%',
+  },
+  classicLogoImage: {
+    width: 220,
+    height: 110,
+  },
+  classicTitle: {
+    fontWeight: '800',
+    fontSize: 34,
+    letterSpacing: -0.5,
+    textAlign: 'center',
+  },
+  classicTagline: {
+    fontWeight: '500',
+    fontSize: 16,
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   // Diwali Layout Styles
   diwaliContainer: {

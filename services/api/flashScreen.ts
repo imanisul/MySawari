@@ -29,26 +29,26 @@ export interface FlashScreenConfig {
 
 export const DEFAULT_FLASH_SCREEN_CONFIG: FlashScreenConfig = {
   isEnabled: true,
-  durationSeconds: 4, // Exactly 4 seconds default
+  durationSeconds: 3,
   brandTitle: 'MySawari',
   brandTagline: 'Your ride, your way.',
-  isOccasionActive: true,
-  occasionName: 'MySawari',
-  occasionGreeting: 'Your ride, your way.',
+  isOccasionActive: false,
+  occasionName: '',
+  occasionGreeting: '',
   occasionSubtext: '',
   occasionBadge: '',
-  occasionTheme: 'diwali_animated',
-  primaryColor: '#323E71',
+  occasionTheme: 'classic',
+  primaryColor: '#1C2A53',
   accentColor: '#E0A126',
-  backgroundColor: '#F8F8F5',
-  gradientColors: ['#F8F8F5', '#F8F8F5'],
+  backgroundColor: '#FFFFFF',
+  gradientColors: ['#FFFFFF', '#FFFFFF'],
   bgImageUrl: '',
-  bgImageOpacity: 0.35,
+  bgImageOpacity: 1,
   showLogo: true,
   showTagline: true,
   showProgressBar: false,
   showSkipButton: false,
-  animationStyle: 'diwali_animated',
+  animationStyle: 'smooth_fade',
 };
 
 const FLASH_STORAGE_KEY = '@mysawari_flash_screen_config';

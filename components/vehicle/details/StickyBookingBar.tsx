@@ -190,8 +190,8 @@ function Breakup({ price }: { price: ReadyPrice }) {
     <View style={[styles.bCard, { backgroundColor: p.soft, borderColor: p.border }]} accessibilityLabel="Price breakup">
       <Row label={`Rental charges (${price.perDay} x ${n} day${n === 1 ? '' : 's'})`} value={formatCurrency(price.rentalAmount)} tone="strong" />
       {price.driverCharge > 0 && <Row label="Driver charges" value={formatCurrency(price.driverCharge)} tone="strong" />}
-      {price.pickupCharge > 0 && <Row label="Delivery charges" value={formatCurrency(price.pickupCharge)} tone="strong" />}
-      {price.dropCharge > 0 && <Row label="Return pickup charges" value={formatCurrency(price.dropCharge)} tone="strong" />}
+      {price.pickupCharge > 0 && <Row label="Delivery charges (pay at handover)" value={formatCurrency(price.pickupCharge)} tone="strong" />}
+      {price.dropCharge > 0 && <Row label="Return pickup charges (pay at handover)" value={formatCurrency(price.dropCharge)} tone="strong" />}
       {price.membershipDiscount > 0 && <Row label="Membership discount" value={`-${formatCurrency(price.membershipDiscount)}`} tone="green" />}
       {price.couponDiscount > 0 && <Row label={price.couponCode ? `Coupon discount (${price.couponCode})` : 'Coupon discount'} value={`-${formatCurrency(price.couponDiscount)}`} tone="green" />}
       {price.sawariCashUsed > 0 && <Row label="SawariCash used" value={`-${formatCurrency(price.sawariCashUsed)}`} tone="green" />}

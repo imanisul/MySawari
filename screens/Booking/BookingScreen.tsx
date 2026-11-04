@@ -232,7 +232,7 @@ export default function BookingScreen() {
 
   const ready = price.state === 'ready' ? price : null;
   const days = ready?.days ?? pricingQuote?.rentalDays ?? 1;
-  const name = [selectedCar.model, selectedCar.variant].filter(Boolean).join(' ') || selectedCar.displayName || selectedCar.name;
+  const name = selectedCar.name; // same name as the car details page
   const year = selectedCar.modelYear || selectedCar.registrationYear;
   const title = year && !String(name).includes(String(year)) ? `${name} ${year}` : name;
   const meta = [selectedCar.transmission, selectedCar.fuel, selectedCar.type === 'Bike' ? null : (/seat/i.test(String(selectedCar.seats)) ? selectedCar.seats : `${selectedCar.seats} seats`)].filter(Boolean) as string[];
@@ -339,7 +339,7 @@ export default function BookingScreen() {
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={[styles.stopTitle, { color: p.fg }]}>Pickup{!isMissingDates ? ` · ${dayAndTime(startStr, pickupTime)}` : ''}</Text>
                 <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={1}>
-                  {deliverPickup ? `Doorstep delivery · ${pickupWhere}` : pickupWhere}
+                  {deliverPickup ? `Doorstep delivery · ${pickupWhere}${ready?.pickupCharge ? ` · +${formatCurrency(ready.pickupCharge)}` : ''}` : pickupWhere}
                 </Text>
               </View>
               <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
@@ -382,7 +382,7 @@ export default function BookingScreen() {
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={[styles.stopTitle, { color: p.fg }]}>Return{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
                 <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1}>
-                  {collectReturn ? `Doorstep collection · ${returnWhere}` : returnWhere}
+                  {collectReturn ? `Doorstep collection · ${returnWhere}${ready?.dropCharge ? ` · +${formatCurrency(ready.dropCharge)}` : ''}` : returnWhere}
                 </Text>
               </View>
               <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>

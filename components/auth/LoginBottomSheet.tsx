@@ -42,13 +42,25 @@ const SHEET_OFFSET = Dimensions.get('window').height;
 export function extractOtpCode(text: string): string | null {
   if (!text || typeof text !== 'string') return null;
   const trimmed = text.trim();
+  // 1. Raw exact 6 digits: "123456"
   if (/^\d{6}$/.test(trimmed)) return trimmed;
-  const kw = trimmed.match(/(?:otp|code|verification|login|mysawari)[\s\w:]*?(\d{6})\b/i);
+  // 2. WhatsApp bold: "*123456*" or "* 123456 *"
+  const starMatch = trimmed.match(/\*\s*(\d{6})\s*\*/);
+  if (starMatch && starMatch[1]) return starMatch[1];
+  // 3. Keyword followed by 6 digits (allowing symbols like :, *, -, spaces, quotes, newlines)
+  const kw = trimmed.match(/(?:otp|code|verification|login|mysawari|password|pin)[^\d]{0,25}(\d{6})\b/i);
   if (kw && kw[1]) return kw[1];
-  const trail = trimmed.match(/\b(\d{6})\b\s+is\s+your/i);
+  // 4. "123456 is your verification code / OTP"
+  const trail = trimmed.match(/\b(\d{6})\b[^\d]{0,20}(?:is\s+your|to\s+login|for\s+mysawari)/i);
   if (trail && trail[1]) return trail[1];
+  // 5. Standalone 6-digit sequence not part of phone number
   const matches = trimmed.match(/(?<!\d)\d{6}(?!\d)/g);
   if (matches && matches.length === 1) return matches[0];
+  if (matches && matches.length > 1) {
+    const near = trimmed.match(/(?:otp|code|verification|login|mysawari)[\s\S]*?(?<!\d)(\d{6})(?!\d)/i);
+    if (near && near[1]) return near[1];
+    return matches[0];
+  }
   return null;
 }
 
@@ -303,6 +315,7 @@ export function LoginBottomSheet({
 
   // ── Auto-detect OTP from clipboard (SMS / WhatsApp) ──
   const lastDetectedOtp = useRef<string | null>(null);
+  const [detectedClipOtp, setDetectedClipOtp] = useState<string | null>(null);
 
   const checkClipboardForOtp = async () => {
     if (step !== 'otp' || loading) return;
@@ -312,18 +325,25 @@ export function LoginBottomSheet({
       const text = await Clipboard.getStringAsync();
       if (!text) return;
       const detected = extractOtpCode(text);
-      if (detected && detected.length === OTP_LENGTH && detected !== lastDetectedOtp.current) {
-        lastDetectedOtp.current = detected;
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        setOtp(detected);
-        verify(detected);
+      if (detected && detected.length === OTP_LENGTH) {
+        setDetectedClipOtp(detected);
+        if (detected !== lastDetectedOtp.current && !otp) {
+          lastDetectedOtp.current = detected;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          setOtp(detected);
+          verify(detected);
+        }
       }
     } catch {}
   };
 
   useEffect(() => {
-    if (step !== 'otp') return;
-    const timer = setTimeout(checkClipboardForOtp, 350);
+    if (step !== 'otp') {
+      setDetectedClipOtp(null);
+      return;
+    }
+    // Check clipboard once when entering OTP step, and on AppState active (when returning from WhatsApp/SMS)
+    const timer = setTimeout(checkClipboardForOtp, 400);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         checkClipboardForOtp();
@@ -333,7 +353,7 @@ export function LoginBottomSheet({
       clearTimeout(timer);
       sub.remove();
     };
-  }, [step, loading]);
+  }, [step, loading, otp]);
 
   // ── Step 1: phone ──
   useEffect(() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); }, [error]);
@@ -355,6 +375,17 @@ export function LoginBottomSheet({
       setOtp('');
       setResendIn(RESEND_SECONDS);
       setStep('otp');
+
+      // Direct auto-fetch if returned (dev/reviewer mode)
+      if (res.otp && String(res.otp).length === OTP_LENGTH) {
+        const autoOtp = String(res.otp);
+        setTimeout(() => {
+          setOtp(autoOtp);
+          lastDetectedOtp.current = autoOtp;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          verify(autoOtp);
+        }, 500);
+      }
     } catch (e: any) {
       setError(e?.message || 'Could not send the code. Please check your number and try again.');
     } finally {
@@ -370,6 +401,15 @@ export function LoginBottomSheet({
       setOtpId(res.otpId || null);
       setOtp('');
       setResendIn(RESEND_SECONDS);
+      if (res.otp && String(res.otp).length === OTP_LENGTH) {
+        const autoOtp = String(res.otp);
+        setTimeout(() => {
+          setOtp(autoOtp);
+          lastDetectedOtp.current = autoOtp;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          verify(autoOtp);
+        }, 500);
+      }
     } catch (e: any) {
       setError(e?.message || 'Could not resend the code. Please try again.');
     } finally {
@@ -526,8 +566,23 @@ export function LoginBottomSheet({
                   onChangeText={(t) => {
                     const d = t.replace(/\D/g, '');
                     // A pasted "+91 98765 43210" or "098765 43210" drops the prefix.
-                    setMobile(d.length > 10 && /^(91|0)/.test(d) ? d.slice(-10) : d.slice(0, 10));
+                    const clean = d.length > 10 && /^(91|0)/.test(d) ? d.slice(-10) : d.slice(0, 10);
+                    setMobile(clean);
                     setError(null);
+                    if (clean.length === 10) {
+                      API.checkUser(clean).then((exists) => {
+                        if (exists) {
+                          setIsExisting(true);
+                          setIsFirstTime(false);
+                          setTermsAccepted(true);
+                          AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+                        } else {
+                          setIsExisting(false);
+                          setIsFirstTime(true);
+                          setTermsAccepted(false);
+                        }
+                      }).catch(() => {});
+                    }
                   }}
                   onFocus={() => setFocus('phone')}
                   onBlur={() => setFocus(null)}
@@ -585,6 +640,25 @@ export function LoginBottomSheet({
                 Enter the 6-digit code sent to WhatsApp{'\n'}{masked(mobile)} ·{' '}
                 <Text style={{ color: ui.navy, fontFamily: 'PlusJakartaSans_600SemiBold' }} onPress={back} accessibilityRole="button">Change</Text>
               </Text>
+              {detectedClipOtp && otp !== detectedClipOtp && (
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    setOtp(detectedClipOtp);
+                    lastDetectedOtp.current = detectedClipOtp;
+                    verify(detectedClipOtp);
+                  }}
+                  style={[styles.detectedOtpChip, { borderColor: ui.navy + '40', backgroundColor: ui.roundBtn }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Autofill code ${detectedClipOtp}`}
+                >
+                  <Feather name="clipboard" size={13} color={ui.navy} />
+                  <Text style={[styles.detectedOtpText, { color: ui.navy }]}>
+                    Paste detected OTP:{' '}
+                    <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{detectedClipOtp}</Text>
+                  </Text>
+                </Pressable>
+              )}
               <OtpBoxes
                 value={otp}
                 onChange={(v) => { setOtp(v); if (error) setError(null); }}
@@ -897,6 +971,22 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 11,
     color: '#059669',
+  },
+  detectedOtpChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    alignSelf: 'center',
+    borderWidth: 1,
+    marginTop: -4,
+  },
+  detectedOtpText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 12,
   },
 
   // Navi referral card (Step 3)

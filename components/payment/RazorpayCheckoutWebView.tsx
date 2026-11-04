@@ -154,15 +154,28 @@ export function RazorpayCheckoutWebView({
       url.startsWith('paytmmp://') ||
       url.startsWith('bhim://') ||
       url.startsWith('credpay://') ||
-      url.startsWith('intent://')
+      url.startsWith('whatsapp://')
     ) {
-      Linking.canOpenURL(url).then((supported) => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
+      Linking.openURL(url).catch(() => {});
+      return false;
+    }
+
+    if (url.startsWith('intent://')) {
+      if (Platform.OS === 'android') {
+        try {
+          const schemeMatch = url.match(/scheme=([^;]+)/);
+          if (schemeMatch && schemeMatch[1]) {
+            const rawUrl = url.split('#Intent')[0].replace('intent://', `${schemeMatch[1]}://`);
+            Linking.openURL(rawUrl).catch(() => {
+              Linking.openURL(url).catch(() => {});
+            });
+          } else {
+            Linking.openURL(url).catch(() => {});
+          }
+        } catch {
           Linking.openURL(url).catch(() => {});
         }
-      }).catch(() => {});
+      }
       return false;
     }
 

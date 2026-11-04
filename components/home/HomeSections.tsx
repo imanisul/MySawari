@@ -521,20 +521,22 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
   );
 }
 
-/** A trip the customer searched (where, which dates, what time), MakeMyTrip style: tap to search it again. */
+/** A trip the customer searched (where, which dates, what time), MakeMyTrip style: tap to resume or search again. */
 export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSearch; onPress: () => void; onRemove?: () => void }) {
   const p = useDetailsPalette();
   const time = search.pickupTime && search.returnTime ? `${search.pickupTime} – ${search.returnTime}` : '';
+
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Search ${search.vehicleType}s in ${search.dropoff.name}, ${search.dateRange}`}
+      accessibilityLabel={`Search in ${search.dropoff.name}, ${search.dateRange}`}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      style={({ pressed }) => [styles.tripCard, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [
+        styles.tripCard,
+        { backgroundColor: p.page, borderColor: p.deliveryBorder },
+        pressed && { opacity: 0.85 },
+      ]}
     >
-      <View style={[styles.tripIcon, { backgroundColor: p.chipBg }]}>
-        <Feather name="map-pin" size={15} color={p.navy} />
-      </View>
       <View style={{ flex: 1 }}>
         <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1}>{search.dropoff.name}</Text>
         <View style={styles.tripLine}>
@@ -547,7 +549,6 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
             <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{time}</Text>
           </View>
         )}
-        <Text style={[styles.tripType, { color: p.navy }]}>{search.vehicleType === 'bike' ? 'Bikes' : 'Cars'}</Text>
       </View>
       {onRemove ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Remove this search" onPress={onRemove} hitSlop={10}>
@@ -1051,11 +1052,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: 16, marginBottom: 12, paddingHorizontal: 16 },
 
   tripCard: { width: 246, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12 },
-  tripIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   tripWhere: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   tripWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   tripLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  tripType: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, lineHeight: 15, marginTop: 2 },
 
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },

@@ -1017,9 +1017,10 @@ const styles = StyleSheet.create({
   addDayBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
 
   // Figma "Car Details Navigation": 393×50, padding 4/16/10, 4 between the pills (so a 36px pill).
-  pills: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, gap: 4 },
-  pill: { borderRadius: 18, paddingHorizontal: 13, height: 36, alignItems: 'center', justifyContent: 'center' },
-  pillText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
+  pills: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, gap: 4, alignItems: 'center' },
+  // Figma "Link": padding 8 / 12, 36 high, fully round, 4 apart; the label is 13 / 20 medium.
+  pill: { borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 8, height: 36, alignItems: 'center', justifyContent: 'center' },
+  pillText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, includeFontPadding: false },
 
   table: { borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
   tableRow: { flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12 },

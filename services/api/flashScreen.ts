@@ -32,23 +32,23 @@ export const DEFAULT_FLASH_SCREEN_CONFIG: FlashScreenConfig = {
   durationSeconds: 4, // Exactly 4 seconds default
   brandTitle: 'MySawari',
   brandTagline: 'Your ride, your way.',
-  isOccasionActive: false,
-  occasionName: '',
-  occasionGreeting: '',
-  occasionSubtext: 'Your ride, your way.',
-  occasionBadge: '✨ Premium Self-Drive',
-  occasionTheme: 'classic',
+  isOccasionActive: true,
+  occasionName: 'MySawari',
+  occasionGreeting: 'Your ride, your way.',
+  occasionSubtext: '',
+  occasionBadge: '',
+  occasionTheme: 'diwali_animated',
   primaryColor: '#323E71',
-  accentColor: '#323E71',
-  backgroundColor: '#FFFFFF',
-  gradientColors: ['#FFFFFF', '#FFFFFF'],
+  accentColor: '#E0A126',
+  backgroundColor: '#F8F8F5',
+  gradientColors: ['#F8F8F5', '#F8F8F5'],
   bgImageUrl: '',
   bgImageOpacity: 0.35,
   showLogo: true,
   showTagline: true,
   showProgressBar: false,
   showSkipButton: false,
-  animationStyle: 'fade_in',
+  animationStyle: 'diwali_animated',
 };
 
 const FLASH_STORAGE_KEY = '@mysawari_flash_screen_config';
@@ -72,12 +72,9 @@ export async function getCachedFlashScreenConfig(): Promise<FlashScreenConfig> {
           showSkipButton: false,
         };
 
-        // If stored config has old dark navy background, migrate to white with logo-colored typography
-        if (merged.backgroundColor === '#08142E' || !merged.isOccasionActive) {
-          merged.backgroundColor = '#FFFFFF';
-          merged.gradientColors = ['#FFFFFF', '#FFFFFF'];
-          merged.primaryColor = '#323E71';
-          merged.accentColor = '#323E71';
+        if (merged.backgroundColor === '#08142E') {
+          merged.backgroundColor = merged.isOccasionActive ? '#F8F8F5' : '#FFFFFF';
+          merged.gradientColors = merged.isOccasionActive ? ['#F8F8F5', '#F8F8F5'] : ['#FFFFFF', '#FFFFFF'];
         }
 
         return merged;

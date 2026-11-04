@@ -23,6 +23,8 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { BlurHost } from '@/components/common/BottomBlur';
 import { BlurTargetView } from 'expo-blur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
+import { Skeleton } from '@/components/common/Skeleton';
+import { LoadingImage, AnimatedVehiclePlaceholder } from '@/components/common/LoadingImage';
 
 import { ActivityAPI } from '@/services/api/activity';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
@@ -48,7 +50,7 @@ export default function CarDetailsScreen() {
   const { id: paramCarId, vehicleId: paramVehicleId } = useLocalSearchParams<{ id?: string; vehicleId?: string }>();
   const targetCarId = paramCarId || paramVehicleId;
   const { data: fetchedVehicles = [], isLoading: isFleetLoading } = useVehicles();
-  const { selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates } = useSawari();
+  const { selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates, isDarkMode } = useSawari();
 
   // If a specific car ID was passed or selectedCar is the dummy placeholder, select the real vehicle
   useEffect(() => {
@@ -112,10 +114,11 @@ export default function CarDetailsScreen() {
     router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
 
-  // "Check Availability": date & time first, then the location page, then back here with the price.
+  // "Check Availability": date & time first, then the location page, then back here with the price. The policy
+  // tick and Book Now come after that; it never jumps ahead to the payment page.
   const checkAvailability = () => {
     Haptics.selectionAsync();
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true', thenBook: 'true' } });
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true' } });
   };
 
   // Figma flow: Check Availability → date & time → back here with the price → Book Now.
@@ -212,11 +215,44 @@ export default function CarDetailsScreen() {
     mainScrollRef.current?.scrollTo({ y, animated: true });
   };
 
-  // Show loading indicator if fleet is still loading and no real car is selected yet
+  // Show animated vehicle details skeleton if fleet is still loading and no real car is selected yet
   if ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && isFleetLoading) {
     return (
-      <View style={[styles.screen, { backgroundColor: p.page, justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={p.navy} />
+      <View style={[styles.screen, { backgroundColor: p.page }]}>
+        <View style={{ paddingTop: insets.top, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+          <Skeleton width={32} height={32} borderRadius={16} />
+          <View style={{ flex: 1, gap: 6 }}>
+            <Skeleton width="65%" height={16} borderRadius={4} />
+            <Skeleton width="45%" height={12} borderRadius={4} />
+          </View>
+          <Skeleton width={32} height={32} borderRadius={16} />
+          <Skeleton width={32} height={32} borderRadius={16} />
+        </View>
+
+        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
+          <View style={{ width: '100%', height: 212, borderRadius: 10, overflow: 'hidden' }}>
+            <AnimatedVehiclePlaceholder colors={p} isDark={isDarkMode} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+            {[1, 2, 3, 4, 5].map((i) => (
+              <View key={i} style={{ flex: 1, height: 42, borderRadius: 4, overflow: 'hidden' }}>
+                <AnimatedVehiclePlaceholder colors={p} isDark={isDarkMode} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={{ paddingHorizontal: 16, marginTop: 20, gap: 14 }}>
+          <Skeleton width="80%" height={22} borderRadius={6} />
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Skeleton width={90} height={24} borderRadius={12} />
+            <Skeleton width={110} height={24} borderRadius={12} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
+            <Skeleton width="48%" height={68} borderRadius={10} />
+            <Skeleton width="48%" height={68} borderRadius={10} />
+          </View>
+        </View>
       </View>
     );
   }

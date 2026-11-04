@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,7 +17,9 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { FaqList } from '@/components/vehicle/details/CarDetailsSections';
 import { PF } from '@/components/profile/ProfileParts';
 
-const DEFAULT_PLAY_STORE_BASE = 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
+const DEFAULT_STORE_BASE = Platform.OS === 'ios'
+  ? 'https://mysawari.app'
+  : 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
 const PURPLE = '#6152D8';
 
 /** Light rays fanning out from below the avatars (design hero). */
@@ -63,7 +65,7 @@ export default function ReferEarnScreen() {
   }, [isAuthenticated, customer.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const code = customer.referralCode || '';
-  const rawBaseUrl = (config?.referralShareUrl || DEFAULT_PLAY_STORE_BASE).trim();
+  const rawBaseUrl = (config?.referralShareUrl || DEFAULT_STORE_BASE).trim();
 
   // Dynamically format link: handles Google Play Store referrer format or standard URL query format
   const link = useMemo(() => {

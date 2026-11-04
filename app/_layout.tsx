@@ -121,25 +121,20 @@ function RootLayoutNav() {
           screenOptions={{
             headerBackTitle: 'Back',
             headerShown: false,
-            animation: 'slide_from_right',
+            animation: 'flip',
+            presentation: 'modal',
             contentStyle: { backgroundColor: colors.background },
           }}
         >
-          {/* Modal routes slide up; native stack automatically reverses transitions on back. */}
-          <Stack.Screen name="planner" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="location" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="return-location" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="driver-option" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="driver-charges" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="payment-error" options={{ presentation: 'modal' }} />
+          {/* Native stack reverses the flip automatically on back. */}
+          <Stack.Screen name="planner" />
+          <Stack.Screen name="location" />
+          <Stack.Screen name="return-location" />
+          <Stack.Screen name="driver-option" />
+          <Stack.Screen name="driver-charges" />
+          <Stack.Screen name="payment-error" />
           <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
           <Stack.Screen name="payment-processing" options={{ gestureEnabled: false }} />
-          {/* Flow-specific transitions. Native stack reverses each animation on back. */}
-          <Stack.Screen name="search" options={{ animation: 'fade_from_bottom' }} />
-          {/* Native Expo Router does not provide shared-element or combined fade + scale transitions. */}
-          <Stack.Screen name="car-details" options={{ animation: 'none' }} />
-          <Stack.Screen name="booking" options={{ animation: 'slide_from_bottom' }} />
-          <Stack.Screen name="payment" options={{ animation: 'fade_from_bottom' }} />
         </Stack>
         {showBottomNavigation && <BottomNavigation />}
       </View>

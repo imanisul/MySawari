@@ -1,3 +1,10 @@
 node_modules/
 mysawari_customer_backend/
+build-artifacts/
+dist/
+web-build/
+.expo/
+graphify-out/
+docs/
 .claude/
+.git/

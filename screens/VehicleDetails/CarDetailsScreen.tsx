@@ -26,6 +26,7 @@ import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 
 import { ActivityAPI } from '@/services/api/activity';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
+import Reanimated, { FadeInDown, FadeOutUp } from 'react-native-reanimated';
 
 // Layout follows the Figma "Car Detail Page" frame (My Sawari Customer App V-1, node 852-7608).
 type SectionKey = 'overview' | 'specification' | 'benefits' | 'features' | 'location';
@@ -234,8 +235,13 @@ export default function CarDetailsScreen() {
   }
 
   return (
-    <BlurTargetProvider target={blurTarget}>
-      <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
+    <Reanimated.View
+      entering={FadeInDown.duration(320)}
+      exiting={FadeOutUp.duration(220)}
+      style={styles.screen}
+    >
+      <BlurTargetProvider target={blurTarget}>
+        <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
         <VehicleHeader title={title} tripLabel={tripLabel} onEditTrip={openDates} />
 
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
@@ -330,8 +336,9 @@ export default function CarDetailsScreen() {
           }
         }}
       />
-      </BlurHost>
-    </BlurTargetProvider>
+        </BlurHost>
+      </BlurTargetProvider>
+    </Reanimated.View>
   );
 }
 

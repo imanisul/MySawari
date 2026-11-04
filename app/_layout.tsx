@@ -134,6 +134,12 @@ function RootLayoutNav() {
           <Stack.Screen name="payment-error" options={{ presentation: 'modal' }} />
           <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
           <Stack.Screen name="payment-processing" options={{ gestureEnabled: false }} />
+          {/* Flow-specific transitions. Native stack reverses each animation on back. */}
+          <Stack.Screen name="search" options={{ animation: 'fade_from_bottom' }} />
+          {/* Native Expo Router does not provide shared-element or combined fade + scale transitions. */}
+          <Stack.Screen name="car-details" options={{ animation: 'none' }} />
+          <Stack.Screen name="booking" options={{ animation: 'slide_from_bottom' }} />
+          <Stack.Screen name="payment" options={{ animation: 'fade_from_bottom' }} />
         </Stack>
         {showBottomNavigation && <BottomNavigation />}
       </View>

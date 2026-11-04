@@ -1797,6 +1797,25 @@ export const API = {
   },
 
   /**
+   * GET /api/auth/check-user?phone=...
+   * Fast check to see if user has an existing account (to skip privacy checkbox for returning customers)
+   */
+  async checkUser(mobile: string): Promise<boolean> {
+    try {
+      const clean = mobile.replace(/\D/g, '').slice(-10);
+      if (clean.length !== 10) return false;
+      const res = await timedFetch(`${BACKEND_URL}/auth/check-user?phone=${encodeURIComponent(clean)}`, {
+        method: 'GET',
+        headers: await withInstallId({ 'Content-Type': 'application/json' }),
+      }, 3000);
+      const data = await res.json();
+      return Boolean(data.data?.isExistingUser);
+    } catch {
+      return false;
+    }
+  },
+
+  /**
    * POST /api/auth/send-otp
    */
   async sendOtp(mobile: string, deviceId?: string) {
@@ -1813,7 +1832,8 @@ export const API = {
         message: data.message,
         isExistingUser: data.data?.isExistingUser,
         otpId: data.data?.otpId,
-        expiresInSec: data.data?.expiresInSec
+        expiresInSec: data.data?.expiresInSec,
+        otp: data.data?.otp,
       };
     } catch (e: any) {
       throw new Error(e.message);

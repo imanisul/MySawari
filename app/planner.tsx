@@ -1,6 +1,6 @@
 import React from 'react';
-import PlannerScreen from '@/screens/Home/PlannerScreen';
+import { Redirect } from 'expo-router';
 
 export default function Route() {
-  return <PlannerScreen />;
+  return <Redirect href="/" />;
 }

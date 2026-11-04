@@ -4,7 +4,7 @@ import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
-import { BottomNavigation, LoginBottomSheet } from '@/components';
+import { LoginBottomSheet } from '@/components';
 import { BlurHost, BlurTarget } from '@/components/common/BottomBlur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
@@ -116,7 +116,6 @@ export default function BookingsScreen() {
           <BookingSkeleton index={0} />
           <BookingSkeleton index={1} />
         </View>
-        <BottomNavigation />
       </View>
     );
   }
@@ -151,7 +150,6 @@ export default function BookingsScreen() {
           </Pressable>
         </View>
         <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
-        <BottomNavigation />
       </View>
     );
   }
@@ -224,8 +222,6 @@ export default function BookingsScreen() {
         </ScrollView>
       )}
      </BlurTarget>
-
-      <BottomNavigation />
 
       {/* Same sheets (and server calls) as Trip Details */}
       <ReviewModal trip={reviewTrip} onClose={() => { setReviewTrip(null); refetchReviews(); }} />

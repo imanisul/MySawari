@@ -27,7 +27,7 @@ import {
 import { Anton_400Regular } from '@expo-google-fonts/anton';
 import { PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold, PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans';
 import { Feather, FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { Stack, DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { Stack, DarkTheme, DefaultTheme, ThemeProvider, usePathname } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { RewardCardGate } from '@/components/rewards/RewardCardGate';
 import { StatusBar } from 'expo-status-bar';
@@ -40,6 +40,7 @@ import { PushNotificationHandler } from '@/components/notifications/PushNotifica
 import * as Location from 'expo-location';
 import { API } from '@/services/backend/api';
 import { handleDeepLinkReferralUrl } from '@/utils/referralLinkHandler';
+import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 
 // The native splash is the only splash. It stays up until the first usable screen is ready (see AppGate).
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -85,6 +86,8 @@ focusManager.setEventListener((handleFocus) => {
 function RootLayoutNav() {
   const colors = useColors();
   const { isDarkMode } = useSawari();
+  const pathname = usePathname();
+  const showBottomNavigation = ['/', '/explore', '/bookings', '/profile'].includes(pathname);
 
   // React Navigation's own NavigationContainer (which expo-router's <Stack> wraps) is never told about
   // our palette otherwise, so it silently falls back to its built-in DefaultTheme — whose `card` colour
@@ -112,22 +115,28 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={navTheme}>
-    {/* contentStyle: the screen behind a transition is the app background, never a blank white frame. */}
-    <Stack screenOptions={{ headerBackTitle: 'Back', headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-      {/* Screens with custom transitions / presentation options (other routes are auto-discovered by Expo Router) */}
-      <Stack.Screen name="index" options={{ animation: 'none' }} />
-      <Stack.Screen name="explore" options={{ animation: 'none' }} />
-      <Stack.Screen name="planner" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="location" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="return-location" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="driver-option" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="driver-charges" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="payment-error" options={{ presentation: 'modal' }} />
-      <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
-      <Stack.Screen name="payment-processing" options={{ gestureEnabled: false }} />
-      <Stack.Screen name="bookings" options={{ animation: 'none' }} />
-      <Stack.Screen name="profile" options={{ animation: 'none' }} />
-    </Stack>
+      <View style={{ flex: 1 }}>
+        {/* contentStyle: the screen behind a transition is the app background, never a blank white frame. */}
+        <Stack
+          screenOptions={{
+            headerBackTitle: 'Back',
+            headerShown: false,
+            animation: 'slide_from_right',
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
+          {/* Modal routes slide up; native stack automatically reverses transitions on back. */}
+          <Stack.Screen name="planner" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="location" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="return-location" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="driver-option" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="driver-charges" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="payment-error" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="confirmation" options={{ gestureEnabled: false }} />
+          <Stack.Screen name="payment-processing" options={{ gestureEnabled: false }} />
+        </Stack>
+        {showBottomNavigation && <BottomNavigation />}
+      </View>
     </ThemeProvider>
   );
 }

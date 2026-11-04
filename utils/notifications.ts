@@ -16,7 +16,6 @@ const mockNotifications = {
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 if (isExpoGo) {
-  if (__DEV__) console.warn('expo-notifications is mocked because it is not available in Expo Go SDK 53');
   Notifications = mockNotifications;
 } else {
   try {

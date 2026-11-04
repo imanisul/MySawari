@@ -3,7 +3,6 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { BlurTargetView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { BottomNavigation } from '../navigation/BottomNavigation';
 import { BlurHost } from './BottomBlur';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { BlurTargetProvider } from './BlurTargetContext';
@@ -51,7 +50,6 @@ export function Page({
           )}
         </BlurTargetView>
       </BlurTargetProvider>
-      {bottomNav && <BottomNavigation />}
     </BlurHost>
   );
 }

@@ -1115,7 +1115,7 @@ const styles = StyleSheet.create({
   // Figma "Contact Section": 361×66 border-box, padding 10/12/12, a 42px row.
   helpCard: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12, minHeight: 66 },
   helpTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
-  helpSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 6 },
+  helpSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16, marginTop: 2 },
   helpBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
   agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },

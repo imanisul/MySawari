@@ -221,8 +221,12 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 16,
     paddingTop: 16,
-    // Flat bar: no top line, shadow or blur above it.
+    // Figma "Sticky (Price Detail + CTA)": padding 16 16 8, 16 between the blocks, a 1px #E7EAF4 top edge and a soft
+    // navy lift (kept short; Figma's 52px offset smears into a grey band on a phone).
     gap: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E7EAF4',
+    boxShadow: '0px -4px 12px rgba(47, 62, 117, 0.06)',
   },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 40 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },

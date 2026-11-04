@@ -5,10 +5,10 @@ import {
   StyleSheet,
   Animated,
   Image,
-  Pressable,
   Easing,
   useWindowDimensions,
-  Platform,
+  StatusBar,
+  Pressable,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -50,12 +50,16 @@ const SLOW_LOAD_MS = 14000;
 
 export type SplashStep = { key: string; label: string; done: boolean };
 
+// MySawari signature brand color extracted directly from the logo mark
+const BRAND_LOGO_COLOR = '#323E71';
+
 /**
  * High-End Dynamic Flash Screen:
- *  - Displays "MySawari · Your ride, your way."
- *  - Default duration: exactly 4 seconds (4000ms), controllable dynamically from the Operation App.
- *  - Supports festive / occasion themes (Diwali, Bihu, New Year, Puja, etc.) configured via Operation App.
- *  - Responsive & adaptive layout across all mobile devices, tablets, and screen aspect ratios.
+ *  - Pure white background screen with MySawari logo and brand name.
+ *  - Text rendered in #323E71 (the exact signature color of the logo).
+ *  - Clean presentation: no loading spinner/bar, no skip button.
+ *  - 4-second duration (controllable dynamically from Operation App).
+ *  - Smooth fade-in and exit transitions, adapting across all device aspect ratios.
  */
 export function AnimatedSplash({
   isReady,
@@ -81,19 +85,17 @@ export function AnimatedSplash({
   const [config, setConfig] = useState<FlashScreenConfig>(DEFAULT_FLASH_SCREEN_CONFIG);
   const [brandDone, setBrandDone] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
-  const [skipWaiting, setSkipWaiting] = useState(false);
 
   // Animated values
   const overlayOpacity = useRef(new Animated.Value(1)).current;
   const brandOpacity = useRef(new Animated.Value(0)).current;
-  const logoScale = useRef(new Animated.Value(0.85)).current;
+  const logoScale = useRef(new Animated.Value(0.88)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const titleY = useRef(new Animated.Value(18)).current;
+  const titleY = useRef(new Animated.Value(16)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
-  const taglineY = useRef(new Animated.Value(18)).current;
+  const taglineY = useRef(new Animated.Value(16)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
   const occasionOpacity = useRef(new Animated.Value(0)).current;
-  const progressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Load cached config immediately on mount, then sync in background
@@ -161,18 +163,18 @@ export function AnimatedSplash({
       Animated.timing(occasionOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
     ]).start();
 
-    // Gentle pulse loop for the logo mark
+    // Subtle gentle pulse loop for the logo mark
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.03,
-          duration: 1200,
+          toValue: 1.025,
+          duration: 1300,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
-          toValue: 0.98,
-          duration: 1200,
+          toValue: 0.985,
+          duration: 1300,
           easing: Easing.inOut(Easing.quad),
           useNativeDriver: true,
         }),
@@ -180,15 +182,7 @@ export function AnimatedSplash({
     );
     pulseLoop.start();
 
-    // Progress bar fills over the configured duration
-    Animated.timing(progressAnim, {
-      toValue: 1,
-      duration: durationMs,
-      easing: Easing.linear,
-      useNativeDriver: false,
-    }).start();
-
-    // Timer completes after exactly durationMs
+    // Timer completes after exactly durationMs (default 4 seconds)
     const t = setTimeout(() => {
       setBrandDone(true);
     }, durationMs);
@@ -207,7 +201,7 @@ export function AnimatedSplash({
     return () => clearTimeout(t);
   }, [isDataReady, skipSplash, loadFailed]);
 
-  const canExit = (isReady && isDataReady) || skipWaiting || brandDone;
+  const canExit = (isReady && isDataReady) || brandDone;
 
   // Exit transition: when configured duration has played and app is ready
   useEffect(() => {
@@ -215,7 +209,7 @@ export function AnimatedSplash({
 
     Animated.timing(overlayOpacity, {
       toValue: 0,
-      duration: 450,
+      duration: 400,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
@@ -227,9 +221,7 @@ export function AnimatedSplash({
   // Responsive device metrics
   const isSmallDevice = windowWidth < 375;
   const isTablet = windowWidth >= 768;
-  const logoWidth = Math.min(windowWidth * (isTablet ? 0.35 : 0.62), 250);
-  const logoHeight = Math.round(logoWidth * 0.48);
-  const progressBarWidth = Math.min(windowWidth * 0.45, 160);
+  const logoSize = Math.min(windowWidth * (isTablet ? 0.3 : 0.44), 170);
 
   // Dynamic occasion content
   const isOccasionActive = config?.isOccasionActive && Boolean(config?.occasionName || config?.occasionBadge);
@@ -238,16 +230,17 @@ export function AnimatedSplash({
   const displayTagline = isOccasionActive && config?.occasionGreeting ? config.occasionGreeting : (config?.brandTagline || 'Your ride, your way.');
   const displaySubtext = isOccasionActive && config?.occasionSubtext ? config.occasionSubtext : null;
 
-  // Background gradient: fallback to premium deep royal navy
-  const activeGradients = (config?.gradientColors && config.gradientColors.length >= 2)
-    ? config.gradientColors
-    : ['#08142E', '#0A1F4F'];
-  const accentColor = config?.accentColor || '#F59E0B';
+  // Background is pure clean white as requested
+  const isCustomFestive = isOccasionActive && config?.gradientColors && config.gradientColors.length >= 2 && config.gradientColors[0] !== '#08142E';
+  const activeGradients = isCustomFestive ? config.gradientColors : ['#FFFFFF', '#FFFFFF'];
+  const brandTextColor = isCustomFestive ? (config?.primaryColor || BRAND_LOGO_COLOR) : BRAND_LOGO_COLOR;
+  const brandTaglineColor = isCustomFestive ? (config?.accentColor || BRAND_LOGO_COLOR) : BRAND_LOGO_COLOR;
+  const accentColor = config?.accentColor || BRAND_LOGO_COLOR;
 
   const showProblem = !isDataReady && (loadFailed || isSlow);
 
   return (
-    <View style={[styles.container, { backgroundColor: activeGradients[0] }]}>
+    <View style={styles.container}>
       {/* App renders underneath directly to prevent white blink on transition */}
       {children}
 
@@ -261,7 +254,10 @@ export function AnimatedSplash({
             },
           ]}
         >
-          {/* Background Gradient */}
+          {/* Status bar with dark icons for crisp readability on white screen */}
+          <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+
+          {/* Background Gradient / Solid White */}
           <LinearGradient
             colors={activeGradients as any}
             style={StyleSheet.absoluteFill}
@@ -269,61 +265,30 @@ export function AnimatedSplash({
             end={{ x: 0, y: 1 }}
           />
 
-          {/* Optional Occasion Poster Image with dark vignette */}
-          {config?.bgImageUrl ? (
+          {/* Optional Occasion Poster Image if active */}
+          {isCustomFestive && config?.bgImageUrl ? (
             <Image
               source={{ uri: config.bgImageUrl }}
               style={[
                 StyleSheet.absoluteFill,
-                { opacity: config.bgImageOpacity ?? 0.3 },
+                { opacity: config.bgImageOpacity ?? 0.25 },
               ]}
               resizeMode="cover"
             />
           ) : null}
 
-          {/* Optional Skip Button (Top Right) */}
-          {config?.showSkipButton !== false && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Skip intro"
-              onPress={() => {
-                setSkipWaiting(true);
-                Animated.timing(overlayOpacity, {
-                  toValue: 0,
-                  duration: 280,
-                  easing: Easing.out(Easing.cubic),
-                  useNativeDriver: true,
-                }).start(() => {
-                  markSplashGone();
-                  setIsAnimationComplete(true);
-                });
-              }}
-              style={({ pressed }) => [
-                styles.skipButton,
-                {
-                  top: Math.max(insets.top + 12, 18),
-                  borderColor: 'rgba(255, 255, 255, 0.28)',
-                },
-                pressed && { opacity: 0.65 },
-              ]}
-            >
-              <Text style={styles.skipButtonText}>Skip</Text>
-              <Feather name="chevron-right" size={13} color="#CBD5E1" />
-            </Pressable>
-          )}
-
-          {/* Safe Area Container */}
+          {/* Centered Brand Content */}
           <Animated.View
             style={[
               styles.centerContent,
               {
-                paddingTop: insets.top + 20,
-                paddingBottom: insets.bottom + 20,
+                paddingTop: insets.top + 24,
+                paddingBottom: insets.bottom + 24,
                 opacity: brandOpacity,
               },
             ]}
           >
-            {/* Occasion Badge (e.g. 🪔 Happy Diwali / 🌸 Rongali Bihu) */}
+            {/* Occasion Badge (if festive occasion active) */}
             {isOccasionActive && (
               <Animated.View
                 style={[
@@ -351,25 +316,26 @@ export function AnimatedSplash({
             >
               <Image
                 source={require('@/assets/images/MySawari_nobg.png')}
-                style={[styles.logoImage, { width: logoWidth, height: logoHeight }]}
+                style={[styles.logoImage, { width: logoSize, height: logoSize }]}
                 resizeMode="contain"
               />
             </Animated.View>
 
-            {/* Brand Title: MySawari */}
+            {/* Brand Title: MySawari - Text colored in exact logo color #323E71 */}
             {config?.showLogo !== false && (
               <Animated.View
                 style={{
                   opacity: titleOpacity,
                   transform: [{ translateY: titleY }],
-                  marginTop: isSmallDevice ? 4 : 8,
+                  marginTop: isSmallDevice ? 10 : 14,
                 }}
               >
                 <Text
                   style={[
                     styles.titleText,
                     {
-                      fontSize: isSmallDevice ? 26 : isTablet ? 38 : 32,
+                      fontSize: isSmallDevice ? 28 : isTablet ? 38 : 32,
+                      color: brandTextColor,
                     },
                   ]}
                   numberOfLines={1}
@@ -379,13 +345,13 @@ export function AnimatedSplash({
               </Animated.View>
             )}
 
-            {/* Tagline: Your ride, your way. */}
+            {/* Tagline: Your ride, your way. - Text colored in logo tone */}
             {config?.showTagline !== false && (
               <Animated.View
                 style={{
                   opacity: taglineOpacity,
                   transform: [{ translateY: taglineY }],
-                  marginTop: isSmallDevice ? 4 : 8,
+                  marginTop: isSmallDevice ? 6 : 8,
                   paddingHorizontal: 24,
                 }}
               >
@@ -394,6 +360,7 @@ export function AnimatedSplash({
                     styles.taglineText,
                     {
                       fontSize: isSmallDevice ? 13 : isTablet ? 17 : 15,
+                      color: brandTaglineColor,
                     },
                   ]}
                   numberOfLines={2}
@@ -403,39 +370,13 @@ export function AnimatedSplash({
               </Animated.View>
             )}
 
-            {/* Occasion Subtext (e.g. Special festive discount) */}
+            {/* Occasion Subtext (if active) */}
             {displaySubtext && (
-              <Animated.View style={{ opacity: occasionOpacity, marginTop: 6, paddingHorizontal: 28 }}>
+              <Animated.View style={{ opacity: occasionOpacity, marginTop: 8, paddingHorizontal: 28 }}>
                 <Text style={[styles.occasionSubtext, { color: accentColor }]}>
                   {displaySubtext}
                 </Text>
               </Animated.View>
-            )}
-
-            {/* Dynamic Progress Indicator Bar (lasting configured duration) */}
-            {config?.showProgressBar !== false && (
-              <View
-                style={[
-                  styles.progressBarTrack,
-                  {
-                    width: progressBarWidth,
-                    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-                  },
-                ]}
-              >
-                <Animated.View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      backgroundColor: accentColor,
-                      width: progressAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0, progressBarWidth],
-                      }),
-                    },
-                  ]}
-                />
-              </View>
             )}
 
             {/* Fallback actions if connection is slow */}
@@ -448,26 +389,27 @@ export function AnimatedSplash({
                     onPress={onRetry}
                     style={({ pressed }) => [
                       styles.actionBtn,
-                      { backgroundColor: accentColor },
                       pressed && { opacity: 0.75 },
                     ]}
                   >
-                    <Feather name="refresh-cw" size={14} color="#08142E" />
-                    <Text style={[styles.actionBtnText, { color: '#08142E' }]}>Retry</Text>
+                    <Feather name="refresh-cw" size={14} color="#323E71" />
+                    <Text style={[styles.actionBtnText, { color: '#323E71' }]}>Retry</Text>
                   </Pressable>
                 )}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Continue"
-                  onPress={() => setSkipWaiting(true)}
+                  onPress={() => {
+                    markSplashGone();
+                    setIsAnimationComplete(true);
+                  }}
                   style={({ pressed }) => [
                     styles.actionBtn,
-                    { borderColor: 'rgba(255, 255, 255, 0.4)', borderWidth: 1 },
                     pressed && { opacity: 0.75 },
                   ]}
                 >
-                  <Text style={[styles.actionBtnText, { color: '#FFFFFF' }]}>Continue</Text>
-                  <Feather name="arrow-right" size={14} color="#FFFFFF" />
+                  <Text style={[styles.actionBtnText, { color: '#323E71' }]}>Continue</Text>
+                  <Feather name="arrow-right" size={14} color="#323E71" />
                 </Pressable>
               </View>
             )}
@@ -481,29 +423,12 @@ export function AnimatedSplash({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   overlay: {
     ...StyleSheet.absoluteFill,
+    backgroundColor: '#FFFFFF',
     zIndex: 99999,
-  },
-  skipButton: {
-    position: 'absolute',
-    right: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0, 0, 0, 0.42)',
-    borderWidth: 1,
-    zIndex: 100000,
-  },
-  skipButtonText: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 12,
-    color: '#E2E8F0',
-    letterSpacing: 0.3,
   },
   centerContent: {
     flex: 1,
@@ -519,7 +444,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1.2,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: '#F8FAFC',
     marginBottom: 16,
   },
   occasionBadgeText: {
@@ -529,25 +454,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   logoImage: {
-    maxWidth: 260,
+    maxWidth: 200,
   },
   titleText: {
     fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: -0.6,
+    color: BRAND_LOGO_COLOR,
+    letterSpacing: -0.5,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
   },
   taglineText: {
     fontFamily: 'Inter_500Medium',
-    color: '#CBD5E1',
-    letterSpacing: 0.4,
+    color: BRAND_LOGO_COLOR,
+    opacity: 0.85,
+    letterSpacing: 0.3,
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
   },
   occasionSubtext: {
     fontFamily: 'Inter_500Medium',
@@ -556,20 +476,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 16,
   },
-  progressBarTrack: {
-    height: 3,
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginTop: 24,
-  },
-  progressBarFill: {
-    height: 3,
-    borderRadius: 2,
-  },
   troubleActions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 24,
+    marginTop: 28,
   },
   actionBtn: {
     flexDirection: 'row',
@@ -578,7 +488,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   actionBtnText: {
     fontFamily: 'Inter_600SemiBold',

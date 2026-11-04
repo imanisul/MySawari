@@ -13,13 +13,14 @@ import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, ca
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet } from '@/components';
 import { API } from '@/services/backend/api';
+import { isPastSearch, RecentSearch } from '@/utils/recentSearches';
 import { useVehicles } from '@/hooks/useVehicles';
-import { recentlyViewedQueryOptions } from '@/hooks/useHomeData';
+import { recentlyViewedQueryOptions, recentSearchesQueryOptions } from '@/hooks/useHomeData';
 import { Reveal } from '@/components/common/Reveal';
 import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
-  HomeHero, ReferStrip, HomeSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
+  HomeHero, ReferStrip, HomeSearchCard, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
   DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HOME_PURPLE,
 } from '@/components/home/HomeSections';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
@@ -190,6 +191,21 @@ export default function HomeScreen() {
     return byAvailability(top).slice(0, 8);
   }, [fetchedVehicles, typeName, withAvail]);
 
+  // Recent Searches: the trips this customer searched (where, dates, time), newest first; past dates are dropped.
+  const { data: savedSearches = [] } = useQuery(recentSearchesQueryOptions(recentKey));
+  useFocusEffect(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['recentSearches', recentKey || 'guest'] });
+  }, [queryClient, recentKey]));
+  const tripSearches = useMemo(() => savedSearches.filter((t) => !isPastSearch(t)), [savedSearches]);
+  const openTripSearch = useCallback((t: RecentSearch) => {
+    setBookingSource('home');
+    setVehicleType(t.vehicleType);
+    setDropoff(t.dropoff);
+    setDates(t.dateRange, t.duration);
+    setTimes(t.pickupTime, t.returnTime);
+    router.push('/explore');
+  }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, router]);
+
   const openPick = useCallback((item: any) => {
     selectCar(item);
     setBookingSource('home');
@@ -267,7 +283,7 @@ export default function HomeScreen() {
     });
   }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 
-  const sections = useMemo(() => ['header', 'recent', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
+  const sections = useMemo(() => ['header', 'searches', 'recent', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
     let content: React.ReactNode = null;
@@ -295,7 +311,7 @@ export default function HomeScreen() {
         if (!recent.length) break;
         content = (
           <>
-            <HomeSectionTitle title="Recent Searches" />
+            <HomeSectionTitle title="Recently Viewed" />
             <FlatList
               data={recent}
               horizontal
@@ -321,6 +337,25 @@ export default function HomeScreen() {
               keyExtractor={(v) => `pick-${v.id}`}
               // The real day rate (vehicle pricePerDay), not a member price: no membership passed to the card.
               renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={[styles.row, { gap: 8 }]}
+              snapToInterval={254}
+              decelerationRate="fast"
+              removeClippedSubviews={false}
+            />
+          </>
+        );
+        break;
+      case 'searches':
+        if (!tripSearches.length) break;
+        content = (
+          <>
+            <HomeSectionTitle title="Recent Searches" />
+            <FlatList
+              data={tripSearches}
+              horizontal
+              keyExtractor={(t) => `trip-${t.id}`}
+              renderItem={({ item: t }) => <TripSearchCard search={t} onPress={() => openTripSearch(t)} />}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.row, { gap: 8 }]}
               snapToInterval={254}
@@ -384,7 +419,7 @@ export default function HomeScreen() {
     }
     if (!content) return null;
     return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, recent, openPick, milestone, journey, claimable, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, openPick, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>

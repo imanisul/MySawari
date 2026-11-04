@@ -1,8 +1,8 @@
 {
   "app.json": {
-    "mtime": 1793709388.365294,
-    "seen": 1793709873.609109,
-    "ast_hash": "03f435b111355b0e50ae4db40fa36fdb",
+    "mtime": 1793710043.7675333,
+    "seen": 1793712670.641257,
+    "ast_hash": "a498458a72f553b988eb42b2cb73f0f3",
     "semantic_hash": ""
   },
   "app/+html.tsx": {
@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "components/common/AnimatedSplash.tsx": {
-    "mtime": 1793709303.4119823,
-    "seen": 1793709873.609183,
-    "ast_hash": "2abe3243433b4a9421b3d87a903f7ee0",
+    "mtime": 1793712755.51722,
+    "seen": 1793714156.940365,
+    "ast_hash": "52597b84a0278e5a1a14abbb77964522",
     "semantic_hash": ""
   },
   "components/common/CategoryTabs.tsx": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "components/home/HomeSections.tsx": {
-    "mtime": 1793704947.1813767,
-    "seen": 1793708593.278503,
-    "ast_hash": "cfc0a8b8906d7ffa1f23b7fa5cfdc1ae",
+    "mtime": 1793716215.6669521,
+    "seen": 1793716228.4440992,
+    "ast_hash": "16853f9a182afe3098532bc639b60844",
     "semantic_hash": ""
   },
   "components/index.ts": {
@@ -570,9 +570,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/CarDetailsSections.tsx": {
-    "mtime": 1793709388.3659394,
-    "seen": 1793709873.609223,
-    "ast_hash": "0451995f24854e086838ab65d107cf7c",
+    "mtime": 1793712658.4067402,
+    "seen": 1793712670.641384,
+    "ast_hash": "c8a1a4c457c237a6729122ac4b7da464",
     "semantic_hash": ""
   },
   "components/vehicle/details/DetailsTabs.tsx": {
@@ -594,9 +594,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/StickyBookingBar.tsx": {
-    "mtime": 1793709971.070439,
-    "seen": 1793709984.450621,
-    "ast_hash": "8dbd3f2584cfdeb5244fea254e11bb30",
+    "mtime": 1793712658.4063156,
+    "seen": 1793712670.641388,
+    "ast_hash": "04b334e5b120fccdd5ce68af2600b545",
     "semantic_hash": ""
   },
   "components/vehicle/details/SubPageHeader.tsx": {
@@ -810,9 +810,9 @@
     "semantic_hash": ""
   },
   "screens/Home/HomeScreen.tsx": {
-    "mtime": 1793704044.0118132,
-    "seen": 1793704061.552307,
-    "ast_hash": "74147d72de7f85304a39a8c55d632f15",
+    "mtime": 1793716193.475231,
+    "seen": 1793716228.444156,
+    "ast_hash": "c929eacc6fbb9aefee5c9aa85d908e2b",
     "semantic_hash": ""
   },
   "screens/Home/LocationScreen.tsx": {
@@ -2358,9 +2358,9 @@
     "semantic_hash": ""
   },
   "services/api/flashScreen.ts": {
-    "mtime": 1793687278.5520267,
-    "seen": 1793689397.392713,
-    "ast_hash": "38855ee257c49a45026a2bffec4d347b",
+    "mtime": 1793712618.943526,
+    "seen": 1793712670.641452,
+    "ast_hash": "f8907792c19c42dd6dae576b156b86a6",
     "semantic_hash": ""
   },
   "hooks/queryPersistence.ts": {

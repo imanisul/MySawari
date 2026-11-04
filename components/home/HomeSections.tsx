@@ -13,6 +13,7 @@ import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { formatCurrency, memberDayPrice, type QuoteParams } from '@/services/backend/pricingEngine';
 import { offersQueryOptions, isOfferLive } from '@/services/api/offers';
+import type { RecentSearch } from '@/utils/recentSearches';
 import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
 import LowestPriceIcon from '@/assets/images/benefit_lowest_price.svg';
@@ -520,6 +521,30 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
   );
 }
 
+/** A trip the customer searched (where, which dates, what time), MakeMyTrip style: tap to search it again. */
+export function TripSearchCard({ search, onPress }: { search: RecentSearch; onPress: () => void }) {
+  const p = useDetailsPalette();
+  const time = search.pickupTime && search.returnTime ? `${search.pickupTime} – ${search.returnTime}` : '';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Search ${search.vehicleType}s in ${search.dropoff.name}, ${search.dateRange}`}
+      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      style={({ pressed }) => [styles.tripCard, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.85 }]}
+    >
+      <View style={[styles.tripIcon, { backgroundColor: p.chipBg }]}>
+        <Feather name="clock" size={15} color={p.navy} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1}>{search.dropoff.name}</Text>
+        <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{search.dateRange}{time ? ` · ${time}` : ''}</Text>
+        <Text style={[styles.tripType, { color: p.navy }]}>{search.vehicleType === 'bike' ? 'Bikes' : 'Cars'}</Text>
+      </View>
+      <Feather name="chevron-right" size={16} color={p.muted} />
+    </Pressable>
+  );
+}
+
 export function HomeSectionTitle({ title }: { title: string }) {
   const p = useDetailsPalette();
   return <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">{title}</Text>;
@@ -533,7 +558,7 @@ const cardDate = (label: string) => label.replace(/^(\d{1,2}) ([A-Za-z]{3})[a-z]
 // Figma "Success" green for the availability line on the cards.
 const AVAILABLE_GREEN = '#339F79';
 
-export function TopPickCard({ car, membership, onPress }: { car: Car & { availability?: any; isAvailable?: boolean }; membership?: QuoteParams['membership']; onPress: () => void }) {
+export function TopPickCard({ car, membership, onPress }: { car: Car & { availability?: any; isAvailable?: boolean; viewedContext?: any }; membership?: QuoteParams['membership']; onPress: () => void }) {
   const p = useDetailsPalette();
   const images: ImageSourcePropType[] = (car as any).images?.length ? (car as any).images : [car.image];
   // Top picks show the first photo only: no auto-slide (the design's card is static).
@@ -547,6 +572,12 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
   // Members see their price with the day rate struck through; everyone else sees the day rate.
   const memberPrice = memberDayPrice(car.perDay, membership);
   const meta = [car.transmission, car.fuel, car.type === 'Bike' ? null : (/seat/i.test(car.seats) ? car.seats : `${car.seats} Seater`)].filter(Boolean) as string[];
+
+  // A recent search carries the trip it was made for: where, which dates and what time (only what was actually chosen).
+  const ctx = car.viewedContext;
+  const tripWhere = ctx?.dropoff?.name as string | undefined;
+  const tripWhen = ctx?.dateRange && !/select/i.test(ctx.dateRange) ? (ctx.dateRange as string) : '';
+  const tripTime = tripWhen && ctx?.pickupTime && ctx?.returnTime ? `${ctx.pickupTime} – ${ctx.returnTime}` : '';
 
   return (
     <Pressable
@@ -596,6 +627,22 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
             {available ? 'Available now' : availability.nextAvailableFrom ? `Available on ${cardDate(availability.nextAvailableFrom)}` : availability.headline}
           </Text>
         </View>
+        {!!(tripWhere || tripWhen) && (
+          <View style={[styles.pickTrip, { borderTopColor: p.deliveryBorder }]}>
+            {!!tripWhere && (
+              <View style={styles.pickTripRow}>
+                <Feather name="map-pin" size={11} color={p.navy} />
+                <Text style={[styles.pickTripText, { color: p.fg }]} numberOfLines={1}>{tripWhere}</Text>
+              </View>
+            )}
+            {!!tripWhen && (
+              <View style={styles.pickTripRow}>
+                <Feather name="calendar" size={11} color={p.navy} />
+                <Text style={[styles.pickTripText, { color: p.muted }]} numberOfLines={1}>{tripWhen}{tripTime ? ` · ${tripTime}` : ''}</Text>
+              </View>
+            )}
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -1009,6 +1056,16 @@ const styles = StyleSheet.create({
 
   // Figma sections each pad 8 top and bottom, so blocks sit 16 apart; title to content is 12.
   sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: 16, marginBottom: 12, paddingHorizontal: 16 },
+
+  tripCard: { width: 246, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12 },
+  tripIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  tripWhere: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  tripWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
+  tripType: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, lineHeight: 15, marginTop: 2 },
+
+  pickTrip: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, gap: 4 },
+  pickTripRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pickTripText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
 
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },

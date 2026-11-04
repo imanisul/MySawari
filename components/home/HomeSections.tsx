@@ -521,22 +521,61 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
   );
 }
 
-/** A trip the customer searched (where, which dates, what time), MakeMyTrip style: tap to search it again. */
+/** A trip the customer searched (where, which dates, what time), MakeMyTrip style: tap to resume or search again. */
 export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSearch; onPress: () => void; onRemove?: () => void }) {
   const p = useDetailsPalette();
   const time = search.pickupTime && search.returnTime ? `${search.pickupTime} – ${search.returnTime}` : '';
+
+  const isCheckout = search.stage === 'payment' || search.stage === 'booking';
+  const stageBadgeText = search.stage === 'payment' ? 'Payment'
+                       : search.stage === 'booking' ? 'Booking'
+                       : search.stage === 'car' ? 'Selected'
+                       : null;
+  const stageColor = search.stage === 'payment' ? '#10B981'
+                   : search.stage === 'booking' ? '#3B82F6'
+                   : search.stage === 'car' ? '#8B5CF6'
+                   : p.navy;
+
+  const iconName = search.stage === 'payment' ? 'credit-card'
+                 : search.stage === 'booking' ? 'check-circle'
+                 : search.stage === 'car' ? 'truck'
+                 : 'map-pin';
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Search ${search.vehicleType}s in ${search.dropoff.name}, ${search.dateRange}`}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      style={({ pressed }) => [styles.tripCard, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.85 }]}
+      style={({ pressed }) => [
+        styles.tripCard,
+        { backgroundColor: p.page, borderColor: isCheckout ? stageColor : p.deliveryBorder },
+        pressed && { opacity: 0.85 },
+      ]}
     >
-      <View style={[styles.tripIcon, { backgroundColor: p.chipBg }]}>
-        <Feather name="map-pin" size={15} color={p.navy} />
+      <View style={[styles.tripIcon, { backgroundColor: search.stage && search.stage !== 'results' ? `${stageColor}15` : p.chipBg }]}>
+        <Feather name={iconName as any} size={15} color={stageColor} />
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1}>{search.dropoff.name}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+          <Text style={[styles.tripWhere, { color: p.fg, flex: 1 }]} numberOfLines={1}>
+            {search.carName ? search.carName : search.dropoff.name}
+          </Text>
+          {stageBadgeText && (
+            <View style={{ backgroundColor: `${stageColor}1A`, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
+              <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, color: stageColor }}>
+                {stageBadgeText}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {!!search.carName && (
+          <View style={styles.tripLine}>
+            <Feather name="map-pin" size={11} color={p.muted} />
+            <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{search.dropoff.name}</Text>
+          </View>
+        )}
+
         <View style={styles.tripLine}>
           <Feather name="calendar" size={11} color={p.muted} />
           <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{search.dateRange}</Text>
@@ -547,7 +586,14 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
             <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{time}</Text>
           </View>
         )}
-        <Text style={[styles.tripType, { color: p.navy }]}>{search.vehicleType === 'bike' ? 'Bikes' : 'Cars'}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+          <Text style={[styles.tripType, { color: p.navy }]}>{search.vehicleType === 'bike' ? 'Bikes' : 'Cars'}</Text>
+          {search.stage && search.stage !== 'results' && (
+            <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: stageColor }}>
+              • Resume trip
+            </Text>
+          )}
+        </View>
       </View>
       {onRemove ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Remove this search" onPress={onRemove} hitSlop={10}>

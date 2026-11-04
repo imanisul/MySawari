@@ -24,7 +24,7 @@ import { BlurHost } from '@/components/common/BottomBlur';
 import { BlurTargetView } from 'expo-blur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 import { Skeleton } from '@/components/common/Skeleton';
-import { LoadingImage } from '@/components/common/LoadingImage';
+import { LoadingImage, AnimatedVehiclePlaceholder } from '@/components/common/LoadingImage';
 
 import { ActivityAPI } from '@/services/api/activity';
 import { addRecentlyViewed } from '@/utils/recentlyViewed';
@@ -50,7 +50,7 @@ export default function CarDetailsScreen() {
   const { id: paramCarId, vehicleId: paramVehicleId } = useLocalSearchParams<{ id?: string; vehicleId?: string }>();
   const targetCarId = paramCarId || paramVehicleId;
   const { data: fetchedVehicles = [], isLoading: isFleetLoading } = useVehicles();
-  const { selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates } = useSawari();
+  const { selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates, isDarkMode } = useSawari();
 
   // If a specific car ID was passed or selectedCar is the dummy placeholder, select the real vehicle
   useEffect(() => {
@@ -230,12 +230,12 @@ export default function CarDetailsScreen() {
 
         <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
           <View style={{ width: '100%', height: 212, borderRadius: 10, overflow: 'hidden' }}>
-            <LoadingImage source="" style={StyleSheet.absoluteFill} />
+            <AnimatedVehiclePlaceholder colors={p} isDark={isDarkMode} />
           </View>
           <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
             {[1, 2, 3, 4, 5].map((i) => (
               <View key={i} style={{ flex: 1, height: 42, borderRadius: 4, overflow: 'hidden' }}>
-                <LoadingImage source="" style={StyleSheet.absoluteFill} />
+                <AnimatedVehiclePlaceholder colors={p} isDark={isDarkMode} />
               </View>
             ))}
           </View>

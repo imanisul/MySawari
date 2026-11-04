@@ -49,7 +49,7 @@ function optimizeCloudinaryUrl(source: any): any {
 /**
  * Animated shimmer skeleton with a pulsing vehicle silhouette for loading vehicle images.
  */
-function AnimatedVehiclePlaceholder({ colors, isDark }: { colors: any; isDark: boolean }) {
+export function AnimatedVehiclePlaceholder({ colors, isDark }: { colors: any; isDark: boolean }) {
   const [layout, setLayout] = useState({ width: 0, height: 0 });
   const shimmerAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
@@ -169,9 +169,25 @@ function AnimatedVehiclePlaceholder({ colors, isDark }: { colors: any; isDark: b
   );
 }
 
+export function isValidImageSource(source: any): boolean {
+  if (!source) return false;
+  if (typeof source === 'number') return true;
+  if (typeof source === 'string') return source.trim().length > 0;
+  if (typeof source === 'object') {
+    if (typeof source.uri === 'string') return source.uri.trim().length > 0;
+  }
+  return false;
+}
+
 export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageProps) {
   const colors = useColors();
   const { isDarkMode } = useSawari();
+  const valid = isValidImageSource(props.source);
+
+  if (!valid) {
+    return <AnimatedVehiclePlaceholder colors={colors} isDark={isDarkMode} />;
+  }
+
   const srcKey = getSourceKey(props.source);
   const isLocal = typeof props.source === 'number';
   const isAlreadyLoaded = isLocal || (srcKey ? loadedUris.has(srcKey) : false);

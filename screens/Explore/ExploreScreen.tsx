@@ -35,7 +35,7 @@ export default function ExploreScreen() {
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
   // Cars or bikes, as chosen on Home.
-  const { setBookingSource, vehicleType: homeType, setVehicleType } = useSawari();
+  const { setBookingSource, vehicleType: homeType } = useSawari();
   const isBike = homeType === 'bike';
   const CHIPS = chipsFor(isBike);
 
@@ -145,22 +145,6 @@ export default function ExploreScreen() {
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        {/* Cars / Bikes: the list below, its quick filters and the Filter sheet all follow this. */}
-        {(['car', 'bike'] as const).map((t) => {
-          const on = homeType === t;
-          return (
-            <Pressable
-              key={t}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              onPress={() => { if (!on) { Haptics.selectionAsync(); setVehicleType(t); } }}
-              style={[styles.chip, { borderColor: on ? p.navy : p.segBorder, backgroundColor: on ? p.navy : p.page }]}
-            >
-              <Text style={[styles.chipText, { color: on ? p.onNavy : p.muted }]}>{t === 'car' ? 'Cars' : 'Bikes'}</Text>
-            </Pressable>
-          );
-        })}
-        <View style={[styles.chipDivider, { backgroundColor: p.segBorder }]} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Filter${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
@@ -286,7 +270,6 @@ const styles = StyleSheet.create({
   chip: { height: 36, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4 },
   filterChipFixed: { width: 70 },
-  chipDivider: { width: 1, height: 24, alignSelf: 'center' },
   chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   empty: { borderWidth: 1, borderRadius: 12, marginHorizontal: 16, marginTop: 8, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, marginTop: 6 },

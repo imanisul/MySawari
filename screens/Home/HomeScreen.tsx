@@ -223,11 +223,36 @@ export default function HomeScreen() {
   const openTripSearch = useCallback((t: RecentSearch) => {
     setBookingSource('home');
     setVehicleType(t.vehicleType);
-    setDropoff(t.dropoff);
-    setDates(t.dateRange, t.duration);
-    setTimes(t.pickupTime, t.returnTime);
-    router.push('/explore');
-  }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, router]);
+    if (t.dropoff) setDropoff(t.dropoff);
+    if (t.dateRange && t.duration) setDates(t.dateRange, t.duration);
+    if (t.pickupTime && t.returnTime) setTimes(t.pickupTime, t.returnTime);
+
+    if (t.trip) {
+      if (t.trip.mode) setMode(t.trip.mode);
+      if (typeof t.trip.isDeliveryRequested === 'boolean') setIsDeliveryRequested(t.trip.isDeliveryRequested);
+      if (t.trip.deliveryMode) setDeliveryMode(t.trip.deliveryMode);
+      setPickup(t.trip.pickup || null);
+      setReturnAddress(t.trip.returnAddress || null);
+    }
+
+    if (t.carId) {
+      const found = fetchedVehicles.find((v) => String(v.id) === String(t.carId)) || cars.find((v) => String(v.id) === String(t.carId));
+      if (found) {
+        selectCar(found);
+      }
+    }
+
+    const target = t.stage === 'payment' ? '/payment'
+                 : t.stage === 'booking' ? '/booking'
+                 : t.stage === 'car' ? '/car-details'
+                 : '/explore';
+
+    if (target === '/explore' || target === '/car-details') {
+      router.push(target as any);
+    } else {
+      requireLogin(() => router.push(target as any));
+    }
+  }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress, fetchedVehicles, selectCar, requireLogin, router]);
 
   const openPick = useCallback((item: any) => {
     selectCar(item);

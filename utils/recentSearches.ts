@@ -40,33 +40,33 @@ export async function getRecentSearches(userId?: string | null): Promise<RecentS
   try {
     const raw = await AsyncStorage.getItem(keyFor(userId));
     const list = raw ? JSON.parse(raw) : [];
-    return Array.isArray(list) ? list.filter((s) => s && s.dropoff?.name && s.dateRange) : [];
+    return Array.isArray(list) ? list.filter((s) => s && s.dropoff?.name) : [];
   } catch {
     return [];
   }
 }
 
 export const searchIdFor = (dropoffName: string, dateRange: string, vehicleType: string) =>
-  `${dropoffName.toLowerCase()}|${dateRange}|${vehicleType}`;
+  `${(dropoffName || '').toLowerCase()}|${dateRange || ''}|${vehicleType || ''}`;
 
 type SearchBase = Omit<RecentSearch, 'id' | 'savedAt' | 'stage' | 'carId' | 'carName' | 'trip'>;
 
 export async function saveRecentSearch(userId: string | null | undefined, s: SearchBase): Promise<RecentSearch[]> {
-  const id = searchIdFor(s.dropoff.name, s.dateRange, s.vehicleType);
+  if (!s.dropoff?.name) return await getRecentSearches(userId);
+  const effectiveRange = (!s.dateRange || s.dateRange.includes('Select')) ? 'Upcoming Trip' : s.dateRange;
+  const id = searchIdFor(s.dropoff.name, effectiveRange, s.vehicleType);
   const list = await getRecentSearches(userId);
   const prev = list.find((x) => x.id === id);
   // A repeated search keeps how far that trip got (car chosen, checkout reached).
-  const entry: RecentSearch = { ...prev, ...s, id, savedAt: Date.now(), stage: prev?.stage || 'results' };
+  const entry: RecentSearch = { ...prev, ...s, dateRange: effectiveRange, id, savedAt: Date.now(), stage: prev?.stage || 'results' };
   const next = [entry, ...list.filter((x) => x.id !== id)].slice(0, MAX_RECENT);
   try { await AsyncStorage.setItem(keyFor(userId), JSON.stringify(next)); } catch {}
   return next;
 }
 
 /**
- * Records the page an already-searched trip has reached (results → car → booking → payment). The most recent
- * page wins, so Home resumes exactly where the customer left. It never creates an entry: only an actual search
- * (the results page) does. It used to, from whatever destination and dates happened to be set — a Top Destination
- * tile tapped on Home, a car opened with leftover dates — and those showed up as searches nobody made.
+ * Records the page a trip has reached (results → car → booking → payment). The most recent
+ * page wins, so Home resumes exactly where the customer left.
  */
 export async function markSearchProgress(
   userId: string | null | undefined,
@@ -74,15 +74,20 @@ export async function markSearchProgress(
   stage: SearchStage,
   extra: { carId?: string; carName?: string; trip?: TripChoices } = {},
 ): Promise<void> {
-  if (!s.dropoff?.name || !s.dateRange || s.dateRange.includes('Select')) return;
-  const id = searchIdFor(s.dropoff.name, s.dateRange, s.vehicleType);
+  if (!s.dropoff?.name) return;
+  const effectiveRange = (!s.dateRange || s.dateRange.includes('Select')) ? 'Upcoming Trip' : s.dateRange;
+  const id = searchIdFor(s.dropoff.name, effectiveRange, s.vehicleType);
   const list = await getRecentSearches(userId);
   const prev = list.find((x) => x.id === id);
-  if (!prev) return;
   const entry: RecentSearch = {
-    ...prev, ...s, id, savedAt: Date.now(), stage,
-    carId: stage === 'results' ? undefined : extra.carId ?? prev?.carId,
-    carName: stage === 'results' ? undefined : extra.carName ?? prev?.carName,
+    ...prev,
+    ...s,
+    dateRange: effectiveRange,
+    id,
+    savedAt: Date.now(),
+    stage,
+    carId: stage === 'results' ? undefined : (extra.carId ?? prev?.carId),
+    carName: stage === 'results' ? undefined : (extra.carName ?? prev?.carName),
     trip: extra.trip ?? prev?.trip,
   };
   const next = [entry, ...list.filter((x) => x.id !== id)].slice(0, MAX_RECENT);
@@ -110,12 +115,17 @@ export async function adoptGuestSearches(userId: string): Promise<void> {
 
 /** Its start date has already gone by, so it can only be reused with new dates. */
 export function isPastSearch(s: RecentSearch): boolean {
+  if (!s.dateRange || s.dateRange === 'Upcoming Trip' || s.dateRange.includes('Select')) return false;
+  // If saved in the last 48 hours, keep it active so the customer can resume what they're actively working on.
+  if (s.savedAt && Date.now() - s.savedAt < 48 * 3600 * 1000) {
+    return false;
+  }
   const [start] = splitDateRange(s.dateRange);
-  // Labels carry no year ("12 Oct"): the trip is the first such date on/after the day it was searched.
+  if (!start) return false;
   const saved = new Date(s.savedAt || Date.now());
   const savedDay = Math.floor(Date.UTC(saved.getFullYear(), saved.getMonth(), saved.getDate()) / 86400000);
-  const sameYear = parseDayLabel(start ? `${start} ${saved.getFullYear()}` : null);
-  if (sameYear === null) return true;
+  const sameYear = parseDayLabel(`${start} ${saved.getFullYear()}`);
+  if (sameYear === null) return false;
   const day = sameYear >= savedDay ? sameYear : parseDayLabel(`${start} ${saved.getFullYear() + 1}`);
-  return day === null || day < todayDayNum();
+  return day !== null && day < todayDayNum();
 }

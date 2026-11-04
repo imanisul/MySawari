@@ -122,17 +122,21 @@ export function AnimatedSplash({
   // Load cached config immediately on mount, then sync in background
   useEffect(() => {
     let active = true;
-    getCachedFlashScreenConfig().then((cached) => {
-      if (active && cached) {
-        setConfig(cached);
-      }
-    });
+    getCachedFlashScreenConfig()
+      .then((cached) => {
+        if (active && cached) {
+          setConfig(cached);
+        }
+      })
+      .catch(() => {});
 
-    fetchRemoteFlashScreenConfig().then((fresh) => {
-      if (active && fresh) {
-        setConfig(fresh);
-      }
-    });
+    fetchRemoteFlashScreenConfig()
+      .then((fresh) => {
+        if (active && fresh) {
+          setConfig(fresh);
+        }
+      })
+      .catch(() => {});
 
     return () => {
       active = false;
@@ -320,6 +324,7 @@ export function AnimatedSplash({
               ]}
               contentFit="cover"
               autoplay
+              onError={() => {}}
             />
           ) : null}
 

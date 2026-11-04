@@ -374,10 +374,12 @@ export function DatesSheet() {
       });
     });
 
-    if (thenLocation === 'true' && dropoff?.name) {
+    if (thenLocation === 'true' && thenBook === 'true' && isAuthenticated) {
+      // Book Now: straight to payment, with or without a destination (the payment page has its own destination field).
+      router.replace('/booking');
+    } else if (thenLocation === 'true' && dropoff?.name) {
       // A destination is already set (shown, and changeable, in this page's own field): no second location page.
-      // On to payment (or back to the car when not signed in).
-      router.replace(thenBook === 'true' && isAuthenticated ? '/booking' : '/car-details');
+      router.replace('/car-details');
     } else if (thenLocation === 'true') {
       // Check Availability from a car: after the dates, the location page; choosing there returns to the car.
       router.replace({ pathname: '/dropoff', params: thenBook === 'true' ? { forSpecificCar: 'true', thenBook: 'true' } : { forSpecificCar: 'true' } });

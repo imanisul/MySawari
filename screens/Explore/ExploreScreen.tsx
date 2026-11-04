@@ -35,11 +35,17 @@ export default function ExploreScreen() {
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
   // Cars or bikes, as chosen on Home.
-  const { setBookingSource, vehicleType: homeType } = useSawari();
+  const { setBookingSource, vehicleType: homeType, setDropoff, setDates, duration } = useSawari();
   const isBike = homeType === 'bike';
   const CHIPS = chipsFor(isBike);
 
-  useFocusEffect(useCallback(() => { setBookingSource('explore'); }, [setBookingSource]));
+  // Explore starts a trip from scratch: a location and dates left over from a search made on Home must not
+  // fill in the location and date pages when a car is booked from here.
+  useFocusEffect(useCallback(() => {
+    setBookingSource('explore');
+    setDropoff(null);
+    setDates('Select Dates', duration);
+  }, [setBookingSource, setDropoff, setDates])); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showSortSheet, setShowSortSheet] = useState(false);

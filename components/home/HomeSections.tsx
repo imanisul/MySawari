@@ -526,56 +526,19 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
   const p = useDetailsPalette();
   const time = search.pickupTime && search.returnTime ? `${search.pickupTime} – ${search.returnTime}` : '';
 
-  const isCheckout = search.stage === 'payment' || search.stage === 'booking';
-  const stageBadgeText = search.stage === 'payment' ? 'Payment'
-                       : search.stage === 'booking' ? 'Booking'
-                       : search.stage === 'car' ? 'Selected'
-                       : null;
-  const stageColor = search.stage === 'payment' ? '#10B981'
-                   : search.stage === 'booking' ? '#3B82F6'
-                   : search.stage === 'car' ? '#8B5CF6'
-                   : p.navy;
-
-  const iconName = search.stage === 'payment' ? 'credit-card'
-                 : search.stage === 'booking' ? 'check-circle'
-                 : search.stage === 'car' ? 'truck'
-                 : 'map-pin';
-
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Search ${search.vehicleType}s in ${search.dropoff.name}, ${search.dateRange}`}
+      accessibilityLabel={`Search in ${search.dropoff.name}, ${search.dateRange}`}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={({ pressed }) => [
         styles.tripCard,
-        { backgroundColor: p.page, borderColor: isCheckout ? stageColor : p.deliveryBorder },
+        { backgroundColor: p.page, borderColor: p.deliveryBorder },
         pressed && { opacity: 0.85 },
       ]}
     >
-      <View style={[styles.tripIcon, { backgroundColor: search.stage && search.stage !== 'results' ? `${stageColor}15` : p.chipBg }]}>
-        <Feather name={iconName as any} size={15} color={stageColor} />
-      </View>
       <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-          <Text style={[styles.tripWhere, { color: p.fg, flex: 1 }]} numberOfLines={1}>
-            {search.carName ? search.carName : search.dropoff.name}
-          </Text>
-          {stageBadgeText && (
-            <View style={{ backgroundColor: `${stageColor}1A`, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5 }}>
-              <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, color: stageColor }}>
-                {stageBadgeText}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {!!search.carName && (
-          <View style={styles.tripLine}>
-            <Feather name="map-pin" size={11} color={p.muted} />
-            <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{search.dropoff.name}</Text>
-          </View>
-        )}
-
+        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1}>{search.dropoff.name}</Text>
         <View style={styles.tripLine}>
           <Feather name="calendar" size={11} color={p.muted} />
           <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{search.dateRange}</Text>
@@ -586,14 +549,6 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
             <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{time}</Text>
           </View>
         )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-          <Text style={[styles.tripType, { color: p.navy }]}>{search.vehicleType === 'bike' ? 'Bikes' : 'Cars'}</Text>
-          {search.stage && search.stage !== 'results' && (
-            <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, color: stageColor }}>
-              • Resume trip
-            </Text>
-          )}
-        </View>
       </View>
       {onRemove ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Remove this search" onPress={onRemove} hitSlop={10}>
@@ -1097,11 +1052,9 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: 16, marginBottom: 12, paddingHorizontal: 16 },
 
   tripCard: { width: 246, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12 },
-  tripIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   tripWhere: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   tripWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   tripLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  tripType: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 10, lineHeight: 15, marginTop: 2 },
 
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },

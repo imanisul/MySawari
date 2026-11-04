@@ -46,7 +46,8 @@ export function StickyBookingBar({
   // A car that is free (today, or for the chosen dates) says "Book Now"; with no dates yet the button first opens the
   // date picker, then Book Now continues. "Check Availability" is only for a car that is busy for the chosen dates.
   const canBook = isAvailable && hasTrip;
-  const label = isAvailable && (hasTrip || !bookLabel) ? (bookLabel || 'Book Now') : 'Check Availability';
+  const isBook = !!isAvailable && (hasTrip || !bookLabel);
+  const label = isBook ? (bookLabel || 'Book Now') : 'Check Availability';
   const onPress = canBook
     ? () => {
         if (isAuthenticated) {
@@ -56,7 +57,9 @@ export function StickyBookingBar({
         }
       }
     : onCheckAvailability;
-  const disabled = !onPress || (canBook && !agreed);
+  // Book Now needs the policy tick even before dates are picked (then it opens the date picker); only a busy car's
+  // "Check Availability" is free of it.
+  const disabled = !onPress || (isBook && !agreed);
   const payableNow = price.state === 'ready' ? price.payableNow : BOOKING_ADVANCE_AMOUNT;
 
   return (
@@ -144,7 +147,7 @@ export function StickyBookingBar({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
-          accessibilityHint={canBook && !agreed ? 'Tick the policy agreement first' : undefined}
+          accessibilityHint={isBook && !agreed ? 'Tick the policy agreement first' : undefined}
           onPress={onPress}
           disabled={disabled}
           style={({ pressed }) => [styles.button, { backgroundColor: p.navy }, pressed && styles.pressed, disabled && { opacity: 0.5 }]}

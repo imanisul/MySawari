@@ -246,9 +246,9 @@
     "semantic_hash": ""
   },
   "components/booking/DatesSheet.tsx": {
-    "mtime": 1793606029.8950357,
-    "seen": 1793610839.445934,
-    "ast_hash": "d7d730e6f6bfdbb14b81864344f49ea7",
+    "mtime": 1793770656.3646965,
+    "seen": 1793770675.175387,
+    "ast_hash": "e0ca485fef7b09651e28a72f313fd95d",
     "semantic_hash": ""
   },
   "components/booking/DriverChargesSheet.tsx": {
@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "components/booking/DropoffSheet.tsx": {
-    "mtime": 1793518082.7863698,
-    "seen": 1793518112.2098691,
-    "ast_hash": "0b56f446a1acdbe33f8cd3560630761c",
+    "mtime": 1793770359.6936343,
+    "seen": 1793770501.459944,
+    "ast_hash": "af6843cd0e66ad6f4694b98cc76ceebe",
     "semantic_hash": ""
   },
   "components/booking/ExtendBookingSheet.tsx": {
@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "components/booking/SearchCard.tsx": {
-    "mtime": 1793520206.4413607,
-    "seen": 1793520456.622124,
-    "ast_hash": "0969e34258517bc83ffa3af3e5563d8a",
+    "mtime": 1793769336.4839265,
+    "seen": 1793769348.189239,
+    "ast_hash": "35859c2acd77200700e34aa19b89b108",
     "semantic_hash": ""
   },
   "components/booking/SearchSheet.tsx": {
@@ -468,9 +468,9 @@
     "semantic_hash": ""
   },
   "components/home/HomeSections.tsx": {
-    "mtime": 1793716215.6669521,
-    "seen": 1793716228.4440992,
-    "ast_hash": "16853f9a182afe3098532bc639b60844",
+    "mtime": 1793767935.3545063,
+    "seen": 1793767947.8244932,
+    "ast_hash": "0728298d9109fe46513e7afb006094b8",
     "semantic_hash": ""
   },
   "components/index.ts": {
@@ -594,9 +594,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/StickyBookingBar.tsx": {
-    "mtime": 1793712658.4063156,
-    "seen": 1793712670.641388,
-    "ast_hash": "04b334e5b120fccdd5ce68af2600b545",
+    "mtime": 1793772145.8028066,
+    "seen": 1793772155.950324,
+    "ast_hash": "9690cbaad9d26d0f6220c0373f1eaf10",
     "semantic_hash": ""
   },
   "components/vehicle/details/SubPageHeader.tsx": {
@@ -810,9 +810,9 @@
     "semantic_hash": ""
   },
   "screens/Home/HomeScreen.tsx": {
-    "mtime": 1793716193.475231,
-    "seen": 1793716228.444156,
-    "ast_hash": "c929eacc6fbb9aefee5c9aa85d908e2b",
+    "mtime": 1793768952.5295036,
+    "seen": 1793768971.08013,
+    "ast_hash": "4d3ddfa5d23b08cbb71676d97f6b4e83",
     "semantic_hash": ""
   },
   "screens/Home/LocationScreen.tsx": {
@@ -852,9 +852,9 @@
     "semantic_hash": ""
   },
   "screens/Payment/PaymentScreen.tsx": {
-    "mtime": 1793546141.9515598,
-    "seen": 1793546229.850764,
-    "ast_hash": "2baa052bdb8765ff41c03a199555817a",
+    "mtime": 1793769336.4829223,
+    "seen": 1793769348.1893382,
+    "ast_hash": "26b95c2d6ce10816337ef75ff1c7cb14",
     "semantic_hash": ""
   },
   "screens/Payment/PaymentsListScreen.tsx": {
@@ -918,9 +918,9 @@
     "semantic_hash": ""
   },
   "screens/VehicleDetails/CarDetailsScreen.tsx": {
-    "mtime": 1793709388.3439214,
-    "seen": 1793709873.609283,
-    "ast_hash": "aa0c324a985893601d639e28f577b0f6",
+    "mtime": 1793772145.8032908,
+    "seen": 1793772155.9503858,
+    "ast_hash": "81380669ac47bdb8ab62d7c0d0074049",
     "semantic_hash": ""
   },
   "screens/Wallet/WalletScreen.tsx": {
@@ -954,9 +954,9 @@
     "semantic_hash": ""
   },
   "services/backend/api.ts": {
-    "mtime": 1793704924.535355,
-    "seen": 1793708593.278593,
-    "ast_hash": "a3ca1b2c01afae5801d8c1bd24c64ca1",
+    "mtime": 1793770835.1157238,
+    "seen": 1793771156.2530618,
+    "ast_hash": "40320a8cad1fb9c8d94eda913563d9ef",
     "semantic_hash": ""
   },
   "services/backend/pricingEngine.ts": {
@@ -1746,9 +1746,9 @@
     "semantic_hash": ""
   },
   "components/profile/ProfileParts.tsx": {
-    "mtime": 1793709388.3656623,
-    "seen": 1793709873.609214,
-    "ast_hash": "75eabf44bd1bae35db1555901b6fb328",
+    "mtime": 1793771593.9374118,
+    "seen": 1793771606.447335,
+    "ast_hash": "1d42b7669666564a19914a15bcbe930e",
     "semantic_hash": ""
   },
   "hooks/usePlaceSearch.ts": {
@@ -2310,9 +2310,9 @@
     "semantic_hash": ""
   },
   "screens/Rewards/RewardsScreen.tsx": {
-    "mtime": 1793626063.2889037,
-    "seen": 1793626111.279791,
-    "ast_hash": "d59f4bcecf59a9472e7b1e9610a54d9f",
+    "mtime": 1793772080.3464885,
+    "seen": 1793772155.950379,
+    "ast_hash": "11b2ef910b1692add1666c5d5552ef93",
     "semantic_hash": ""
   },
   "components/auth/LoginGate.tsx": {
@@ -2340,9 +2340,9 @@
     "semantic_hash": ""
   },
   "components/rewards/RewardScratchModal.tsx": {
-    "mtime": 1793626063.2883365,
-    "seen": 1793626111.2797272,
-    "ast_hash": "5d3280f43e74da33907a73a2d3d4e113",
+    "mtime": 1793770938.3228114,
+    "seen": 1793771156.2529879,
+    "ast_hash": "3bdb6fe8bab7a11a813db00af0d0f46a",
     "semantic_hash": ""
   },
   "components/rewards/ScratchCard.tsx": {
@@ -2352,9 +2352,9 @@
     "semantic_hash": ""
   },
   "hooks/useRideJourney.ts": {
-    "mtime": 1793625959.2479367,
-    "seen": 1793626111.2797608,
-    "ast_hash": "4c48d995e3422bd01efce907b8592c5d",
+    "mtime": 1793770963.1716146,
+    "seen": 1793771156.2530198,
+    "ast_hash": "a3d5608a74a8cfc416d741b2b3bca23d",
     "semantic_hash": ""
   },
   "services/api/flashScreen.ts": {

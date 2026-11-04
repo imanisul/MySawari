@@ -1406,7 +1406,7 @@ export const API = {
     cancelledRides: number;
     totalSpent: number;
     tier: string;
-    milestones: Array<{ rides: number; label: string; rewardAmount: number; type: string; unlocked: boolean; claimed: boolean }>;
+    milestones: Array<{ rides: number; label: string; rewardAmount: number; type: string; unlocked: boolean; claimed: boolean; scratchAmount?: number; maxCash?: number }>;
     nextMilestone: { label: string; ridesNeeded: number; rewardAmount: number } | null;
     earnedRewards: Array<{ type: string; label: string; amount: number; earnedAt: string }>;
     /** The welcome scratch card: `scratched` false while it waits to be opened. */

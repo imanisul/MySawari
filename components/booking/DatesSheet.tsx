@@ -170,8 +170,9 @@ export function DatesSheet() {
   const router = useRouter();
   // fresh: opened right after choosing a destination (or for a trip whose dates have passed) — the
   // customer picks the dates themselves, nothing is pre-filled from an earlier search.
-  const { returnBack, fresh, forSpecificCar, fromDestination, thenLocation } = useLocalSearchParams<{
+  const { returnBack, fresh, forSpecificCar, fromDestination, thenLocation, thenBook } = useLocalSearchParams<{
     thenLocation?: string;
+    thenBook?: string;
     returnBack?: string;
     fresh?: string;
     forSpecificCar?: string;
@@ -179,7 +180,7 @@ export function DatesSheet() {
   }>();
   const freshPick = fresh === 'true';
   const { data: fetchedVehicles = [] } = useVehicles();
-  const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, selectCar, dropoff, isDarkMode } = useSawari();
+  const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, selectCar, dropoff, isDarkMode, isAuthenticated } = useSawari();
 
   // Figma palette in light mode; dark mode keeps the theme tokens.
   const ui = isDarkMode
@@ -373,9 +374,13 @@ export function DatesSheet() {
       });
     });
 
-    if (thenLocation === 'true') {
+    if (thenLocation === 'true' && dropoff?.name) {
+      // A destination is already set (shown, and changeable, in this page's own field): no second location page.
+      // On to payment (or back to the car when not signed in).
+      router.replace(thenBook === 'true' && isAuthenticated ? '/booking' : '/car-details');
+    } else if (thenLocation === 'true') {
       // Check Availability from a car: after the dates, the location page; choosing there returns to the car.
-      router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+      router.replace({ pathname: '/dropoff', params: thenBook === 'true' ? { forSpecificCar: 'true', thenBook: 'true' } : { forSpecificCar: 'true' } });
     } else if (returnBack === 'true') {
       router.back();
     } else if (fromDestination === 'true') {
@@ -450,7 +455,7 @@ export function DatesSheet() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Change destination"
-            onPress={() => router.push({ pathname: '/dropoff', params: { returnBack: 'true' } })}
+            onPress={() => { router.push({ pathname: '/dropoff', params: { returnBack: 'true' } }); }}
             style={[styles.destField, { flex: 1, borderColor: ui.border }]}
           >
             <PinOutline color={dropoff?.name ? ui.muted : ui.muted} />

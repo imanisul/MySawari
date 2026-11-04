@@ -122,8 +122,8 @@ export const rupees = (n: number, decimals = false) =>
   `₹${(Number(n) || 0).toLocaleString('en-IN', decimals ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 })}`;
 
 const styles = StyleSheet.create({
-  toggle: { width: 38, height: 20, borderRadius: 10, justifyContent: 'center' },
-  knob: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 1.5, shadowOffset: { width: 0, height: 1 }, elevation: 1 },
+  toggle: { width: 38, height: 20, borderRadius: 30, justifyContent: 'center' },
+  knob: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFFFFF' },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   back: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontFamily: PF.semibold, fontSize: 17, lineHeight: 28 },

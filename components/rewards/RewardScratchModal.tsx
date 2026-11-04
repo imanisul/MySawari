@@ -24,17 +24,32 @@ export function RewardScratchModal({ card, onClose }: { card: PendingCard | null
   const [state, setState] = useState<'idle' | 'saving' | 'done' | 'error'>('idle');
   const [revealAll, setRevealAll] = useState(false);
   const [error, setError] = useState('');
+  const [wonAmount, setWonAmount] = useState<number>(card?.amount ?? 0);
 
-  useEffect(() => { if (card) { setState('idle'); setRevealAll(false); setError(''); } }, [card?.label]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (card) {
+      setState('idle');
+      setRevealAll(false);
+      setError('');
+      setWonAmount(card.amount);
+    }
+  }, [card?.label, card?.amount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = async () => {
     if (!card || state === 'saving' || state === 'done') return;
     setState('saving');
     try {
-      if (card.kind === 'signup') await API.scratchSignupBonus();
-      else await API.claimMilestoneReward(card.label);
+      let prize = card.amount;
+      if (card.kind === 'signup') {
+        const res = await API.scratchSignupBonus();
+        if (res?.reward?.amount) prize = res.reward.amount;
+      } else {
+        const res = await API.claimMilestoneReward(card.label);
+        if (res?.reward?.amount) prize = res.reward.amount;
+      }
+      setWonAmount(prize);
       setState('done');
-      Promise.resolve(earnSawariCash(card.amount)).catch(() => {});
+      Promise.resolve(earnSawariCash(prize)).catch(() => {});
     } catch (e: any) {
       // "already claimed" means the money is in the wallet already: show it as opened.
       if (/already/i.test(String(e?.message))) setState('done');
@@ -57,7 +72,7 @@ export function RewardScratchModal({ card, onClose }: { card: PendingCard | null
             <View style={styles.cardWrap}>
               <ScratchCard onReveal={open} revealed={revealAll}>
                 <Text style={styles.prizeLabel}>You won</Text>
-                <Text style={styles.prize}>{formatCurrency(card.amount)}</Text>
+                <Text style={styles.prize}>{formatCurrency(wonAmount)}</Text>
                 <Text style={styles.prizeSub}>SawariCash</Text>
               </ScratchCard>
             </View>
@@ -68,7 +83,7 @@ export function RewardScratchModal({ card, onClose }: { card: PendingCard | null
               </Pressable>
             )}
             {state === 'saving' && <ActivityIndicator color="#2F3E75" />}
-            {state === 'done' && <Text style={styles.ok}>{formatCurrency(card.amount)} has been added to your wallet.</Text>}
+            {state === 'done' && <Text style={styles.ok}>{formatCurrency(wonAmount)} has been added to your wallet.</Text>}
             {state === 'error' && (
               <>
                 <Text style={styles.err}>{error}</Text>

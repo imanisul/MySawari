@@ -105,7 +105,7 @@ export default function CarDetailsScreen() {
 
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  const [agreed, setAgreed] = useState(true); // default agreed so the customer can book directly
+  const [agreed, setAgreed] = useState(false); // the customer ticks it themselves
   const [barHeight, setBarHeight] = useState(165 + Math.max(insets.bottom, 12));
 
   const openDates = () => {
@@ -116,7 +116,7 @@ export default function CarDetailsScreen() {
   // "Check Availability": date & time first, then the location page, then back here with the price.
   const checkAvailability = () => {
     Haptics.selectionAsync();
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true' } });
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true', thenBook: 'true' } });
   };
 
   // Figma flow: Check Availability → date & time → back here with the price → Book Now.
@@ -129,9 +129,9 @@ export default function CarDetailsScreen() {
     }
     const isMissingEnd = !endStr || endStr.includes('Select');
     if (!hasTrip || isMissingEnd) {
-      openDates();
+      router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true', thenBook: 'true' } });
     } else if (!dropoff?.name) {
-      router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
+      router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true', thenBook: 'true' } });
     } else {
       router.push('/booking');
     }

@@ -46,10 +46,10 @@ export function DropoffSheet() {
   const p = useDetailsPalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { setDropoff } = useSawari();
+  const { setDropoff, isAuthenticated } = useSawari();
   // returnBack: opened from a screen that wants the customer back afterwards (booking page, trip sheet).
   // q: opened from a state on Home's "Explore Northeast", pre-filtered to it.
-  const params = useLocalSearchParams<{ returnBack?: string; q?: string; forSpecificCar?: string }>();
+  const params = useLocalSearchParams<{ returnBack?: string; q?: string; forSpecificCar?: string; thenBook?: string }>();
   const [query, setQuery] = useState(typeof params.q === 'string' ? params.q : '');
   const [remote, setRemote] = useState<Place[]>([]);
   const [searching, setSearching] = useState(false);
@@ -91,7 +91,10 @@ export function DropoffSheet() {
     setDropoff({ id: pl.id, name: pl.name, address: pl.address, latitude: pl.latitude, longitude: pl.longitude, source: pl.source });
     import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_destination', 'DropoffSheet', { destination: pl.name }));
     if (params.forSpecificCar === 'true') {
-      if (router.canGoBack()) {
+      if (params.thenBook === 'true' && isAuthenticated) {
+        // Location and dates are both chosen: straight to the payment page.
+        router.replace('/booking');
+      } else if (router.canGoBack()) {
         router.back();
       } else {
         router.replace('/car-details');

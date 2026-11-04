@@ -34,6 +34,10 @@ function optimizeCloudinaryUrl(source: any): any {
     return source;
   }
 
+  if (uri.startsWith('http://') && !uri.includes('localhost') && !uri.includes('127.0.0.1') && !uri.includes('10.0.2.2')) {
+    uri = uri.replace(/^http:\/\//i, 'https://');
+  }
+
   if (uri.includes('res.cloudinary.com') && uri.includes('/upload/')) {
     if (!uri.includes('q_auto') && !uri.includes('w_')) {
       uri = uri.replace('/upload/', '/upload/q_auto,f_auto,w_800,c_limit/');

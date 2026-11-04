@@ -114,10 +114,11 @@ export default function CarDetailsScreen() {
     router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
 
-  // "Check Availability": date & time first, then the location page, then back here with the price.
+  // "Check Availability": date & time first, then the location page, then back here with the price. The policy
+  // tick and Book Now come after that; it never jumps ahead to the payment page.
   const checkAvailability = () => {
     Haptics.selectionAsync();
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true', thenBook: 'true' } });
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true' } });
   };
 
   // Figma flow: Check Availability → date & time → back here with the price → Book Now.

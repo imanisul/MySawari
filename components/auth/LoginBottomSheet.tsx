@@ -342,9 +342,8 @@ export function LoginBottomSheet({
       setDetectedClipOtp(null);
       return;
     }
-    checkClipboardForOtp();
-    const timer = setTimeout(checkClipboardForOtp, 350);
-    const interval = setInterval(checkClipboardForOtp, 1000);
+    // Check clipboard once when entering OTP step, and on AppState active (when returning from WhatsApp/SMS)
+    const timer = setTimeout(checkClipboardForOtp, 400);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         checkClipboardForOtp();
@@ -352,7 +351,6 @@ export function LoginBottomSheet({
     });
     return () => {
       clearTimeout(timer);
-      clearInterval(interval);
       sub.remove();
     };
   }, [step, loading, otp]);

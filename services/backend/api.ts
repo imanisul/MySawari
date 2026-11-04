@@ -249,7 +249,8 @@ const PLATE_PROXY_VERSION = 'pv=6';
  */
 export function plateSafeImageUrl(url: string): string {
   if (!url) return '';
-  const absolute = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  let absolute = url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  absolute = enforceHttpsUrl(absolute);
   // Already a processed-photo URL that is plate-safe on Cloudinary CDN
   if (absolute.includes('/plate-safe/')) {
     return absolute;

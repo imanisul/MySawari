@@ -594,9 +594,9 @@
     "semantic_hash": ""
   },
   "components/vehicle/details/StickyBookingBar.tsx": {
-    "mtime": 1793771319.326686,
-    "seen": 1793771334.173996,
-    "ast_hash": "cbf3d6c083379d1aa607c1fba3973fbe",
+    "mtime": 1793772145.8028066,
+    "seen": 1793772155.950324,
+    "ast_hash": "9690cbaad9d26d0f6220c0373f1eaf10",
     "semantic_hash": ""
   },
   "components/vehicle/details/SubPageHeader.tsx": {
@@ -918,9 +918,9 @@
     "semantic_hash": ""
   },
   "screens/VehicleDetails/CarDetailsScreen.tsx": {
-    "mtime": 1793770359.6944277,
-    "seen": 1793770501.460115,
-    "ast_hash": "4f9bcd53f3d526d0303e86a304f2a7f2",
+    "mtime": 1793772145.8032908,
+    "seen": 1793772155.9503858,
+    "ast_hash": "81380669ac47bdb8ab62d7c0d0074049",
     "semantic_hash": ""
   },
   "screens/Wallet/WalletScreen.tsx": {
@@ -2310,9 +2310,9 @@
     "semantic_hash": ""
   },
   "screens/Rewards/RewardsScreen.tsx": {
-    "mtime": 1793771082.313546,
-    "seen": 1793771156.2530491,
-    "ast_hash": "2c91a600168c2e5377f219884f887aa3",
+    "mtime": 1793772080.3464885,
+    "seen": 1793772155.950379,
+    "ast_hash": "11b2ef910b1692add1666c5d5552ef93",
     "semantic_hash": ""
   },
   "components/auth/LoginGate.tsx": {

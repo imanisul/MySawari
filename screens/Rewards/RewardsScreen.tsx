@@ -134,9 +134,6 @@ export default function RewardsScreen() {
                   </View>
                   <View style={styles.col2}>
                     <Text style={[styles.tierReward, { color: p.navy }]}>{tier.reward}</Text>
-                    <Text style={[styles.tierSub, { color: p.muted }]}>
-                      Mystery card up to ₹{tier.maxCash}
-                    </Text>
                   </View>
                   <View style={styles.col3}>
                     {m.claimed ? (
@@ -178,36 +175,7 @@ export default function RewardsScreen() {
             })}
           </View>
 
-          {/* Explanation Box */}
-          <View style={[styles.infoCard, { backgroundColor: p.purpleBg, borderColor: p.purpleBorder }]}>
-            <View style={styles.infoHeader}>
-              <Feather name="gift" size={17} color={p.purple} />
-              <Text style={[styles.infoTitle, { color: p.purple }]}>Scratch Card Mystery Rewards</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Feather name="check-circle" size={14} color={p.purple} style={styles.infoIcon} />
-              <Text style={[styles.infoText, { color: p.fg }]}>
-                <Text style={styles.infoStrong}>4 Trips Milestone: </Text>
-                Win a mystery scratch card with up to 200 Sawari Cash (random ₹10 – ₹200).
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Feather name="check-circle" size={14} color={p.purple} style={styles.infoIcon} />
-              <Text style={[styles.infoText, { color: p.fg }]}>
-                <Text style={styles.infoStrong}>8, 12, 20 & 30 Trips: </Text>
-                Win a mystery scratch card with up to 350 Sawari Cash (random ₹10 – ₹350).
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Feather name="check-circle" size={14} color={p.purple} style={styles.infoIcon} />
-              <Text style={[styles.infoText, { color: p.fg }]}>
-                <Text style={styles.infoStrong}>Instant Credit: </Text>
-                Once scratched, Sawari Cash is credited directly to your wallet for future rides!
-              </Text>
-            </View>
-          </View>
-
-          <Text style={[styles.section, { color: p.muted }]}>Rewards received</Text>
+          <Text style={[styles.section, { color: p.muted }]}>Rewards earned</Text>
           {received.length === 0 ? (
             <Text style={[styles.note, { color: p.muted, textAlign: 'left' }]}>
               Nothing yet. Finish 4 trips to earn your first reward.
@@ -251,22 +219,14 @@ const styles = StyleSheet.create({
   colHead1: { width: 80, fontFamily: F.semibold, fontSize: 11, letterSpacing: 0.5 },
   colHead2: { flex: 1, fontFamily: F.semibold, fontSize: 11, letterSpacing: 0.5 },
   colHead3: { width: 85, textAlign: 'right', fontFamily: F.semibold, fontSize: 11, letterSpacing: 0.5 },
-  tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, minHeight: 62, paddingVertical: 10 },
+  tableRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, minHeight: 52, paddingVertical: 8 },
   col1: { width: 80 },
   col2: { flex: 1, paddingRight: 6 },
   col3: { width: 85, alignItems: 'flex-end', justifyContent: 'center' },
   tierRides: { fontFamily: F.semibold, fontSize: 14 },
   tierReward: { fontFamily: F.bold, fontSize: 14 },
-  tierSub: { fontFamily: F.medium, fontSize: 11, marginTop: 2 },
   lockedWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   lockedText: { fontFamily: F.medium, fontSize: 12 },
-  infoCard: { borderWidth: 1, borderRadius: 12, padding: 14, marginTop: 14, gap: 8 },
-  infoHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  infoTitle: { fontFamily: F.semibold, fontSize: 14 },
-  infoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  infoIcon: { marginTop: 2 },
-  infoText: { flex: 1, fontFamily: F.regular, fontSize: 12.5, lineHeight: 18 },
-  infoStrong: { fontFamily: F.semibold },
   list: { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, minHeight: 62, paddingVertical: 10 },
   rowTitle: { fontFamily: F.semibold, fontSize: 14, lineHeight: 20 },

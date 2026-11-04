@@ -307,7 +307,6 @@ export default function CarDetailsScreen() {
       <StickyBookingBar
         isAvailable={isAvailable}
         agreed={agreed}
-        agreeHint="Tick the policy agreement below to continue"
         onHeight={setBarHeight}
         hasTrip={hasTrip}
         onCheckAvailability={checkAvailability}

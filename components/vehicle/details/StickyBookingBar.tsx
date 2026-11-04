@@ -22,14 +22,11 @@ export function StickyBookingBar({
   onBookNow,
   onCheckAvailability,
   bookLabel,
-  agreeHint,
   onHeight,
 }: {
   /** Button text once the trip can be booked (default "Book Now"; the payment page uses "Pay ₹500 & Book"). */
   bookLabel?: string;
   isAvailable?: boolean;
-  /** Shown instead of the payable note while the policy agreement is still unticked. */
-  agreeHint?: string;
   /** Policy Agreement checkbox on the page. */
   agreed?: boolean;
   /** Whether pickup and return dates are chosen (needed for a trip price). */
@@ -159,9 +156,7 @@ export function StickyBookingBar({
         </Pressable>
 
         {/* Figma: "₹500 payable now • Refundable up to 24h before trip", 6 apart, centred. */}
-        {isBook && !agreed && agreeHint ? (
-          <View style={styles.noteRow}><Text style={[styles.note, { color: p.red }]}>{agreeHint}</Text></View>
-        ) : price.state === 'ready' && price.membershipFee > 0 ? (
+        {price.state === 'ready' && price.membershipFee > 0 ? (
           <View style={styles.noteRow}><Text style={[styles.note, { color: p.green }]}>{formatCurrency(payableNow)} payable now (incl. {price.buyingPlan} membership)</Text></View>
         ) : (
           <View style={styles.noteRow}>

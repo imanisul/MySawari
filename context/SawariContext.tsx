@@ -93,7 +93,7 @@ type SawariContextValue = {
   /** Plan chosen on car details / payment to buy together with this booking (null = none). */
   planToBuy: 'starter' | 'plus' | 'pro' | null;
   setPlanToBuy: (plan: 'starter' | 'plus' | 'pro' | null) => void;
-  confirmBookingPayment: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string, idempotencyKey?: string) => Promise<void>;
+  confirmBookingPayment: (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string; razorpaySignature?: string }, bookingId?: string, idempotencyKey?: string) => Promise<void>;
   lastBooking: BookingSnapshot | null;
 
   customer: AppCustomer;
@@ -814,7 +814,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           customer,
           {}, // Payment details no longer needed here (it's a hold)
           fuelEstimate || undefined,
-          idempotencyKey
+          idempotencyKey,
+          pricingQuote
         );
         setLastBooking(snapshot);
         // Refresh cash in the background: a failed wallet refresh must not look like a failed reservation
@@ -822,12 +823,12 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         API.getWallet(true).then(applyWallet).catch(() => {});
         return snapshot;
       },
-      confirmBookingPayment: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string }, bookingId?: string, idempotencyKey?: string) => {
+      confirmBookingPayment: async (paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string; razorpaySignature?: string }, bookingId?: string, idempotencyKey?: string) => {
         // The id is passed in by the payment screen: reading `lastBooking` here could see an old copy of
         // state (it is set moments earlier in the same flow), which failed with "No active booking hold".
         const id = bookingId || lastBooking?.id;
         if (!id) throw new Error('No active booking hold found');
-        const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId, idempotencyKey);
+        const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId, idempotencyKey, paymentDetails.razorpaySignature);
         
         // Update the lastBooking state with the confirmed booking info so the ConfirmationScreen can read the real bookingCode
         setLastBooking((prev: any) => ({

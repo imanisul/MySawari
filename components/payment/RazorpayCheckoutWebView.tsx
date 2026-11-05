@@ -192,6 +192,10 @@ export function RazorpayCheckoutWebView({
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
           javaScriptEnabled={true}
           domStorageEnabled={true}
+          cacheEnabled={true}
+          cacheMode={Platform.OS === 'android' ? 'LOAD_CACHE_ELSE_NETWORK' : undefined}
+          sharedCookiesEnabled={true}
+          thirdPartyCookiesEnabled={true}
           startInLoadingState={false}
           javaScriptCanOpenWindowsAutomatically
           onError={() => loadFailed('Could not open the payment page. Please check your connection and try again.')}

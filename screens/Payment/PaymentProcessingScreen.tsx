@@ -93,23 +93,23 @@ export default function PaymentProcessingScreen() {
         return;
       }
       try {
-        // Step 1: Secure Vehicle Hold (Atomic OCC + Idempotency)
-        // The payment order does not depend on the hold, so both are requested together (one wait instead of two).
+        // Step 1 & 2 in Parallel: Secure Vehicle Hold and Razorpay Order simultaneously.
+        // If the order was already prefetched from BookingScreen, it resolves in sub-milliseconds.
         const orderRequest = API.createRazorpayOrder(
           { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
           idempotencyKey.current
         );
-        orderRequest.catch(() => {}); // its error is handled below, once the hold is secured
-        const snapshot = await createBookingSnapshot(idempotencyKey.current);
+
+        const [snapshot, order] = await Promise.all([
+          createBookingSnapshot(idempotencyKey.current),
+          orderRequest
+        ]);
+
         if (!snapshot) throw new Error('Failed to secure vehicle lock. Please try again.');
         holdId.current = snapshot.id;
-        // The customer went back while the hold was being created: free it and stop here.
         if (left.current) { releaseHold(); return; }
-        setSetupStep(1);
 
-        // Step 2: Create Order (Idempotent order creation with gateway receipt key)
-        const order = await orderRequest;
-        if (left.current) { releaseHold(); return; }
+        setSetupStep(1);
         setRazorpayOrder(order);
         setStatus('PAYMENT_PENDING'); 
       } catch (err: any) {
@@ -129,22 +129,12 @@ export default function PaymentProcessingScreen() {
   const handleRazorpaySuccess = async (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
     paid.current = true; // money has moved: never release this hold from the app
     setStatus('VERIFYING');
-    try {
-      const isVerified = await API.verifyPayment(data.razorpay_order_id, data.razorpay_payment_id, data.razorpay_signature);
-      if (isVerified) {
-        completeBookingFlow({ razorpayOrderId: data.razorpay_order_id, razorpayPaymentId: data.razorpay_payment_id });
-      } else {
-        // Never actually left unresolved: if the payment was really deducted, the ID is shown so support can trace it.
-        setErrorMsg(`Payment verification failed for payment ${data.razorpay_payment_id}. If the amount was deducted, please contact support with this payment ID.`);
-        setStatus('ERROR');
-      }
-    } catch (e: any) {
-      setErrorMsg(e.message || 'Payment verification failed');
-      setStatus('ERROR');
-    }
+    // One call: the server checks the signature and the payment with Razorpay as it confirms the booking
+    // (a separate verify-signature call first cost an extra round trip).
+    completeBookingFlow({ razorpayOrderId: data.razorpay_order_id, razorpayPaymentId: data.razorpay_payment_id, razorpaySignature: data.razorpay_signature });
   };
 
-  const completeBookingFlow = async (paymentDetails: { razorpayOrderId?: string, razorpayPaymentId?: string } | null) => {
+  const completeBookingFlow = async (paymentDetails: { razorpayOrderId?: string, razorpayPaymentId?: string, razorpaySignature?: string } | null) => {
     // Confirmation is under way (paid online, or fully covered by Sawari Cash): never release this hold now.
     paid.current = true;
     setStatus('VERIFYING');

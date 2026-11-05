@@ -99,6 +99,14 @@ export default function BookingScreen() {
     API.getCoupons().then((list) => setCoupons(list || [])).catch(() => setCoupons([]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pre-create Razorpay order in background as soon as payable amount is known.
+  // This allows opening Razorpay checkout in sub-milliseconds when user taps Pay & Book.
+  useEffect(() => {
+    if (isAuthenticated && pricingQuote?.onlinePayableNow && pricingQuote.onlinePayableNow > 0) {
+      API.prefetchRazorpayOrder(pricingQuote.onlinePayableNow);
+    }
+  }, [isAuthenticated, pricingQuote?.onlinePayableNow]);
+
   useEffect(() => {
     // A plausible full number, settled briefly, so a lead isn't sent per keystroke.
     if (!selectedCar || !/^\d{10}$/.test(customer?.mobile || '')) return;

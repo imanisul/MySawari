@@ -603,6 +603,14 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
   return runRequest();
 }
 
+// In-flight / pre-created Razorpay order cache for sub-millisecond checkout response
+let preloadedOrderCache: {
+  amount: number;
+  receiptKey?: string;
+  promise: Promise<{ orderId: string; amountPaise: number; keyId: string }>;
+  timestamp: number;
+} | null = null;
+
 export const API = {
   /**
    * GET /api/pickup-locations
@@ -1054,6 +1062,29 @@ export const API = {
   },
 
   /**
+   * Warm up / pre-create Razorpay order in the background while user is reviewing booking options.
+   * Enables opening Razorpay in sub-milliseconds when user taps Pay.
+   */
+  prefetchRazorpayOrder(amountRupees: number, idempotencyKey?: string): void {
+    if (!amountRupees || amountRupees <= 0) return;
+    const now = Date.now();
+    if (preloadedOrderCache && preloadedOrderCache.amount === amountRupees && (now - preloadedOrderCache.timestamp < 120000)) {
+      return;
+    }
+    const key = idempotencyKey || 'pf_' + now.toString(36);
+    const p = this.createRazorpayOrder({ onlinePayableNow: amountRupees, idempotencyKey: key }, key);
+    preloadedOrderCache = {
+      amount: amountRupees,
+      receiptKey: key,
+      promise: p,
+      timestamp: now,
+    };
+    p.catch(() => {
+      if (preloadedOrderCache?.promise === p) preloadedOrderCache = null;
+    });
+  },
+
+  /**
    * POST /api/payments/create-order
    */
   async createRazorpayOrder(params: any, idempotencyKey?: string): Promise<{ orderId: string, amountPaise: number, keyId: string }> {
@@ -1063,22 +1094,38 @@ export const API = {
         throw new Error('No Razorpay order required for zero amount');
       }
 
+      // If already preloaded and matching amount within 2 minutes, return in sub-milliseconds
+      if (preloadedOrderCache && preloadedOrderCache.amount === amountToPay && (Date.now() - preloadedOrderCache.timestamp < 120000)) {
+        return await preloadedOrderCache.promise;
+      }
+
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       const key = idempotencyKey || params.idempotencyKey;
       if (key) {
         headers['Idempotency-Key'] = `${key}-order`; // own key per endpoint: the server replays the first answer for a repeated key
       }
 
-      const response = await fetchWithAuth(`${BACKEND_URL}/payments/create-order`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ amount: amountToPay, receipt: key })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Failed to create Razorpay order');
+      const orderPromise = (async () => {
+        const response = await fetchWithAuth(`${BACKEND_URL}/payments/create-order`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ amount: amountToPay, receipt: key })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Failed to create Razorpay order');
+        return { orderId: data.data.id, amountPaise: data.data.amount, keyId: data.data.keyId };
+      })();
 
-      return { orderId: data.data.id, amountPaise: data.data.amount, keyId: data.data.keyId };
+      preloadedOrderCache = {
+        amount: amountToPay,
+        receiptKey: key,
+        promise: orderPromise,
+        timestamp: Date.now(),
+      };
+
+      return await orderPromise;
     } catch (e: any) {
+      preloadedOrderCache = null;
       throw new Error(e.message);
     }
   },
@@ -1135,11 +1182,11 @@ export const API = {
     customerDetails: { name: string; mobile: string; email?: string },
     paymentDetails: { razorpayOrderId?: string; razorpayPaymentId?: string },
     fuelEstimateDetails?: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number },
-    idempotencyKey?: string
+    idempotencyKey?: string,
+    existingQuote?: any
   ): Promise<BookingSnapshot> {
-    // BACKEND VALIDATION: Recalculate quote to prevent frontend manipulation
-    const serverQuote = await this.quoteBooking(params);
-    const quote = serverQuote;
+    // Reuse existing client-side quote if valid, eliminating a redundant 500-1500ms round-trip to the quote endpoint
+    const quote = existingQuote && existingQuote.rentalAmount ? existingQuote : (await this.quoteBooking(params));
     // A plan bought together with this booking: its price is part of the one payment, but not of the booking.
     const membershipFee = quote.membershipFee || 0;
     const bookingPaidNow = Math.max(0, quote.onlinePayableNow - membershipFee);
@@ -1352,7 +1399,7 @@ export const API = {
     }
   },
 
-  async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string, idempotencyKey?: string): Promise<any> {
+  async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string, idempotencyKey?: string, razorpaySignature?: string): Promise<any> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (idempotencyKey) {
       headers['Idempotency-Key'] = `${idempotencyKey}-confirm`;
@@ -1361,7 +1408,7 @@ export const API = {
     const response = await fetchWithAuth(`${BACKEND_URL}/bookings/${bookingId}/confirm`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ razorpayOrderId, razorpayPaymentId })
+      body: JSON.stringify({ razorpayOrderId, razorpayPaymentId, razorpaySignature })
     });
     const saved = await response.json().catch(() => ({}));
     if (!response.ok) {

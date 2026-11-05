@@ -188,7 +188,15 @@ export default function MembershipScreen() {
 
   // "Subscribe" pressed with no plan picked: ask for one instead of guessing.
   const [needPick, setNeedPick] = useState(false);
-  useEffect(() => { if (selected) setNeedPick(false); }, [selected]);
+  useEffect(() => {
+    if (selected) {
+      setNeedPick(false);
+      if (isAuthenticated) {
+        const def = getPlanDef(selected);
+        if (def?.price) API.prefetchRazorpayOrder(def.price);
+      }
+    }
+  }, [selected, isAuthenticated]);
 
   useEffect(() => {
     if (loading) return;

@@ -1,6 +1,7 @@
 import React from 'react';
+import { ListSkeleton } from '@/components/loading/ListSkeleton';
 import { safeBack } from '@/utils/navigation';
-import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, Alert } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -86,7 +87,7 @@ export default function OffersScreen() {
     <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
       <ScreenHeader title="Offers and Coupons" divider={!applyMode} />
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={p.muted} />
+        <ListSkeleton />
       ) : (
         <FlatList
           data={coupons}

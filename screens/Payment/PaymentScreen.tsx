@@ -56,6 +56,13 @@ export default function PaymentScreen() {
   const useCash = sawariCashToApply > 0;
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Preload Razorpay order in background as soon as payable amount is known
+  useEffect(() => {
+    if (isAuthenticated && pricingQuote?.onlinePayableNow && pricingQuote.onlinePayableNow > 0) {
+      API.prefetchRazorpayOrder(pricingQuote.onlinePayableNow);
+    }
+  }, [isAuthenticated, pricingQuote?.onlinePayableNow]);
+
   useEffect(() => {
     // Fetch coupons (likely already cached from startup warm-up, so this is instant)
     API.getCoupons().then(res => setAvailableCoupons(res)).catch(() => setAvailableCoupons([]));

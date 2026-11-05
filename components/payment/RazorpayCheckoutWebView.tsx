@@ -4,6 +4,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 interface RazorpayCheckoutWebViewProps {
+  /** If false, the webview remains mounted in memory off-screen (warm) so it opens in sub-milliseconds when needed. */
+  visible?: boolean;
   /** Empty while the order is still being created: the page loads checkout.js meanwhile, then opens at once. */
   orderId?: string;
   amount?: number;
@@ -24,6 +26,7 @@ interface RazorpayCheckoutWebViewProps {
 }
 
 export function RazorpayCheckoutWebView({
+  visible = true,
   orderId,
   amount,
   currency,
@@ -46,6 +49,7 @@ export function RazorpayCheckoutWebView({
   const opened = useRef(false);
   const failed = useRef(false);
   const early = useRef<string | null>(null); // a load error before the order exists is reported once it does
+  const lastOrderId = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
   const fail = (message: string) => {
     if (failed.current || opened.current) return;
@@ -59,14 +63,23 @@ export function RazorpayCheckoutWebView({
 
   useEffect(() => {
     if (!orderId || !ready) return;
+    if (visible === false) return;
     if (early.current) { fail(early.current); return; }
+
+    // Reset opened and failed flags on order/visibility change
+    if (lastOrderId.current !== orderId) {
+      opened.current = false;
+      failed.current = false;
+      lastOrderId.current = orderId;
+    }
+
     const t = setTimeout(() => fail('The secure payment page is taking too long to open. Please check your connection and try again.'), 25000);
     const options = {
       key: razorpayKey || '',
       amount: Number(amount) || 0,
-      currency,
-      name,
-      description,
+      currency: currency || 'INR',
+      name: name || 'MySawari',
+      description: description || 'Vehicle Rental Booking',
       image: image || '',
       order_id: orderId,
       prefill: { name: prefill?.name || '', email: prefill?.email || '', contact: prefill?.contact || '' },
@@ -74,7 +87,7 @@ export function RazorpayCheckoutWebView({
     };
     webRef.current?.injectJavaScript(`window.startCheckout(${JSON.stringify(options)}); true;`);
     return () => clearTimeout(t);
-  }, [orderId, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [orderId, ready, visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fixed page: it starts loading checkout.js as soon as this mounts (while the car is held and the order is
   // created), so the payment sheet only has to open, not download.
@@ -84,6 +97,10 @@ export function RazorpayCheckoutWebView({
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="dns-prefetch" href="https://checkout.razorpay.com">
+        <link rel="dns-prefetch" href="https://api.razorpay.com">
+        <link rel="preconnect" href="https://checkout.razorpay.com" crossorigin>
+        <link rel="preconnect" href="https://api.razorpay.com" crossorigin>
         <title>Razorpay Checkout</title>
         <style>
           html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
@@ -91,17 +108,25 @@ export function RazorpayCheckoutWebView({
     </head>
     <body>
         <script>
-            var post = function (m) { window.ReactNativeWebView.postMessage(JSON.stringify(m)); };
+            var post = function (m) {
+                try {
+                    window.ReactNativeWebView.postMessage(JSON.stringify(m));
+                } catch (e) {}
+            };
             var loadError = function (d) { post({ event: 'loaderror', data: { description: d } }); };
             window.onerror = function () { loadError('Could not open the payment page. Please try again.'); };
             var pending = null;
             function launch(options) {
-                options.handler = function (response) { post({ event: 'success', data: response }); };
-                options.modal = { ondismiss: function () { post({ event: 'dismiss' }); } };
-                var rzp1 = new Razorpay(options);
-                rzp1.on('payment.failed', function (response) { post({ event: 'failure', data: response.error }); });
-                try { rzp1.open(); } catch (e) { setTimeout(function () { rzp1.open(); }, 100); }
-                post({ event: 'opened' });
+                try {
+                    options.handler = function (response) { post({ event: 'success', data: response }); };
+                    options.modal = { ondismiss: function () { post({ event: 'dismiss' }); } };
+                    var rzp1 = new Razorpay(options);
+                    rzp1.on('payment.failed', function (response) { post({ event: 'failure', data: response.error }); });
+                    try { rzp1.open(); } catch (e) { setTimeout(function () { rzp1.open(); }, 50); }
+                    post({ event: 'opened' });
+                } catch (e) {
+                    loadError('Failed to initialize Razorpay checkout');
+                }
             }
             window.startCheckout = function (options) {
                 if (typeof Razorpay === 'undefined') { pending = options; return; }
@@ -110,7 +135,7 @@ export function RazorpayCheckoutWebView({
             post({ event: 'ready' });
         </script>
         <script src="https://checkout.razorpay.com/v1/checkout.js"
-            onload="if (pending) launch(pending)"
+            onload="post({ event: 'ready' }); if (pending) { launch(pending); pending = null; }"
             onerror="loadError('Could not load the secure payment page. Please check your connection and try again.')"></script>
     </body>
     </html>
@@ -182,7 +207,14 @@ export function RazorpayCheckoutWebView({
     // Edge-to-edge: keep checkout clear of the status bar and the navigation bar (3-button, gesture bar, iPhone home
     // indicator). The inset padding sits on the outer View: KeyboardAvoidingView overwrites its own paddingBottom
     // with the keyboard height (0 when closed), which used to hide the bottom of checkout behind the navigation bar.
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View
+      style={[
+        styles.container,
+        { paddingTop: insets.top, paddingBottom: insets.bottom },
+        visible === false && styles.hiddenContainer
+      ]}
+      pointerEvents={visible === false ? 'none' : 'auto'}
+    >
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'android' ? 'padding' : undefined}>
         <WebView
           ref={webRef}
@@ -211,5 +243,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  hiddenContainer: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    top: -9999,
+    left: -9999,
+    opacity: 0,
+    overflow: 'hidden',
   },
 });

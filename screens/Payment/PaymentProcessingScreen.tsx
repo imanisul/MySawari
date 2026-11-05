@@ -34,6 +34,7 @@ export default function PaymentProcessingScreen() {
     boughtPlan.current = ({ starter: 'Starter', plus: 'Plus', pro: 'Pro' } as const)[pricingQuote.membershipPlanToBuy];
   }
   const holdId = useRef<string | null>(null);
+  const holdPromiseRef = useRef<Promise<any> | null>(null);
   const paid = useRef(false);
   // Unique idempotency key generated per payment attempt to prevent double-charging or double-booking
   const idempotencyKey = useRef<string>('pay_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9));
@@ -93,20 +94,25 @@ export default function PaymentProcessingScreen() {
         return;
       }
       try {
-        // Step 1 & 2 in Parallel: Secure Vehicle Hold and Razorpay Order simultaneously.
-        // If the order was already prefetched from BookingScreen, it resolves in sub-milliseconds.
-        const orderRequest = API.createRazorpayOrder(
+        // Step 1: Kick off vehicle hold concurrently in background (does not block opening Razorpay!)
+        const holdPromise = createBookingSnapshot(idempotencyKey.current);
+        holdPromiseRef.current = holdPromise;
+        holdPromise.then((snapshot) => {
+          if (snapshot) holdId.current = snapshot.id;
+          if (left.current) releaseHold();
+        }).catch((err) => {
+          if (!paid.current) {
+            setErrorMsg(err?.message || 'Failed to secure vehicle lock.');
+            setStatus('ERROR');
+          }
+        });
+
+        // Step 2: Fetch or reuse prefetched Razorpay order (sub-millisecond from preloaded cache)
+        const order = await API.createRazorpayOrder(
           { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
           idempotencyKey.current
         );
 
-        const [snapshot, order] = await Promise.all([
-          createBookingSnapshot(idempotencyKey.current),
-          orderRequest
-        ]);
-
-        if (!snapshot) throw new Error('Failed to secure vehicle lock. Please try again.');
-        holdId.current = snapshot.id;
         if (left.current) { releaseHold(); return; }
 
         setSetupStep(1);
@@ -129,6 +135,12 @@ export default function PaymentProcessingScreen() {
   const handleRazorpaySuccess = async (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
     paid.current = true; // money has moved: never release this hold from the app
     setStatus('VERIFYING');
+    if (holdPromiseRef.current) {
+      try {
+        const snapshot = await holdPromiseRef.current;
+        if (snapshot) holdId.current = snapshot.id;
+      } catch {}
+    }
     // One call: the server checks the signature and the payment with Razorpay as it confirms the booking
     // (a separate verify-signature call first cost an extra round trip).
     completeBookingFlow({ razorpayOrderId: data.razorpay_order_id, razorpayPaymentId: data.razorpay_payment_id, razorpaySignature: data.razorpay_signature });

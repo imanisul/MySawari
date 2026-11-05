@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, ActivityIndicator } from 'react-native';
+import { ListSkeleton } from '@/components/loading/ListSkeleton';
+import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
@@ -86,7 +87,7 @@ export default function RefundsScreen() {
     <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
       <ScreenHeader title="My Refund" />
       {isLoading ? (
-        <ActivityIndicator style={{ marginTop: 60 }} color={p.muted} />
+        <ListSkeleton />
       ) : (
         <FlatList
           data={list}

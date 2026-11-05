@@ -251,21 +251,8 @@ export default function BookingDetailScreen() {
 
             if (isVerified) {
               return (
-                <View style={[styles.box, styles.handoverSection, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
-                  <View style={styles.handoverHeaderRow}>
-                    <View style={[styles.otpIconBadge, { backgroundColor: '#DCFCE7' }]}>
-                      <Feather name="check-circle" size={18} color="#16A34A" />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.handoverSectionTitle, { color: '#166534' }]}>Vehicle Handover Verification</Text>
-                      <View style={styles.verifiedBadgeContainer}>
-                        <Text style={styles.verifiedBadgeText}>OTP VERIFIED</Text>
-                      </View>
-                    </View>
-                  </View>
-                  <Text style={[styles.handoverDesc, { color: '#15803D' }]}>
-                    Your vehicle handover verification is complete. Enjoy your trip!
-                  </Text>
+                <View style={styles.otpVerifiedBadge}>
+                  <Text style={styles.otpVerifiedBadgeText}>✔  OTP Verified</Text>
                 </View>
               );
             }
@@ -280,19 +267,10 @@ export default function BookingDetailScreen() {
               const digits = otpCode.split('');
               return (
                 <View style={[styles.box, styles.handoverSection, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
-                  <View style={styles.handoverHeaderRow}>
-                    <View style={[styles.otpIconBadge, { backgroundColor: c.lightBlue }]}>
-                      <Feather name="shield" size={18} color={c.navy} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.handoverSectionTitle, { color: c.foreground }]}>Vehicle Handover Verification</Text>
-                      <Text style={[styles.handoverSubtitle, { color: c.mutedForeground }]}>Your Vehicle Handover OTP</Text>
-                    </View>
-                  </View>
 
                   <View style={styles.otpBoxesRow}>
                     {digits.map((digit, index) => (
-                      <View key={index} style={[styles.otpDigitBox, { borderColor: c.navy, backgroundColor: '#F8FAFC' }]}>
+                      <View key={index} style={[styles.otpDigitBox, { borderColor: c.navy, backgroundColor: '#FFFFFF' }]}>
                         <Text style={[styles.otpDigitText, { color: c.navy }]}>{digit}</Text>
                       </View>
                     ))}
@@ -564,6 +542,8 @@ const styles = StyleSheet.create({
   box: { borderWidth: 1, borderRadius: 16, padding: 13 },
   banner: { borderRadius: 8, borderWidth: 1, borderColor: '#E7EAF4', paddingHorizontal: 8, paddingVertical: 6 },
   bannerLine: { borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  otpVerifiedBadge: { alignSelf: 'center', backgroundColor: '#304367', borderRadius: 6, paddingHorizontal: 9, paddingVertical: 4 },
+  otpVerifiedBadgeText: { fontFamily: FONT.semibold, fontSize: 10, lineHeight: 14, color: '#FFFFFF' },
   rowTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
   helpTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
   helpBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
@@ -606,27 +586,18 @@ const styles = StyleSheet.create({
   handoverSection: { padding: 16, gap: 12, borderRadius: 14 },
   handoverHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   otpIconBadge: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  handoverSectionTitle: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 20 },
-  handoverSubtitle: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 17, marginTop: 1 },
-  verifiedBadgeContainer: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginTop: 4,
-  },
-  verifiedBadgeText: { fontFamily: FONT.bold, fontSize: 11, color: '#15803D', letterSpacing: 0.5 },
-  otpBoxesRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginVertical: 4 },
+  handoverSectionTitle: { fontFamily: FONT.semibold, fontSize: 10, lineHeight: 20 },
+  handoverSubtitle: { fontFamily: FONT.medium, fontSize: 8, lineHeight: 17, marginTop: 1 },
+  otpBoxesRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginVertical: 4, backgroundColor: '#FFFFFF' },
   otpDigitBox: {
-    width: 48,
-    height: 52,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 6,
     borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  otpDigitText: { fontFamily: FONT.bold, fontSize: 24, letterSpacing: 1 },
+  otpDigitText: { fontFamily: FONT.bold, fontSize: 12, letterSpacing: 1, backgroundColor: '#FFFFFF' },
   handoverFooterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  handoverDesc: { flex: 1, fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
+  handoverDesc: { flex: 1, fontFamily: FONT.medium, fontSize: 8, lineHeight: 18 },
 });

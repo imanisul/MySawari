@@ -77,7 +77,10 @@ export default function PaymentScreen() {
     if (!code) return;
     setCouponError(null);
     await API.getCoupons().catch(() => []);
-    if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code) <= 0) {
+    if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code, {
+      vehicleId: selectedCar?.id || (selectedCar as any)?._id,
+      vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
+    }) <= 0) {
       setCouponError(`${code} isn't valid for this booking.`);
       return;
     }

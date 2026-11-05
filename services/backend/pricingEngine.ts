@@ -22,13 +22,22 @@ function legCharge(loc: Coordinates, roadKm?: number | null): { charge: number; 
 }
 
 export type Coupon = {
+  _id?: string;
   code: string;
+  title?: string;
+  subtitle?: string;
+  description?: string;
   discountType: 'FLAT' | 'PERCENTAGE';
   discountValue: number;
   minimumBooking: number;
   maximumDiscount?: number | null;
   expiryDate: string;
+  startDate?: string | null;
   active: boolean;
+  applicableType?: 'all' | 'specific_vehicles' | 'category' | 'campaign';
+  applicableVehicleIds?: string[];
+  applicableCategories?: string[];
+  vehicleId?: string;
 };
 
 /**
@@ -51,6 +60,8 @@ export function formatCurrency(amount: number): string {
 
 export type QuoteParams = {
   dailyRate: number;
+  vehicleId?: string;
+  vehicleCategory?: string;
   pickupDateStr: string;
   returnDateStr: string;
   pickupTime?: string;
@@ -308,12 +319,47 @@ export function setCouponCatalog(list: Coupon[]) {
  * whose minimum booking is met, capped at the rent, rounded to whole rupees. A typo or unknown code
  * gives ₹0 off.
  */
-export function calculateCouponDiscount(rentalAmount: number, _driverCharge: number, couponCode?: string): number {
+export function calculateCouponDiscount(
+  rentalAmount: number,
+  _driverCharge: number,
+  couponCode?: string,
+  vehicleContext?: { vehicleId?: string; vehicleCategory?: string }
+): number {
   if (!couponCode || !couponCode.trim()) return 0;
   const base = Math.max(0, rentalAmount);
   const coupon = couponCatalog.find(c => String(c.code).toUpperCase() === couponCode.trim().toUpperCase());
   if (!coupon || coupon.active === false) return 0;
   if (new Date(coupon.expiryDate) < new Date()) return 0;
+  if (coupon.startDate && new Date(coupon.startDate) > new Date()) return 0;
+
+  // Vehicle-specific eligibility check
+  const isVehicleSpecific =
+    coupon.applicableType === 'specific_vehicles' ||
+    Boolean(coupon.vehicleId) ||
+    (Array.isArray(coupon.applicableVehicleIds) && coupon.applicableVehicleIds.length > 0);
+
+  if (isVehicleSpecific) {
+    const allowed = new Set<string>();
+    if (coupon.vehicleId) allowed.add(String(coupon.vehicleId));
+    if (coupon.applicableVehicleIds) coupon.applicableVehicleIds.forEach(id => allowed.add(String(id)));
+    if (allowed.size > 0) {
+      if (!vehicleContext?.vehicleId || !allowed.has(String(vehicleContext.vehicleId))) {
+        return 0; // Not applicable to this vehicle
+      }
+    }
+  }
+
+  // Category eligibility check
+  if (
+    coupon.applicableType === 'category' &&
+    Array.isArray(coupon.applicableCategories) &&
+    coupon.applicableCategories.length > 0
+  ) {
+    const currentCat = (vehicleContext?.vehicleCategory || '').trim().toLowerCase();
+    const matches = coupon.applicableCategories.some(c => c.trim().toLowerCase() === currentCat);
+    if (!matches) return 0; // Not applicable to this category
+  }
+
   if (base < (coupon.minimumBooking || 0)) return 0;
   const value = Number(coupon.discountValue);
   if (!Number.isFinite(value) || value < 0) return 0;
@@ -407,7 +453,10 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const rentalDays = calculateRentalDays(pickupDateStr, returnDateStr, pickupTime, returnTime);
   const rentalAmount = calculateRentalAmount(dailyRate, rentalDays);
   const driverCharge = calculateDriverCharge(driverMode, rentalDays);
-  const couponDiscount = calculateCouponDiscount(rentalAmount, driverCharge, couponCode);
+  const couponDiscount = calculateCouponDiscount(rentalAmount, driverCharge, couponCode, {
+    vehicleId: params.vehicleId,
+    vehicleCategory: params.vehicleCategory,
+  });
   const discountedRentalAmount = Math.max(0, rentalAmount + driverCharge - couponDiscount);
 
   const pickup = calculatePickupCharge(isDeliveryRequested, deliveryMode, pickupLocation, pickupRoadKm);

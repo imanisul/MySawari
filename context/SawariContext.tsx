@@ -569,6 +569,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
 
     return {
       dailyRate: selectedCar.perDay,
+      vehicleId: selectedCar.id || (selectedCar as any)._id,
+      vehicleCategory: selectedCar.category || (selectedCar as any).segment,
       pickupDateStr,
       returnDateStr,
       pickupTime,

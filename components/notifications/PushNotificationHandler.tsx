@@ -30,8 +30,10 @@ export function PushNotificationHandler() {
     const { syncNotifications: sync, markNotificationRead: markRead, selectCar } = latest.current;
     const notificationId = asString(data?.notificationId);
     const bookingId = asString(data?.bookingId);
-    const carId = asString(data?.carId);
-    const link = asString(data?.link);
+    const carId = asString(data?.carId) || asString(data?.vehicleId);
+    const offerId = asString(data?.offerId);
+    const promoCode = asString(data?.promoCode) || asString(data?.code);
+    const link = asString(data?.link) || asString(data?.deepLink);
 
     if (notificationId) markRead(notificationId).catch(() => {});
     sync().catch(() => {});
@@ -41,15 +43,33 @@ export function PushNotificationHandler() {
     } else if (carId) {
       import('@/services/backend/api').then(({ API }) => {
         API.getVehiclesWithAvailability().then((cars: any[]) => {
-          const car = cars.find(c => String(c.id) === carId);
+          const car = cars.find(c => String(c.id) === String(carId) || String(c._id) === String(carId));
           if (car) {
             selectCar(car);
-            router.push('/car-details');
-          } else {
-            router.push('/explore');
           }
-        }).catch(() => router.push('/explore'));
+          router.push({
+            pathname: '/car-details',
+            params: {
+              id: carId,
+              vehicleId: carId,
+              ...(offerId ? { offerId } : {}),
+              ...(promoCode ? { promoCode } : {}),
+            },
+          });
+        }).catch(() => {
+          router.push({
+            pathname: '/car-details',
+            params: {
+              id: carId,
+              vehicleId: carId,
+              ...(offerId ? { offerId } : {}),
+              ...(promoCode ? { promoCode } : {}),
+            },
+          });
+        });
       });
+    } else if (offerId) {
+      router.push({ pathname: '/offers', params: { offerId, ...(promoCode ? { promoCode } : {}) } });
     } else if (link && link.startsWith('/') && !link.startsWith('//')) {
       // Only in-app routes; a push must never be able to send the app to an outside address.
       router.push(link as any);

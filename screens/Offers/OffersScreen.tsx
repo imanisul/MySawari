@@ -46,7 +46,7 @@ export default function OffersScreen() {
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const applyMode = mode === 'apply';
-  const { applyCoupon, appliedCouponCode } = useSawari();
+  const { applyCoupon, appliedCouponCode, selectedCar } = useSawari();
   const { pricingQuote } = useQuote();
   const [toast, setToast] = React.useState(false);
   const [toastMsg, setToastMsg] = React.useState('Coupon Applied');
@@ -66,9 +66,22 @@ export default function OffersScreen() {
 
   const use = (c: Coupon) => {
     Haptics.selectionAsync();
+    const vehicleContext = {
+      vehicleId: selectedCar?.id || (selectedCar as any)?._id,
+      vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
+    };
+
     if (applyMode) {
-      if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code) <= 0) {
-        Alert.alert('Not valid for this trip', c.minimumBooking > 0 ? `${c.code} needs a booking of at least ₹${c.minimumBooking.toLocaleString('en-IN')}.` : `${c.code} can't be used on this booking.`);
+      if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code, vehicleContext) <= 0) {
+        let msg = `${c.code} can't be used on this booking.`;
+        if (c.minimumBooking > 0 && pricingQuote.rentalAmount < c.minimumBooking) {
+          msg = `${c.code} needs a booking of at least ₹${c.minimumBooking.toLocaleString('en-IN')}.`;
+        } else if (c.applicableType === 'specific_vehicles' || c.vehicleId) {
+          msg = `${c.code} is only valid for selected cars and cannot be applied to this vehicle.`;
+        } else if (c.applicableType === 'category') {
+          msg = `${c.code} is only valid for ${c.applicableCategories?.join(', ')} vehicles.`;
+        }
+        Alert.alert('Not valid for this trip', msg);
         return;
       }
       applyCoupon(c.code);
@@ -79,8 +92,13 @@ export default function OffersScreen() {
       setTimeout(() => { setToast(false); safeBack(router); }, 900);
       return;
     }
+
     applyCoupon(c.code); // checked again against the trip at checkout
-    router.push('/explore');
+    if (c.vehicleId) {
+      router.push({ pathname: '/car-details', params: { id: c.vehicleId, vehicleId: c.vehicleId, promoCode: c.code } });
+    } else {
+      router.push('/explore');
+    }
   };
 
   return (

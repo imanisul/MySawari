@@ -6,6 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles, useLiveCar } from '@/hooks/useVehicles';
+import { useQuery } from '@tanstack/react-query';
+import { offersQueryOptions, Offer } from '@/services/api/offers';
+import { Feather } from '@expo/vector-icons';
 import { LoginBottomSheet } from '@/components';
 import { cars, getAvailability, splitDateRange, parseDayLabel, dayNumToLabel, isHighDemand } from '@/utils/sawari';
 
@@ -47,10 +50,40 @@ export default function CarDetailsScreen() {
   const blurTarget = useRef<View | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id: paramCarId, vehicleId: paramVehicleId } = useLocalSearchParams<{ id?: string; vehicleId?: string }>();
+  const { id: paramCarId, vehicleId: paramVehicleId, offerId: paramOfferId, promoCode: paramPromoCode } =
+    useLocalSearchParams<{ id?: string; vehicleId?: string; offerId?: string; promoCode?: string }>();
   const targetCarId = paramCarId || paramVehicleId;
   const { data: fetchedVehicles = [], isLoading: isFleetLoading } = useVehicles();
-  const { selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate, isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates, isDarkMode } = useSawari();
+  const {
+    selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate,
+    isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates, isDarkMode,
+    applyCoupon, appliedCouponCode,
+  } = useSawari();
+
+  const { data: offers = [] } = useQuery(offersQueryOptions);
+
+  // Identify targeted offer if passed via push/deep-link
+  const targetOffer = (paramOfferId || paramPromoCode)
+    ? offers.find(
+        (o: Offer) =>
+          (paramOfferId && (o._id === paramOfferId || o.id === paramOfferId)) ||
+          (paramPromoCode && o.code === paramPromoCode)
+      )
+    : null;
+
+  const isParamOfferExpired = Boolean(
+    (paramOfferId || paramPromoCode) &&
+      (!targetOffer || (targetOffer.expiryDate && new Date(targetOffer.expiryDate) < new Date()))
+  );
+
+  // Auto-apply promo code if valid and not yet applied
+  useEffect(() => {
+    if (targetOffer?.code && appliedCouponCode !== targetOffer.code && !isParamOfferExpired) {
+      applyCoupon(targetOffer.code);
+    } else if (paramPromoCode && !appliedCouponCode && !isParamOfferExpired) {
+      applyCoupon(paramPromoCode);
+    }
+  }, [targetOffer, paramPromoCode, appliedCouponCode, isParamOfferExpired, applyCoupon]);
 
   // If a specific car ID was passed or selectedCar is the dummy placeholder, select the real vehicle
   useEffect(() => {
@@ -299,6 +332,71 @@ export default function CarDetailsScreen() {
           <View style={{ height: 16 }} />
           <DriverCard />
           <View style={{ height: 8 }} />
+
+          {/* Promoted Offer / Campaign Banner */}
+          {isParamOfferExpired && (
+            <View style={{
+              marginHorizontal: 16,
+              marginBottom: 10,
+              padding: 12,
+              borderRadius: 12,
+              backgroundColor: '#FEF2F2',
+              borderWidth: 1,
+              borderColor: '#FECACA',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 10,
+            }}>
+              <Feather name="alert-triangle" size={18} color="#DC2626" />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#991B1B' }}>
+                  Campaign Offer Expired
+                </Text>
+                <Text style={{ fontSize: 12, color: '#B91C1C', marginTop: 2 }}>
+                  The offer you clicked has ended. However, you can still book {title} at our regular best daily rates!
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {targetOffer && !isParamOfferExpired && (
+            <View style={{
+              marginHorizontal: 16,
+              marginBottom: 10,
+              padding: 14,
+              borderRadius: 12,
+              backgroundColor: '#F0FDF4',
+              borderWidth: 1.5,
+              borderColor: '#86EFAC',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+            }}>
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: '#DCFCE7',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Feather name="tag" size={18} color="#16A34A" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#166534' }}>
+                  {targetOffer.title || 'Special Promotional Offer!'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#15803D', marginTop: 2 }}>
+                  {targetOffer.discount ? `${targetOffer.discount} applied at checkout` : targetOffer.subtitle}
+                </Text>
+                {targetOffer.code ? (
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#166534', marginTop: 4 }}>
+                    PROMO CODE: {targetOffer.code} (ACTIVE)
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          )}
           {/* Marks which rule this trip falls under; "Add 1 day" is hidden for 2+ day trips, which are already unlimited. */}
           <MileageLimits
             tripDays={hasTrip ? tripDays : undefined}

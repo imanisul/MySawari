@@ -17,6 +17,7 @@ export interface Offer {
   type: 'coupon' | 'special_deal' | 'banner';
   title: string;
   subtitle: string;
+  description?: string;
   discount?: string;
   code?: string;
   expiry?: string;
@@ -25,6 +26,14 @@ export interface Offer {
   image?: any;
   displayFormat?: 'image' | 'text' | 'combination';
   lines?: [string, string] | string[];
+  applicableType?: 'all' | 'specific_vehicles' | 'category' | 'campaign';
+  applicableVehicleIds?: string[];
+  applicableCategories?: string[];
+  startDate?: string;
+  minimumBooking?: number;
+  discountType?: 'FLAT' | 'PERCENTAGE';
+  discountValue?: number;
+  maximumDiscount?: number | null;
   // Special deal fields
   vehicleId?: string;
   originalPrice?: number;
@@ -94,6 +103,12 @@ export async function fetchOffers(): Promise<Offer[]> {
             image: plateSafeOfferImage(offer.image),
             expiry: offer.expiryDate ? formatExpiry(offer.expiryDate) : '',
             expiryDate: offer.expiryDate,
+            startDate: offer.startDate,
+            description: offer.description || '',
+            applicableType: offer.applicableType || 'all',
+            applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
+            applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
+            vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
             active: offer.active,
             approvalStatus: offer.approvalStatus,
           };
@@ -115,6 +130,17 @@ export async function fetchOffers(): Promise<Offer[]> {
             displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
             lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
             expiry: formatExpiry(offer.expiryDate),
+            expiryDate: offer.expiryDate,
+            startDate: offer.startDate,
+            description: offer.description || '',
+            minimumBooking: offer.minimumBooking,
+            discountType: offer.discountType,
+            discountValue: offer.discountValue,
+            maximumDiscount: offer.maximumDiscount,
+            applicableType: offer.applicableType || 'all',
+            applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
+            applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
+            vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
             gradientColors: offer.gradientColors || ['#6178D8', '#8B5CF6'],
             icon: offer.icon || 'tag',
             image: plateSafeOfferImage(offer.image),
@@ -129,16 +155,20 @@ export async function fetchOffers(): Promise<Offer[]> {
             type: 'special_deal',
             title: offer.title,
             subtitle: offer.subtitle,
+            description: offer.description || '',
             discount: offer.discountPercent ? `${offer.discountPercent}% OFF` : '',
-            code: '',
+            code: offer.code || '',
             displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
             lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
             expiry: formatExpiry(offer.expiryDate),
             expiryDate: offer.expiryDate,
+            startDate: offer.startDate,
+            applicableType: 'specific_vehicles',
+            applicableVehicleIds: [String(offer.vehicleId)],
+            vehicleId: String(offer.vehicleId),
             gradientColors: offer.gradientColors || ['#FF416C', '#FF4B2B'],
             icon: offer.icon || 'zap',
             image: plateSafeOfferImage(offer.image),
-            vehicleId: offer.vehicleId,
             originalPrice: offer.originalPrice,
             dealPrice: offer.dealPrice,
             discountPercent: offer.discountPercent,

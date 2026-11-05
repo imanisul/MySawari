@@ -25,13 +25,28 @@ export function extractReferralCode(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 3) return null;
 
-  // 1. URL parameter check (?code=... or &code=... or ?ref=...)
-  const urlParamMatch = trimmed.match(/[?&](?:code|ref|referralCode)=([A-Za-z0-9_-]{4,20})/i);
-  if (urlParamMatch && urlParamMatch[1]) {
-    return urlParamMatch[1].toUpperCase();
+  // 1. URL Path format: https://mysawari.in/ref/CODE, mysawari://ref/CODE, /referral/CODE, /invite/CODE
+  const urlPathMatch = trimmed.match(/(?:ref|referral|invite)\/([A-Za-z0-9_-]{4,20})/i);
+  if (urlPathMatch && urlPathMatch[1]) {
+    const code = urlPathMatch[1].toUpperCase();
+    if (!/^\d+$/.test(code)) return code;
   }
 
-  // 2. Share message patterns (e.g. "code *XYZ*", "code: XYZ", "use my code XYZ")
+  // 2. Google Play Store referrer format: referrer=code%3DCODE or referrer=CODE
+  const playReferrerMatch = trimmed.match(/referrer=(?:code(?:%3D|=))?([A-Za-z0-9_-]{4,20})/i);
+  if (playReferrerMatch && playReferrerMatch[1]) {
+    const code = playReferrerMatch[1].toUpperCase();
+    if (!/^\d+$/.test(code)) return code;
+  }
+
+  // 3. URL query parameter check (?code=... or &code=... or ?ref=...)
+  const urlParamMatch = trimmed.match(/[?&](?:code|ref|referralCode)=([A-Za-z0-9_-]{4,20})/i);
+  if (urlParamMatch && urlParamMatch[1]) {
+    const code = urlParamMatch[1].toUpperCase();
+    if (!/^\d+$/.test(code)) return code;
+  }
+
+  // 4. Share message patterns (e.g. "code *XYZ*", "code: XYZ", "use my code XYZ")
   const messagePatterns = [
     /(?:use\s+my\s+code|invite\s+code|referral\s+code|my\s+code)\s*[:*]?\s*([A-Za-z0-9]{4,15})\b/i,
     /\*([A-Za-z0-9]{5,15})\*/, // text inside asterisks like *ANISUL99*
@@ -47,7 +62,7 @@ export function extractReferralCode(text: string): string | null {
     }
   }
 
-  // 3. Standalone code string check (e.g. copied code directly)
+  // 5. Standalone code string check (e.g. copied code directly)
   // Must be 5-12 alphanumeric characters, not a pure number (phone number), and not an email
   if (/^[A-Za-z0-9]{5,12}$/.test(trimmed)) {
     const upper = trimmed.toUpperCase();

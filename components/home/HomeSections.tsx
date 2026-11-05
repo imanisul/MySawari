@@ -258,6 +258,18 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
 
   const handleSlidePress = useCallback((s: HeroSlide) => {
     Haptics.selectionAsync();
+    if (s.vehicleId) {
+      if (s.code) Clipboard.setStringAsync(s.code);
+      router.push({
+        pathname: '/car-details',
+        params: {
+          id: s.vehicleId,
+          vehicleId: s.vehicleId,
+          ...(s.code ? { promoCode: s.code } : {}),
+        },
+      });
+      return;
+    }
     if (s.code) {
       Clipboard.setStringAsync(s.code);
       CustomAlert.alert(
@@ -265,8 +277,6 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
         `Promo code "${s.code}" has been copied to your clipboard. Paste it at checkout to get your discount!`,
         [{ text: 'Great!' }]
       );
-    } else if (s.vehicleId) {
-      router.push({ pathname: '/car-details', params: { id: s.vehicleId, vehicleId: s.vehicleId } });
     }
   }, [router]);
 

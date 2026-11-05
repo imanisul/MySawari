@@ -210,6 +210,19 @@ export function LoginBottomSheet({
     }).start();
   }, [visible]);
 
+  // Ensure referral code is populated if detected during flow when entering profile step
+  useEffect(() => {
+    if (step === 'profile' && !referral) {
+      getPendingReferral().then((ref) => {
+        if (ref) {
+          setPendingReferral(ref);
+          setReferral(ref.code);
+          setReferralStatusMsg({ text: `Referred by ${ref.referrerName}`, valid: true });
+        }
+      }).catch(() => {});
+    }
+  }, [step, referral]);
+
   // Debounced real-time validation when user types or edits referral code on Profile step
   useEffect(() => {
     if (step !== 'profile') return;
@@ -473,6 +486,7 @@ export function LoginBottomSheet({
     try {
       const { token, refreshToken, user } = await API.verifyOtp(mobile, digitsOf(otp), name.trim(), referral, otpId || undefined);
       markLoggedIn();
+      clearPendingReferral().catch(() => {});
       setWelcomeName(name.trim().split(/\s+/)[0]);
       const sessionSaved = login(token, refreshToken, user);
       // Email is optional and saved once the session exists; a failure here never blocks sign-in.

@@ -958,13 +958,22 @@ export const API = {
               && (!o.approvalStatus || o.approvalStatus === 'approved')
               && Number.isFinite(new Date(o.expiryDate).getTime()) && new Date(o.expiryDate).getTime() >= now)
             .map((o: any) => ({
+              _id: o._id,
               code: o.code.trim().toUpperCase(),
+              title: o.title || '',
+              subtitle: o.subtitle || '',
+              description: o.description || '',
               discountType: o.discountType,
               discountValue: Number(o.discountValue) || 0,
               minimumBooking: Number(o.minimumBooking) || 0,
               maximumDiscount: o.maximumDiscount ?? null,
               expiryDate: o.expiryDate,
+              startDate: o.startDate || null,
               active: o.active !== false,
+              applicableType: o.applicableType || 'all',
+              applicableVehicleIds: Array.isArray(o.applicableVehicleIds) ? o.applicableVehicleIds.map(String) : [],
+              applicableCategories: Array.isArray(o.applicableCategories) ? o.applicableCategories : [],
+              vehicleId: o.vehicleId ? String(o.vehicleId) : undefined,
             }));
           couponCache = { at: Date.now(), list };
           setCouponCatalog(list);

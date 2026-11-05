@@ -5,7 +5,10 @@
     "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/images/MySawari.png",
-    "scheme": "car-rental-mobile",
+    "scheme": [
+      "car-rental-mobile",
+      "mysawari"
+    ],
     "userInterfaceStyle": "light",
     "runtimeVersion": {
       "policy": "appVersion"
@@ -60,7 +63,29 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#F9F9F8"
-      }
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "mysawari.in",
+              "pathPrefix": "/ref"
+            },
+            {
+              "scheme": "https",
+              "host": "mysawari.app",
+              "pathPrefix": "/ref"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "androidStatusBar": {
       "translucent": true,

@@ -19,7 +19,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { forSpecificCar, returnBack } = useLocalSearchParams();
+  const { forSpecificCar, returnBack, thenBook } = useLocalSearchParams();
   const {
     pickup: pickupLocation,
     setPickup: setPickupLocation,
@@ -28,6 +28,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
     setDropoff,
     deliveryMode,
     isDarkMode,
+    isAuthenticated,
   } = useSawari();
 
   const [mode, setMode] = useState<LocationSearchMode>(isDestination ? 'destination' : (isReturn ? 'return' : 'pickup'));
@@ -41,7 +42,10 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
 
   const leaveAfterDestination = () => {
     if (forSpecificCar === 'true') {
-      if (router.canGoBack()) {
+      if (thenBook === 'true' && isAuthenticated) {
+        // Book Now: dates and destination are both set, so straight to the payment page.
+        router.replace('/booking');
+      } else if (router.canGoBack()) {
         router.back();
       } else {
         router.replace('/car-details');

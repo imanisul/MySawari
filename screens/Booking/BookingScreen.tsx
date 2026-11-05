@@ -415,376 +415,376 @@ export default function BookingScreen() {
 
   return (
     <BlurTargetProvider target={blurTarget}>
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
-       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
-        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: 260 + insets.bottom }]}>
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => safeBack(router)} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
-              <Feather name="chevron-left" size={18} color={p.sub} />
-            </Pressable>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.headerTitle, { color: p.fg }]}>Payment Option</Text>
-              <Text style={[styles.headerSub, { color: p.sub }]}>Secure & encrypted payment</Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Booking policies" onPress={() => router.push('/terms')} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
-              <Feather name="info" size={16} color={p.sub} />
-            </Pressable>
-          </View>
-
-          {/* Car */}
-          <View style={[styles.carCard, { borderColor: '#EAECF1' }]}>
-            <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
-              <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  {!!selectedCar.manufacturer && <Text style={[styles.brand, { color: p.muted }]}>{selectedCar.manufacturer}</Text>}
-                  <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1}>{title}</Text>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
+          <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
+            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingTop: insets.top + 8, paddingBottom: 260 + insets.bottom }]}>
+              {/* Header */}
+              <View style={styles.header}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={() => safeBack(router)} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
+                  <Feather name="chevron-left" size={18} color={p.sub} />
+                </Pressable>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.headerTitle, { color: p.fg }]}>Payment Option</Text>
+                  <Text style={[styles.headerSub, { color: p.sub }]}>Secure & encrypted payment</Text>
                 </View>
-                {!!selectedCar.rating && (
-                  <View style={[styles.rating, { backgroundColor: p.navy }]}>
-                    <Text style={styles.ratingText}>{Number(selectedCar.rating).toFixed(1)}</Text>
-                    <Ionicons name="star" size={12} color={p.star} />
+                <Pressable accessibilityRole="button" accessibilityLabel="Booking policies" onPress={() => router.push('/terms')} hitSlop={8} style={[styles.circle, { backgroundColor: p.iconBg }]}>
+                  <Feather name="info" size={16} color={p.sub} />
+                </Pressable>
+              </View>
+
+              {/* Car */}
+              <View style={[styles.carCard, { borderColor: '#EAECF1' }]}>
+                <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
+                  <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" transition={150} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      {!!selectedCar.manufacturer && <Text style={[styles.brand, { color: p.muted }]}>{selectedCar.manufacturer}</Text>}
+                      <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1}>{title}</Text>
+                    </View>
+                    {!!selectedCar.rating && (
+                      <View style={[styles.rating, { backgroundColor: p.navy }]}>
+                        <Text style={styles.ratingText}>{Number(selectedCar.rating).toFixed(1)}</Text>
+                        <Ionicons name="star" size={12} color={p.star} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.carMeta, { color: p.muted }]} numberOfLines={1}>{meta.join('  •  ')}</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${mode}, change driving option`} onPress={chooseDriver} hitSlop={6}>
+                    <Text style={[styles.carMeta, { color: p.muted }]}>{mode}  •  {days} day{days === 1 ? '' : 's'}</Text>
+                  </Pressable>
+                  {ready && (
+                    <View style={styles.priceRow}>
+                      <Text style={[styles.carPrice, { color: p.fg }]}>{formatCurrency(ready.total)}</Text>
+                      {Math.round(ready.original) > Math.round(ready.total) && <Text style={[styles.carStrike, { color: p.muted }]}>{formatCurrency(ready.original)}</Text>}
+                    </View>
+                  )}
+                </View>
+              </View>
+
+              {/* Rental duration */}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={isMissingDates ? 'Select your dates' : `${days} day rental duration. Edit dates`}
+                onPress={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
+                style={({ pressed }) => [styles.duration, { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4' }, pressed && { opacity: 0.7 }]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
+                  {!isMissingDates && (
+                    <Text style={[styles.durationSub, { color: p.sub }]} numberOfLines={1}>
+                      {longWhen(startStr, pickupTime)}  →  {longWhen(endStr, returnTime)}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.edit}>
+                  <Feather name="edit" size={17} color={p.navy} />
+                  <Text style={[styles.editText, { color: p.navy }]}>Edit</Text>
+                </View>
+              </Pressable>
+
+              {!isVehicleAvailable && !isMissingDates && (
+                <View style={[styles.notice, { backgroundColor: p.redBg, borderColor: p.redBorder }]}>
+                  <Text style={[styles.noticeTitle, { color: p.red }]}>Not available for these dates</Text>
+                  <Text style={[styles.noticeText, { color: p.sub }]}>This vehicle was booked for part of your trip. Please change your dates.</Text>
+                </View>
+              )}
+
+              {/* Pickup & drop-off: Pickup -> Destination (in-between) -> Return, connected seamlessly */}
+              <Text style={[styles.section, { color: p.fg }]}>Pickup & drop-off</Text>
+              <View style={styles.journeyContainer}>
+                {/* Continuous vertical route line connecting Pickup, Destination and Return */}
+                <View style={[styles.journeyLine, { backgroundColor: p.deliveryBorder }]} pointerEvents="none" />
+
+                {/* 1. Pickup */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Pickup ${pickupWhere}. Change`}
+                  onPress={choosePickup}
+                  style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
+                >
+                  <View style={[styles.ring, { borderColor: p.green, backgroundColor: p.page }]}>
+                    <View style={[styles.innerDot, { backgroundColor: p.green }]} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.stopTitle, { color: p.fg }]}>Pickup{!isMissingDates ? ` · ${dayAndTime(startStr, pickupTime)}` : ''}</Text>
+                    <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={1}>
+                      {deliverPickup ? `Doorstep delivery · ${pickupWhere}${ready?.pickupCharge ? ` · +${formatCurrency(ready.pickupCharge)}` : ''}` : pickupWhere}
+                    </Text>
+                  </View>
+                  <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
+                </Pressable>
+
+                {/* 2. Destination (In-between Pickup and Return) */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Destination ${destinationWhere}. Change`}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    router.push({ pathname: '/dropoff', params: { returnBack: 'true' } });
+                  }}
+                  style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
+                >
+                  <View style={[styles.ring, { borderColor: isMissingDestination ? p.red : p.navy, backgroundColor: p.page }]}>
+                    <View style={[styles.innerDot, { backgroundColor: isMissingDestination ? p.red : p.navy }]} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.stopTitle, { color: p.fg }]}>Destination</Text>
+                    <Text style={[styles.stopSub, { color: isMissingDestination ? p.red : p.sub }]} numberOfLines={1}>
+                      {destinationWhere}
+                    </Text>
+                  </View>
+                  <Text style={[styles.changeText, { color: isMissingDestination ? p.red : p.navy }]}>
+                    {isMissingDestination ? 'Choose' : 'Change'}
+                  </Text>
+                </Pressable>
+
+                {/* 3. Return */}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Return ${returnWhere}. Change`}
+                  onPress={chooseReturn}
+                  style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
+                >
+                  <View style={[styles.ring, { borderColor: p.red, backgroundColor: p.page }]}>
+                    <View style={[styles.innerDot, { backgroundColor: p.red }]} />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.stopTitle, { color: p.fg }]}>Return{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
+                    <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1}>
+                      {collectReturn ? `Doorstep collection · ${returnWhere}${ready?.dropCharge ? ` · +${formatCurrency(ready.dropCharge)}` : ''}` : returnWhere}
+                    </Text>
+                  </View>
+                  <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
+                </Pressable>
+              </View>
+
+              {/* Offers & Coupon */}
+              <View style={styles.sectionRow}>
+                <Text style={[styles.section, { color: p.fg }]}>Offers & Coupon</Text>
+                <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/offers', params: { mode: 'apply' } } as any)} hitSlop={8}>
+                  <Text style={[styles.viewAll, { color: p.navy }]}>View all</Text>
+                </Pressable>
+              </View>
+              {appliedCouponCode ? (
+                <View style={[styles.couponApplied, { backgroundColor: p.greenBg, borderColor: p.greenBorder }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.couponAppliedTitle, { color: p.green }]}>{appliedCouponCode} applied</Text>
+                    {!!pricingQuote?.couponDiscount && <Text style={[styles.couponAppliedSub, { color: p.sub }]}>You save {formatCurrency(pricingQuote.couponDiscount)} on this trip</Text>}
+                  </View>
+                  <Pressable accessibilityRole="button" onPress={removeCoupon} hitSlop={8}>
+                    <Text style={[styles.apply, { color: p.red }]}>Remove</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View style={[styles.couponField, { borderColor: couponError ? p.red : '#EAECF1' }]}>
+                  <TextInput
+                    value={couponInput}
+                    onChangeText={(t) => { setCouponInput(t.toUpperCase()); setCouponError(null); }}
+                    placeholder="Enter Coupon Code"
+                    placeholderTextColor={p.muted}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={() => handleApplyCoupon(couponInput)}
+                    style={[styles.couponInput, { color: p.fg }]}
+                  />
+                  <Pressable accessibilityRole="button" onPress={() => handleApplyCoupon(couponInput)} disabled={!couponInput.trim()} style={styles.applyBtn}>
+                    <Text style={[styles.apply, { color: couponInput.trim() ? p.navy : '#747EA3' }]}>Apply</Text>
+                  </Pressable>
+                </View>
+              )}
+              {!!couponError && <Text style={[styles.couponError, { color: p.red }]}>{couponError}</Text>}
+              {!appliedCouponCode && coupons.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+                  {coupons.map((c) => (
+                    <Pressable key={c.code} accessibilityRole="button" accessibilityLabel={`Apply ${c.code}`} onPress={() => handleApplyCoupon(c.code)} style={({ pressed }) => [styles.chip, { backgroundColor: '#F9F9FB' }, pressed && { opacity: 0.7 }]}>
+                      <Text style={[styles.chipText, { color: p.navy }]}>{c.code}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+
+              {/* Save on your booking */}
+              <Text style={[styles.section, { color: p.fg }]}>Save on your booking</Text>
+              <View style={[styles.saveCard, { borderColor: '#EAECF1' }]}>
+                <View style={styles.saveRow}>
+                  <View style={[styles.saveIcon, { backgroundColor: '#F9F9FB' }]}>
+                    <MaterialCommunityIcons name="cash" size={18} color={p.sub} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.saveTitle, { color: p.fg }]}>SawariCash</Text>
+                    <View style={[styles.cashChip, { backgroundColor: p.chipBg }]}>
+                      <Text style={[styles.cashChipText, { color: p.navy }]}>{formatCurrency(sawariCash)} available</Text>
+                    </View>
+                  </View>
+                  <DesignToggle
+                    accessibilityLabel="Use SawariCash"
+                    value={sawariCashToApply > 0}
+                    disabled={sawariCash <= 0}
+                    onValueChange={(on) => { Haptics.selectionAsync(); applySawariCash(on ? sawariCash : 0); }}
+                  />
+                </View>
+                {sawariCashToApply > 0 && !!pricingQuote && (
+                  <Text style={[styles.cashNote, { color: p.green }]}>
+                    {pricingQuote.sawariCashUsed > 0 ? `${formatCurrency(pricingQuote.sawariCashUsed)} used on this trip (up to ₹50 or 10% of the rent).` : 'Not usable on this trip.'}
+                  </Text>
+                )}
+
+                <View style={[styles.divider, { backgroundColor: p.divider }]} />
+
+                <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlans }} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowPlans((v) => !v); }} style={styles.saveRow}>
+                  <View style={[styles.saveIcon, { backgroundColor: '#F9F9FB' }]}>
+                    <MaterialCommunityIcons name="crown-outline" size={18} color={p.sub} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.saveTitle, { color: p.fg }]}>Membership</Text>
+                    <Text style={[styles.saveSub, { color: p.sub }]}>
+                      {planToBuy
+                        ? `${PLANS.find((x) => x.key === planToBuy)?.name} membership added · ${formatCurrency(PLANS.find((x) => x.key === planToBuy)?.price || 0)} with this payment`
+                        : isMember
+                          ? `${PLANS.find((x) => x.key === membership!.plan)?.name ?? 'Member'} member${pricingQuote?.subscriptionDiscount ? ` · ${formatCurrency(pricingQuote.subscriptionDiscount)} off this trip` : ''}`
+                          : 'Explore plans and trip savings'}
+                    </Text>
+                  </View>
+                  <Feather name={showPlans ? 'chevron-up' : 'chevron-down'} size={16} color={p.sub} />
+                </Pressable>
+
+                {showPlans && (
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    {PLANS.filter((pl) => !isMember || PLANS.findIndex((x) => x.key === pl.key) > PLANS.findIndex((x) => x.key === membership!.plan)).map((pl) => {
+                      const save = Math.min(pl.perTripCap, Math.round(tripRent * pl.pct));
+                      const purple = pl.key === 'plus';
+                      const bg = purple ? p.purple : pl.key === 'pro' ? p.greenBg : p.page;
+                      const border = purple ? p.purple : pl.key === 'pro' ? p.proBorder : p.memberBorder;
+                      const text = purple ? '#FFFFFF' : p.fg;
+                      const sub = purple ? 'rgba(255,255,255,0.85)' : p.sub;
+                      return (
+                        <Pressable
+                          key={pl.key}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${isMember ? 'Upgrade to' : 'Get'} ${pl.name}, ${formatCurrency(pl.price)} a year${save > 0 ? `, save ${formatCurrency(save)} on this trip` : ''}`}
+                          // Picking a plan adds it to this booking (one payment) with a celebration; tapping it again removes it.
+                          onPress={() => {
+                            if (planToBuy === pl.key) { Haptics.selectionAsync(); setPlanToBuy(null); return; }
+                            setPlanToBuy(pl.key);
+                            setCelebrate({ name: pl.name, price: pl.price, save, pctLabel: pl.pctLabel });
+                          }}
+                          style={({ pressed }) => [styles.plan, { backgroundColor: bg, borderColor: border }, pressed && { opacity: 0.9 }]}
+                        >
+                          <View style={[styles.radio, planToBuy === pl.key
+                            ? { borderColor: purple ? '#FFFFFF' : pl.key === 'pro' ? p.green : p.purple, backgroundColor: purple ? '#FFFFFF' : pl.key === 'pro' ? p.green : p.purple, alignItems: 'center', justifyContent: 'center' }
+                            : { borderColor: purple ? '#FFFFFF' : p.radioRing }]}>
+                            {planToBuy === pl.key && <View style={{ width: 5.5, height: 5.5, borderRadius: 3, backgroundColor: purple ? p.purple : '#FFFFFF' }} />}
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <View style={styles.planNameRow}>
+                              <Image source={pl.icon} style={{ width: pl.iconSize, height: pl.iconSize }} contentFit="contain" />
+                              <Text style={[styles.planName, { color: text }]}>{pl.name}</Text>
+                              {save > 0 && (
+                                <View style={[styles.saveChip, { backgroundColor: p.green }]}>
+                                  <Text style={styles.saveChipText}>{planToBuy === pl.key ? `${formatCurrency(save)} Saved` : `Save ${formatCurrency(save)} on this trip`}</Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={[styles.planSub, { color: sub }]} numberOfLines={1}>{pl.pctLabel} off every trip  •  Save up to ₹{pl.annual}/year</Text>
+                          </View>
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={[styles.planPrice, { color: text }]}>{formatCurrency(pl.price)}</Text>
+                            <Text style={[styles.planSub, { color: sub }]}>/year</Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 )}
               </View>
-              <Text style={[styles.carMeta, { color: p.muted }]} numberOfLines={1}>{meta.join('  •  ')}</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel={`${mode}, change driving option`} onPress={chooseDriver} hitSlop={6}>
-                <Text style={[styles.carMeta, { color: p.muted }]}>{mode}  •  {days} day{days === 1 ? '' : 's'}</Text>
-              </Pressable>
-              {ready && (
-                <View style={styles.priceRow}>
-                  <Text style={[styles.carPrice, { color: p.fg }]}>{formatCurrency(ready.total)}</Text>
-                  {Math.round(ready.original) > Math.round(ready.total) && <Text style={[styles.carStrike, { color: p.muted }]}>{formatCurrency(ready.original)}</Text>}
-                </View>
-              )}
-            </View>
-          </View>
 
-          {/* Rental duration */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={isMissingDates ? 'Select your dates' : `${days} day rental duration. Edit dates`}
-            onPress={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
-            style={({ pressed }) => [styles.duration, { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4' }, pressed && { opacity: 0.7 }]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
-              {!isMissingDates && (
-                <Text style={[styles.durationSub, { color: p.sub }]} numberOfLines={1}>
-                  {longWhen(startStr, pickupTime)}  →  {longWhen(endStr, returnTime)}
-                </Text>
-              )}
-            </View>
-            <View style={styles.edit}>
-              <Feather name="edit" size={17} color={p.navy} />
-              <Text style={[styles.editText, { color: p.navy }]}>Edit</Text>
-            </View>
-          </Pressable>
-
-          {!isVehicleAvailable && !isMissingDates && (
-            <View style={[styles.notice, { backgroundColor: p.redBg, borderColor: p.redBorder }]}>
-              <Text style={[styles.noticeTitle, { color: p.red }]}>Not available for these dates</Text>
-              <Text style={[styles.noticeText, { color: p.sub }]}>This vehicle was booked for part of your trip. Please change your dates.</Text>
-            </View>
-          )}
-
-          {/* Pickup & drop-off: Pickup -> Destination (in-between) -> Return, connected seamlessly */}
-          <Text style={[styles.section, { color: p.fg }]}>Pickup & drop-off</Text>
-          <View style={styles.journeyContainer}>
-            {/* Continuous vertical route line connecting Pickup, Destination and Return */}
-            <View style={[styles.journeyLine, { backgroundColor: p.deliveryBorder }]} pointerEvents="none" />
-
-            {/* 1. Pickup */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Pickup ${pickupWhere}. Change`}
-              onPress={choosePickup}
-              style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
-            >
-              <View style={[styles.ring, { borderColor: p.green, backgroundColor: p.page }]}>
-                <View style={[styles.innerDot, { backgroundColor: p.green }]} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.stopTitle, { color: p.fg }]}>Pickup{!isMissingDates ? ` · ${dayAndTime(startStr, pickupTime)}` : ''}</Text>
-                <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={1}>
-                  {deliverPickup ? `Doorstep delivery · ${pickupWhere}${ready?.pickupCharge ? ` · +${formatCurrency(ready.pickupCharge)}` : ''}` : pickupWhere}
-                </Text>
-              </View>
-              <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
-            </Pressable>
-
-            {/* 2. Destination (In-between Pickup and Return) */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Destination ${destinationWhere}. Change`}
-              onPress={() => {
-                Haptics.selectionAsync();
-                router.push({ pathname: '/dropoff', params: { returnBack: 'true' } });
-              }}
-              style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
-            >
-              <View style={[styles.ring, { borderColor: isMissingDestination ? p.red : p.navy, backgroundColor: p.page }]}>
-                <View style={[styles.innerDot, { backgroundColor: isMissingDestination ? p.red : p.navy }]} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.stopTitle, { color: p.fg }]}>Destination</Text>
-                <Text style={[styles.stopSub, { color: isMissingDestination ? p.red : p.sub }]} numberOfLines={1}>
-                  {destinationWhere}
-                </Text>
-              </View>
-              <Text style={[styles.changeText, { color: isMissingDestination ? p.red : p.navy }]}>
-                {isMissingDestination ? 'Choose' : 'Change'}
+              <Text style={[styles.note, { color: p.sub }]}>
+                *Note : Original Driving License and Aadhaar Card verification is Mandatory at the time of vehicle handover
               </Text>
-            </Pressable>
-
-            {/* 3. Return */}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Return ${returnWhere}. Change`}
-              onPress={chooseReturn}
-              style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
-            >
-              <View style={[styles.ring, { borderColor: p.red, backgroundColor: p.page }]}>
-                <View style={[styles.innerDot, { backgroundColor: p.red }]} />
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.stopTitle, { color: p.fg }]}>Return{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
-                <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1}>
-                  {collectReturn ? `Doorstep collection · ${returnWhere}${ready?.dropCharge ? ` · +${formatCurrency(ready.dropCharge)}` : ''}` : returnWhere}
-                </Text>
-              </View>
-              <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
-            </Pressable>
-          </View>
-
-          {/* Offers & Coupon */}
-          <View style={styles.sectionRow}>
-            <Text style={[styles.section, { color: p.fg }]}>Offers & Coupon</Text>
-            <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/offers', params: { mode: 'apply' } } as any)} hitSlop={8}>
-              <Text style={[styles.viewAll, { color: p.navy }]}>View all</Text>
-            </Pressable>
-          </View>
-          {appliedCouponCode ? (
-            <View style={[styles.couponApplied, { backgroundColor: p.greenBg, borderColor: p.greenBorder }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.couponAppliedTitle, { color: p.green }]}>{appliedCouponCode} applied</Text>
-                {!!pricingQuote?.couponDiscount && <Text style={[styles.couponAppliedSub, { color: p.sub }]}>You save {formatCurrency(pricingQuote.couponDiscount)} on this trip</Text>}
-              </View>
-              <Pressable accessibilityRole="button" onPress={removeCoupon} hitSlop={8}>
-                <Text style={[styles.apply, { color: p.red }]}>Remove</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={[styles.couponField, { borderColor: couponError ? p.red : '#EAECF1' }]}>
-              <TextInput
-                value={couponInput}
-                onChangeText={(t) => { setCouponInput(t.toUpperCase()); setCouponError(null); }}
-                placeholder="Enter Coupon Code"
-                placeholderTextColor={p.muted}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={() => handleApplyCoupon(couponInput)}
-                style={[styles.couponInput, { color: p.fg }]}
-              />
-              <Pressable accessibilityRole="button" onPress={() => handleApplyCoupon(couponInput)} disabled={!couponInput.trim()} style={styles.applyBtn}>
-                <Text style={[styles.apply, { color: couponInput.trim() ? p.navy : '#747EA3' }]}>Apply</Text>
-              </Pressable>
-            </View>
-          )}
-          {!!couponError && <Text style={[styles.couponError, { color: p.red }]}>{couponError}</Text>}
-          {!appliedCouponCode && coupons.length > 0 && (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-              {coupons.map((c) => (
-                <Pressable key={c.code} accessibilityRole="button" accessibilityLabel={`Apply ${c.code}`} onPress={() => handleApplyCoupon(c.code)} style={({ pressed }) => [styles.chip, { backgroundColor: '#F9F9FB' }, pressed && { opacity: 0.7 }]}>
-                  <Text style={[styles.chipText, { color: p.navy }]}>{c.code}</Text>
-                </Pressable>
-              ))}
             </ScrollView>
+          </BlurTargetView>
+
+          <StickyBookingBar
+            hasTrip={!isMissingDates}
+            isAvailable={isVehicleAvailable}
+            agreed={!isSubmitting && !waitingForPrice}
+            bookLabel={waitingForPrice ? 'Getting price…' : `Pay ${formatCurrency(payable)} & Book`}
+            onNeedLogin={() => setShowLogin(true)}
+            onBookNow={payAndBook}
+            onCheckAvailability={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
+          />
+          {/* "You're saving ₹X — <Plan> Membership Applied!": highlights member savings on the Payment Option page. */}
+          <MembershipSavedPopup
+            hasTrip={!isMissingDates}
+            tripKey={`${selectedCar?.id || 'car'}`}
+            screen="booking"
+          />
+          {celebrate && (
+            <MembershipCelebration
+              visible
+              confetti
+              plan={celebrate.name}
+              amount={celebrate.save > 0 ? celebrate.save : null}
+              title={`${celebrate.name} Membership Applied!`}
+              note={celebrate.save > 0 ? `${formatCurrency(celebrate.price)} for 1 year, paid with your booking` : `${celebrate.pctLabel} off every trip · ${formatCurrency(celebrate.price)}/year with your booking`}
+              onClose={() => setCelebrate(null)}
+            />
           )}
-
-          {/* Save on your booking */}
-          <Text style={[styles.section, { color: p.fg }]}>Save on your booking</Text>
-          <View style={[styles.saveCard, { borderColor: '#EAECF1' }]}>
-            <View style={styles.saveRow}>
-              <View style={[styles.saveIcon, { backgroundColor: '#F9F9FB' }]}>
-                <MaterialCommunityIcons name="cash" size={18} color={p.sub} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.saveTitle, { color: p.fg }]}>SawariCash</Text>
-                <View style={[styles.cashChip, { backgroundColor: p.chipBg }]}>
-                  <Text style={[styles.cashChipText, { color: p.navy }]}>{formatCurrency(sawariCash)} available</Text>
-                </View>
-              </View>
-              <DesignToggle
-                accessibilityLabel="Use SawariCash"
-                value={sawariCashToApply > 0}
-                disabled={sawariCash <= 0}
-                onValueChange={(on) => { Haptics.selectionAsync(); applySawariCash(on ? sawariCash : 0); }}
-              />
-            </View>
-            {sawariCashToApply > 0 && !!pricingQuote && (
-              <Text style={[styles.cashNote, { color: p.green }]}>
-                {pricingQuote.sawariCashUsed > 0 ? `${formatCurrency(pricingQuote.sawariCashUsed)} used on this trip (up to ₹50 or 10% of the rent).` : 'Not usable on this trip.'}
-              </Text>
-            )}
-
-            <View style={[styles.divider, { backgroundColor: p.divider }]} />
-
-            <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPlans }} onPress={() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); setShowPlans((v) => !v); }} style={styles.saveRow}>
-              <View style={[styles.saveIcon, { backgroundColor: '#F9F9FB' }]}>
-                <MaterialCommunityIcons name="crown-outline" size={18} color={p.sub} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.saveTitle, { color: p.fg }]}>Membership</Text>
-                <Text style={[styles.saveSub, { color: p.sub }]}>
-                  {planToBuy
-                    ? `${PLANS.find((x) => x.key === planToBuy)?.name} membership added · ${formatCurrency(PLANS.find((x) => x.key === planToBuy)?.price || 0)} with this payment`
-                    : isMember
-                      ? `${PLANS.find((x) => x.key === membership!.plan)?.name ?? 'Member'} member${pricingQuote?.subscriptionDiscount ? ` · ${formatCurrency(pricingQuote.subscriptionDiscount)} off this trip` : ''}`
-                      : 'Explore plans and trip savings'}
-                </Text>
-              </View>
-              <Feather name={showPlans ? 'chevron-up' : 'chevron-down'} size={16} color={p.sub} />
-            </Pressable>
-
-            {showPlans && (
-              <View style={{ gap: 8, marginTop: 4 }}>
-                {PLANS.filter((pl) => !isMember || PLANS.findIndex((x) => x.key === pl.key) > PLANS.findIndex((x) => x.key === membership!.plan)).map((pl) => {
-                  const save = Math.min(pl.perTripCap, Math.round(tripRent * pl.pct));
-                  const purple = pl.key === 'plus';
-                  const bg = purple ? p.purple : pl.key === 'pro' ? p.greenBg : p.page;
-                  const border = purple ? p.purple : pl.key === 'pro' ? p.proBorder : p.memberBorder;
-                  const text = purple ? '#FFFFFF' : p.fg;
-                  const sub = purple ? 'rgba(255,255,255,0.85)' : p.sub;
-                  return (
-                    <Pressable
-                      key={pl.key}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${isMember ? 'Upgrade to' : 'Get'} ${pl.name}, ${formatCurrency(pl.price)} a year${save > 0 ? `, save ${formatCurrency(save)} on this trip` : ''}`}
-                      // Picking a plan adds it to this booking (one payment) with a celebration; tapping it again removes it.
-                      onPress={() => {
-                        if (planToBuy === pl.key) { Haptics.selectionAsync(); setPlanToBuy(null); return; }
-                        setPlanToBuy(pl.key);
-                        setCelebrate({ name: pl.name, price: pl.price, save, pctLabel: pl.pctLabel });
-                      }}
-                      style={({ pressed }) => [styles.plan, { backgroundColor: bg, borderColor: border }, pressed && { opacity: 0.9 }]}
-                    >
-                      <View style={[styles.radio, planToBuy === pl.key
-                        ? { borderColor: purple ? '#FFFFFF' : pl.key === 'pro' ? p.green : p.purple, backgroundColor: purple ? '#FFFFFF' : pl.key === 'pro' ? p.green : p.purple, alignItems: 'center', justifyContent: 'center' }
-                        : { borderColor: purple ? '#FFFFFF' : p.radioRing }]}>
-                        {planToBuy === pl.key && <View style={{ width: 5.5, height: 5.5, borderRadius: 3, backgroundColor: purple ? p.purple : '#FFFFFF' }} />}
-                      </View>
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <View style={styles.planNameRow}>
-                          <Image source={pl.icon} style={{ width: pl.iconSize, height: pl.iconSize }} contentFit="contain" />
-                          <Text style={[styles.planName, { color: text }]}>{pl.name}</Text>
-                          {save > 0 && (
-                            <View style={[styles.saveChip, { backgroundColor: p.green }]}>
-                              <Text style={styles.saveChipText}>{planToBuy === pl.key ? `${formatCurrency(save)} Saved` : `Save ${formatCurrency(save)} on this trip`}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={[styles.planSub, { color: sub }]} numberOfLines={1}>{pl.pctLabel} off every trip  •  Save up to ₹{pl.annual}/year</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={[styles.planPrice, { color: text }]}>{formatCurrency(pl.price)}</Text>
-                        <Text style={[styles.planSub, { color: sub }]}>/year</Text>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
-          </View>
-
-          <Text style={[styles.note, { color: p.sub }]}>
-            *Note : Original Driving License and Aadhaar Card verification is Mandatory at the time of vehicle handover
-          </Text>
-        </ScrollView>
-       </BlurTargetView>
-
-        <StickyBookingBar
-          hasTrip={!isMissingDates}
-          isAvailable={isVehicleAvailable}
-          agreed={!isSubmitting && !waitingForPrice}
-          bookLabel={waitingForPrice ? 'Getting price…' : `Pay ${formatCurrency(payable)} & Book`}
-          onNeedLogin={() => setShowLogin(true)}
-          onBookNow={payAndBook}
-          onCheckAvailability={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
-        />
-        {/* "You're saving ₹X — <Plan> Membership Applied!": highlights member savings on the Payment Option page. */}
-        <MembershipSavedPopup
-          hasTrip={!isMissingDates}
-          tripKey={`${selectedCar?.id || 'car'}`}
-          screen="booking"
-        />
-        {celebrate && (
-          <MembershipCelebration
-            visible
-            confetti
-            plan={celebrate.name}
-            amount={celebrate.save > 0 ? celebrate.save : null}
-            title={`${celebrate.name} Membership Applied!`}
-            note={celebrate.save > 0 ? `${formatCurrency(celebrate.price)} for 1 year, paid with your booking` : `${celebrate.pctLabel} off every trip · ${formatCurrency(celebrate.price)}/year with your booking`}
-            onClose={() => setCelebrate(null)}
-          />
-        )}
-        <LoginBottomSheet
-          visible={showLogin}
-          showSkip={false}
-          required={isAuthenticated === false}
-          onClose={() => {
-            setShowLogin(false);
-            if (isAuthenticated === false) {
-              safeBack(router);
-            }
-          }}
-          onLoginSuccess={() => setShowLogin(false)}
-        />
-        {/* Pre-warmed Razorpay checkout webview: preloads checkout.js in memory, opens in 0.1ms */}
-        <View
-          style={checkoutVisible ? [StyleSheet.absoluteFill, { zIndex: 9999 }] : { position: 'absolute', width: 1, height: 1, top: -9999, left: -9999, opacity: 0 }}
-          pointerEvents={checkoutVisible ? 'auto' : 'none'}
-        >
-          <RazorpayCheckoutWebView
-            visible={checkoutVisible}
-            orderId={checkoutOrder?.orderId}
-            amount={checkoutOrder?.amountPaise}
-            currency="INR"
-            name="MySawari"
-            description="Vehicle Rental Booking"
-            themeColor={p.navy || '#111A2B'}
-            razorpayKey={checkoutOrder?.keyId}
-            prefill={{
-              name: customer?.name || undefined,
-              contact: customer?.mobile || undefined,
-              email: customer?.email || undefined,
+          <LoginBottomSheet
+            visible={showLogin}
+            showSkip={false}
+            required={isAuthenticated === false}
+            onClose={() => {
+              setShowLogin(false);
+              if (isAuthenticated === false) {
+                safeBack(router);
+              }
             }}
-            onSuccess={handleRazorpaySuccess}
-            onFailure={handleRazorpayFailure}
-            onClose={handleRazorpayClose}
+            onLoginSuccess={() => setShowLogin(false)}
           />
-        </View>
-
-        {/* Verification overlay shown after payment is received while backend records and confirms in ms */}
-        {isVerifying && (
-          <View style={[StyleSheet.absoluteFill, { zIndex: 10000 }]}>
-            <PaymentProgress
-              title={verifyingTitle}
-              subtitle={verifyingSubtitle}
-              steps={['Reserving vehicle', 'Payment verified', 'Booking confirmed']}
-              current={1}
-              amount={pricingQuote?.onlinePayableNow}
+          {/* Pre-warmed Razorpay checkout webview: preloads checkout.js in memory, opens in 0.1ms */}
+          <View
+            style={checkoutVisible ? [StyleSheet.absoluteFill, { zIndex: 9999 }] : { position: 'absolute', width: 1, height: 1, top: -9999, left: -9999, opacity: 0 }}
+            pointerEvents={checkoutVisible ? 'auto' : 'none'}
+          >
+            <RazorpayCheckoutWebView
+              visible={checkoutVisible}
+              orderId={checkoutOrder?.orderId}
+              amount={checkoutOrder?.amountPaise}
+              currency="INR"
+              name="MySawari"
+              description="Vehicle Rental Booking"
+              themeColor={p.navy || '#111A2B'}
+              razorpayKey={checkoutOrder?.keyId}
+              prefill={{
+                name: customer?.name || undefined,
+                contact: customer?.mobile || undefined,
+                email: customer?.email || undefined,
+              }}
+              onSuccess={handleRazorpaySuccess}
+              onFailure={handleRazorpayFailure}
+              onClose={handleRazorpayClose}
             />
           </View>
-        )}
-      </BlurHost>
-    </KeyboardAvoidingView>
+
+          {/* Verification overlay shown after payment is received while backend records and confirms in ms */}
+          {isVerifying && (
+            <View style={[StyleSheet.absoluteFill, { zIndex: 10000 }]}>
+              <PaymentProgress
+                title={verifyingTitle}
+                subtitle={verifyingSubtitle}
+                steps={['Reserving vehicle', 'Payment verified', 'Booking confirmed']}
+                current={1}
+                amount={pricingQuote?.onlinePayableNow}
+              />
+            </View>
+          )}
+        </BlurHost>
+      </KeyboardAvoidingView>
     </BlurTargetProvider>
   );
 }

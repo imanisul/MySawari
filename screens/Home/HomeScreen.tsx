@@ -180,7 +180,7 @@ export default function HomeScreen() {
       return v && !isInService(v) ? { ...withAvail(v), viewedContext: item } : null;
     })
     .filter(Boolean)
-    .slice(0, 6) as any[], [viewedIds, fetchedVehicles, withAvail]);
+    .slice(0, 4) as any[], [viewedIds, fetchedVehicles, withAvail]);
 
   // Top Picks: the most booked vehicles of the selected type (last 90 days, from the bookings), free ones first;
   // the curated favourites only break ties.
@@ -216,7 +216,7 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['recentSearches', recentKey || 'guest'] });
   }, [queryClient, recentKey]));
-  const tripSearches = useMemo(() => savedSearches.filter((t) => !isPastSearch(t)), [savedSearches]);
+  const tripSearches = useMemo(() => savedSearches.filter((t) => !isPastSearch(t)).slice(0, 4), [savedSearches]);
   const removeTripSearch = useCallback((id: string) => {
     removeRecentSearch(recentKey, id).then((next) => queryClient.setQueryData(['recentSearches', recentKey || 'guest'], next));
   }, [recentKey, queryClient]);

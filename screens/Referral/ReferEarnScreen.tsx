@@ -83,8 +83,9 @@ export default function ReferEarnScreen() {
   const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\nDownload or open MySawari:\n${link}\n\n(Referral code: *${code}*)`;
 
   const faqs = useMemo(() => [
-    { q: 'How does the Refer & Earn program work?', a: `Share your link or code. When your friend signs up with it and completes their first trip, you get ${pct} of their booking amount as commission in your wallet.` },
-    { q: 'What does my friend get?', a: 'Your friend signs up with your invite code and gets a 100 SawariCash scratch card. Scratching it adds the 100 SawariCash to their wallet.' },
+    { q: 'How does the Refer & Earn program work?', a: `Share your personal invite link or code. When your friend signs up and completes their trip, you earn ${pct} commission of their total trip amount directly in your wallet.` },
+    { q: 'Can I withdraw my referral earnings to my bank account?', a: 'Yes, absolutely! All referral commissions are credited as real cash to your Wallet balance. You can withdraw directly to your Bank Account or UPI at any time from Profile → Wallet.' },
+    { q: 'What does my friend get?', a: 'Your friend signs up with your invite code and gets 100 SawariCash in their wallet to use towards their trip.' },
     { q: 'Who is eligible for the referral offer?', a: 'Anyone new to MySawari who signs up with your code or link. Existing customers and your own numbers do not count.' },
     { q: 'What if my friend books without using my referral link?', a: 'The referral is only linked when your friend signs up with your code or link, so the reward cannot be added afterwards.' },
     { q: 'Where can I check my referral status?', a: 'Open "See your referral history" on this page, or Profile → Referral Tracking, to follow each friend from sign-up to reward.' },
@@ -120,9 +121,9 @@ export default function ReferEarnScreen() {
   };
 
   const STEPS = [
-    { t: 'Share Your Code or Link', s: 'Send your personal link or code to your friends.' },
-    { t: 'They Sign Up & Book', s: 'Your friend signs up with your code and gets a 100 SawariCash scratch card.' },
-    { t: `You get ${pct} Commission`, s: `The moment your friend completes their first trip, you get ${pct} of their trip booking amount as commission.` },
+    { t: 'Share Your Code or Link', s: 'Send your personal invite link or code to your friends.' },
+    { t: 'They Sign Up & Book', s: 'Your friend signs up with your invite code and gets 100 SawariCash in their wallet.' },
+    { t: `Earn ${pct} Commission in Wallet`, s: `When your friend completes their trip, you earn ${pct} commission of their total trip amount directly in your wallet, ready to withdraw to your bank account.` },
   ];
 
   // Measured from the design (393 wide): purple header 182 below the status bar, the white card 88 from its
@@ -153,8 +154,8 @@ export default function ReferEarnScreen() {
               <Feather name="chevron-left" size={22} color="#FFFFFF" />
             </Pressable>
             <View style={[styles.heroCard, { top: cardTop, backgroundColor: p.page, borderColor: p.purpleBorder }]}>
-              <Text style={[styles.heroTitle, { color: PURPLE }]} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>Invite Friends. Earn {pct} Back.</Text>
-              <Text style={[styles.heroSub, { color: p.sub }]}>Get {pct} of your friend’s booking amount as wallet cash when they complete their first trip.</Text>
+              <Text style={[styles.heroTitle, { color: PURPLE }]} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>Invite Friends. Earn {pct} Commission.</Text>
+              <Text style={[styles.heroSub, { color: p.sub }]}>Earn {pct} of your friend's total trip amount as wallet cash — withdraw directly to your bank account anytime!</Text>
             </View>
             <View accessible={false} style={[styles.avatars, { top: cardTop - 46, left: (width - 152) / 2 }]}>
               <Image source={require('@/assets/images/refer_avatar_2.jpg')} style={[styles.avatar, { left: 0, top: 10, borderColor: '#D1CCF9' }]} />

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, StatusTimeline, PF, rupees } from '@/components/profile/ProfileParts';
 import { useReferrals, referralSteps, tripLine } from '@/utils/referrals';
+import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
 
 /**
  * Figma "Referral Reward": the friend, their trip and the reward (₹0 until credited), a status line, and the
@@ -20,7 +21,7 @@ export default function ReferralRewardScreen() {
 
   const note = !ref ? null
     : ref.stage === 'processing' ? { text: 'Your reward is being processed and will be credited within 1–2 working days.', green: true }
-      : ref.stage === 'credited' ? { text: `${ref.amount > 0 ? rupees(ref.amount) : 'Your reward'} has been added to your SawariCash.`, green: true }
+      : ref.stage === 'credited' ? { text: `${ref.amount > 0 ? rupees(ref.amount) : 'Your 10% commission'} has been credited to your Wallet balance (withdrawable to bank).`, green: true }
         : ref.stage === 'registered' ? { text: "Hasn't booked a trip yet.", green: false }
           : ref.stage === 'booked' || ref.stage === 'ongoing' ? { text: 'Reward unlocks after trip completion.', green: false }
             : ref.stage === 'cancelled' ? { text: 'No reward earned  •  Trip cancelled', green: false }
@@ -33,7 +34,14 @@ export default function ReferralRewardScreen() {
     <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: p.page }]}>
       <ScreenHeader title="Referral Reward" />
       {!ref ? (
-        isLoading ? <ActivityIndicator style={{ marginTop: 60 }} color={p.muted} /> : (
+        isLoading ? (
+          <SkeletonGroup>
+            <View style={{ padding: 16, gap: 14 }}>
+              <Skeleton width="100%" height={120} borderRadius={16} />
+              {[0, 1, 2].map((i) => <Skeleton key={i} width="100%" height={56} borderRadius={12} delay={80 + i * 70} />)}
+            </View>
+          </SkeletonGroup>
+        ) : (
           <Text style={[styles.missing, { color: p.muted }]}>This referral could not be found. Go back and pull down to refresh.</Text>
         )
       ) : (

@@ -9,6 +9,7 @@ import { API } from '@/services/backend/api';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, StatusTimeline, Step, Dashes, PF, longStamp, rupees } from '@/components/profile/ProfileParts';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
 
 type Tx = { id: string; type: string; label?: string; description?: string; amount: number; date: string; status?: string; reason?: string };
 type WStage = 'processing' | 'review' | 'approved' | 'completed' | 'rejected';
@@ -119,7 +120,7 @@ export default function MyWalletScreen() {
             ) : failed ? (
               <Text style={[styles.balanceErr, { color: p.red }]}>Couldn't load. Pull down to retry.</Text>
             ) : (
-              <ActivityIndicator style={{ alignSelf: 'flex-start', marginTop: 8 }} color={p.muted} />
+              <Skeleton width={130} height={34} borderRadius={8} style={{ marginTop: 6 }} />
             )}
           </View>
           {!!wallet && wallet.withdrawable > 0 && (
@@ -129,7 +130,10 @@ export default function MyWalletScreen() {
           )}
         </View>
         {!!wallet && wallet.withdrawable > 0 && wallet.withdrawable < balance && (
-          <Text style={[styles.hint, { color: p.muted }]}>{rupees(wallet.withdrawable, true)} can be withdrawn. The rest can be used on your bookings.</Text>
+          <Text style={[styles.hint, { color: p.muted }]}>{rupees(wallet.withdrawable, true)} can be withdrawn to bank. The rest can be used on your bookings.</Text>
+        )}
+        {!!wallet && wallet.withdrawable > 0 && wallet.withdrawable === balance && (
+          <Text style={[styles.hint, { color: p.green }]}>Entire balance ({rupees(wallet.withdrawable, true)}) is withdrawable directly to your bank account.</Text>
         )}
 
         {wallet && txs.length === 0 && (
@@ -226,7 +230,7 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
   const p = useDetailsPalette();
   const insets = useSafeAreaInsets();
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState<'upi' | 'bank'>('upi');
+  const [method, setMethod] = useState<'bank' | 'upi'>('bank');
   const [upi, setUpi] = useState('');
   const [bank, setBank] = useState({ accountHolderName: '', accountNumber: '', ifsc: '', bankName: '' });
   const [error, setError] = useState('');
@@ -286,10 +290,10 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
               <Feather name="x" size={20} color={p.sub} />
             </Pressable>
           </View>
-          <Text style={[styles.sheetSub, { color: p.muted }]}>Up to {rupees(max, true)} can be withdrawn.</Text>
+          <Text style={[styles.sheetSub, { color: p.muted }]}>Up to {rupees(max, true)} can be withdrawn directly to your bank account or UPI.</Text>
           {field(amount, (t) => setAmount(t.replace(/[^\d]/g, '')), 'Amount (₹)', { keyboardType: 'number-pad' })}
           <View style={styles.methods}>
-            {(['upi', 'bank'] as const).map((m) => (
+            {(['bank', 'upi'] as const).map((m) => (
               <Pressable
                 key={m}
                 accessibilityRole="radio"
@@ -297,7 +301,7 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
                 onPress={() => { Haptics.selectionAsync(); setMethod(m); setError(''); }}
                 style={[styles.method, { borderColor: method === m ? p.navy : p.border, backgroundColor: method === m ? p.summary : p.page }]}
               >
-                <Text style={[styles.methodText, { color: method === m ? p.navy : p.sub }]}>{m === 'upi' ? 'UPI' : 'Bank account'}</Text>
+                <Text style={[styles.methodText, { color: method === m ? p.navy : p.sub }]}>{m === 'bank' ? 'Bank account' : 'UPI'}</Text>
               </Pressable>
             ))}
           </View>

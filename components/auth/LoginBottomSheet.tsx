@@ -36,6 +36,11 @@ import {
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 60;
 const HAS_LOGGED_IN_KEY = '@mysawari_has_logged_in_before';
+// Read once when the app starts, so the sheet knows on its very first frame whether to ask for the terms
+// (it used to show the tick for a moment on every open until the saved flag arrived, which jumped the layout).
+let loggedInBefore: boolean | null = null;
+AsyncStorage.getItem(HAS_LOGGED_IN_KEY).then((v) => { loggedInBefore = v === 'true'; }).catch(() => {});
+const markLoggedIn = () => { loggedInBefore = true; AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {}); };
 const SHEET_OFFSET = Dimensions.get('window').height;
 
 /** Extracts a 6-digit OTP code from SMS text, WhatsApp messages, or raw clipboard content. */
@@ -138,7 +143,8 @@ export function LoginBottomSheet({
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
   const [isExisting, setIsExisting] = useState(false);
-  const [isFirstTime, setIsFirstTime] = useState(true);
+  const [isFirstTime, setIsFirstTime] = useState(loggedInBefore !== true);
+  const [flagKnown, setFlagKnown] = useState(loggedInBefore !== null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [referral, setReferral] = useState('');
@@ -163,15 +169,19 @@ export function LoginBottomSheet({
     setReferralStatusMsg(null);
 
     // If user has logged in before on this device, it's 2nd time: don't show tick button and auto-accept
+    if (loggedInBefore !== null) { setIsFirstTime(!loggedInBefore); setTermsAccepted(loggedInBefore); }
     AsyncStorage.getItem(HAS_LOGGED_IN_KEY)
       .then((val) => {
         const hasLoggedIn = val === 'true';
+        loggedInBefore = hasLoggedIn;
         setIsFirstTime(!hasLoggedIn);
         setTermsAccepted(hasLoggedIn);
+        setFlagKnown(true);
       })
       .catch(() => {
         setIsFirstTime(true);
         setTermsAccepted(false);
+        setFlagKnown(true);
       });
 
     // Detect referral from pending storage or clipboard (Navi pattern)
@@ -369,7 +379,7 @@ export function LoginBottomSheet({
       if (existing) {
         setIsFirstTime(false);
         setTermsAccepted(true);
-        AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+        markLoggedIn();
       }
       setOtpId(res.otpId || null);
       setOtp('');
@@ -439,7 +449,7 @@ export function LoginBottomSheet({
     }
     try {
       const { token, refreshToken, user } = await API.verifyOtp(mobile, code, '', '', otpId || undefined);
-      AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+      markLoggedIn();
       setWelcomeName(String(user?.name || '').trim().split(/\s+/)[0] || '');
       // "You're in" shows the moment the server says yes; the session is saved underneath it.
       finish(login(token, refreshToken, user));
@@ -462,7 +472,7 @@ export function LoginBottomSheet({
     setLoading(true); setError(null);
     try {
       const { token, refreshToken, user } = await API.verifyOtp(mobile, digitsOf(otp), name.trim(), referral, otpId || undefined);
-      AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+      markLoggedIn();
       setWelcomeName(name.trim().split(/\s+/)[0]);
       const sessionSaved = login(token, refreshToken, user);
       // Email is optional and saved once the session exists; a failure here never blocks sign-in.
@@ -575,7 +585,7 @@ export function LoginBottomSheet({
                           setIsExisting(true);
                           setIsFirstTime(false);
                           setTermsAccepted(true);
-                          AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
+                          markLoggedIn();
                         } else {
                           setIsExisting(false);
                           // checkUser also says "no" on a slow or failed call: a phone that has logged in before
@@ -605,7 +615,7 @@ export function LoginBottomSheet({
               </View>
               {!!error && <Text style={[styles.error, { color: ui.error, textAlign: 'left' }]}>{error}</Text>}
               {/* Returning customers already agreed on their first login. */}
-              {isFirstTime ? (
+              {isFirstTime && flagKnown ? (
                 <View style={styles.checkRow}>
                   <Pressable
                     onPress={() => setTermsAccepted((accepted) => !accepted)}

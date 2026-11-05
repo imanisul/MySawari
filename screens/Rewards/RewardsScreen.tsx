@@ -10,6 +10,7 @@ import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
 import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
 
 const F = {
   regular: 'PlusJakartaSans_400Regular',
@@ -60,7 +61,12 @@ export default function RewardsScreen() {
       {!isAuthenticated ? (
         <View style={styles.center}><Text style={[styles.note, { color: p.muted }]}>Log in to see your trip rewards.</Text></View>
       ) : isLoading ? (
-        <View style={styles.center}><ActivityIndicator color={p.navy} /></View>
+        <SkeletonGroup>
+          <View style={{ padding: 16, gap: 14 }}>
+            <Skeleton width="100%" height={140} borderRadius={16} />
+            {[0, 1, 2].map((i) => <Skeleton key={i} width="100%" height={72} borderRadius={14} delay={80 + i * 70} />)}
+          </View>
+        </SkeletonGroup>
       ) : (
         <ScrollView
           contentContainerStyle={styles.content}

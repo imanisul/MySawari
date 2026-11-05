@@ -57,14 +57,12 @@ export default function ProfileScreen() {
 
   const doLogout = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setLoggingOut(true);
-    try {
-      await logout();
-    } finally {
-      setLoggingOut(false);
-      setConfirmLogout(false);
-      router.replace('/');
-    }
+    // One motion at a time: the confirm popup closes and the page flips home first; only then does the session end,
+    // so the sign-in sheet slides up over a settled Home instead of over a popup and a transition at once.
+    setConfirmLogout(false);
+    router.replace('/');
+    await new Promise((r) => setTimeout(r, 700));
+    await logout();
   };
   const [refreshing, setRefreshing] = useState(false);
   const [autoCash, setAutoCash] = useState(false);

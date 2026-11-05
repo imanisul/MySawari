@@ -172,7 +172,7 @@ export default function PaymentProcessingScreen() {
 
       setTimeout(() => {
         router.replace('/confirmation');
-      }, 1500);
+      }, 600);
     } catch (e: any) {
       const reason = e.message || 'Failed to confirm booking';
       
@@ -214,25 +214,28 @@ export default function PaymentProcessingScreen() {
 
   const payNow = pricingQuote?.onlinePayableNow;
 
-  if (status === 'PAYMENT_PENDING' && razorpayOrder) {
+  // The payment page is mounted (hidden) while the car is held and the order created, so checkout.js is already
+  // loaded when the order arrives and the sheet opens straight away.
+  if (status === 'INITIATING' || (status === 'PAYMENT_PENDING' && razorpayOrder)) {
+    const pending = status === 'PAYMENT_PENDING';
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <PaymentProgress
-          title="Opening secure payment"
-          subtitle="Connecting to Razorpay. Please don’t close the app or press back."
+          title={pending ? 'Opening secure payment' : setupStep === 0 ? 'Reserving your car' : 'Initiating payment'}
+          subtitle={pending ? 'Connecting to Razorpay. Please don’t close the app or press back.' : 'Hold on, this only takes a few seconds. Please don’t press back.'}
           steps={STEPS}
-          current={1}
+          current={pending ? 1 : setupStep}
           amount={payNow}
         />
-        <View style={StyleSheet.absoluteFill}>
+        <View style={pending ? StyleSheet.absoluteFill : { position: 'absolute', width: 1, height: 1, opacity: 0 }} pointerEvents={pending ? 'auto' : 'none'}>
           <RazorpayCheckoutWebView
-            orderId={razorpayOrder.orderId}
-            amount={razorpayOrder.amountPaise}
+            orderId={razorpayOrder?.orderId}
+            amount={razorpayOrder?.amountPaise}
             currency="INR"
             name="MySawari"
             description="Vehicle Rental Booking"
             themeColor={colors.navy || '#111A2B'}
-            razorpayKey={razorpayOrder.keyId}
+            razorpayKey={razorpayOrder?.keyId}
             prefill={{
               name: customer?.name || undefined,
               contact: customer?.mobile || undefined,
@@ -289,16 +292,8 @@ export default function PaymentProcessingScreen() {
     );
   }
 
-  // Setting up checkout, or checking the payment with the server.
-  return status === 'INITIATING' ? (
-    <PaymentProgress
-      title={setupStep === 0 ? 'Reserving your car' : 'Initiating payment'}
-      subtitle="Hold on, this only takes a few seconds. Please don’t press back."
-      steps={STEPS}
-      current={setupStep}
-      amount={payNow}
-    />
-  ) : (
+  // Checking the payment with the server.
+  return (
     <PaymentProgress
       title="Verifying payment"
       subtitle="We’re confirming your payment with the bank. Please don’t close the app or press back."

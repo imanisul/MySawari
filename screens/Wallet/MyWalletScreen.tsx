@@ -274,10 +274,12 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetWrap}>
+      {/* 'padding' on Android too: a translucent Modal ignores the system resize, so the sheet sat behind the keyboard. */}
+      <KeyboardAvoidingView behavior="padding" style={styles.sheetWrap}>
         <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={[styles.sheet, { backgroundColor: p.page, paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <View style={styles.sheetHead}>
             <Text style={[styles.sheetTitle, { color: p.fg }]}>Withdraw money</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8}>
@@ -313,6 +315,7 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
           <Pressable accessibilityRole="button" onPress={submit} disabled={busy} style={({ pressed }) => [styles.submit, { backgroundColor: p.navy }, (pressed || busy) && { opacity: 0.85 }]}>
             {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Request withdrawal</Text>}
           </Pressable>
+          </ScrollView>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -348,7 +351,7 @@ const styles = StyleSheet.create({
   cardBody: { padding: 12, gap: 12 },
   bodyTitle: { fontFamily: PF.semibold, fontSize: 15, lineHeight: 23 },
   sheetWrap: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'transparent' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 18 },
+  sheet: { maxHeight: '92%', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 18 },
   sheetHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   sheetTitle: { fontFamily: PF.medium, fontSize: 17 },
   sheetSub: { fontFamily: PF.regular, fontSize: 12, marginTop: 4, marginBottom: 6 },

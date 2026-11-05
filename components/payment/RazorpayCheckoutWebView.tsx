@@ -1,11 +1,12 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, KeyboardAvoidingView, Linking, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 
 interface RazorpayCheckoutWebViewProps {
-  orderId: string;
-  amount: number;
+  /** Empty while the order is still being created: the page loads checkout.js meanwhile, then opens at once. */
+  orderId?: string;
+  amount?: number;
   currency: string;
   name: string;
   description: string;
@@ -16,7 +17,7 @@ interface RazorpayCheckoutWebViewProps {
     contact?: string;
   };
   themeColor?: string;
-  razorpayKey: string;
+  razorpayKey?: string;
   onSuccess: (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
   onFailure: (error: any) => void;
   onClose: () => void;
@@ -37,26 +38,47 @@ export function RazorpayCheckoutWebView({
   onClose
 }: RazorpayCheckoutWebViewProps) {
   
-  // Encoded as real JS literals (not interpolated into quotes) so a name/description containing a
-  // quote or backslash (e.g. an apostrophe in a customer's name) can never break the generated script.
-  const jsString = (v: string | undefined) => JSON.stringify(v || '');
   const insets = useSafeAreaInsets();
+  const webRef = useRef<WebView>(null);
 
-  // Checkout must show up within a reasonable time: if Razorpay's page never reports it opened (no network,
-  // blocked script), the customer gets an error and a way back instead of a screen that waits forever.
+  // Checkout must show up within a reasonable time once the order exists: if Razorpay's page never reports it
+  // opened (no network, blocked script), the customer gets an error and a way back instead of waiting forever.
   const opened = useRef(false);
   const failed = useRef(false);
+  const early = useRef<string | null>(null); // a load error before the order exists is reported once it does
+  const [ready, setReady] = useState(false);
   const fail = (message: string) => {
     if (failed.current || opened.current) return;
     failed.current = true;
     onFailure({ description: message });
   };
-  useEffect(() => {
-    const t = setTimeout(() => fail('The secure payment page is taking too long to open. Please check your connection and try again.'), 25000);
-    return () => clearTimeout(t);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const loadFailed = (message: string) => {
+    if (orderId) fail(message);
+    else early.current = early.current || message;
+  };
 
-  const checkoutHtml = `
+  useEffect(() => {
+    if (!orderId || !ready) return;
+    if (early.current) { fail(early.current); return; }
+    const t = setTimeout(() => fail('The secure payment page is taking too long to open. Please check your connection and try again.'), 25000);
+    const options = {
+      key: razorpayKey || '',
+      amount: Number(amount) || 0,
+      currency,
+      name,
+      description,
+      image: image || '',
+      order_id: orderId,
+      prefill: { name: prefill?.name || '', email: prefill?.email || '', contact: prefill?.contact || '' },
+      theme: { color: themeColor },
+    };
+    webRef.current?.injectJavaScript(`window.startCheckout(${JSON.stringify(options)}); true;`);
+    return () => clearTimeout(t);
+  }, [orderId, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fixed page: it starts loading checkout.js as soon as this mounts (while the car is held and the order is
+  // created), so the payment sheet only has to open, not download.
+  const checkoutHtml = useRef(`
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -70,64 +92,38 @@ export function RazorpayCheckoutWebView({
     <body>
         <script>
             var post = function (m) { window.ReactNativeWebView.postMessage(JSON.stringify(m)); };
-            window.onerror = function (msg) { post({ event: 'failure', data: { description: 'Could not open the payment page. Please try again.' } }); };
-        </script>
-        <script src="https://checkout.razorpay.com/v1/checkout.js" onerror="post({ event: 'failure', data: { description: 'Could not load the secure payment page. Please check your connection and try again.' } })"></script>
-        <script>
-            if (typeof Razorpay === 'undefined') { throw new Error('no razorpay'); }
-            var options = {
-                "key": ${jsString(razorpayKey)},
-                "amount": ${Number(amount) || 0},
-                "currency": ${jsString(currency)},
-                "name": ${jsString(name)},
-                "description": ${jsString(description)},
-                "image": ${jsString(image)},
-                "order_id": ${jsString(orderId)},
-                "handler": function (response){
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                      event: 'success',
-                      data: response
-                    }));
-                },
-                "prefill": {
-                    "name": ${jsString(prefill?.name)},
-                    "email": ${jsString(prefill?.email)},
-                    "contact": ${jsString(prefill?.contact)}
-                },
-                "theme": {
-                    "color": ${jsString(themeColor)}
-                },
-                "modal": {
-                    "ondismiss": function(){
-                        window.ReactNativeWebView.postMessage(JSON.stringify({ event: 'dismiss' }));
-                    }
-                }
-            };
-            
-            var rzp1 = new Razorpay(options);
-            
-            rzp1.on('payment.failed', function (response){
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  event: 'failure',
-                  data: response.error
-                }));
-            });
-            
-            try {
-              rzp1.open();
-            } catch(e) {
-              setTimeout(function(){ rzp1.open(); }, 100);
+            var loadError = function (d) { post({ event: 'loaderror', data: { description: d } }); };
+            window.onerror = function () { loadError('Could not open the payment page. Please try again.'); };
+            var pending = null;
+            function launch(options) {
+                options.handler = function (response) { post({ event: 'success', data: response }); };
+                options.modal = { ondismiss: function () { post({ event: 'dismiss' }); } };
+                var rzp1 = new Razorpay(options);
+                rzp1.on('payment.failed', function (response) { post({ event: 'failure', data: response.error }); });
+                try { rzp1.open(); } catch (e) { setTimeout(function () { rzp1.open(); }, 100); }
+                post({ event: 'opened' });
             }
-            post({ event: 'opened' });
+            window.startCheckout = function (options) {
+                if (typeof Razorpay === 'undefined') { pending = options; return; }
+                launch(options);
+            };
+            post({ event: 'ready' });
         </script>
+        <script src="https://checkout.razorpay.com/v1/checkout.js"
+            onload="if (pending) launch(pending)"
+            onerror="loadError('Could not load the secure payment page. Please check your connection and try again.')"></script>
     </body>
     </html>
-  `;
+  `).current;
 
   const onMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
-      if (data.event === 'opened') {
+      if (data.event === 'ready') {
+        setReady(true);
+      } else if (data.event === 'loaderror') {
+        loadFailed(data.data.description);
+      } else if (data.event === 'opened') {
         opened.current = true;
       } else if (data.event === 'success') {
         onSuccess(data.data);
@@ -189,6 +185,7 @@ export function RazorpayCheckoutWebView({
     <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'android' ? 'padding' : undefined}>
         <WebView
+          ref={webRef}
           originWhitelist={['*']}
           source={{ html: checkoutHtml, baseUrl: 'https://checkout.razorpay.com' }}
           onMessage={onMessage}
@@ -197,8 +194,8 @@ export function RazorpayCheckoutWebView({
           domStorageEnabled={true}
           startInLoadingState={false}
           javaScriptCanOpenWindowsAutomatically
-          onError={() => fail('Could not open the payment page. Please check your connection and try again.')}
-          onHttpError={() => fail('Could not open the payment page. Please try again.')}
+          onError={() => loadFailed('Could not open the payment page. Please check your connection and try again.')}
+          onHttpError={() => loadFailed('Could not open the payment page. Please try again.')}
           style={{ flex: 1, backgroundColor: 'transparent' }}
         />
       </KeyboardAvoidingView>

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TripReviewSheet } from './TripReviewSheet';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
-export type ReviewTrip = { bookingId: string; carId: string; vehicleName: string };
+export type ReviewTrip = { bookingId: string; carId: string; vehicleName: string; rating?: number };
 
 /**
  * Figma "How was your trip?" bottom sheet over the trip (Activity, Trip Details, and the automatic prompt
@@ -24,7 +24,7 @@ export function ReviewModal({ trip, onClose }: { trip: ReviewTrip | null; onClos
         </Pressable>
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 12) + 4 }]}>
           <ScrollView bounces={false} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            {trip && <TripReviewSheet carId={trip.carId} bookingId={trip.bookingId} vehicleName={trip.vehicleName} onClose={onClose} />}
+            {trip && <TripReviewSheet carId={trip.carId} bookingId={trip.bookingId} vehicleName={trip.vehicleName} initialRating={trip.rating} onClose={onClose} />}
           </ScrollView>
         </View>
       </KeyboardAvoidingView>

@@ -109,9 +109,9 @@ export default function ProfileScreen() {
     { key: 'fav', icon: 'heart', title: 'Favourite Cars', sub: 'Saved vehicles', onPress: () => go('/wishlist') },
     { key: 'addr', icon: 'map-pin', title: 'Saved Addresses', sub: 'Home, work and other locations', onPress: () => go('/saved-addresses') },
     { key: 'refer', icon: 'credit-card', title: 'Refer & Earn', sub: 'Invite friends and earn 10%', onPress: () => go('/refer') },
+    { key: 'track', icon: 'users', title: 'Referral Tracking', sub: 'Track your referrals', onPress: () => go('/referrals') },
     { key: 'rewards', icon: 'award', title: 'Rewards', sub: 'Trip milestones and rewards earned', onPress: () => go('/rewards') },
     { key: 'cash', icon: 'dollar-sign', title: 'SawariCash', cash: true },
-    { key: 'track', icon: 'users', title: 'Referral Tracking', sub: 'Track your referrals', onPress: () => go('/referrals') },
     { key: 'refunds', icon: 'rotate-ccw', title: 'My Refunds', sub: 'Refunds on cancellations', onPress: () => go('/refunds') },
     { key: 'offers', icon: 'tag', title: 'Offers & coupons', sub: 'Choose a coupon to save on your trip', onPress: () => go('/offers') },
   ];

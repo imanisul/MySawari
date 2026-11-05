@@ -578,8 +578,13 @@ export function LoginBottomSheet({
                           AsyncStorage.setItem(HAS_LOGGED_IN_KEY, 'true').catch(() => {});
                         } else {
                           setIsExisting(false);
-                          setIsFirstTime(true);
-                          setTermsAccepted(false);
+                          // checkUser also says "no" on a slow or failed call: a phone that has logged in before
+                          // already accepted the terms, so only a first-ever login on it is asked again.
+                          AsyncStorage.getItem(HAS_LOGGED_IN_KEY).then((val) => {
+                            const seen = val === 'true';
+                            setIsFirstTime(!seen);
+                            setTermsAccepted(seen);
+                          }).catch(() => {});
                         }
                       }).catch(() => {});
                     }

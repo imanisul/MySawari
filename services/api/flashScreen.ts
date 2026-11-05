@@ -29,7 +29,7 @@ export interface FlashScreenConfig {
 
 export const DEFAULT_FLASH_SCREEN_CONFIG: FlashScreenConfig = {
   isEnabled: true,
-  durationSeconds: 3,
+  durationSeconds: 4,
   brandTitle: 'MySawari',
   brandTagline: 'Your ride, your way.',
   isOccasionActive: false,
@@ -54,11 +54,46 @@ export const DEFAULT_FLASH_SCREEN_CONFIG: FlashScreenConfig = {
 const FLASH_STORAGE_KEY = '@mysawari_flash_screen_config';
 const OPERATION_BACKEND_URL = 'https://mysawari-operation-backend.onrender.com/api/v1/flash-screen';
 
+// In-memory module cache to ensure synchronous access without mode-switch flickers
+let memoryFlashConfig: FlashScreenConfig | null = null;
+let preloadPromise: Promise<FlashScreenConfig> | null = null;
+
+export function getSynchronousFlashScreenConfig(): FlashScreenConfig {
+  return memoryFlashConfig || DEFAULT_FLASH_SCREEN_CONFIG;
+}
+
 /**
- * Returns locally cached flash config synchronously or near-instantaneously from AsyncStorage.
+ * Pre-hydrates the flash screen configuration into memory immediately.
+ * Called early in app bootstrap so AnimatedSplash always renders the PROPER ONE directly,
+ * preventing any flash or double-screen switch.
+ */
+export function preloadFlashScreenConfig(): Promise<FlashScreenConfig> {
+  if (preloadPromise) return preloadPromise;
+
+  preloadPromise = (async () => {
+    // 1. Instantly load locally cached configuration
+    const cached = await getCachedFlashScreenConfig();
+
+    // 2. Fetch fresh remote configuration in parallel (timeout 1800ms to avoid blocking boot)
+    fetchRemoteFlashScreenConfig().catch(() => {});
+
+    return cached;
+  })();
+
+  return preloadPromise;
+}
+
+// Auto-trigger early pre-hydration as soon as the module is evaluated
+preloadFlashScreenConfig().catch(() => {});
+
+/**
+ * Returns locally cached flash config from AsyncStorage and populates memory cache.
  * Guarantees zero blank screen or network delay on cold start.
  */
 export async function getCachedFlashScreenConfig(): Promise<FlashScreenConfig> {
+  if (memoryFlashConfig) {
+    return memoryFlashConfig;
+  }
   try {
     const raw = await AsyncStorage.getItem(FLASH_STORAGE_KEY);
     if (raw) {
@@ -77,12 +112,14 @@ export async function getCachedFlashScreenConfig(): Promise<FlashScreenConfig> {
           merged.gradientColors = merged.isOccasionActive ? ['#F8F8F5', '#F8F8F5'] : ['#FFFFFF', '#FFFFFF'];
         }
 
+        memoryFlashConfig = merged;
         return merged;
       }
     }
   } catch (err) {
     // Graceful fallback to default
   }
+  memoryFlashConfig = DEFAULT_FLASH_SCREEN_CONFIG;
   return DEFAULT_FLASH_SCREEN_CONFIG;
 }
 
@@ -103,6 +140,7 @@ export async function fetchRemoteFlashScreenConfig(): Promise<FlashScreenConfig 
           ...json.data,
           durationSeconds: Number(json.data.durationSeconds) > 0 ? Number(json.data.durationSeconds) : 4,
         };
+        memoryFlashConfig = merged;
         await AsyncStorage.setItem(FLASH_STORAGE_KEY, JSON.stringify(merged));
         return merged;
       }
@@ -122,6 +160,7 @@ export async function fetchRemoteFlashScreenConfig(): Promise<FlashScreenConfig 
           ...json.data,
           durationSeconds: Number(json.data.durationSeconds) > 0 ? Number(json.data.durationSeconds) : 4,
         };
+        memoryFlashConfig = merged;
         await AsyncStorage.setItem(FLASH_STORAGE_KEY, JSON.stringify(merged));
         return merged;
       }

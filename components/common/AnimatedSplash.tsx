@@ -21,6 +21,7 @@ import {
   FlashScreenConfig,
   getCachedFlashScreenConfig,
   fetchRemoteFlashScreenConfig,
+  getSynchronousFlashScreenConfig,
 } from '@/services/api/flashScreen';
 
 const AnimatedG = Animated.createAnimatedComponent(G);
@@ -53,13 +54,17 @@ const SLOW_LOAD_MS = 14000;
 
 export type SplashStep = { key: string; label: string; done: boolean };
 
-// MySawari signature brand colors
+// MySawari signature brand colors & Senior Designer Diwali Palette
 const BRAND_LOGO_COLOR = '#1C2A53';
-const FESTIVE_BG = '#FAF9F5';
+const FESTIVE_BG = '#FCFBF7';
 const FESTIVE_INK = '#1C2A53';
-const FESTIVE_SUB = '#5B688A';
-const FESTIVE_LINE = '#D9DCE8';
-const FESTIVE_GOLD = '#E0A126';
+const FESTIVE_SUB = '#5A6689';
+const FESTIVE_MUTED = '#8C97B2';
+const FESTIVE_LINE = '#EAD5B0';
+const FESTIVE_GOLD = '#D49A3D';
+const FESTIVE_GOLD_DARK = '#B45309';
+const FESTIVE_AMBER = '#E08714';
+const FESTIVE_HALO = 'rgba(212, 154, 61, 0.12)';
 
 /**
  * High-End Dynamic Flash Screen:
@@ -96,9 +101,10 @@ export function AnimatedSplash({
 
   const skipSplash = useRef(hasShownSplash).current;
   const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash);
-  const [config, setConfig] = useState<FlashScreenConfig>(DEFAULT_FLASH_SCREEN_CONFIG);
+  const [config, setConfig] = useState<FlashScreenConfig>(getSynchronousFlashScreenConfig);
   const [brandDone, setBrandDone] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
+  const entranceStartedRef = useRef(false);
 
   // Common animated values
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -118,6 +124,7 @@ export function AnimatedSplash({
   const twinkle3 = useRef(new Animated.Value(0.2)).current;
   const twinkle4 = useRef(new Animated.Value(0.2)).current;
   const glowScale = useRef(new Animated.Value(1)).current;
+  const flameAnim = useRef(new Animated.Value(0)).current;
 
   // Load cached config immediately on mount, then sync in background
   useEffect(() => {
@@ -125,7 +132,10 @@ export function AnimatedSplash({
     getCachedFlashScreenConfig()
       .then((cached) => {
         if (active && cached) {
-          setConfig(cached);
+          setConfig((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(cached)) return prev;
+            return cached;
+          });
         }
       })
       .catch(() => {});
@@ -133,7 +143,10 @@ export function AnimatedSplash({
     fetchRemoteFlashScreenConfig()
       .then((fresh) => {
         if (active && fresh) {
-          setConfig(fresh);
+          setConfig((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(fresh)) return prev;
+            return fresh;
+          });
         }
       })
       .catch(() => {});
@@ -160,9 +173,10 @@ export function AnimatedSplash({
     }
   }, [config?.isEnabled, skipSplash]);
 
-  // Entrance animations and timer
+  // Entrance animations (guarantees animation starts only once)
   useEffect(() => {
-    if (skipSplash || config?.isEnabled === false) return;
+    if (skipSplash || config?.isEnabled === false || entranceStartedRef.current) return;
+    entranceStartedRef.current = true;
 
     // Fade in brand container
     Animated.timing(brandOpacity, {
@@ -216,6 +230,14 @@ export function AnimatedSplash({
     );
     glowLoop.start();
 
+    const flameLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(flameAnim, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(flameAnim, { toValue: 0, duration: 650, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ])
+    );
+    flameLoop.start();
+
     const makeTwinkle = (val: Animated.Value, delay: number) => {
       return Animated.loop(
         Animated.sequence([
@@ -234,22 +256,26 @@ export function AnimatedSplash({
     t3Loop.start();
     t4Loop.start();
 
-    // Timer completes after exactly durationMs (default 4 seconds)
-    const t = setTimeout(() => {
-      setBrandDone(true);
-    }, durationMs);
-
     return () => {
-      clearTimeout(t);
       spinLoop.stop();
       spinRevLoop.stop();
       glowLoop.stop();
+      flameLoop.stop();
       t1Loop.stop();
       t2Loop.stop();
       t3Loop.stop();
       t4Loop.stop();
     };
-  }, [durationMs, skipSplash, config?.isEnabled]);
+  }, [skipSplash, config?.isEnabled]);
+
+  // Independent, resilient duration timer
+  useEffect(() => {
+    if (skipSplash || config?.isEnabled === false || brandDone) return;
+    const t = setTimeout(() => {
+      setBrandDone(true);
+    }, durationMs);
+    return () => clearTimeout(t);
+  }, [durationMs, skipSplash, config?.isEnabled, brandDone]);
 
   // Handle slow loads
   useEffect(() => {
@@ -288,9 +314,23 @@ export function AnimatedSplash({
   const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const spinReverse = spinReverseAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-360deg'] });
 
+  // Living flame breathing animations
+  const flameScaleY = flameAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 1.09, 0.95],
+  });
+  const flameScaleX = flameAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [1, 0.94, 1.05],
+  });
+  const flameTranslateY = flameAnim.interpolate({
+    inputRange: [0, 0.5, 1],
+    outputRange: [0, -1.8, 0.4],
+  });
+
   // Determine mode
   const isSpecialMedia = Boolean(config?.bgImageUrl);
-  const isFestiveMode = !isSpecialMedia && Boolean(config?.isOccasionActive && (config?.occasionTheme?.includes('diwali') || config?.occasionTheme === 'festive_glow'));
+  const isFestiveMode = !isSpecialMedia && Boolean(config?.isOccasionActive);
   const activeBg = isSpecialMedia 
     ? (config?.backgroundColor || '#FFFFFF') 
     : isFestiveMode 
@@ -342,7 +382,7 @@ export function AnimatedSplash({
             </Animated.View>
           ) : isFestiveMode ? (
             /* ======================================================== */
-            /* MODE 2: FESTIVE OCCASION / DIWALI ANIMATED MODE */
+            /* MODE 2: SENIOR DESIGNER DIWALI SPECIAL / FESTIVE MODE */
             /* ======================================================== */
             <Animated.View
               style={[
@@ -354,106 +394,136 @@ export function AnimatedSplash({
                 },
               ]}
             >
-              {/* 1. Top Decorative Garland String Lights */}
+              {/* 1. Auspicious Top Toran Canopy with Hanging Marigold Bells & Lights */}
               <View pointerEvents="none" style={styles.garlandWrap}>
-                <Svg viewBox="0 0 400 70" width="100%" height={Math.min(windowHeight * 0.12, 72)} preserveAspectRatio="xMidYMin meet">
-                  <Path d="M0 4 Q100 40 200 14 Q300 -8 400 26" fill="none" stroke={FESTIVE_LINE} strokeWidth={1.2} />
-                  <AnimatedG opacity={twinkle1} fill={FESTIVE_GOLD}>
-                    <Path d="M30 15 l4 7 l-4 7 l-4 -7 Z" />
-                    <Path d="M255 6 l4 7 l-4 7 l-4 -7 Z" />
+                <Svg viewBox="0 0 400 68" width="100%" height={Math.min(windowHeight * 0.11, 70)} preserveAspectRatio="xMidYMin meet">
+                  {/* Delicate festive garland arch */}
+                  <Path d="M 0 6 Q 100 28 200 12 Q 300 -4 400 22" fill="none" stroke={FESTIVE_LINE} strokeWidth={1.2} />
+
+                  {/* Hanging cords & sacred accents */}
+                  {/* Left Bell */}
+                  <Path d="M 50 17 L 50 34" stroke={FESTIVE_LINE} strokeWidth={1} />
+                  <AnimatedG opacity={twinkle1}>
+                    <Circle cx="50" cy="36" r="3" fill={FESTIVE_AMBER} />
+                    <Path d="M 46 40 L 54 40 L 52 46 L 48 46 Z" fill={FESTIVE_GOLD} />
                   </AnimatedG>
-                  <AnimatedG opacity={twinkle2} fill={FESTIVE_GOLD}>
-                    <Path d="M165 20 l4 7 l-4 7 l-4 -7 Z" />
-                    <Path d="M388 22 l4 7 l-4 7 l-4 -7 Z" />
+
+                  {/* Left-center Marigold Droplet */}
+                  <Path d="M 120 22 L 120 38" stroke={FESTIVE_LINE} strokeWidth={1} />
+                  <AnimatedG opacity={twinkle3}>
+                    <Circle cx="120" cy="40" r="3.5" fill={FESTIVE_GOLD} />
+                    <Circle cx="120" cy="40" r="1.5" fill="#FFFBEB" />
                   </AnimatedG>
-                  <AnimatedG opacity={twinkle3} fill={FESTIVE_GOLD}>
-                    <Path d="M75 25 l4 7 l-4 7 l-4 -7 Z" />
-                    <Path d="M300 6 l4 7 l-4 7 l-4 -7 Z" />
+
+                  {/* Center Sacred Hanging Motif */}
+                  <Path d="M 200 12 L 200 32" stroke={FESTIVE_LINE} strokeWidth={1} />
+                  <AnimatedG opacity={twinkle2}>
+                    <Path d="M 200 32 L 204 38 L 200 44 L 196 38 Z" fill={FESTIVE_GOLD} />
+                    <Circle cx="200" cy="48" r="2.2" fill={FESTIVE_AMBER} />
                   </AnimatedG>
-                  <AnimatedG opacity={twinkle4} fill={FESTIVE_GOLD}>
-                    <Path d="M120 27 l4 7 l-4 7 l-4 -7 Z" />
-                    <Path d="M210 12 l4 7 l-4 7 l-4 -7 Z" />
-                    <Path d="M345 12 l4 7 l-4 7 l-4 -7 Z" />
+
+                  {/* Right-center Marigold Droplet */}
+                  <Path d="M 280 8 L 280 26" stroke={FESTIVE_LINE} strokeWidth={1} />
+                  <AnimatedG opacity={twinkle4}>
+                    <Circle cx="280" cy="28" r="3.5" fill={FESTIVE_GOLD} />
+                    <Circle cx="280" cy="28" r="1.5" fill="#FFFBEB" />
+                  </AnimatedG>
+
+                  {/* Right Bell */}
+                  <Path d="M 350 17 L 350 35" stroke={FESTIVE_LINE} strokeWidth={1} />
+                  <AnimatedG opacity={twinkle1}>
+                    <Circle cx="350" cy="37" r="3" fill={FESTIVE_AMBER} />
+                    <Path d="M 346 41 L 354 41 L 352 47 L 348 47 Z" fill={FESTIVE_GOLD} />
                   </AnimatedG>
                 </Svg>
               </View>
 
-              {/* 2. Twinkling 4-Point Sparkle Stars */}
-              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '22%', left: '11%', opacity: twinkle2 }]}>
-                <Svg viewBox="0 0 10 10" width={13} height={13}>
-                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+              {/* 2. Soft Twinkling Auspicious 4-Point Stars */}
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '18%', left: '11%', opacity: twinkle2 }]}>
+                <Svg viewBox="0 0 12 12" width={13} height={13}>
+                  <Path d="M6 0 L7.2 4.8 L12 6 L7.2 7.2 L6 12 L4.8 7.2 L0 6 L4.8 4.8 Z" fill={FESTIVE_GOLD} />
                 </Svg>
               </Animated.View>
-              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '30%', right: '12%', opacity: twinkle4 }]}>
-                <Svg viewBox="0 0 10 10" width={16} height={16}>
-                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { top: '24%', right: '13%', opacity: twinkle4 }]}>
+                <Svg viewBox="0 0 12 12" width={15} height={15}>
+                  <Path d="M6 0 L7.2 4.8 L12 6 L7.2 7.2 L6 12 L4.8 7.2 L0 6 L4.8 4.8 Z" fill={FESTIVE_GOLD} />
                 </Svg>
               </Animated.View>
-              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '26%', left: '14%', opacity: twinkle1 }]}>
-                <Svg viewBox="0 0 10 10" width={12} height={12}>
-                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '24%', left: '13%', opacity: twinkle1 }]}>
+                <Svg viewBox="0 0 12 12" width={12} height={12}>
+                  <Path d="M6 0 L7.2 4.8 L12 6 L7.2 7.2 L6 12 L4.8 7.2 L0 6 L4.8 4.8 Z" fill={FESTIVE_GOLD} />
                 </Svg>
               </Animated.View>
-              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '33%', right: '11%', opacity: twinkle3 }]}>
-                <Svg viewBox="0 0 10 10" width={14} height={14}>
-                  <Path d="M5 0 L6 4 L10 5 L6 6 L5 10 L4 6 L0 5 L4 4 Z" fill={FESTIVE_GOLD} />
+              <Animated.View pointerEvents="none" style={[styles.starAbsolute, { bottom: '28%', right: '11%', opacity: twinkle3 }]}>
+                <Svg viewBox="0 0 12 12" width={14} height={14}>
+                  <Path d="M6 0 L7.2 4.8 L12 6 L7.2 7.2 L6 12 L4.8 7.2 L0 6 L4.8 4.8 Z" fill={FESTIVE_GOLD} />
                 </Svg>
               </Animated.View>
 
-              {/* 3. Center Orbiting Celestial Rings, Halo & Brand Typography */}
+              {/* 3. Centerpiece Block: Sacred Mandala Halo + MySawari Emblem + Handcrafted Diya */}
               <View style={styles.diwaliCenterBlock}>
-                <View style={[styles.ringsWrap, { width: ringSize, height: ringSize }]}>
-                  {/* Soft Radial Halo */}
+                {/* Festive Occasion Header Ribbon */}
+                <Animated.View style={[styles.festiveBadgeRow, { opacity: titleOpacity }]}>
+                  <View style={styles.festiveBadgeLine} />
+                  <Text style={styles.festiveBadgeText}>
+                    {config?.occasionBadge || '✦  HAPPY DIWALI  ✦'}
+                  </Text>
+                  <View style={styles.festiveBadgeLine} />
+                </Animated.View>
+
+                {/* Concentric Rotating Mandala Geometry + Authentic Brand Emblem */}
+                <View style={[styles.ringsWrap, { width: ringSize, height: ringSize, marginTop: 14 }]}>
+                  {/* Soft Breathing Golden Aura */}
                   <Animated.View
                     style={[
                       styles.haloGlow,
                       {
-                        width: ringSize * 0.94,
-                        height: ringSize * 0.94,
-                        borderRadius: ringSize * 0.47,
+                        width: ringSize * 0.95,
+                        height: ringSize * 0.95,
+                        borderRadius: (ringSize * 0.95) / 2,
                         transform: [{ scale: glowScale }],
                       },
                     ]}
                   />
 
-                  {/* Outer Clockwise Dashed Golden Ring with Markers */}
+                  {/* Outer Clockwise Delicate Dashed Gold Ring with 4 Cardinal Diamonds */}
                   <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', transform: [{ rotate: spin }] }]}>
                     <Svg viewBox="0 0 200 200" width={ringSize} height={ringSize}>
-                      <Circle cx="100" cy="100" r="96" fill="none" stroke={FESTIVE_GOLD} strokeWidth={1.6} strokeDasharray="1.5 8" strokeLinecap="round" />
+                      <Circle cx="100" cy="100" r="95" fill="none" stroke={FESTIVE_GOLD} strokeWidth={1.4} strokeDasharray="3 7" strokeLinecap="round" />
                       <G fill={FESTIVE_GOLD}>
-                        <Path d="M100 0 l3 6 l-3 6 l-3 -6 Z" />
-                        <Path d="M200 100 l-6 3 l-6 -3 l6 -3 Z" />
-                        <Path d="M100 200 l3 -6 l-3 -6 l-3 6 Z" />
-                        <Path d="M0 100 l6 3 l6 -3 l-6 -3 Z" />
+                        <Path d="M100 0 L103 5 L100 10 L97 5 Z" />
+                        <Path d="M200 100 L195 103 L190 100 L195 97 Z" />
+                        <Path d="M100 200 L103 195 L100 190 L97 195 Z" />
+                        <Path d="M0 100 L5 103 L10 100 L5 97 Z" />
                       </G>
                     </Svg>
                   </Animated.View>
 
-                  {/* Inner Counter-Clockwise Dot Ring */}
+                  {/* Inner Counter-Clockwise Auspicious Petal Ring */}
                   <Animated.View style={[StyleSheet.absoluteFill, { alignItems: 'center', justifyContent: 'center', transform: [{ rotate: spinReverse }] }]}>
                     <Svg viewBox="0 0 200 200" width={ringSize * 0.86} height={ringSize * 0.86}>
-                      <Circle cx="100" cy="100" r="97" fill="none" stroke={FESTIVE_LINE} strokeWidth={1} />
-                      <G fill={FESTIVE_LINE}>
-                        <Circle cx="100" cy="3" r="2.5" />
-                        <Circle cx="197" cy="100" r="2.5" />
-                        <Circle cx="100" cy="197" r="2.5" />
-                        <Circle cx="3" cy="100" r="2.5" />
-                        <Circle cx="168.6" cy="31.4" r="2" />
-                        <Circle cx="168.6" cy="168.6" r="2" />
-                        <Circle cx="31.4" cy="168.6" r="2" />
-                        <Circle cx="31.4" cy="31.4" r="2" />
+                      <Circle cx="100" cy="100" r="96" fill="none" stroke={FESTIVE_LINE} strokeWidth={0.9} />
+                      <G fill={FESTIVE_GOLD}>
+                        <Circle cx="100" cy="4" r="2.2" />
+                        <Circle cx="196" cy="100" r="2.2" />
+                        <Circle cx="100" cy="196" r="2.2" />
+                        <Circle cx="4" cy="100" r="2.2" />
+                        <Circle cx="167.9" cy="32.1" r="1.8" />
+                        <Circle cx="167.9" cy="167.9" r="1.8" />
+                        <Circle cx="32.1" cy="167.9" r="1.8" />
+                        <Circle cx="32.1" cy="32.1" r="1.8" />
                       </G>
                     </Svg>
                   </Animated.View>
 
-                  {/* MySawari Brand Emblem Logo */}
+                  {/* The Authentic MySawari Monogram Emblem (MySawari_nobg.png) */}
                   <Animated.Image
-                    source={require('@/assets/images/diwali_splash/e4dbf1fccac9f7627d383d6daa9ade36.png')}
+                    source={require('@/assets/images/MySawari_nobg.png')}
                     style={[
                       styles.diwaliEmblem,
                       {
-                        width: ringSize * 0.48,
-                        height: ringSize * 0.48,
+                        width: ringSize * 0.54,
+                        height: ringSize * 0.54,
                         opacity: logoOpacity,
                         transform: [{ scale: logoScale }],
                       },
@@ -462,18 +532,102 @@ export function AnimatedSplash({
                   />
                 </View>
 
-                {/* 4. Brand Typography */}
-                <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 18 }}>
-                  <Text style={[styles.diwaliBrandTitle, { fontSize: isSmallDevice ? 34 : isTablet ? 46 : 40 }]}>
+                {/* 4. Handcrafted Traditional Diya (Living Sacred Flame) */}
+                <Animated.View
+                  style={[
+                    styles.diwaliDiyaWrap,
+                    {
+                      opacity: logoOpacity,
+                      transform: [{ scale: logoScale }],
+                    },
+                  ]}
+                >
+                  <Svg viewBox="0 0 80 50" width={isSmallDevice ? 64 : 74} height={isSmallDevice ? 40 : 46}>
+                    {/* Soft Warmth under Diya */}
+                    <Circle cx="40" cy="36" r="24" fill={FESTIVE_HALO} />
+
+                    {/* Terracotta Brass Bowl */}
+                    <Path
+                      d="M 16 28 C 26 34, 54 34, 64 28 C 67 31, 64 36, 57 41 C 48 45, 32 45, 23 41 C 16 36, 13 31, 16 28 Z"
+                      fill="#B45309"
+                      stroke="#92400E"
+                      strokeWidth={0.8}
+                    />
+                    {/* Golden Bowl Rim Highlight */}
+                    <Path
+                      d="M 16 28 C 26 33, 54 33, 64 28 C 54 30, 26 30, 16 28 Z"
+                      fill={FESTIVE_GOLD}
+                    />
+                  </Svg>
+
+                  {/* Living Flame with Gentle sin-wave Flicker */}
+                  <Animated.View
+                    style={[
+                      styles.flameAbsolute,
+                      {
+                        transform: [
+                          { translateY: flameTranslateY },
+                          { scaleY: flameScaleY },
+                          { scaleX: flameScaleX },
+                        ],
+                      },
+                    ]}
+                  >
+                    <Svg viewBox="0 0 40 30" width={isSmallDevice ? 32 : 36} height={isSmallDevice ? 24 : 28}>
+                      {/* Outer Warm Amber Flame */}
+                      <Path
+                        d="M 20 2 C 26 10, 28 15, 24 20 C 22 22, 18 22, 16 20 C 12 15, 14 10, 20 2 Z"
+                        fill="#F59E0B"
+                      />
+                      {/* Inner Sacred Radiant Core */}
+                      <Path
+                        d="M 20 6 C 23 12, 25 15, 22 18 C 21 19, 19 19, 18 18 C 15 15, 17 12, 20 6 Z"
+                        fill="#FFFBEB"
+                      />
+                    </Svg>
+                  </Animated.View>
+                </Animated.View>
+
+                {/* 5. Brand Typography Hierarchy */}
+                <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 8 }}>
+                  <Text style={[styles.diwaliBrandTitle, { fontSize: isSmallDevice ? 32 : isTablet ? 44 : 38 }]}>
                     {displayTitle}
                   </Text>
                 </Animated.View>
 
-                <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 8 }}>
-                  <Text style={[styles.diwaliBrandTagline, { fontSize: isSmallDevice ? 15 : isTablet ? 19 : 17 }]}>
-                    {displayTagline}
+                <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 6 }}>
+                  <Text style={[styles.diwaliBrandTagline, { fontSize: isSmallDevice ? 14 : isTablet ? 18 : 16 }]}>
+                    {config?.occasionGreeting || displayTagline || 'Lighting Every Journey'}
                   </Text>
                 </Animated.View>
+
+                {config?.occasionSubtext ? (
+                  <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 4 }}>
+                    <Text style={styles.diwaliOccasionSubtext}>
+                      {config.occasionSubtext}
+                    </Text>
+                  </Animated.View>
+                ) : null}
+              </View>
+
+              {/* 6. Auspicious Bottom Grounding Lotus Petal Arc */}
+              <View pointerEvents="none" style={styles.bottomLotusWrap}>
+                <Svg viewBox="0 0 240 36" width={Math.min(windowWidth * 0.6, 220)} height={32} preserveAspectRatio="xMidYMax meet">
+                  <Path
+                    d="M 20 34 Q 120 12 220 34"
+                    fill="none"
+                    stroke={FESTIVE_LINE}
+                    strokeWidth={1}
+                  />
+                  <Path
+                    d="M 60 34 Q 120 20 180 34"
+                    fill="none"
+                    stroke={FESTIVE_GOLD}
+                    strokeWidth={0.8}
+                    strokeDasharray="2 4"
+                  />
+                  <Circle cx="120" cy="18" r="2.5" fill={FESTIVE_GOLD} />
+                </Svg>
               </View>
             </Animated.View>
           ) : (
@@ -605,25 +759,72 @@ const styles = StyleSheet.create({
   },
   haloGlow: {
     position: 'absolute',
-    backgroundColor: 'rgba(224, 161, 38, 0.16)',
+    backgroundColor: FESTIVE_HALO,
     zIndex: 0,
+  },
+  festiveBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
+  festiveBadgeLine: {
+    width: 22,
+    height: 1,
+    backgroundColor: FESTIVE_GOLD,
+    opacity: 0.65,
+  },
+  festiveBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 12,
+    color: FESTIVE_GOLD_DARK,
+    letterSpacing: 3.5,
+    textTransform: 'uppercase',
   },
   diwaliEmblem: {
     zIndex: 3,
+  },
+  diwaliDiyaWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -8,
+    position: 'relative',
+    zIndex: 4,
+  },
+  flameAbsolute: {
+    position: 'absolute',
+    top: -3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 5,
   },
   diwaliBrandTitle: {
     fontFamily: 'Inter_700Bold',
     fontWeight: '800',
     color: FESTIVE_INK,
-    letterSpacing: -0.8,
+    letterSpacing: -0.6,
     textAlign: 'center',
   },
   diwaliBrandTagline: {
     fontFamily: 'Inter_500Medium',
     fontWeight: '500',
     color: FESTIVE_SUB,
+    letterSpacing: 0.25,
+    textAlign: 'center',
+  },
+  diwaliOccasionSubtext: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12.5,
+    color: FESTIVE_MUTED,
     letterSpacing: 0.2,
     textAlign: 'center',
+  },
+  bottomLotusWrap: {
+    position: 'absolute',
+    bottom: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
 
   troubleActions: {

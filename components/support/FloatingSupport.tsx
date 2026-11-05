@@ -20,6 +20,7 @@ const HIDDEN_ROUTES = [
   '/location',
   '/return-location',
   '/dropoff',
+  '/dates',
 ];
 
 export function FloatingSupport() {

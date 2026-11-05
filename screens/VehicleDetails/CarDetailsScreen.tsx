@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager } from 'react-native';
+import { Animated, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager } from 'react-native';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -182,6 +182,11 @@ export default function CarDetailsScreen() {
     const task = InteractionManager.runAfterInteractions(() => setShowRest(true));
     return () => task.cancel();
   }, []);
+  // The skeleton shows while the screen slides in; the real page then fades in over it.
+  const fadeIn = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (showRest) Animated.timing(fadeIn, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+  }, [showRest, fadeIn]);
 
   useEffect(() => {
     mainScrollRef.current?.scrollTo({ y: 0, animated: false });
@@ -215,8 +220,8 @@ export default function CarDetailsScreen() {
     mainScrollRef.current?.scrollTo({ y, animated: true });
   };
 
-  // Show animated vehicle details skeleton if fleet is still loading and no real car is selected yet
-  if ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && isFleetLoading) {
+  // Animated skeleton while the screen is sliding in, or while the fleet loads and no real car is selected yet
+  if (!showRest || ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && isFleetLoading)) {
     return (
       <View style={[styles.screen, { backgroundColor: p.page }]}>
         <View style={{ paddingTop: insets.top, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
@@ -270,6 +275,7 @@ export default function CarDetailsScreen() {
   }
 
   return (
+    <Animated.View style={{ flex: 1, opacity: fadeIn }}>
     <BlurTargetProvider target={blurTarget}>
       <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
         <VehicleHeader title={title} tripLabel={tripLabel} onEditTrip={openDates} />
@@ -368,6 +374,7 @@ export default function CarDetailsScreen() {
       />
       </BlurHost>
     </BlurTargetProvider>
+    </Animated.View>
   );
 }
 

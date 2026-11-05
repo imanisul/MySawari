@@ -83,6 +83,7 @@ export default function BookingDetailScreen() {
   const [showCancel, setShowCancel] = useState(false);
   const [showExtend, setShowExtend] = useState(false);
   const [showReview, setShowReview] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
   const [showRefundTrack, setShowRefundTrack] = useState(false);
 
   const { data: myReviews } = useQuery({ queryKey: ['myReviews'], queryFn: () => API.reviews.mine(), staleTime: 60 * 1000, enabled: isAuthenticated === true });
@@ -302,16 +303,7 @@ export default function BookingDetailScreen() {
 
           {/* Completed: rate the trip */}
           {completed && (
-            <RateTrip
-              reviewed={reviewed}
-              onAddPhotos={() => setShowReview(true)}
-              onSubmit={async (rating, text) => {
-                await API.reviews.submit(String(s.vehicleId), rating, text, { bookingId: s.id });
-                queryClient.invalidateQueries({ queryKey: ['myReviews'] });
-                queryClient.invalidateQueries({ queryKey: ['pendingReviews'] });
-                queryClient.invalidateQueries({ queryKey: ['carReviews'] });
-              }}
-            />
+            <RateTrip reviewed={reviewed} onRate={(n) => { setReviewRating(n); setShowReview(true); }} />
           )}
 
           {upcoming && (
@@ -420,8 +412,8 @@ export default function BookingDetailScreen() {
       <ExtendBookingSheet visible={showExtend} onClose={() => setShowExtend(false)} booking={s} onSuccess={setSnapshot} />
       <RefundTrackingModal visible={showRefundTrack} onClose={() => setShowRefundTrack(false)} booking={s} onRefundUpdated={() => refetchBookings()} />
       <ReviewModal
-        trip={showReview ? { bookingId: s.id, carId: String(s.vehicleId), vehicleName: s.vehicleName } : null}
-        onClose={() => { setShowReview(false); queryClient.invalidateQueries({ queryKey: ['myReviews'] }); }}
+        trip={showReview ? { bookingId: s.id, carId: String(s.vehicleId), vehicleName: s.vehicleName, rating: reviewRating } : null}
+        onClose={() => { setShowReview(false); setReviewRating(0); queryClient.invalidateQueries({ queryKey: ['myReviews'] }); }}
       />
         </BlurTargetView>
       </View>
@@ -461,19 +453,10 @@ function Cta({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-function RateTrip({ reviewed, onSubmit, onAddPhotos }: {
-  reviewed: boolean;
-  onSubmit: (rating: number, text: string) => Promise<void>;
-  onAddPhotos: () => void;
-}) {
+function RateTrip({ reviewed, onRate }: { reviewed: boolean; onRate: (rating: number) => void }) {
   const c = useTripColors();
-  const [rating, setRating] = useState(0);
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
-  if (reviewed || sent) {
+  if (reviewed) {
     return (
       <View style={[styles.box, styles.rateDone, { backgroundColor: c.success + '12', borderColor: c.success + '40' }]}>
         <Feather name="check-circle" size={18} color={c.success} />
@@ -481,40 +464,17 @@ function RateTrip({ reviewed, onSubmit, onAddPhotos }: {
       </View>
     );
   }
+  // A tap on a star opens the review popup (stars, tell us more, trip photos, place visited) with that rating filled.
   return (
     <View style={[styles.box, { backgroundColor: c.card, borderColor: c.border, paddingTop: 17, gap: 12 }]}>
       <Text style={[styles.rateTitle, { color: c.foreground }]}>Rate the car and overall experience</Text>
       <View style={styles.stars}>
         {[1, 2, 3, 4, 5].map((n) => (
-          <Pressable key={n} onPress={() => setRating(n)} hitSlop={4} accessibilityLabel={`${n} star${n === 1 ? '' : 's'}`}>
-            <FontAwesome name={n <= rating ? 'star' : 'star-o'} size={24} color={n <= rating ? '#F5B301' : c.mutedForeground} />
+          <Pressable key={n} onPress={() => onRate(n)} hitSlop={4} accessibilityRole="button" accessibilityLabel={`${n} star${n === 1 ? '' : 's'}`}>
+            <FontAwesome name="star-o" size={28} color={c.mutedForeground} />
           </Pressable>
         ))}
       </View>
-      <TextInput
-        value={text}
-        onChangeText={setText}
-        placeholder="Share your feedbacks"
-        placeholderTextColor={c.mutedForeground}
-        multiline
-        style={[styles.feedback, { borderColor: c.border, color: c.foreground, backgroundColor: c.background }]}
-      />
-      {!!err && <Text style={[styles.body, { color: c.destructive }]}>{err}</Text>}
-      <Pressable
-        disabled={!rating || busy}
-        onPress={async () => {
-          setBusy(true); setErr(null);
-          try { await onSubmit(rating, text); setSent(true); } catch (e: any) { setErr(e?.message || 'Could not send your review. Please try again.'); } finally { setBusy(false); }
-        }}
-        style={[styles.rateCta, { backgroundColor: rating ? c.primary : c.disabledBg }]}
-      >
-        {busy ? <ActivityIndicator color={c.primaryForeground} /> : (
-          <Text style={[styles.ctaText, { fontSize: 15, color: rating ? c.primaryForeground : c.disabledText }]}>Submit</Text>
-        )}
-      </Pressable>
-      <Pressable onPress={onAddPhotos} hitSlop={6} style={{ alignSelf: 'center' }}>
-        <Text style={[styles.link, { color: c.blue }]}>Add trip photos and the place you visited</Text>
-      </Pressable>
     </View>
   );
 }

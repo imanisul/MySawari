@@ -34,16 +34,18 @@ type Photo = { key: string; uri: string; mimeType?: string; base64?: string; sta
  * (optional), add trip photos (optional — each uploads as soon as it's picked, with its own "Uploading"
  * tile), Submit → "Feedback Submitted". Saved with POST /reviews (photos via the signed Cloudinary upload).
  */
-export function TripReviewSheet({ carId, bookingId, vehicleName, onClose, onSubmitted }: {
+export function TripReviewSheet({ carId, bookingId, vehicleName, initialRating = 0, onClose, onSubmitted }: {
   carId: string;
   bookingId: string;
   vehicleName: string;
+  /** Stars already tapped on the trip page, so the sheet opens with them filled. */
+  initialRating?: number;
   onClose: () => void;
   onSubmitted?: () => void;
 }) {
   const p = useDetailsPalette();
   const queryClient = useQueryClient();
-  const [rating, setRating] = useState(0);
+  const [rating, setRating] = useState(initialRating);
   const [text, setText] = useState('');
   const [focused, setFocused] = useState<'text' | 'place' | null>(null);
   const [needStars, setNeedStars] = useState(false);

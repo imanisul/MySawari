@@ -224,56 +224,22 @@ export default function HomeScreen() {
     setBookingSource('home');
     setVehicleType(t.vehicleType);
     if (t.dropoff) setDropoff(t.dropoff);
-    if (t.dateRange && t.duration) setDates(t.dateRange, t.duration);
+    // 'Upcoming Trip' is a placeholder for "no dates picked", not a range the results can search.
+    if (t.dateRange && t.duration && t.dateRange !== 'Upcoming Trip') setDates(t.dateRange, t.duration);
     if (t.pickupTime && t.returnTime) setTimes(t.pickupTime, t.returnTime);
-
-    if (t.trip) {
-      if (t.trip.mode) setMode(t.trip.mode);
-      if (typeof t.trip.isDeliveryRequested === 'boolean') setIsDeliveryRequested(t.trip.isDeliveryRequested);
-      if (t.trip.deliveryMode) setDeliveryMode(t.trip.deliveryMode);
-      setPickup(t.trip.pickup || null);
-      setReturnAddress(t.trip.returnAddress || null);
-    }
-
-    if (t.carId) {
-      const found = fetchedVehicles.find((v) => String(v.id) === String(t.carId)) || cars.find((v) => String(v.id) === String(t.carId));
-      if (found) {
-        selectCar(found);
-      }
-    }
-
-    const target = t.stage === 'payment' ? '/payment'
-                 : t.stage === 'booking' ? '/booking'
-                 : t.stage === 'car' ? '/car-details'
-                 : '/explore';
-
-    if (target === '/explore' || target === '/car-details') {
-      router.push(target as any);
-    } else {
-      requireLogin(() => router.push(target as any));
-    }
-  }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress, fetchedVehicles, selectCar, requireLogin, router]);
+    // A recent search always opens the available cars for that place and dates.
+    router.push('/search');
+  }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, router]);
 
   const openPick = useCallback((item: any) => {
     selectCar(item);
     setBookingSource('home');
-    const ctx = item.viewedContext;
-    if (!ctx) { router.push('/car-details'); return; }
-    // A recently viewed vehicle reopens with the trip it was viewed for.
-    if (ctx.dropoff) setDropoff(ctx.dropoff);
-    if (ctx.dateRange && ctx.duration) setDates(ctx.dateRange, ctx.duration);
-    if (ctx.pickupTime && ctx.returnTime) setTimes(ctx.pickupTime, ctx.returnTime);
-    if (ctx.trip) {
-      if (ctx.trip.mode) setMode(ctx.trip.mode);
-      setIsDeliveryRequested(!!ctx.trip.isDeliveryRequested);
-      if (ctx.trip.deliveryMode) setDeliveryMode(ctx.trip.deliveryMode);
-      setPickup(ctx.trip.pickup || null);
-      setReturnAddress(ctx.trip.returnAddress || null);
-    }
-    const target = ctx.stage === 'payment' ? '/payment' : ctx.stage === 'booking' ? '/booking' : '/car-details';
-    if (target === '/car-details') router.push('/car-details');
-    else requireLogin(() => router.push(target as any));
-  }, [selectCar, setBookingSource, router, requireLogin, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress]);
+    // The car's details page only: location, dates and time are asked again, so booking never starts from an old trip.
+    setDropoff(null);
+    setDates('Select Dates', '5 days');
+    setTimes('08:00 AM', '08:00 AM');
+    router.push('/car-details');
+  }, [selectCar, setBookingSource, router, setDropoff, setDates, setTimes]);
 
   // ── Trip milestone (ride journey from the server) ──
   const { data: journey, refetch: refetchJourney, cards } = useRideJourney();

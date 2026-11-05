@@ -16,7 +16,7 @@ import { loadHomeData } from '@/hooks/useHomeData';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { LoginGate } from '@/components/auth/LoginGate';
-import { ErrorBoundary, FloatingSupport, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
+import { ErrorBoundary, UpdateModal, AnimatedSplash, CustomAlertProvider } from '@/components';
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -41,6 +41,10 @@ import * as Location from 'expo-location';
 import { API } from '@/services/backend/api';
 import { handleDeepLinkReferralUrl } from '@/utils/referralLinkHandler';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
+import { preloadFlashScreenConfig } from '@/services/api/flashScreen';
+
+// Pre-hydrate flash screen settings immediately so only the PROPER ONE ever appears
+preloadFlashScreenConfig().catch(() => {});
 
 // The native splash is the only splash. It stays up until the first usable screen is ready (see AppGate).
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -225,7 +229,6 @@ export default function RootLayout() {
             <SawariProvider>
               <AppGate fontError={!!fontError && !fontsLoaded}>
                 <RootLayoutNav />
-                <FloatingSupport />
                 <OTAUpdateChecker />
                 <PostTripReviewPrompt />
                 <RewardCardGate />

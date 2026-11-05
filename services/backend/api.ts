@@ -86,6 +86,13 @@ export type BookingSnapshot = {
   fastagAmount?: number;
   securityDeposit?: number;
   totalCollected?: number;
+  handoverOtp?: {
+    otp?: string;
+    status: 'PENDING' | 'VERIFIED' | 'BYPASSED' | string;
+    generatedAt?: string;
+    verifiedAt?: string;
+    bypassedAt?: string;
+  };
 };
 
 /**
@@ -1675,6 +1682,13 @@ export const API = {
           refundStatus: b.refundStatus,
           cancelledAt: b.cancelledAt,
           pendingRefund: b.pendingRefund || undefined,
+          handoverOtp: b.handoverOtp ? {
+            otp: b.handoverOtp.otp,
+            status: b.handoverOtp.status || 'PENDING',
+            generatedAt: b.handoverOtp.generatedAt,
+            verifiedAt: b.handoverOtp.verifiedAt,
+            bypassedAt: b.handoverOtp.bypassedAt,
+          } : undefined,
           extensions: (b.extensions || []).map((e: any) => ({
             id: e._id,
             daysToAdd: e.additionalDays,

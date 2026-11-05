@@ -240,6 +240,77 @@ export default function BookingDetailScreen() {
 
           <BookingCard booking={s} image={matchedCar?.image} />
 
+          {/* Vehicle Handover Verification Section */}
+          {(() => {
+            const isVerified = s.handoverOtp?.status === 'VERIFIED';
+            const isBypassed = s.handoverOtp?.status === 'BYPASSED';
+            const otpCode = s.handoverOtp?.otp;
+            const isEligible = !cancelled && (upcoming || ongoing || isVerified) && s.status !== 'CANCELLED';
+
+            if (!isEligible) return null;
+
+            if (isVerified) {
+              return (
+                <View style={[styles.box, styles.handoverSection, { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' }]}>
+                  <View style={styles.handoverHeaderRow}>
+                    <View style={[styles.otpIconBadge, { backgroundColor: '#DCFCE7' }]}>
+                      <Feather name="check-circle" size={18} color="#16A34A" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.handoverSectionTitle, { color: '#166534' }]}>Vehicle Handover Verification</Text>
+                      <View style={styles.verifiedBadgeContainer}>
+                        <Text style={styles.verifiedBadgeText}>OTP VERIFIED</Text>
+                      </View>
+                    </View>
+                  </View>
+                  <Text style={[styles.handoverDesc, { color: '#15803D' }]}>
+                    Your vehicle handover verification is complete. Enjoy your trip!
+                  </Text>
+                </View>
+              );
+            }
+
+            // If bypassed, do not display OTP Verified. Keep the distinction between bypassed and verified.
+            if (isBypassed) {
+              return null;
+            }
+
+            // Display OTP only for eligible confirmed bookings that have not yet completed handover
+            if (otpCode && (upcoming || s.status === 'CONFIRMED')) {
+              const digits = otpCode.split('');
+              return (
+                <View style={[styles.box, styles.handoverSection, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>
+                  <View style={styles.handoverHeaderRow}>
+                    <View style={[styles.otpIconBadge, { backgroundColor: c.lightBlue }]}>
+                      <Feather name="shield" size={18} color={c.navy} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.handoverSectionTitle, { color: c.foreground }]}>Vehicle Handover Verification</Text>
+                      <Text style={[styles.handoverSubtitle, { color: c.mutedForeground }]}>Your Vehicle Handover OTP</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.otpBoxesRow}>
+                    {digits.map((digit, index) => (
+                      <View key={index} style={[styles.otpDigitBox, { borderColor: c.navy, backgroundColor: '#F8FAFC' }]}>
+                        <Text style={[styles.otpDigitText, { color: c.navy }]}>{digit}</Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  <View style={styles.handoverFooterRow}>
+                    <Feather name="info" size={14} color={c.navy} style={{ marginTop: 2 }} />
+                    <Text style={[styles.handoverDesc, { color: c.foreground }]}>
+                      Share this OTP with the MySawari executive during vehicle handover.
+                    </Text>
+                  </View>
+                </View>
+              );
+            }
+
+            return null;
+          })()}
+
           {upcoming && (
             <Banner
               tone={s.status === 'PENDING' ? 'pending' : 'info'}
@@ -530,4 +601,32 @@ const styles = StyleSheet.create({
   hint: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, textAlign: 'center' },
   cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
+
+  // Vehicle Handover Verification
+  handoverSection: { padding: 16, gap: 12, borderRadius: 14 },
+  handoverHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  otpIconBadge: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  handoverSectionTitle: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 20 },
+  handoverSubtitle: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 17, marginTop: 1 },
+  verifiedBadgeContainer: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginTop: 4,
+  },
+  verifiedBadgeText: { fontFamily: FONT.bold, fontSize: 11, color: '#15803D', letterSpacing: 0.5 },
+  otpBoxesRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginVertical: 4 },
+  otpDigitBox: {
+    width: 48,
+    height: 52,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpDigitText: { fontFamily: FONT.bold, fontSize: 24, letterSpacing: 1 },
+  handoverFooterRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  handoverDesc: { flex: 1, fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
 });

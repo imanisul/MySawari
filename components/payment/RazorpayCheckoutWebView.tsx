@@ -242,7 +242,7 @@ export function RazorpayCheckoutWebView({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
   },
   hiddenContainer: {
     position: 'absolute',

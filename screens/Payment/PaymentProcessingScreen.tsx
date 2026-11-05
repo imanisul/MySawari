@@ -117,7 +117,12 @@ export default function PaymentProcessingScreen() {
 
         setSetupStep(1);
         setRazorpayOrder(order);
-        setStatus('PAYMENT_PENDING'); 
+        // Show opening screen with 'Opening secure payment' then reveal Razorpay in milliseconds
+        setTimeout(() => {
+          if (!left.current) {
+            setStatus('PAYMENT_PENDING');
+          }
+        }, 250);
       } catch (err: any) {
         // Handle 100% sawari cash / zero online payable flow
         if (left.current) { releaseHold(); return; }
@@ -231,6 +236,7 @@ export default function PaymentProcessingScreen() {
         />
         <View style={pending ? StyleSheet.absoluteFill : { position: 'absolute', width: 1, height: 1, opacity: 0 }} pointerEvents={pending ? 'auto' : 'none'}>
           <RazorpayCheckoutWebView
+            visible={pending}
             orderId={razorpayOrder?.orderId}
             amount={razorpayOrder?.amountPaise}
             currency="INR"

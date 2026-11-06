@@ -1570,6 +1570,29 @@ export const API = {
     }
   },
 
+  /**
+   * GET /api/customers/wallet/membership — only the membership, one quick lookup. The Membership page used to read the
+   * whole wallet (which also settles referral money and adds up the history) just to learn the plan. An older server
+   * without this route answers 404, so the full wallet is read instead.
+   */
+  async getMembership(): Promise<{ membership: any | null; failed?: boolean }> {
+    try {
+      const { getItemAsync } = require('../../utils/secureStore');
+      if (!(await getItemAsync('auth_token'))) return { membership: null };
+      const response = await fetchWithAuth(`${BACKEND_URL}/customers/wallet/membership`);
+      if (response.status === 404) {
+        const wallet: any = await this.getWallet(true);
+        return wallet?.failed ? { membership: null, failed: true } : { membership: wallet?.membership ?? null };
+      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to fetch membership');
+      const m = data.data?.membership;
+      return { membership: m && typeof m.plan === 'string' ? { ...m, plan: m.plan.trim().toLowerCase(), totalSaved: Math.max(0, Number(m.totalSaved) || 0) } : null };
+    } catch {
+      return { membership: null, failed: true };
+    }
+  },
+
   async requestWithdrawal(amount: number, method: 'upi' | 'bank', details: any) {
     try {
       const response = await fetchWithAuth(`${BACKEND_URL}/customers/wallet/withdraw`, {

@@ -19,6 +19,7 @@ import {
   ExclusiveOffer,
   exclusiveOffersQueryOptions,
   recordOfferView,
+  specificCarOf,
 } from '@/services/api/offers';
 import { ExclusiveOfferDetailModal } from '@/components/offers/ExclusiveOfferDetailModal';
 
@@ -61,6 +62,16 @@ export function ExclusiveOffersSection() {
       }
     }
   }, [params?.openExclusiveOfferId, offers]);
+
+  // An offer that was deleted (or ended) while its page is open closes the page instead of staying on screen.
+  useEffect(() => {
+    if (!modalVisible || !selectedOffer) return;
+    const id = String(selectedOffer._id || selectedOffer.id);
+    if (!offers.some((o) => String(o._id || o.id) === id)) {
+      setModalVisible(false);
+      setSelectedOffer(null);
+    }
+  }, [offers, modalVisible, selectedOffer]);
 
   if (!offers || offers.length === 0) {
     return null;
@@ -220,7 +231,10 @@ export function ExclusiveOffersSection() {
         : null) ||
       vehicles[0]?.image;
 
-    const imageUrl = item.image?.url || item.image?.uri || vehicleImage;
+    // A deal on specific cars shows that car's own photo; others use the deal's banner.
+    const dealCar = specificCarOf(item, vehicles);
+    const dealCarImage = dealCar?.image || dealCar?.images?.[0];
+    const imageUrl = dealCarImage || item.image?.url || item.image?.uri || vehicleImage;
 
     const resolvedVehicleName =
       (typeof item.vehicleId === 'object'
@@ -308,7 +322,7 @@ export function ExclusiveOffersSection() {
             </Text>
           ) : isOvernight ? (
             <Text style={[styles.cardSubtitle, { color: '#7E22CE' }]} numberOfLines={1}>
-              Tonight 8 PM to 8 AM • Auto-applied code
+              Tonight 8 PM to 8 AM
             </Text>
           ) : isAllCars ? (
             <Text style={[styles.cardSubtitle, { color: '#059669' }]} numberOfLines={1}>
@@ -338,9 +352,6 @@ export function ExclusiveOffersSection() {
       {/* Section Header */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">Exclusive Offers</Text>
-        <View style={styles.verifiedBadge}>
-          <Text style={styles.verifiedBadgeText}>Special deals</Text>
-        </View>
       </View>
 
       {/* Cards List */}

@@ -336,6 +336,10 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
         AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(live)).catch(() => {});
         return live;
       }
+    } else if (res.status < 500) {
+      // The server answered and has no list for us (say 404): the saved copy would only bring back deleted offers.
+      AsyncStorage.removeItem(EXCLUSIVE_OFFERS_CACHE_KEY).catch(() => {});
+      return [];
     }
   } catch (e) {
     console.warn('[Offers] Failed to fetch exclusive offers:', e);
@@ -391,4 +395,23 @@ export async function recordOfferView(offerId: string): Promise<void> {
       method: 'POST',
     });
   } catch {}
+}
+
+/**
+ * The car (or bike) a deal is for, from the live fleet. Only for deals on specific vehicles: a deal for all cars
+ * has no single car, so it returns undefined. Looks through the deal's own prices, then its car list, then its car.
+ */
+export function specificCarOf(offer: any, vehicles: any[]): any | undefined {
+  if (!offer || offer.allVehicles || offer.applicableType === 'all' || !vehicles?.length) return undefined;
+  const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
+  const ids = [
+    ...(offer.vehiclePrices || []).map((p: any) => asId(p.vehicleId)),
+    ...(offer.applicableVehicleIds || []).map(asId),
+    asId(offer.vehicleId),
+  ].filter(Boolean);
+  for (const id of ids) {
+    const car = vehicles.find((v: any) => String(v.id ?? v._id) === id);
+    if (car) return car;
+  }
+  return undefined;
 }

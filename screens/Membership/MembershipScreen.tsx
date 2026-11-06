@@ -140,9 +140,9 @@ export default function MembershipScreen() {
   const fetchMembership = useCallback(async () => {
     setChecking(true);
     try {
-      const wallet: any = await API.getWallet(true).catch(() => ({ failed: true }));
-      if (!wallet?.failed) {
-        setMembership(activeOnly(wallet?.membership));
+      const result = await API.getMembership();
+      if (!result.failed) {
+        setMembership(activeOnly(result.membership));
       }
     } catch {
       // Background check failed; keep known state
@@ -192,14 +192,11 @@ export default function MembershipScreen() {
   // "Subscribe" pressed with no plan picked: ask for one instead of guessing.
   const [needPick, setNeedPick] = useState(false);
   useEffect(() => {
-    if (selected) {
-      setNeedPick(false);
-      if (isAuthenticated) {
-        const def = getPlanDef(selected);
-        if (def?.price) API.prefetchRazorpayOrder(def.price);
-      }
-    }
-  }, [selected, isAuthenticated]);
+    if (selected) setNeedPick(false);
+    // The order for the plan the button will buy (the pick, or a member's next plan up) is created before the tap.
+    const price = (selected ? getPlanDef(selected) : activePlan ? offered[0] : undefined)?.price;
+    if (isAuthenticated && price) API.prefetchRazorpayOrder(price);
+  }, [selected, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (loading) return;
@@ -302,25 +299,6 @@ export default function MembershipScreen() {
     );
   }
 
-  if (checkoutStatus === 'PAYMENT_PENDING' && razorpayOrder) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <RazorpayCheckoutWebView
-          orderId={razorpayOrder.orderId}
-          amount={razorpayOrder.amountPaise}
-          currency="INR"
-          name="MySawari Membership"
-          description={`Activate ${getPlanDef(activating!)?.name} Plan`}
-          themeColor={colors.navy || '#111A2B'}
-          razorpayKey={razorpayOrder.keyId}
-          onSuccess={handleRazorpaySuccess}
-          onFailure={handleCancelPayment}
-          onClose={handleCancelPayment}
-        />
-      </View>
-    );
-  }
-
   if (checkoutStatus === 'VERIFYING') {
     return (
       <PaymentProgress
@@ -342,6 +320,7 @@ export default function MembershipScreen() {
   const headerBottom = activePlan ? activePlan.headerBottom : '#7365E0';
   const ctaLabel = target ? (activePlan ? `Upgrade to ${target.name}` : `Get ${target.name}`) : 'Subscribe';
   const showCta = offered.length > 0;
+  const payOpen = checkoutStatus === 'PAYMENT_PENDING' && !!razorpayOrder;
   const ctaSpace = showCta ? 53 + 16 + Math.max(insets.bottom, 12) : insets.bottom + 24;
   const onCta = () => {
     if (target) { handleActivate(target.key); return; }
@@ -423,11 +402,11 @@ export default function MembershipScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={target ? `${ctaLabel}, ${formatCurrency(target.price)} a year` : 'Subscribe, choose a plan first'}
-              disabled={!!activating || checking}
+              disabled={!!activating}
               onPress={onCta}
-              style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, (pressed || !!activating || checking) && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, (pressed || !!activating) && { opacity: 0.85 }]}
             >
-              {activating || checking ? <ActivityIndicator color="#FFFFFF" /> : <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.ctaText}>{ctaLabel}</Text>}
+              {activating ? <ActivityIndicator color="#FFFFFF" /> : <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.ctaText}>{ctaLabel}</Text>}
             </Pressable>
           </View>
         </View>
@@ -498,6 +477,35 @@ export default function MembershipScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Payment sheet: mounted (hidden) from the moment the page opens, exactly like booking, so Razorpay's page is
+          already loaded and opens the instant the order exists. */}
+      {isAuthenticated && showCta && (
+        <View
+          style={payOpen ? [StyleSheet.absoluteFill, { zIndex: 50, backgroundColor: colors.background }] : { position: 'absolute', width: 1, height: 1, opacity: 0 }}
+          pointerEvents={payOpen ? 'auto' : 'none'}
+        >
+          <RazorpayCheckoutWebView
+            visible={payOpen}
+            orderId={razorpayOrder?.orderId}
+            amount={razorpayOrder?.amountPaise}
+            currency="INR"
+            name="MySawari"
+            description={activating ? `Activate ${getPlanDef(activating)?.name} Plan` : 'MySawari Membership'}
+            themeColor={colors.navy || '#111A2B'}
+            razorpayKey={razorpayOrder?.keyId}
+            // Same details as booking sends: Razorpay uses the mobile number to put this customer's usual method first.
+            prefill={{
+              name: customer?.name || undefined,
+              contact: customer?.mobile || undefined,
+              email: customer?.email || undefined,
+            }}
+            onSuccess={handleRazorpaySuccess}
+            onFailure={handleCancelPayment}
+            onClose={handleCancelPayment}
+          />
+        </View>
+      )}
     </BlurHost>
   );
 }

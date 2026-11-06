@@ -22,6 +22,8 @@ import { LoginBottomSheet } from '@/components/auth/LoginBottomSheet';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { ExclusiveOffer, claimExclusiveOffer, recordOfferView } from '@/services/api/offers';
+import { API } from '@/services/backend/api';
+import { getAvailability, splitDateRange } from '@/utils/sawari';
 
 interface ExclusiveOfferDetailModalProps {
   offer: ExclusiveOffer | null;
@@ -109,6 +111,7 @@ export function ExclusiveOfferDetailModal({
   const [showLogin, setShowLogin] = useState(false);
   const [showTerms, setShowTerms] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [checking, setChecking] = useState(false);
 
   const offerId = offer ? String(offer._id || offer.id) : null;
 
@@ -216,7 +219,7 @@ export function ExclusiveOfferDetailModal({
   const pricingType = offer.pricingType || 'promotional_price';
   const pricingUnit = offer.pricingUnit === 'per_trip' ? '/trip' : '/day';
 
-  let offerHeadline = 'Special Deal';
+  let offerHeadline = 'Exclusive offer';
   if (pricingType === 'promotional_price') {
     offerHeadline = `${formatCurrency(offer.promotionalPrice ?? 1)}${pricingUnit}`;
   } else if (pricingType === 'fixed_discount') {
@@ -246,8 +249,10 @@ export function ExclusiveOfferDetailModal({
 
   const appliedCode = claimData?.couponCode || claimData?.claimToken || offer.code || 'SPECIALDEAL';
 
-  // Banner falls back to the selected car, then any fleet photo
+  // A deal on specific cars shows the chosen car's own photo; a deal on all cars uses its banner, then any fleet photo.
+  const forSpecificCars = !offer.allVehicles && offer.applicableType !== 'all';
   const imageUrl =
+    (forSpecificCars ? imageOf(selectedVehicle?.carObj) : null) ||
     offer.image?.url ||
     offer.image?.uri ||
     imageOf(selectedVehicle?.carObj) ||
@@ -289,7 +294,8 @@ export function ExclusiveOfferDetailModal({
     }
   };
 
-  const handleProceedToBooking = () => {
+  const handleProceedToBooking = async (justLoggedIn = false) => {
+    if (checking) return;
     if (appliedCode) applyCoupon(appliedCode);
 
     const car = selectedVehicle?.carObj || vehicles[0];
@@ -298,13 +304,16 @@ export function ExclusiveOfferDetailModal({
     const today = new Date();
     const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
     const range = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
+    let tripRange = dateRange;
 
     if (isOvernight || (offer.pickupTime && offer.returnTime)) {
       setDates(range, '1 Day');
       setTimes(pickupTime, returnTime);
+      tripRange = range;
     } else if (!dateRange || dateRange.includes('Select')) {
       setDates(range, '1 Day');
       setTimes('08:00 AM', '08:00 AM');
+      tripRange = range;
     }
 
     if (!dropoff?.name) {
@@ -328,8 +337,33 @@ export function ExclusiveOfferDetailModal({
       });
     }
 
-    onClose();
     const carId = car ? String(car.id || car._id) : '';
+
+    // A deal for specific car(s): if the car is free for the trip, skip the car page and go to checkout.
+    if (!offer.allVehicles && offer.applicableType !== 'all' && car && carId) {
+      // right after logging in, the screen has not re-rendered with the new session yet
+      if (!isAuthenticated && !justLoggedIn) {
+        setShowLogin(true);
+        return;
+      }
+      setChecking(true);
+      try {
+        // The list can be a little old, so the car's bookings are read fresh from the server first.
+        const live = await API.getVehicleAvailability(carId).catch(() => null);
+        const liveCar = live ? { ...car, bookedRanges: live.bookedRanges, dbStatus: live.status || car.dbStatus, maintenanceUntil: live.maintenanceUntil } : car;
+        const [startLabel, endLabel] = splitDateRange(tripRange);
+        if (getAvailability(liveCar, startLabel, endLabel).available) {
+          onClose();
+          router.push({ pathname: '/booking', params: { couponCode: appliedCode || '', isOvernight: isOvernight ? 'true' : 'false' } });
+          return;
+        }
+      } finally {
+        setChecking(false);
+      }
+      // Not free for these dates: the car page shows when it is next available and lets them change dates.
+    }
+
+    onClose();
     router.push({
       pathname: '/car-details',
       params: {
@@ -394,7 +428,7 @@ export function ExclusiveOfferDetailModal({
                       ? '🌙 Overnight (8 PM – 8 AM)'
                       : offer.allVehicles
                       ? '🚗 All Fleet Cars Eligible'
-                      : '⚡ Special Deal'}
+                      : '⚡ Exclusive offer'}
                   </Text>
                 </View>
               </View>
@@ -475,26 +509,8 @@ export function ExclusiveOfferDetailModal({
                       </Text>
                       <Text style={[styles.specSub, { color: p.sub }]}>
                         {offer.allVehicles
-                          ? 'Choose any car with auto-applied offer'
+                          ? 'Choose any car you like'
                           : `${vehiclesList.length} car option(s) available`}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Coupon */}
-                  <View style={styles.dealSpecItem}>
-                    <View style={[styles.specIconBox, { backgroundColor: '#FEF3C7' }]}>
-                      <Feather name="tag" size={14} color="#B45309" />
-                    </View>
-                    <View style={styles.specContent}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[styles.specTitle, { color: p.fg }]}>Coupon: </Text>
-                        <View style={styles.codePill}>
-                          <Text style={styles.codePillText}>{appliedCode}</Text>
-                        </View>
-                      </View>
-                      <Text style={[styles.specSub, { color: '#059669' }]}>
-                        ✓ Applied automatically at checkout
                       </Text>
                     </View>
                   </View>
@@ -611,16 +627,16 @@ export function ExclusiveOfferDetailModal({
               </View>
 
               <TouchableOpacity
-                onPress={handleProceedToBooking}
+                onPress={() => handleProceedToBooking()}
                 activeOpacity={0.88}
                 style={[styles.cta, { backgroundColor: isEnded ? p.sub : ACCENT }]}
                 disabled={isEnded}
               >
-                {claiming ? (
+                {claiming || checking ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <>
-                    <Text style={styles.ctaText}>Book This Deal</Text>
+                    <Text style={styles.ctaText}>{offer.allVehicles ? 'Book This Deal' : 'Book Now'}</Text>
                     <Feather name="arrow-right" size={17} color="#FFFFFF" />
                   </>
                 )}
@@ -633,7 +649,7 @@ export function ExclusiveOfferDetailModal({
       <LoginBottomSheet
         visible={showLogin}
         onClose={() => setShowLogin(false)}
-        onLoginSuccess={() => setShowLogin(false)}
+        onLoginSuccess={() => { setShowLogin(false); handleProceedToBooking(true); }}
       />
     </Modal>
   );

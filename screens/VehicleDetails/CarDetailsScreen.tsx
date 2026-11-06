@@ -95,10 +95,11 @@ export default function CarDetailsScreen() {
     if (targetCarId && fetchedVehicles.length > 0) {
       const match = fetchedVehicles.find((v) => String(v.id) === String(targetCarId));
       if (match && match.id !== selectedCar?.id) selectCar(match);
-    } else if ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && fetchedVehicles.length > 0) {
-      selectCar(fetchedVehicles[0]);
+    } else if (!targetCarId && (!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos')) {
+      // Opened with no car chosen (the app was reloaded on this page): back to Home, not a random car.
+      router.replace('/');
     }
-  }, [targetCarId, fetchedVehicles, selectedCar, selectCar]);
+  }, [targetCarId, fetchedVehicles, selectedCar, selectCar, router]);
 
   // CarListCard already syncs the Explore page's date to dateRange before navigation.
   const effectiveDateRange = dateRange;

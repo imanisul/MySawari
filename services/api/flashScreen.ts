@@ -7,31 +7,45 @@ export interface FlashScreenConfig {
   publicId?: string;
   isActive: boolean;
   version: number;
-  durationSeconds: number; // default: 2.5 - 3 seconds
+  durationSeconds: number; // default: 3.5 seconds
   updatedAt?: string;
   updatedByName?: string;
-  // Legacy compatibility fields
+  // Festive & occasion fields
   isEnabled?: boolean;
   bgImageUrl?: string;
   brandTitle?: string;
   brandTagline?: string;
   isOccasionActive?: boolean;
+  occasionName?: string;
+  occasionGreeting?: string;
+  occasionSubtext?: string;
+  occasionBadge?: string;
+  occasionTheme?: string;
+  primaryColor?: string;
+  accentColor?: string;
   backgroundColor?: string;
   gradientColors?: string[];
+  animationStyle?: string;
 }
 
 export const DEFAULT_FLASH_SCREEN_CONFIG: FlashScreenConfig = {
   imageUrl: '',
-  isActive: false,
-  version: 0,
-  durationSeconds: 2.5,
+  isActive: true,
+  version: 1,
+  durationSeconds: 3.5,
   isEnabled: true,
   bgImageUrl: '',
   brandTitle: 'MySawari',
   brandTagline: 'Your ride, your way.',
-  isOccasionActive: false,
-  backgroundColor: '#FFFFFF',
-  gradientColors: ['#FFFFFF', '#FFFFFF'],
+  isOccasionActive: true, // Default to true so Diwali Flash Screen is active!
+  occasionName: 'Diwali Special',
+  occasionGreeting: 'Festival of Lights • Lighting Every Journey',
+  occasionSubtext: 'Wishing you safe, joyous and prosperous travels',
+  occasionBadge: '✦ HAPPY DIWALI ✦',
+  occasionTheme: 'diwali_animated',
+  animationStyle: 'diwali_animated',
+  backgroundColor: '#FCFBF7',
+  gradientColors: ['#FCFBF7', '#FAF7F0'],
 };
 
 const FLASH_STORAGE_KEY = '@mysawari_single_splash_config_v2';
@@ -76,9 +90,13 @@ function normalizeConfig(raw: any): FlashScreenConfig {
   const rawUrl = String(raw.imageUrl || raw.bgImageUrl || '').trim();
   const secureUrl = rawUrl ? rawUrl.replace(/^http:\/\//i, 'https://') : '';
   const isActive = raw.isActive !== undefined ? Boolean(raw.isActive) : (raw.isEnabled !== false);
-  const version = Number(raw.version) || (raw.updatedAt ? new Date(raw.updatedAt).getTime() : 0);
+  const version = Number(raw.version) || (raw.updatedAt ? new Date(raw.updatedAt).getTime() : 1);
   const duration = Number(raw.durationSeconds);
-  const durationSeconds = !isNaN(duration) && duration >= 1 && duration <= 10 ? duration : 2.5;
+  const durationSeconds = !isNaN(duration) && duration >= 1 && duration <= 10 ? duration : 3.5;
+
+  const isOccasionActive = raw.isOccasionActive !== undefined
+    ? Boolean(raw.isOccasionActive)
+    : (raw.occasionTheme === 'diwali_animated' || raw.occasionTheme === 'diwali_gold' || !secureUrl);
 
   return {
     ...DEFAULT_FLASH_SCREEN_CONFIG,
@@ -92,6 +110,14 @@ function normalizeConfig(raw: any): FlashScreenConfig {
     durationSeconds,
     brandTitle: raw.brandTitle || 'MySawari',
     brandTagline: raw.brandTagline || 'Your ride, your way.',
+    isOccasionActive,
+    occasionName: raw.occasionName || 'Diwali Special',
+    occasionGreeting: raw.occasionGreeting || 'Festival of Lights • Lighting Every Journey',
+    occasionSubtext: raw.occasionSubtext || 'Wishing you safe, joyous and prosperous travels',
+    occasionBadge: raw.occasionBadge || '✦ HAPPY DIWALI ✦',
+    occasionTheme: raw.occasionTheme || 'diwali_animated',
+    animationStyle: raw.animationStyle || 'diwali_animated',
+    backgroundColor: raw.backgroundColor || (isOccasionActive ? '#FCFBF7' : '#FFFFFF'),
   };
 }
 

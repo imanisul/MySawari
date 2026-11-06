@@ -55,8 +55,16 @@ export default function CarDetailsScreen() {
   const blurTarget = useRef<View | null>(null);
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id: paramCarId, vehicleId: paramVehicleId, offerId: paramOfferId, promoCode: paramPromoCode } =
-    useLocalSearchParams<{ id?: string; vehicleId?: string; offerId?: string; promoCode?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    vehicleId?: string;
+    offerId?: string;
+    promoCode?: string;
+    isOvernight?: string;
+    pickupTime?: string;
+    returnTime?: string;
+  }>();
+  const { id: paramCarId, vehicleId: paramVehicleId, offerId: paramOfferId, promoCode: paramPromoCode } = params;
   const targetCarId = paramCarId || paramVehicleId;
   const { data: fetchedVehicles = [], isLoading: isFleetLoading } = useVehicles();
   const {
@@ -174,7 +182,13 @@ export default function CarDetailsScreen() {
     } else if (!dropoff?.name) {
       router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true', thenBook: 'true' } });
     } else {
-      router.push('/booking');
+      router.push({
+        pathname: '/booking',
+        params: {
+          couponCode: appliedCouponCode || paramPromoCode || targetOffer?.code || '',
+          isOvernight: params.isOvernight || '',
+        },
+      });
     }
   };
 
@@ -334,70 +348,6 @@ export default function CarDetailsScreen() {
           <DriverCard />
           <View style={{ height: 8 }} />
 
-          {/* Promoted Offer / Campaign Banner */}
-          {isParamOfferExpired && (
-            <View style={{
-              marginHorizontal: 16,
-              marginBottom: 10,
-              padding: 12,
-              borderRadius: 12,
-              backgroundColor: '#FEF2F2',
-              borderWidth: 1,
-              borderColor: '#FECACA',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-            }}>
-              <Feather name="alert-triangle" size={18} color="#DC2626" />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#991B1B' }}>
-                  Campaign Offer Expired
-                </Text>
-                <Text style={{ fontSize: 12, color: '#B91C1C', marginTop: 2 }}>
-                  The offer you clicked has ended. However, you can still book {title} at our regular best daily rates!
-                </Text>
-              </View>
-            </View>
-          )}
-
-          {targetOffer && !isParamOfferExpired && (
-            <View style={{
-              marginHorizontal: 16,
-              marginBottom: 10,
-              padding: 14,
-              borderRadius: 12,
-              backgroundColor: '#F0FDF4',
-              borderWidth: 1.5,
-              borderColor: '#86EFAC',
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 12,
-            }}>
-              <View style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: '#DCFCE7',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Feather name="tag" size={18} color="#16A34A" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#166534' }}>
-                  {targetOffer.title || 'Special Promotional Offer!'}
-                </Text>
-                <Text style={{ fontSize: 12, color: '#15803D', marginTop: 2 }}>
-                  {targetOffer.discount ? `${targetOffer.discount} applied at checkout` : targetOffer.subtitle}
-                </Text>
-                {targetOffer.code ? (
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#166534', marginTop: 4 }}>
-                    PROMO CODE: {targetOffer.code} (ACTIVE)
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          )}
           {/* Marks which rule this trip falls under; "Add 1 day" is hidden for 2+ day trips, which are already unlimited. */}
           <MileageLimits
             tripDays={hasTrip ? tripDays : undefined}

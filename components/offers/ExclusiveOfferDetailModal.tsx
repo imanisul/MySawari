@@ -20,7 +20,7 @@ import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { LoginBottomSheet } from '@/components/auth/LoginBottomSheet';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
-import { formatCurrency } from '@/services/backend/pricingEngine';
+import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { ExclusiveOffer, claimExclusiveOffer, recordOfferView } from '@/services/api/offers';
 
 interface ExclusiveOfferDetailModalProps {
@@ -87,7 +87,19 @@ export function ExclusiveOfferDetailModal({
   const router = useRouter();
   const p = useDetailsPalette();
   const insets = useSafeAreaInsets();
-  const { isAuthenticated, membership, applyCoupon, selectCar, setDates, setTimes, dateRange } = useSawari();
+  const {
+    isAuthenticated,
+    membership,
+    applyCoupon,
+    selectCar,
+    setDates,
+    setTimes,
+    dateRange,
+    setDropoff,
+    setPickup,
+    dropoff,
+    pickup,
+  } = useSawari();
   const { data: vehicles = [] } = useVehicles();
 
   const [claiming, setClaiming] = useState(false);
@@ -292,16 +304,42 @@ export function ExclusiveOfferDetailModal({
       setTimes(pickupTime, returnTime);
     } else if (!dateRange || dateRange.includes('Select')) {
       setDates(range, '1 Day');
-      setTimes('8:00 AM', '8:00 AM');
+      setTimes('08:00 AM', '08:00 AM');
+    }
+
+    if (!dropoff?.name) {
+      setDropoff({
+        id: 'city_trip',
+        name: 'Local City Trip',
+        address: 'City limits / Self-drive destination',
+        latitude: 26.1412,
+        longitude: 91.7645,
+        source: 'database',
+      });
+    }
+    if (!pickup?.name) {
+      setPickup({
+        id: 'hub_pickup',
+        name: MYSAWARI_HUB_NAME,
+        address: 'MySawari Hub, Kahilipara',
+        latitude: 26.1412,
+        longitude: 91.7645,
+        source: 'database',
+      });
     }
 
     onClose();
+    const carId = car ? String(car.id || car._id) : '';
     router.push({
-      pathname: '/booking',
+      pathname: '/car-details',
       params: {
-        forSpecificCar: 'true',
-        couponCode: appliedCode || '',
+        id: carId,
+        vehicleId: carId,
+        promoCode: appliedCode || '',
+        offerId: offerId || '',
         isOvernight: isOvernight ? 'true' : 'false',
+        pickupTime,
+        returnTime,
       },
     });
   };

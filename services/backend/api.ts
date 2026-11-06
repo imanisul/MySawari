@@ -963,8 +963,8 @@ export const API = {
               title: o.title || '',
               subtitle: o.subtitle || '',
               description: o.description || '',
-              discountType: o.discountType,
-              discountValue: Number(o.discountValue) || 0,
+              discountType: o.discountType || (o.pricingType === 'percentage_discount' ? 'PERCENTAGE' : 'FLAT'),
+              discountValue: Number(o.discountValue) || (o.pricingType === 'percentage_discount' ? (o.discountPercent || 0) : (o.originalPrice && o.promotionalPrice ? Math.max(0, o.originalPrice - o.promotionalPrice) : (o.promotionalPrice || 0))),
               minimumBooking: Number(o.minimumBooking) || 0,
               maximumDiscount: o.maximumDiscount ?? null,
               expiryDate: o.expiryDate,
@@ -975,6 +975,9 @@ export const API = {
               applicableVehicleIds: Array.isArray(o.applicableVehicleIds) ? o.applicableVehicleIds.map(String) : [],
               applicableCategories: Array.isArray(o.applicableCategories) ? o.applicableCategories : [],
               vehicleId: o.vehicleId ? String(o.vehicleId) : undefined,
+              pricingType: o.pricingType,
+              promotionalPrice: o.promotionalPrice,
+              pricingUnit: o.pricingUnit,
             }));
           couponCache = { at: Date.now(), list };
           setCouponCatalog(list);

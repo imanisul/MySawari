@@ -10,11 +10,11 @@ import {
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
-import { formatCurrency } from '@/services/backend/pricingEngine';
+import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
   ExclusiveOffer,
   exclusiveOffersQueryOptions,
@@ -24,10 +24,24 @@ import { ExclusiveOfferDetailModal } from '@/components/offers/ExclusiveOfferDet
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 246; // same width as the Top Picks cards
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function ExclusiveOffersSection() {
+  const router = useRouter();
   const p = useDetailsPalette();
-  const { membership } = useSawari();
+  const {
+    membership,
+    selectCar,
+    setDates,
+    setTimes,
+    dateRange,
+    applyCoupon,
+    setDropoff,
+    setPickup,
+    dropoff,
+    pickup,
+    selectedCar,
+  } = useSawari();
   const { data: vehicles = [] } = useVehicles();
   const params = useLocalSearchParams<{ openExclusiveOfferId?: string }>();
 
@@ -36,15 +50,14 @@ export function ExclusiveOffersSection() {
 
   const { data: offers = [], refetch } = useQuery(exclusiveOffersQueryOptions);
 
-  // Auto-open modal if deep-linked via push notification
+  // Directly navigate to car details if deep-linked via push notification
   useEffect(() => {
     if (params?.openExclusiveOfferId && offers.length > 0) {
       const match = offers.find(
         (o) => String(o._id || o.id) === String(params.openExclusiveOfferId)
       );
       if (match) {
-        setSelectedOffer(match);
-        setModalVisible(true);
+        handleCardPress(match);
       }
     }
   }, [params?.openExclusiveOfferId, offers]);
@@ -58,8 +71,93 @@ export function ExclusiveOffersSection() {
 
   const handleCardPress = (offer: ExclusiveOffer) => {
     recordOfferView(offer._id || offer.id);
-    setSelectedOffer(offer);
-    setModalVisible(true);
+
+    // 1. Resolve target vehicle
+    let targetCar: any = null;
+    if (offer.vehicleId) {
+      const vId =
+        typeof offer.vehicleId === 'object'
+          ? String((offer.vehicleId as any)._id || (offer.vehicleId as any).id)
+          : String(offer.vehicleId);
+      targetCar = vehicles.find((v: any) => String(v.id || v._id) === vId);
+    }
+    if (!targetCar && Array.isArray(offer.vehiclePrices) && offer.vehiclePrices.length > 0) {
+      const vId = String(offer.vehiclePrices[0].vehicleId);
+      targetCar = vehicles.find((v: any) => String(v.id || v._id) === vId);
+    }
+    if (!targetCar && Array.isArray(offer.applicableVehicleIds) && offer.applicableVehicleIds.length > 0) {
+      const vId = String(offer.applicableVehicleIds[0]);
+      targetCar = vehicles.find((v: any) => String(v.id || v._id) === vId);
+    }
+    if (!targetCar) {
+      targetCar = (selectedCar && selectedCar.id !== 'seltos') ? selectedCar : vehicles[0];
+    }
+
+    if (targetCar) {
+      selectCar(targetCar);
+    }
+
+    // 2. Pre-fill dates and times
+    const isOvernight = Boolean(
+      offer.isOvernight ||
+      (offer.pickupTime && offer.returnTime && offer.pickupTime.includes('PM') && offer.returnTime.includes('AM'))
+    );
+    const pickupT = offer.pickupTime || (isOvernight ? '08:00 PM' : '08:00 AM');
+    const returnT = offer.returnTime || (isOvernight ? '08:00 AM' : '08:00 AM');
+
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
+    const range = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
+
+    if (isOvernight || (offer.pickupTime && offer.returnTime)) {
+      setDates(range, '1 Day');
+      setTimes(pickupT, returnT);
+    } else if (!dateRange || dateRange.includes('Select')) {
+      setDates(range, '1 Day');
+      setTimes('08:00 AM', '08:00 AM');
+    }
+
+    // 3. Auto-apply coupon code
+    if (offer.code) {
+      applyCoupon(offer.code.trim().toUpperCase());
+    }
+
+    // 4. Default pickup & destination if empty so booking does not block
+    if (!dropoff?.name) {
+      setDropoff({
+        id: 'city_trip',
+        name: 'Local City Trip',
+        address: 'City limits / Self-drive destination',
+        latitude: 26.1412,
+        longitude: 91.7645,
+        source: 'database',
+      });
+    }
+    if (!pickup?.name) {
+      setPickup({
+        id: 'hub_pickup',
+        name: MYSAWARI_HUB_NAME,
+        address: 'MySawari Hub, Kahilipara',
+        latitude: 26.1412,
+        longitude: 91.7645,
+        source: 'database',
+      });
+    }
+
+    // 5. Navigate directly to /car-details with zero intermediate ads or popup text
+    const carId = targetCar ? String(targetCar.id || (targetCar as any)._id) : '';
+    router.push({
+      pathname: '/car-details',
+      params: {
+        id: carId,
+        vehicleId: carId,
+        promoCode: offer.code || '',
+        offerId: offer._id || offer.id,
+        isOvernight: isOvernight ? 'true' : 'false',
+        pickupTime: pickupT,
+        returnTime: returnT,
+      },
+    });
   };
 
   const renderOfferCard = ({ item }: { item: ExclusiveOffer }) => {
@@ -124,6 +222,19 @@ export function ExclusiveOffersSection() {
 
     const imageUrl = item.image?.url || item.image?.uri || vehicleImage;
 
+    const resolvedVehicleName =
+      (typeof item.vehicleId === 'object'
+        ? (item.vehicleId?.displayName || item.vehicleId?.vehicleName || item.vehicleId?.name)
+        : null) ||
+      (typeof item.vehicleId === 'string'
+        ? vehicles.find((v: any) => String(v.id || v._id) === item.vehicleId)?.name
+        : null) ||
+      (Array.isArray(item.vehiclePrices) && item.vehiclePrices.length > 0
+        ? (item.vehiclePrices[0].vehicleName ||
+            vehicles.find((v: any) => String(v.id || v._id) === String(item.vehiclePrices![0].vehicleId))?.name)
+        : null) ||
+      (isAllCars ? 'All Fleet Cars' : vehicles[0]?.name || 'Available Fleet');
+
     return (
       <TouchableOpacity
         onPress={() => handleCardPress(item)}
@@ -180,6 +291,14 @@ export function ExclusiveOffersSection() {
 
         {/* Content Info */}
         <View style={styles.cardInfo}>
+          {/* Prominently Mentioned Vehicle Name */}
+          <View style={styles.vehicleNameRow}>
+            <Ionicons name="car-sport" size={13} color="#6152D8" />
+            <Text style={[styles.vehicleNameText, { color: p.fg }]} numberOfLines={1}>
+              {resolvedVehicleName}
+            </Text>
+          </View>
+
           <Text style={[styles.cardTitle, { color: p.fg }]} numberOfLines={1}>
             {item.title}
           </Text>
@@ -276,6 +395,8 @@ const styles = StyleSheet.create({
   dealTag: { position: 'absolute', top: 6, left: 6, minHeight: 22, maxWidth: '85%', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, borderRadius: 20, gap: 4 },
   dealTagText: { fontFamily: F.semi, fontSize: 9.5, lineHeight: 13, color: '#FFFFFF' },
   cardInfo: { paddingHorizontal: 6, paddingTop: 8, paddingBottom: 6 },
+  vehicleNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
+  vehicleNameText: { fontFamily: F.semi, fontSize: 12, lineHeight: 16, color: '#111827' },
   cardTitle: { fontFamily: F.semi, fontSize: 13, lineHeight: 19.5 },
   cardSubtitle: { fontFamily: F.med, fontSize: 11, lineHeight: 16.5, marginTop: 1 },
   priceContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },

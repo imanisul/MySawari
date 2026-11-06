@@ -39,6 +39,9 @@ export type Coupon = {
   applicableVehicleIds?: string[];
   applicableCategories?: string[];
   vehicleId?: string;
+  pricingType?: 'promotional_price' | 'fixed_discount' | 'percentage_discount' | 'custom_pricing';
+  promotionalPrice?: number;
+  pricingUnit?: 'per_day' | 'per_trip';
 };
 
 /**
@@ -324,7 +327,7 @@ export function calculateCouponDiscount(
   rentalAmount: number,
   _driverCharge: number,
   couponCode?: string,
-  vehicleContext?: { vehicleId?: string; vehicleCategory?: string }
+  vehicleContext?: { vehicleId?: string; vehicleCategory?: string; days?: number }
 ): number {
   if (!couponCode || !couponCode.trim()) return 0;
   const base = Math.max(0, rentalAmount);
@@ -365,16 +368,23 @@ export function calculateCouponDiscount(
 
   if (base < (coupon.minimumBooking || 0)) return 0;
   const value = Number(coupon.discountValue);
-  if (!Number.isFinite(value) || value < 0) return 0;
 
   let discount: number;
-  if (coupon.discountType === 'FLAT') {
+  const days = vehicleContext?.days || 1;
+
+  if (coupon.pricingType === 'promotional_price' || (coupon as any).type === 'special_deal') {
+    const promoPrice = coupon.promotionalPrice !== null && coupon.promotionalPrice !== undefined
+      ? Number(coupon.promotionalPrice)
+      : (Number((coupon as any).dealPrice) || 1);
+    const dealRental = coupon.pricingUnit === 'per_trip' ? promoPrice : promoPrice * Math.max(1, days);
+    discount = Math.max(0, base - dealRental);
+  } else if (coupon.discountType === 'FLAT') {
     discount = Math.min(value, base);
   } else if (coupon.discountType === 'PERCENTAGE') {
     discount = base * (Math.min(value, 100) / 100);
     if (coupon.maximumDiscount) discount = Math.min(discount, coupon.maximumDiscount);
   } else {
-    return 0;
+    discount = Math.min(value, base);
   }
   return Math.round(Math.max(0, Math.min(discount, base)));
 }
@@ -459,6 +469,7 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   const couponDiscount = calculateCouponDiscount(rentalAmount, driverCharge, couponCode, {
     vehicleId: params.vehicleId,
     vehicleCategory: params.vehicleCategory,
+    days: rentalDays,
   });
   const discountedRentalAmount = Math.max(0, rentalAmount + driverCharge - couponDiscount);
 

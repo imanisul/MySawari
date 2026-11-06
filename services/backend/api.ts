@@ -970,6 +970,7 @@ export const API = {
               expiryDate: o.expiryDate,
               startDate: o.startDate || null,
               active: o.active !== false,
+              allVehicles: o.allVehicles === true || o.applicableType === 'all',
               applicableType: o.applicableType || 'all',
               applicableVehicleIds: Array.isArray(o.applicableVehicleIds) ? o.applicableVehicleIds.map(String) : [],
               applicableCategories: Array.isArray(o.applicableCategories) ? o.applicableCategories : [],

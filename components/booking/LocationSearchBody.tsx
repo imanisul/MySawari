@@ -111,7 +111,6 @@ export function LocationSearchBody({
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
-  const [focused, setFocused] = useState(false);
   const [isDebouncing, setIsDebouncing] = useState(false);
   const [predictions, setPredictions] = useState<any[]>([]);
   const abortController = useRef<AbortController | null>(null);
@@ -243,8 +242,9 @@ export function LocationSearchBody({
       source: 'osm'
     };
 
-    import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('select_location', 'LocationSheet', { locationName: loc.name, mode }));
     onSelect(loc);
+    // After the page has changed: analytics must never sit in the tap's way.
+    setTimeout(() => import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('select_location', 'LocationSheet', { locationName: loc.name, mode })), 0);
   };
 
   const localFiltered = popularLocations.filter(loc =>
@@ -264,18 +264,16 @@ export function LocationSearchBody({
       <View
         style={[
           styles.searchBox,
-          { borderColor: focused ? ui.focusBorder : ui.border, backgroundColor: isDarkMode ? colors.background : '#FFFFFF' },
+          { borderColor: hasQuery ? ui.focusBorder : ui.border, backgroundColor: isDarkMode ? colors.background : '#FFFFFF' },
         ]}
       >
-        <SearchIcon color={focused ? ui.accent : ui.muted} />
+        <SearchIcon color={hasQuery ? ui.accent : ui.muted} />
         <TextInput
           style={[styles.searchInput, { color: ui.title }]}
           placeholder={mode === 'destination' ? "Where are you going?" : (mode === 'pickup' ? "Search delivery address..." : "Search collection address...")}
           placeholderTextColor={ui.muted}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           returnKeyType="search"
           autoCorrect={false}
           autoFocus={autoFocus}
@@ -340,13 +338,9 @@ export function LocationSearchBody({
   style={({ pressed }) => [
     styles.resultItem,
     {
-      backgroundColor: pressed
-        ? (isDarkMode ? '#374151' : '#F0F1F5')
-        : hasQuery && index === 0
-          ? ui.topHit
-          : 'transparent',
-
-      opacity: pressed ? 0.85 : 1,
+      // No dark flash on press: just a light fade, like the other lists.
+      backgroundColor: hasQuery && index === 0 ? ui.topHit : 'transparent',
+      opacity: pressed ? 0.7 : 1,
     },
   ]}
   onPress={() => handleSelectPlace(item)}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, Animated, Pressable, Modal, Image, RefreshControl, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Pressable, Modal, Image, Platform, RefreshControl, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { getAutoApplyCash, setAutoApplyCash } from '@/utils/cashPreference';
 import { DesignToggle } from '@/components/profile/ProfileParts';
+import { openStorePage } from '@/services/rateApp';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
 // Figma "Profile": purple header (name, mobile, email), membership card, Wallet Balance, then one bordered
@@ -117,6 +118,7 @@ export default function ProfileScreen() {
   const infoRows: RowDef[] = [
     // { key: 'help', icon: 'help-circle', title: 'Help & Support', onPress: () => go('/help') },
     // { key: 'safety', icon: 'shield', title: 'Safety', onPress: () => go('/safety') },
+    { key: 'rate', icon: 'star', title: Platform.OS === 'ios' ? 'Rate us on the App Store' : 'Rate us on Play Store', onPress: () => { Haptics.selectionAsync(); openStorePage(); } },
     { key: 'terms', icon: 'file-text', title: 'Terms & Condition', onPress: () => go('/terms') },
     { key: 'cancel', icon: 'x-square', title: 'Cancellation Policy', onPress: () => go('/cancellation-policy') },
     { key: 'privacy', icon: 'file-text', title: 'Privacy Policy', onPress: () => go('/privacy') },
@@ -287,7 +289,7 @@ export default function ProfileScreen() {
       {/* ── ⋮ menu (design: Edit Profile / Settings / Logout) ── */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)} statusBarTranslucent navigationBarTranslucent>
         <Pressable style={styles.menuOverlay} onPress={() => setMenuOpen(false)}>
-          <View style={[styles.menu, { top: menuPos?.top ?? insets.top + 4, right: menuPos?.right ?? 44, backgroundColor: p.page }]}>
+          <View style={[styles.menu, { top: menuPos?.top ?? insets.top + 4, right: menuPos?.right ?? 44, backgroundColor: p.page, borderColor: p.segBorder }]}>
             {[
               { label: 'Edit Profile', onPress: () => go('/edit-profile') },
               { label: 'Settings', onPress: () => go('/settings') },
@@ -407,7 +409,7 @@ const styles = StyleSheet.create({
 
   menuOverlay: { flex: 1 },
   // Figma: 92×111 white card, radius 8, three 35px rows, 12px side padding.
-  menu: { position: 'absolute' ,marginTop: 40, width: 92, borderRadius: 8, paddingVertical: 3, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6 },
+  menu: { position: 'absolute' ,marginTop: 40, width: 92, borderRadius: 8, paddingVertical: 3, borderWidth: 1 },
   menuItem: { paddingHorizontal: 12, height: 35, justifyContent: 'center' },
   menuText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
   dialogOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 18 },

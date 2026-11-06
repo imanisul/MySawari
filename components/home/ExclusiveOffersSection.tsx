@@ -13,6 +13,7 @@ import { Image as CachedImage } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { useSawari } from '@/context/SawariContext';
+import { useVehicles } from '@/hooks/useVehicles';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import {
   ExclusiveOffer,
@@ -22,11 +23,12 @@ import {
 import { ExclusiveOfferDetailModal } from '@/components/offers/ExclusiveOfferDetailModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.78, 300);
+const CARD_WIDTH = 246; // same width as the Top Picks cards
 
 export function ExclusiveOffersSection() {
   const p = useDetailsPalette();
   const { membership } = useSawari();
+  const { data: vehicles = [] } = useVehicles();
   const params = useLocalSearchParams<{ openExclusiveOfferId?: string }>();
 
   const [selectedOffer, setSelectedOffer] = useState<ExclusiveOffer | null>(null);
@@ -103,12 +105,29 @@ export function ExclusiveOffersSection() {
       badgeLabel = 'LIMITED TIME';
     }
 
-    const imageUrl = item.image?.url || item.image?.uri;
+    const isOvernight = Boolean(
+      item.isOvernight ||
+      (item.pickupTime && item.returnTime && item.pickupTime.includes('PM') && item.returnTime.includes('AM'))
+    );
+    const isAllCars = Boolean(item.allVehicles || item.applicableType === 'all');
+
+    // Resolve car image with priority: item.image -> specific vehicle photo -> first fleet vehicle photo
+    const vehicleImage =
+      (typeof item.vehicleId === 'object' ? item.vehicleId?.images?.[0] : null) ||
+      (typeof item.vehicleId === 'string'
+        ? vehicles.find((v: any) => String(v.id || v._id) === item.vehicleId)?.image
+        : null) ||
+      (Array.isArray(item.vehiclePrices) && item.vehiclePrices.length > 0
+        ? vehicles.find((v: any) => String(v.id || v._id) === String(item.vehiclePrices![0].vehicleId))?.image
+        : null) ||
+      vehicles[0]?.image;
+
+    const imageUrl = item.image?.url || item.image?.uri || vehicleImage;
 
     return (
       <TouchableOpacity
         onPress={() => handleCardPress(item)}
-        style={[styles.card, { backgroundColor: p.page, borderColor: p.border }]}
+        style={[styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}
         activeOpacity={0.9}
       >
         {/* Banner Thumbnail */}
@@ -130,19 +149,32 @@ export function ExclusiveOffersSection() {
           <View
             style={[
               styles.dealTag,
-              { backgroundColor: isMemberDeal ? '#2563EB' : '#6152D8' },
+              { backgroundColor: isOvernight ? '#7E22CE' : isMemberDeal ? '#2563EB' : '#6152D8' },
             ]}
           >
-            {isMemberDeal && <Ionicons name="star" size={10} color="#FFFFFF" />}
-            <Text style={styles.dealTagText}>{badgeLabel}</Text>
+            {isOvernight ? (
+              <Feather name="moon" size={10} color="#FFFFFF" />
+            ) : isMemberDeal ? (
+              <Ionicons name="star" size={10} color="#FFFFFF" />
+            ) : null}
+            <Text style={styles.dealTagText} numberOfLines={1}>
+              {isOvernight ? '8 PM – 8 AM' : isAllCars ? 'ALL CARS' : badgeLabel}
+            </Text>
           </View>
 
           {/* Top Right Discount Tag */}
-          {discountBadgeText ? (
-            <View style={styles.discountTag}>
-              <Text style={styles.discountTagText}>{discountBadgeText}</Text>
-            </View>
-          ) : null}
+          <View style={{ position: 'absolute', top: 4, right: 4, flexDirection: 'row', gap: 4 }}>
+            {isAllCars && !isOvernight && (
+              <View style={[styles.discountTag, { backgroundColor: '#059669' }]}>
+                <Text style={styles.discountTagText}>ALL CARS</Text>
+              </View>
+            )}
+            {discountBadgeText ? (
+              <View style={styles.discountTag}>
+                <Text style={styles.discountTagText}>{discountBadgeText}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
 
         {/* Content Info */}
@@ -156,10 +188,27 @@ export function ExclusiveOffersSection() {
             </Text>
           ) : null}
 
+          {/* Time Slot / Overnight / Scope Note */}
+          {isOvernight ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              <Feather name="clock" size={10} color="#7E22CE" />
+              <Text style={{ fontFamily: F.med, fontSize: 10, color: '#7E22CE' }} numberOfLines={1}>
+                {item.pickupTime || '8:00 PM'} → {item.returnTime || '8:00 AM'} (Overnight)
+              </Text>
+            </View>
+          ) : isAllCars ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
+              <Feather name="check-circle" size={10} color="#059669" />
+              <Text style={{ fontFamily: F.med, fontSize: 10, color: '#059669' }} numberOfLines={1}>
+                Applicable on all fleet cars
+              </Text>
+            </View>
+          ) : null}
+
           {/* Price Block */}
           <View style={styles.priceContainer}>
             <View style={styles.priceRow}>
-              <Text style={styles.dealPrice}>{promoPriceDisplay}</Text>
+              <Text style={styles.dealPrice} numberOfLines={1}>{promoPriceDisplay}</Text>
               {origPriceDisplay ? (
                 <Text style={styles.originalPrice}>{origPriceDisplay}</Text>
               ) : null}
@@ -177,12 +226,9 @@ export function ExclusiveOffersSection() {
     <View style={styles.container}>
       {/* Section Header */}
       <View style={styles.sectionHeader}>
-        <View style={styles.titleWithIcon}>
-          <Feather name="zap" size={18} color="#6152D8" />
-          <Text style={[styles.sectionTitle, { color: p.fg }]}>Exclusive Offers</Text>
-        </View>
+        <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">Exclusive Offers</Text>
         <View style={styles.verifiedBadge}>
-          <Text style={styles.verifiedBadgeText}>MEMBER SPECIALS</Text>
+          <Text style={styles.verifiedBadgeText}>Member specials</Text>
         </View>
       </View>
 
@@ -194,7 +240,7 @@ export function ExclusiveOffersSection() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContainer}
-        snapToInterval={CARD_WIDTH + 14}
+        snapToInterval={CARD_WIDTH + 8}
         decelerationRate="fast"
       />
 
@@ -214,142 +260,37 @@ export function ExclusiveOffersSection() {
   );
 }
 
+const F = { semi: 'PlusJakartaSans_600SemiBold', med: 'PlusJakartaSans_500Medium' };
+
+// Mirrors the Top Picks card (HomeSections `pick*`): 246 wide, 12 radius, 2 inset, 144 photo with 8 radius.
 const styles = StyleSheet.create({
-  container: {
-    marginVertical: 10,
-  },
+  container: { marginTop: 4 },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    marginTop: 16,
     marginBottom: 12,
   },
-  titleWithIcon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-  verifiedBadge: {
-    backgroundColor: '#F5F3FF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#DDD6FE',
-  },
-  verifiedBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#6152D8',
-    letterSpacing: 0.5,
-  },
-  listContainer: {
-    paddingHorizontal: 20,
-    gap: 14,
-  },
-  card: {
-    width: CARD_WIDTH,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-  thumbnailContainer: {
-    width: '100%',
-    height: 125,
-    position: 'relative',
-  },
-  thumbnailImage: {
-    width: '100%',
-    height: '100%',
-  },
-  thumbnailPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dealTag: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    gap: 4,
-  },
-  dealTagText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-  },
-  discountTag: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 7,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  discountTagText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  cardInfo: {
-    padding: 12,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  cardSubtitle: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-  },
-  dealPrice: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#16A34A',
-  },
-  originalPrice: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textDecorationLine: 'line-through',
-  },
-  claimArrowBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#F5F3FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  sectionTitle: { fontFamily: F.semi, fontSize: 15, lineHeight: 22.5 },
+  verifiedBadge: { backgroundColor: '#F5F3FF', paddingHorizontal: 8, minHeight: 20, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: '#DDD6FE' },
+  verifiedBadgeText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#6152D8' },
+  listContainer: { paddingHorizontal: 16, gap: 8 },
+  card: { width: CARD_WIDTH, borderRadius: 12, borderWidth: 1, padding: 2, overflow: 'hidden' },
+  thumbnailContainer: { width: '100%', height: 144, borderRadius: 8, overflow: 'hidden' },
+  thumbnailImage: { width: '100%', height: '100%' },
+  thumbnailPlaceholder: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+  dealTag: { position: 'absolute', top: 4, left: 4, minHeight: 20, maxWidth: '60%', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, borderRadius: 20, gap: 4 },
+  dealTagText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#FFFFFF' },
+  discountTag: { position: 'absolute', top: 4, right: 4, minHeight: 20, justifyContent: 'center', backgroundColor: '#DC2626', paddingHorizontal: 8, borderRadius: 20 },
+  discountTagText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#FFFFFF' },
+  cardInfo: { paddingHorizontal: 4, paddingTop: 8, paddingBottom: 6 },
+  cardTitle: { fontFamily: F.semi, fontSize: 13, lineHeight: 19.5 },
+  cardSubtitle: { fontFamily: F.med, fontSize: 11, lineHeight: 16.5 },
+  priceContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, flexShrink: 1 },
+  dealPrice: { fontFamily: F.semi, fontSize: 15, lineHeight: 22.5, color: '#339F79' },
+  originalPrice: { fontFamily: F.med, fontSize: 11, color: '#9CA3AF', textDecorationLine: 'line-through' },
+  claimArrowBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
 });

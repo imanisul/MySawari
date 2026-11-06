@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { startTransition, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
@@ -62,8 +61,10 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
   // delivery or collection point returns to wherever the flow came from.
   const handleSelect = (loc: LocationResult) => {
     if (mode === 'destination') {
-      setDropoff(loc);
+      // Leave first, store the place as a low-priority update: saving it re-renders every open screen,
+      // which used to hold the tap for a moment before the page changed.
       leaveAfterDestination();
+      startTransition(() => setDropoff(loc));
     } else if (mode === 'pickup') {
       setPickupLocation(loc);
       if (deliveryMode === 'both') {
@@ -126,20 +127,9 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
 
   if (fullPage) {
     return (
-      <View style={[styles.page, { backgroundColor: isDarkMode ? colors.background : '#FFFFFF', paddingTop: insets.top + 12 }]}>
-        <View style={styles.topBar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            onPress={() => router.back()}
-            hitSlop={12}
-            style={styles.backBtn}
-          >
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
-          </Pressable>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Select Destination</Text>
-        </View>
-        {body}
+      <View style={[styles.page, { backgroundColor: isDarkMode ? colors.background : '#FFFFFF', paddingTop: insets.top }]}>
+        {/* The field's own 16px top margin is for the sheets; on this full page it sits higher. */}
+        <View style={{ flex: 1, marginTop: -12 }}>{body}</View>
       </View>
     );
   }
@@ -154,19 +144,6 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
 
 const styles = StyleSheet.create({
   page: { flex: 1, paddingHorizontal: 16 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
-  },
-  backBtn: {
-    padding: 4,
-  },
-  headerTitle: {
-    fontFamily: 'Inter_600SemiBold',
-    fontSize: 18,
-  },
   tabContainer: {
     flexDirection: 'row',
     marginBottom: 16,

@@ -5,7 +5,7 @@ import { BlurTargetView } from 'expo-blur';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 import { Alert, LayoutAnimation, Pressable, ScrollView, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { Image } from 'expo-image';
@@ -66,6 +66,7 @@ export default function BookingScreen() {
   useTrackTripProgress('booking'); // Recent searches resume this trip on this page
   const p = useDetailsPalette();
   const router = useRouter();
+  const params = useLocalSearchParams<{ couponCode?: string; isOvernight?: string }>();
   const insets = useSafeAreaInsets();
   const {
     mode, setMode, selectedCar, pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested,
@@ -90,6 +91,20 @@ export default function BookingScreen() {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [coupons, setCoupons] = useState<{ code: string }[]>([]);
+
+  // Auto-apply coupon code passed from Special Deals / Exclusive Offers / Campaign deep-links
+  const autoCouponAttempted = useRef(false);
+  useEffect(() => {
+    const codeParam = params.couponCode ? String(params.couponCode).trim() : null;
+    if (codeParam && !autoCouponAttempted.current) {
+      autoCouponAttempted.current = true;
+      setCouponInput(codeParam.toUpperCase());
+      applyCoupon(codeParam.toUpperCase());
+      API.getCoupons(true).then((list) => {
+        setCoupons(list || []);
+      }).catch(() => {});
+    }
+  }, [params.couponCode]);
   // The plans are shown open for a non-member (to offer them) and when one was already picked on car details;
   // a member's row stays folded until tapped.
   const [showPlans, setShowPlans] = useState(() => !!planToBuy || !(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date())));
@@ -315,7 +330,14 @@ export default function BookingScreen() {
                 style={({ pressed }) => [styles.duration, { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4' }, pressed && { opacity: 0.7 }]}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
+                    {params.isOvernight === 'true' && (
+                      <View style={{ backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#6D28D9' }}>🌙 OVERNIGHT</Text>
+                      </View>
+                    )}
+                  </View>
                   {!isMissingDates && (
                     <Text style={[styles.durationSub, { color: p.sub }]} numberOfLines={1}>
                       {longWhen(startStr, pickupTime)}  →  {longWhen(endStr, returnTime)}

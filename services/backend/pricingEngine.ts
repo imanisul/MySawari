@@ -35,6 +35,7 @@ export type Coupon = {
   startDate?: string | null;
   active: boolean;
   applicableType?: 'all' | 'specific_vehicles' | 'category' | 'campaign';
+  allVehicles?: boolean;
   applicableVehicleIds?: string[];
   applicableCategories?: string[];
   vehicleId?: string;
@@ -332,11 +333,13 @@ export function calculateCouponDiscount(
   if (new Date(coupon.expiryDate) < new Date()) return 0;
   if (coupon.startDate && new Date(coupon.startDate) > new Date()) return 0;
 
-  // Vehicle-specific eligibility check
+  // Vehicle-specific eligibility check (unless offer is for all vehicles)
   const isVehicleSpecific =
-    coupon.applicableType === 'specific_vehicles' ||
-    Boolean(coupon.vehicleId) ||
-    (Array.isArray(coupon.applicableVehicleIds) && coupon.applicableVehicleIds.length > 0);
+    coupon.applicableType !== 'all' &&
+    coupon.allVehicles !== true &&
+    (coupon.applicableType === 'specific_vehicles' ||
+      Boolean(coupon.vehicleId) ||
+      (Array.isArray(coupon.applicableVehicleIds) && coupon.applicableVehicleIds.length > 0));
 
   if (isVehicleSpecific) {
     const allowed = new Set<string>();

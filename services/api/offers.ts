@@ -277,6 +277,12 @@ export interface ExclusiveOffer {
   isMemberEarlyAccess?: boolean;
   vehicleId?: any;
   applicableVehicleIds?: string[];
+  allVehicles?: boolean;
+  applicableType?: 'all' | 'specific_vehicles' | 'category' | 'campaign';
+  pickupTime?: string;
+  returnTime?: string;
+  isOvernight?: boolean;
+  timeSlotLabel?: string;
   analytics?: {
     views?: number;
     clicks?: number;

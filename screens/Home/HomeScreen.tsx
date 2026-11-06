@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CITIES } from '@/constants/cities';
 import { CitySheet } from '@/components/home/CitySheet';
 import Notifications from '@/utils/notifications';
-import { FlatList, Image, StyleSheet, Text, View, RefreshControl, ImageSourcePropType, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
+import { FlatList, StyleSheet, Text, View, RefreshControl, ImageSourcePropType, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {  StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,7 +21,7 @@ import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
   HomeHero, ReferStrip, HomeSearchCard, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
-  DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HomePromoBanner, HOME_PURPLE,
+  DestinationTile, BenefitsGrid, MemberBenefitsCard, RateUsCard, ConnectCard, HomePromoBanner, HOME_PURPLE,
 } from '@/components/home/HomeSections';
 import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
@@ -332,14 +332,14 @@ export default function HomeScreen() {
     'top_hero',
     'search_card',
     'position3_promo',
-    'refer_strip',
     'searches',
-    'exclusive_offers',
     'recent',
+    'exclusive_offers',
     'picks',
     'milestone',
     'middle_banner',
     'destinations',
+    'rate_us',
     'benefits',
     'member',
     'bottom_banner',
@@ -361,7 +361,9 @@ export default function HomeScreen() {
               onCityPress={() => setShowCity(true)}
               sawariCash={isAuthenticated ? sawariCash : 0}
               onWallet={() => {}}
-            />
+            >
+              <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
+            </HomeHero>
           </View>
         );
       case 'search_card':
@@ -374,13 +376,6 @@ export default function HomeScreen() {
         content = (
           <View style={{ marginTop: 8, marginBottom: 4 }}>
             <HomePromoBanner position="position3" />
-          </View>
-        );
-        break;
-      case 'refer_strip':
-        content = (
-          <View style={{ marginHorizontal: 16, marginTop: 4, marginBottom: 6 }}>
-            <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
           </View>
         );
         break;
@@ -493,6 +488,9 @@ export default function HomeScreen() {
       case 'member':
         content = <MemberBenefitsCard isMember={isMember} onPress={() => requireLogin(() => router.push('/membership'))} />;
         break;
+      case 'rate_us':
+        content = <RateUsCard />;
+        break;
       case 'bottom_banner':
         content = <HomePromoBanner position="bottom" />;
         break;
@@ -567,22 +565,12 @@ export default function HomeScreen() {
   );
 }
 
-/**
- * Home footer: "Crafted in Guwahati" over an Assam scene (Brahmaputra, Saraighat bridge, a dhol player,
- * a country boat, a rhino and a MySawari car on the road). The art's sky is faded to white in the image itself,
- * and so is the foliage at the bottom, so both ends melt into the page; in dark mode it is shown as a soft ghost behind the title.
- */
-const FOOTER_ART = require('../../assets/images/home_footer_assam.jpg');
-const FOOTER_RATIO = 828 / 975;
-
+/** Home footer: just "Crafted in Guwahati" (the Assam artwork is hidden). */
 function CraftedFooter({ dark }: { dark: boolean }) {
   return (
     <View style={styles.footer} accessibilityRole="text" accessibilityLabel="Crafted in Guwahati">
-      <Image source={FOOTER_ART} resizeMode="cover" style={[styles.footerArt, dark && { opacity: 0.16 }]} accessibilityIgnoresInvertColors />
-      <View style={styles.footerTitle} pointerEvents="none">
-        <Text style={[styles.footerSmall, { color: dark ? '#7C879B' : '#A3A3A3' }]}>Crafted in</Text>
-        <Text style={[styles.footerBig, { color: dark ? '#3A4760' : '#D4D7DE' }]} maxFontSizeMultiplier={1.1}>GUWAHATI</Text>
-      </View>
+      <Text style={[styles.footerSmall, { color: dark ? '#7C879B' : '#A3A3A3' }]}>Crafted in</Text>
+      <Text style={[styles.footerBig, { color: dark ? '#3A4760' : '#D4D7DE' }]} maxFontSizeMultiplier={1.1}>GUWAHATI</Text>
     </View>
   );
 }
@@ -590,10 +578,7 @@ function CraftedFooter({ dark }: { dark: boolean }) {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   statusBarSpacer: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  footer: { width: '100%', aspectRatio: FOOTER_RATIO, marginTop: 8 },
-  footerArt: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-  // Sits in the faded sky, centred, like the hero's "LOWEST PRICE GUARANTEED" lettering.
-  footerTitle: { position: 'absolute', top: '16%', left: 16, right: 16, alignItems: 'center' },
+  footer: { width: '100%', alignItems: 'center', paddingHorizontal: 16, paddingTop: 32, paddingBottom: 24 },
   footerSmall: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, letterSpacing: 0.5 },
   footerBig: { fontFamily: 'Anton_400Regular', fontSize: 56, lineHeight: 66, letterSpacing: 2, marginTop: 2 },
   // The refer strip sits inside the banner (rays behind it); the white sheet's rounded top covers its foot.

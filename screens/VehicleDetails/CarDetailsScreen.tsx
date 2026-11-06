@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { Animated, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager } from 'react-native';
+import { Animated, Dimensions, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager } from 'react-native';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -41,6 +41,11 @@ const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'features', label: 'Features' },
   { key: 'location', label: 'Location' },
 ];
+// Same sizes as VehicleHeroGallery, so the loading placeholder lines up with the real photo.
+const GALLERY_W = Dimensions.get('window').width - 32;
+const GALLERY_H = Math.round(GALLERY_W * 0.587);
+const THUMB_SK_W = (GALLERY_W - 6 * 4) / 5;
+
 // Index of the section pills among the ScrollView's direct children (top block, pills, …).
 const STICKY_INDEX = 1;
 
@@ -139,7 +144,7 @@ export default function CarDetailsScreen() {
 
   const [showLogin, setShowLogin] = useState(false);
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  const [agreed, setAgreed] = useState(false); // the customer ticks it themselves
+  const [agreed, setAgreed] = useState(true); // pre-ticked; the customer can untick it
   const [barHeight, setBarHeight] = useState(165 + Math.max(insets.bottom, 12));
 
   const openDates = () => {
@@ -257,39 +262,34 @@ export default function CarDetailsScreen() {
   if (!showRest || ((!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos') && isFleetLoading)) {
     return (
       <View style={[styles.screen, { backgroundColor: p.page }]}>
-        <View style={{ paddingTop: insets.top, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-          <Skeleton width={32} height={32} borderRadius={16} />
-          <View style={{ flex: 1, gap: 6 }}>
-            <Skeleton width="65%" height={16} borderRadius={4} />
-            <Skeleton width="45%" height={12} borderRadius={4} />
+        {/* Mirrors the real page block for block (header, name card, photo, thumbnails, driver card) so nothing jumps when it appears. */}
+        <View style={{ paddingTop: insets.top }}>
+          <View style={{ minHeight: 64, paddingHorizontal: 16, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            <Skeleton width={32} height={32} borderRadius={16} />
+            <View style={{ flex: 1, gap: 6 }}>
+              <Skeleton width="65%" height={16} borderRadius={4} />
+              <Skeleton width="45%" height={12} borderRadius={4} />
+            </View>
+            <Skeleton width={32} height={32} borderRadius={16} />
+            <Skeleton width={32} height={32} borderRadius={16} />
           </View>
-          <Skeleton width={32} height={32} borderRadius={16} />
-          <Skeleton width={32} height={32} borderRadius={16} />
         </View>
 
-        <View style={{ paddingHorizontal: 16, marginTop: 8 }}>
-          <View style={{ width: '100%', height: 212, borderRadius: 10, overflow: 'hidden' }}>
+        <View style={{ paddingHorizontal: 16 }}>
+          <Skeleton width="100%" height={82} borderRadius={10} />
+          <View style={{ height: 16 }} />
+          <View style={{ width: '100%', height: GALLERY_H, borderRadius: 10, overflow: 'hidden' }}>
             <AnimatedVehiclePlaceholder colors={p} isDark={isDarkMode} />
           </View>
-          <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+          <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
             {[1, 2, 3, 4, 5].map((i) => (
-              <View key={i} style={{ flex: 1, height: 42, borderRadius: 4, overflow: 'hidden' }}>
+              <View key={i} style={{ width: THUMB_SK_W, height: Math.round(THUMB_SK_W * (45 / 67.5)), borderRadius: 3, overflow: 'hidden' }}>
                 <AnimatedVehiclePlaceholder colors={p} isDark={isDarkMode} />
               </View>
             ))}
           </View>
-        </View>
-
-        <View style={{ paddingHorizontal: 16, marginTop: 20, gap: 14 }}>
-          <Skeleton width="80%" height={22} borderRadius={6} />
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Skeleton width={90} height={24} borderRadius={12} />
-            <Skeleton width={110} height={24} borderRadius={12} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 6 }}>
-            <Skeleton width="48%" height={68} borderRadius={10} />
-            <Skeleton width="48%" height={68} borderRadius={10} />
-          </View>
+          <View style={{ height: 16 }} />
+          <Skeleton width="100%" height={84} borderRadius={10} />
         </View>
       </View>
     );

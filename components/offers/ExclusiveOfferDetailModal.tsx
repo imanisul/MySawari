@@ -38,7 +38,7 @@ export function ExclusiveOfferDetailModal({
 }: ExclusiveOfferDetailModalProps) {
   const router = useRouter();
   const p = useDetailsPalette();
-  const { isAuthenticated, membership, applyCoupon, selectCar } = useSawari();
+  const { isAuthenticated, membership, applyCoupon, selectCar, setDates, setTimes, dateRange } = useSawari();
   const { data: vehicles = [] } = useVehicles();
 
   const [claiming, setClaiming] = useState(false);
@@ -46,6 +46,85 @@ export function ExclusiveOfferDetailModal({
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [showLogin, setShowLogin] = useState(false);
+
+  // Available vehicles list
+  const vehiclesList = useMemo(() => {
+    if (!offer || !vehicles || vehicles.length === 0) return [];
+
+    // 1. If offer applies to all vehicles or has allVehicles toggle enabled
+    if (offer.allVehicles || offer.applicableType === 'all') {
+      return vehicles.map((v: any) => ({
+        vehicleId: String(v.id || v._id),
+        vehicleName: v.name || v.vehicleName || 'Fleet Vehicle',
+        image: v.image || (v.images && v.images[0]),
+        dealPrice: offer.promotionalPrice || 1,
+        originalPrice: v.perDay || v.pricePerDay || 2500,
+        carObj: v,
+      }));
+    }
+
+    // 2. Specific vehicle pricing list
+    if (offer.vehiclePrices && offer.vehiclePrices.length > 0) {
+      return offer.vehiclePrices.map((vp) => {
+        const found = vehicles.find(
+          (v: any) => String(v.id || v._id) === String(vp.vehicleId)
+        );
+        return {
+          vehicleId: vp.vehicleId,
+          vehicleName: vp.vehicleName || found?.name || found?.vehicleName || 'Vehicle',
+          image: found?.image || (found?.images && found.images[0]),
+          dealPrice: vp.dealPrice,
+          originalPrice: vp.originalPrice || found?.perDay || found?.pricePerDay,
+          carObj: found,
+        };
+      });
+    }
+
+    // 3. Applicable vehicle IDs list
+    if (offer.applicableVehicleIds && offer.applicableVehicleIds.length > 0) {
+      return offer.applicableVehicleIds.map((vId) => {
+        const found = vehicles.find(
+          (v: any) => String(v.id || v._id) === String(vId)
+        );
+        return {
+          vehicleId: vId,
+          vehicleName: found?.name || found?.vehicleName || 'Vehicle',
+          image: found?.image || (found?.images && found.images[0]),
+          dealPrice: offer.promotionalPrice || 1,
+          originalPrice: found?.perDay || found?.pricePerDay,
+          carObj: found,
+        };
+      }).filter((item) => item.carObj);
+    }
+
+    // 4. Single vehicle reference
+    if (offer.vehicleId) {
+      const vId = typeof offer.vehicleId === 'object' ? offer.vehicleId._id : offer.vehicleId;
+      const found = vehicles.find(
+        (v: any) => String(v.id || v._id) === String(vId)
+      );
+      if (found) {
+        return [{
+          vehicleId: String(vId),
+          vehicleName: found.name || found.vehicleName,
+          image: found.image || (found.images && found.images[0]),
+          dealPrice: offer.promotionalPrice || 1,
+          originalPrice: found.perDay || found.pricePerDay,
+          carObj: found,
+        }];
+      }
+    }
+
+    // Fallback: If no vehicles restricted, make all fleet vehicles selectable!
+    return vehicles.map((v: any) => ({
+      vehicleId: String(v.id || v._id),
+      vehicleName: v.name || v.vehicleName || 'Fleet Vehicle',
+      image: v.image || (v.images && v.images[0]),
+      dealPrice: offer.promotionalPrice || 1,
+      originalPrice: v.perDay || v.pricePerDay || 2500,
+      carObj: v,
+    }));
+  }, [offer, vehicles]);
 
   useEffect(() => {
     if (offer) {
@@ -59,9 +138,18 @@ export function ExclusiveOfferDetailModal({
         setSelectedVehicleId(typeof offer.vehicleId === 'object' ? offer.vehicleId._id : offer.vehicleId);
       } else if (offer.applicableVehicleIds && offer.applicableVehicleIds.length > 0) {
         setSelectedVehicleId(offer.applicableVehicleIds[0]);
+      } else if (vehicles && vehicles.length > 0) {
+        setSelectedVehicleId(String(vehicles[0].id || (vehicles[0] as any)._id));
       }
     }
-  }, [offer]);
+  }, [offer, vehicles]);
+
+  // Fallback to select first available vehicle if none chosen yet
+  useEffect(() => {
+    if (!selectedVehicleId && vehiclesList.length > 0) {
+      setSelectedVehicleId(String(vehiclesList[0].vehicleId));
+    }
+  }, [vehiclesList, selectedVehicleId]);
 
   if (!offer) return null;
 
@@ -112,61 +200,6 @@ export function ExclusiveOfferDetailModal({
     });
   }
 
-  // Available vehicles list
-  const vehiclesList = useMemo(() => {
-    if (!vehicles || vehicles.length === 0) return [];
-
-    if (offer.vehiclePrices && offer.vehiclePrices.length > 0) {
-      return offer.vehiclePrices.map((vp) => {
-        const found = vehicles.find(
-          (v: any) => String(v.id || v._id) === String(vp.vehicleId)
-        );
-        return {
-          vehicleId: vp.vehicleId,
-          vehicleName: vp.vehicleName || found?.name || found?.vehicleName || 'Vehicle',
-          image: found?.image,
-          dealPrice: vp.dealPrice,
-          originalPrice: vp.originalPrice || found?.perDay || found?.pricePerDay,
-          carObj: found,
-        };
-      });
-    }
-
-    if (offer.applicableVehicleIds && offer.applicableVehicleIds.length > 0) {
-      return offer.applicableVehicleIds.map((vId) => {
-        const found = vehicles.find(
-          (v: any) => String(v.id || v._id) === String(vId)
-        );
-        return {
-          vehicleId: vId,
-          vehicleName: found?.name || found?.vehicleName || 'Vehicle',
-          image: found?.image,
-          dealPrice: offer.promotionalPrice || 1,
-          originalPrice: found?.perDay || found?.pricePerDay,
-          carObj: found,
-        };
-      }).filter((item) => item.carObj);
-    }
-
-    if (offer.vehicleId) {
-      const vId = typeof offer.vehicleId === 'object' ? offer.vehicleId._id : offer.vehicleId;
-      const found = vehicles.find(
-        (v: any) => String(v.id || v._id) === String(vId)
-      );
-      if (found) {
-        return [{
-          vehicleId: String(vId),
-          vehicleName: found.name || found.vehicleName,
-          image: found.image,
-          dealPrice: offer.promotionalPrice || 1,
-          originalPrice: found.perDay || found.pricePerDay,
-          carObj: found,
-        }];
-      }
-    }
-
-    return [];
-  }, [offer, vehicles]);
 
   const handleClaim = async () => {
     if (!isAuthenticated) {
@@ -208,20 +241,52 @@ export function ExclusiveOfferDetailModal({
     if (selectedVehicleId && vehicles) {
       const match = vehicles.find(
         (v: any) => String(v.id || v._id) === String(selectedVehicleId)
-      );
+      ) || vehicles[0];
       if (match) {
         selectCar(match);
       }
     }
 
+    // Overnight / Time slot auto-prefill:
+    // (e.g. today night 8:00 PM to tomorrow morning 8:00 AM)
+    const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
+    const startStr = `${now.getDate()} ${MONTHS_SHORT[now.getMonth()]}`;
+    const endStr = `${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
+
+    if (offer.isOvernight || (offer.pickupTime && offer.returnTime)) {
+      setDates(`${startStr} – ${endStr}`, '1 Day');
+      setTimes(offer.pickupTime || '8:00 PM', offer.returnTime || '8:00 AM');
+    } else if (!dateRange || dateRange.includes('Select')) {
+      setDates(`${startStr} – ${endStr}`, '1 Day');
+      setTimes('8:00 AM', '8:00 AM');
+    }
+
     onClose();
     router.push({
-      pathname: '/dates',
-      params: { fromDestination: 'true', forSpecificCar: 'true' },
+      pathname: '/booking',
+      params: {
+        forSpecificCar: 'true',
+        couponCode: couponToApply || '',
+        isOvernight: offer.isOvernight ? 'true' : 'false',
+      },
     });
   };
 
-  const imageUrl = offer.image?.url || offer.image?.uri;
+  // Selected car object for dynamic image & details
+  const selectedCarObj = useMemo(() => {
+    return vehiclesList.find((v) => String(v.vehicleId) === String(selectedVehicleId))?.carObj || vehicles[0];
+  }, [vehiclesList, selectedVehicleId, vehicles]);
+
+  // Guaranteed image: If offer banner isn't set, auto-fallback to selected car photo or fleet photo
+  const imageUrl =
+    offer.image?.url ||
+    offer.image?.uri ||
+    selectedCarObj?.image ||
+    (selectedCarObj?.images && selectedCarObj.images[0]) ||
+    vehicles[0]?.image ||
+    (vehicles[0]?.images && vehicles[0].images[0]);
 
   return (
     <Modal
@@ -265,6 +330,12 @@ export function ExclusiveOfferDetailModal({
                 <View style={styles.dealOverlayBadge}>
                   <Text style={styles.dealOverlayText}>{promoPriceDisplay}</Text>
                 </View>
+                {offer.allVehicles ? (
+                  <View style={styles.allCarsOverlayBadge}>
+                    <Ionicons name="car-sport" size={12} color="#FFFFFF" />
+                    <Text style={styles.allCarsOverlayText}>ALL CARS</Text>
+                  </View>
+                ) : null}
               </View>
             ) : null}
 
@@ -272,6 +343,32 @@ export function ExclusiveOfferDetailModal({
             <Text style={[styles.title, { color: p.fg }]}>{offer.title}</Text>
             {offer.subtitle ? (
               <Text style={[styles.subtitle, { color: p.sub }]}>{offer.subtitle}</Text>
+            ) : null}
+
+            {/* Overnight / Fixed Time Window Banner */}
+            {(offer.isOvernight || (offer.pickupTime && offer.returnTime)) ? (
+              <View style={styles.overnightCard}>
+                <View style={styles.overnightHeaderRow}>
+                  <Ionicons name={offer.isOvernight ? 'moon' : 'time'} size={17} color="#6152D8" />
+                  <Text style={styles.overnightTitle}>
+                    {offer.timeSlotLabel || (offer.isOvernight ? 'Overnight Deal (8:00 PM – 8:00 AM)' : 'Time-Locked Deal')}
+                  </Text>
+                </View>
+                <View style={styles.overnightTimesRow}>
+                  <View style={styles.overnightTimeBox}>
+                    <Text style={styles.overnightTimeLabel}>Pickup</Text>
+                    <Text style={styles.overnightTimeVal}>{offer.pickupTime || '8:00 PM'}</Text>
+                  </View>
+                  <Feather name="arrow-right" size={16} color="#6152D8" />
+                  <View style={styles.overnightTimeBox}>
+                    <Text style={styles.overnightTimeLabel}>Return</Text>
+                    <Text style={styles.overnightTimeVal}>{offer.returnTime || '8:00 AM'}</Text>
+                  </View>
+                </View>
+                <Text style={styles.overnightNote}>
+                  🌙 Overnight rental (tonight to tomorrow morning). Date & hours will be locked automatically.
+                </Text>
+              </View>
             ) : null}
 
             {/* Membership badge note */}
@@ -312,7 +409,9 @@ export function ExclusiveOfferDetailModal({
             {/* Multi-vehicle picker if applicable */}
             {vehiclesList.length > 0 ? (
               <View style={styles.vehicleSection}>
-                <Text style={[styles.sectionHeading, { color: p.fg }]}>Select Vehicle</Text>
+                <Text style={[styles.sectionHeading, { color: p.fg }]}>
+                  {offer.allVehicles ? 'Select Any Vehicle (All Cars Eligible)' : 'Select Vehicle'}
+                </Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.vehicleRow}>
                   {vehiclesList.map((item) => {
                     const isSelected = String(item.vehicleId) === String(selectedVehicleId);
@@ -385,12 +484,14 @@ export function ExclusiveOfferDetailModal({
 
           {/* Footer Action Button */}
           <View style={[styles.footerArea, { borderTopColor: p.border }]}>
-            {claimData ? (
+            {claimData || offer.code ? (
               <View style={styles.claimedFooter}>
                 <View style={styles.claimedBadgeRow}>
                   <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
                   <Text style={styles.claimedBadgeText}>
-                    Offer Claimed! (Code: {claimData.couponCode || claimData.claimToken})
+                    {claimData
+                      ? `Offer Claimed! (Code: ${claimData.couponCode || claimData.claimToken})`
+                      : `Coupon Code: ${offer.code} (Auto-Applies)`}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -522,6 +623,74 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 14,
+  },
+  allCarsOverlayBadge: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(97, 82, 216, 0.92)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  allCarsOverlayText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
+    letterSpacing: 0.5,
+  },
+  overnightCard: {
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 16,
+  },
+  overnightHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    marginBottom: 10,
+  },
+  overnightTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#5B21B6',
+  },
+  overnightTimesRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginBottom: 8,
+  },
+  overnightTimeBox: {
+    alignItems: 'center',
+  },
+  overnightTimeLabel: {
+    fontSize: 11,
+    color: '#6B7280',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+  },
+  overnightTimeVal: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#1F2937',
+    marginTop: 2,
+  },
+  overnightNote: {
+    fontSize: 11,
+    color: '#6D28D9',
+    fontWeight: '500',
+    lineHeight: 16,
   },
   title: {
     fontSize: 22,

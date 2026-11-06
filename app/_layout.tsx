@@ -42,6 +42,13 @@ import { API } from '@/services/backend/api';
 import { handleDeepLinkReferralUrl } from '@/utils/referralLinkHandler';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { preloadFlashScreenConfig } from '@/services/api/flashScreen';
+import { Text, TextInput } from 'react-native';
+
+// Large system font sizes must not push text out of fixed-size cards, pills and buttons: scale up to 1.2x at most
+// (individual texts can still set their own maxFontSizeMultiplier).
+for (const C of [Text, TextInput] as any[]) {
+  C.defaultProps = { ...C.defaultProps, maxFontSizeMultiplier: 1.2 };
+}
 
 // Pre-hydrate flash screen settings immediately so only the PROPER ONE ever appears
 preloadFlashScreenConfig().catch(() => {});
@@ -131,6 +138,8 @@ function RootLayoutNav() {
           }}
         >
           {/* Native stack reverses the flip automatically on back. */}
+          {/* A tall page rotating in 3D looked broken (photo and text tilted up, then dropped): slide it in flat. */}
+          <Stack.Screen name="car-details" options={{ animation: 'slide_from_right', presentation: 'card' }} />
           <Stack.Screen name="planner" />
           <Stack.Screen name="location" />
           <Stack.Screen name="return-location" />

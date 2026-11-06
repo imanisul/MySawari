@@ -2,7 +2,8 @@ import { Platform, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ANDROID_PACKAGE = 'com.mysawari.customer';
-const IOS_APP_ID = 'com.mysawari.customer';
+// Numeric App Store id (ascAppId in eas.json); the bundle id does not work in App Store URLs.
+const IOS_APP_ID = '6829408836';
 
 const STORAGE_KEY_PREFIX = '@mysawari_membership_rating_prompt_';
 
@@ -94,3 +95,11 @@ export async function requestStoreReview(): Promise<void> {
   }
 }
 
+
+/** "Rate us": opens this app's page straight in Google Play (Android) or the App Store review screen (iPhone). */
+export async function openStorePage(): Promise<void> {
+  const [store, web] = Platform.OS === 'ios'
+    ? [`itms-apps://apps.apple.com/app/id${IOS_APP_ID}?action=write-review`, `https://apps.apple.com/app/id${IOS_APP_ID}?action=write-review`]
+    : [`market://details?id=${ANDROID_PACKAGE}`, `https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE}`];
+  await Linking.openURL(store).catch(() => Linking.openURL(web)).catch(() => {});
+}

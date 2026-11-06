@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, ImageSourcePropType, ScrollView, useWindowDimensions, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, Image, ImageSourcePropType, ScrollView, useWindowDimensions, Linking, Alert } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, Text as SvgText, TextPath, G, RadialGradient, Stop } from 'react-native-svg';
@@ -16,6 +16,7 @@ import { offersQueryOptions, isOfferLive } from '@/services/api/offers';
 import type { RecentSearch } from '@/utils/recentSearches';
 import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
+import { openStorePage } from '@/services/rateApp';
 import LowestPriceIcon from '@/assets/images/benefit_lowest_price.svg';
 import UnlimitedKmIcon from '@/assets/images/benefit_unlimited_km.svg';
 import WellMaintainedIcon from '@/assets/images/benefit_well_maintained.svg';
@@ -1000,6 +1001,35 @@ export function MemberBenefitsCard({ isMember, onPress }: { isMember: boolean; o
   );
 }
 
+/** "Rate us" strip: tonal surface, star badge, five small stars and a filled button; opens Google Play (Android) or the App Store (iPhone). */
+export function RateUsCard() {
+  const p = useDetailsPalette();
+  const store = Platform.OS === 'ios' ? 'App Store' : 'Play Store';
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Rate us on the ${store}`}
+      onPress={() => { Haptics.selectionAsync(); openStorePage(); }}
+      style={({ pressed }) => [styles.rate, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }, pressed && { opacity: 0.92, transform: [{ scale: 0.99 }] }]}
+    >
+      <View style={[styles.rateBadge, { backgroundColor: p.page, borderColor: p.memberBorder }]}>
+        <Ionicons name="star" size={24} color="#F5B301" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rateTitle, { color: p.fg }]} numberOfLines={1}>Enjoying MySawari?</Text>
+        <View style={styles.rateLine}>
+          {[0, 1, 2, 3, 4].map((i) => <Ionicons key={i} name="star" size={14} color="#F5B301" />)}
+          <Text style={[styles.rateSub, { color: p.muted }]} numberOfLines={1}>Rate us on the {store}</Text>
+        </View>
+      </View>
+      <View style={[styles.rateBtn, { backgroundColor: HOME_PURPLE }]}>
+        <Text style={styles.rateBtnText}>Rate</Text>
+        <Feather name="arrow-up-right" size={10} color="#FFFFFF" />
+      </View>
+    </Pressable>
+  );
+}
+
 // The design shows the logos in grey (Figma "luminosity" on white); these are the same logos converted to grey.
 const SOCIAL_GREY: Partial<Record<string, ImageSourcePropType>> = {
   linkedin: require('@/assets/images/social/linkedin_grey.png'),
@@ -1233,7 +1263,6 @@ const styles = StyleSheet.create({
     gap: 9,
     borderRadius: 12,
     borderWidth: 3,
-    borderColor: '#E7EAF4',
     paddingHorizontal: 12,
   },
   destIcon: { width: 20, height: 20 },
@@ -1314,6 +1343,13 @@ const styles = StyleSheet.create({
   memberTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, flexShrink: 1 },
   memberBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 22, paddingHorizontal: 10, borderRadius: 31 },
   memberBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
+  rate: { marginHorizontal: 16, marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderWidth: 1, borderRadius: 16 },
+  rateBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  rateTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, lineHeight: 22.5 },
+  rateLine: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
+  rateSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginLeft: 6, flexShrink: 1 },
+  rateBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 26, paddingHorizontal: 10, borderRadius: 13 },
+  rateBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, lineHeight: 15, color: '#FFFFFF' },
   memberSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 3 },
 
   // Connect
@@ -1331,78 +1367,16 @@ const styles = StyleSheet.create({
   connectTag: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: -4.5, marginBottom: -3.8, textAlign: 'right', alignSelf: 'stretch', includeFontPadding: false },
 
   // Section Promo Banners (Middle & Bottom positions)
-  promoBannerContainer: {
-    paddingHorizontal: 16,
-    marginTop: 16,
-    alignItems: 'center',
-    gap: 12,
-  },
-  promoBannerCard: {
-    height: 160,
-    borderRadius: 16,
-    overflow: 'hidden',
-    backgroundColor: '#1E293B',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  promoBannerPhoto: {
-    width: '100%',
-    height: '100%',
-  },
-  promoBannerContent: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 14,
-    justifyContent: 'flex-end',
-  },
-  promoBannerBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FFE600',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginBottom: 6,
-  },
-  promoBannerBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#1E1466',
-    letterSpacing: 0.5,
-  },
-  promoBannerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-  },
-  promoBannerSubtitle: {
-    fontSize: 12,
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginTop: 2,
-    fontWeight: '500',
-  },
-  promoBannerCtaBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    marginTop: 8,
-    backgroundColor: '#6152D8',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  promoBannerCtaText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
+  promoBannerContainer: { paddingHorizontal: 16, marginTop: 16, alignItems: 'center', gap: 8 },
+  promoBannerCard: { height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: '#1E293B', position: 'relative' },
+  promoBannerPhoto: { width: '100%', height: '100%' },
+  promoBannerContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, justifyContent: 'flex-end' },
+  promoBannerBadge: { alignSelf: 'flex-start', backgroundColor: '#FFE600', paddingHorizontal: 8, minHeight: 20, justifyContent: 'center', borderRadius: 20, marginBottom: 6 },
+  promoBannerBadgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#1E1466' },
+  promoBannerTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
+  promoBannerSubtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, color: 'rgba(255, 255, 255, 0.85)' },
+  promoBannerCtaBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 8, backgroundColor: '#6152D8', paddingHorizontal: 12, minHeight: 28, borderRadius: 20 },
+  promoBannerCtaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16, color: '#FFFFFF' },
   bannerCtaPill: {
     position: 'absolute',
     bottom: 8,

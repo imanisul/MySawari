@@ -80,17 +80,26 @@ export async function loadHomeData(
     step('offers', queryClient.fetchQuery(offersQueryOptions)),
   ];
   if (isAuthenticated) {
-    // Trips from the last launch show at once (saved per customer, marked stale so they refresh right away);
-    // only a first launch waits for them.
-    let savedTrips = false;
-    if (userId) {
-      startQueryPersistence(queryClient, userId);
-      await hydrateUserQueries(queryClient, userId);
-      savedTrips = queryClient.getQueryData(bookingsQueryOptions.queryKey) !== undefined;
-    }
-    const fresh = queryClient.fetchQuery({ ...bookingsQueryOptions, staleTime: savedTrips ? 0 : bookingsQueryOptions.staleTime });
-    if (savedTrips) { fresh.catch(() => {}); onStep?.('trips'); } else tasks.push(step('trips', fresh));
     tasks.push(step('wallet', fetchWallet()));
+
+    // Parallelize user persistence hydration with network calls instead of sequential awaiting
+    const userHydration = (async () => {
+      let savedTrips = false;
+      if (userId) {
+        startQueryPersistence(queryClient, userId);
+        await hydrateUserQueries(queryClient, userId);
+        savedTrips = queryClient.getQueryData(bookingsQueryOptions.queryKey) !== undefined;
+      }
+      const fresh = queryClient.fetchQuery({ ...bookingsQueryOptions, staleTime: savedTrips ? 0 : bookingsQueryOptions.staleTime });
+      if (savedTrips) {
+        fresh.catch(() => {});
+        onStep?.('trips');
+      } else {
+        await fresh.catch(() => {});
+        onStep?.('trips');
+      }
+    })();
+    tasks.push(userHydration);
   }
   await Promise.race([
     Promise.allSettled(tasks),

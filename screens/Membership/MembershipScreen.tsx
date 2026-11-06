@@ -20,6 +20,8 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { FaqList, FAQS } from '@/components/vehicle/details/CarDetailsSections';
 import { PaymentProgress } from '@/components/booking/PaymentProgress';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { MembershipRatingModal } from '@/components/membership/MembershipRatingModal';
+import { shouldPromptMembershipRating } from '@/services/rateApp';
 
 // Membership page (Figma "Get Membership" → Starter / Plus / Pro Member).
 // Plans: rate, per-trip cap and annual cap are the ones the server applies at booking
@@ -103,7 +105,7 @@ export default function MembershipScreen() {
   // ?plan=plus opens the page with that plan picked (Car details' plan picker).
   const params = useLocalSearchParams<{ plan?: string }>();
 
-  const { membership: knownMembership, fetchWallet, isAuthenticated, isAuthLoading } = useSawari();
+  const { membership: knownMembership, fetchWallet, isAuthenticated, isAuthLoading, customer } = useSawari();
   const known = activeOnly(knownMembership);
 
   // If a member's plan is already known, show it immediately.
@@ -125,6 +127,7 @@ export default function MembershipScreen() {
 
   // Popups
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
   const [successPlanName, setSuccessPlanName] = useState('');
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -438,7 +441,18 @@ export default function MembershipScreen() {
       />
 
       {/* ── Success ── */}
-      <Modal visible={showSuccessModal} transparent animationType="fade" onRequestClose={() => setShowSuccessModal(false)} statusBarTranslucent navigationBarTranslucent>
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={async () => {
+          setShowSuccessModal(false);
+          const should = await shouldPromptMembershipRating(customer?.id);
+          if (should) setShowRatingModal(true);
+        }}
+        statusBarTranslucent
+        navigationBarTranslucent
+      >
         <View style={styles.overlay}>
           <ModalBlur />
           <View style={[styles.popup, { backgroundColor: p.page }]}>
@@ -447,12 +461,26 @@ export default function MembershipScreen() {
             </View>
             <Text style={[styles.popupTitle, { color: p.fg }]}>Welcome to {successPlanName}!</Text>
             <Text style={[styles.popupBody, { color: p.muted }]}>Your membership discount is applied automatically on every booking.</Text>
-            <Pressable onPress={() => setShowSuccessModal(false)} style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+            <Pressable
+              onPress={async () => {
+                setShowSuccessModal(false);
+                const should = await shouldPromptMembershipRating(customer?.id);
+                if (should) setShowRatingModal(true);
+              }}
+              style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+            >
               <Text style={styles.popupBtnText}>Awesome</Text>
             </Pressable>
           </View>
         </View>
       </Modal>
+
+      {/* ── Membership Rating Prompt Modal ── */}
+      <MembershipRatingModal
+        visible={showRatingModal}
+        customerId={customer?.id}
+        onClose={() => setShowRatingModal(false)}
+      />
 
       {/* ── Error ── */}
       <Modal visible={showErrorModal} transparent animationType="fade" onRequestClose={() => setShowErrorModal(false)} statusBarTranslucent navigationBarTranslucent>

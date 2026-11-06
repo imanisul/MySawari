@@ -68,6 +68,8 @@ export function PushNotificationHandler() {
           });
         });
       });
+    } else if (data?.type === 'exclusive_offer' || data?.type === 'exclusive') {
+      router.push({ pathname: '/', params: { openExclusiveOfferId: offerId } });
     } else if (offerId) {
       router.push({ pathname: '/offers', params: { offerId, ...(promoCode ? { promoCode } : {}) } });
     } else if (link && link.startsWith('/') && !link.startsWith('//')) {

@@ -4,9 +4,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CITIES } from '@/constants/cities';
 import { CitySheet } from '@/components/home/CitySheet';
 import Notifications from '@/utils/notifications';
-import { FlatList, Image, StyleSheet, Text, View, RefreshControl, ImageSourcePropType } from 'react-native';
+import { FlatList, Image, StyleSheet, Text, View, RefreshControl, ImageSourcePropType, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { setStatusBarStyle } from 'expo-status-bar';
+import {  StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
@@ -130,6 +130,8 @@ export default function HomeScreen() {
   const setCity = (c: string) => { setCityState(c); AsyncStorage.setItem('@selected_city', c).catch(() => {}); };
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [manualRefreshing, setManualRefreshing] = useState(false);
+  const [isPastHero, setIsPastHero] = useState(false);
+  const heroSectionHeight = useRef(0);
 
   /** Runs `go` now when signed in, or after logging in. */
   const requireLogin = useCallback((go: () => void) => {
@@ -139,10 +141,14 @@ export default function HomeScreen() {
 
   // The banner is purple: light status bar text while Home is on screen.
   useFocusEffect(useCallback(() => {
-    setStatusBarStyle('light');
+    StatusBar.setStyle(isPastHero ? 'dark' : 'light');
     import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('view_screen', 'HomeScreen'));
-    return () => setStatusBarStyle(isDarkMode ? 'light' : 'dark');
-  }, [isDarkMode]));
+    return () => StatusBar.setStyle(isDarkMode ? 'light' : 'dark');
+  }, [isDarkMode, isPastHero]));
+
+  useEffect(() => {
+    StatusBar.setStyle(isPastHero ? 'dark' : 'light');
+  }, [isPastHero]);
 
   useFocusEffect(useCallback(() => {
     setBookingSource('home');
@@ -304,7 +310,7 @@ export default function HomeScreen() {
     switch (item) {
       case 'header':
         return (
-          <View>
+          <View onLayout={(event) => { heroSectionHeight.current = event.nativeEvent.layout.height; }}>
             {/* Pulling the page down (iOS bounce) shows more of the hero's purple instead of a white gap above it. */}
             <View pointerEvents="none" style={{ position: 'absolute', top: -1200, left: 0, right: 0, height: 1200, backgroundColor: HOME_PURPLE }} />
             <HomeHero
@@ -442,6 +448,13 @@ export default function HomeScreen() {
         data={sections}
         keyExtractor={(k) => k}
         renderItem={renderSection}
+        onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+          if (!heroSectionHeight.current) return;
+          const threshold = Math.max(0, heroSectionHeight.current - insets.top - 140);
+          const pastHero = event.nativeEvent.contentOffset.y >= threshold;
+          setIsPastHero((current) => current === pastHero ? current : pastHero);
+        }}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         style={{ backgroundColor: p.page }}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
@@ -462,6 +475,8 @@ export default function HomeScreen() {
           />
         }
       />
+
+      {isPastHero && <View pointerEvents="none" style={[styles.statusBarSpacer, { height: insets.top, backgroundColor: p.page }]} />}
 
       <RewardScratchModal card={scratch} onClose={() => setScratch(null)} />
       <CitySheet visible={showCity} value={city} onSelect={setCity} onClose={() => setShowCity(false)} />
@@ -508,6 +523,7 @@ function CraftedFooter({ dark }: { dark: boolean }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  statusBarSpacer: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   footer: { width: '100%', aspectRatio: FOOTER_RATIO, marginTop: 8 },
   footerArt: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   // Sits in the faded sky, centred, like the hero's "LOWEST PRICE GUARANTEED" lettering.

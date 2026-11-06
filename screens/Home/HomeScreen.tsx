@@ -21,8 +21,9 @@ import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
   HomeHero, ReferStrip, HomeSearchCard, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
-  DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HOME_PURPLE,
+  DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HomePromoBanner, HOME_PURPLE,
 } from '@/components/home/HomeSections';
+import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
 import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
 
@@ -158,6 +159,30 @@ export default function HomeScreen() {
       if (isAuthenticated) fetchWallet();
     }
   }, [isAuthLoading, isAuthenticated, setBookingSource, fetchWallet, syncNotifications]));
+
+  // Live content synchronisation: refresh offers on focus and background version check
+  useFocusEffect(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: ['offers'] });
+    queryClient.invalidateQueries({ queryKey: ['exclusive-offers'] });
+  }, [queryClient]));
+
+  const lastContentVersion = useRef(0);
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const { fetchContentVersion } = await import('@/services/api/offers');
+        const ver = await fetchContentVersion();
+        if (ver && ver > lastContentVersion.current) {
+          if (lastContentVersion.current > 0) {
+            queryClient.invalidateQueries({ queryKey: ['offers'] });
+            queryClient.invalidateQueries({ queryKey: ['exclusive-offers'] });
+          }
+          lastContentVersion.current = ver;
+        }
+      } catch {}
+    }, 12000);
+    return () => clearInterval(timer);
+  }, [queryClient]);
 
   // No location-permission request here: the app asks once at start-up (SawariContext's GPS
   // auto-detect). Asking again from Home put a second system popup on screen at launch.
@@ -303,12 +328,29 @@ export default function HomeScreen() {
     });
   }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 
-  const sections = useMemo(() => ['header', 'searches', 'recent', 'picks', 'milestone', 'destinations', 'benefits', 'member', 'connect', 'footer'], []);
+  const sections = useMemo(() => [
+    'top_hero',
+    'search_card',
+    'position3_promo',
+    'refer_strip',
+    'searches',
+    'exclusive_offers',
+    'recent',
+    'picks',
+    'milestone',
+    'middle_banner',
+    'destinations',
+    'benefits',
+    'member',
+    'bottom_banner',
+    'connect',
+    'footer',
+  ], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
     let content: React.ReactNode = null;
     switch (item) {
-      case 'header':
+      case 'top_hero':
         return (
           <View onLayout={(event) => { heroSectionHeight.current = event.nativeEvent.layout.height; }}>
             {/* Pulling the page down (iOS bounce) shows more of the hero's purple instead of a white gap above it. */}
@@ -318,15 +360,33 @@ export default function HomeScreen() {
               city={city}
               onCityPress={() => setShowCity(true)}
               sawariCash={isAuthenticated ? sawariCash : 0}
-              onWallet={() => {}}  
-    >
-              <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
-            </HomeHero>
-            <View style={[styles.sheet, { backgroundColor: p.page, borderColor: p.deliveryBorder }]}>
-              <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDestination={() => openDestination()} />
-            </View>
+              onWallet={() => {}}
+            />
           </View>
         );
+      case 'search_card':
+        return (
+          <View style={[styles.sheet, { backgroundColor: p.page, borderColor: p.deliveryBorder }]}>
+            <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDestination={() => openDestination()} />
+          </View>
+        );
+      case 'position3_promo':
+        content = (
+          <View style={{ marginTop: 8, marginBottom: 4 }}>
+            <HomePromoBanner position="position3" />
+          </View>
+        );
+        break;
+      case 'refer_strip':
+        content = (
+          <View style={{ marginHorizontal: 16, marginTop: 4, marginBottom: 6 }}>
+            <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
+          </View>
+        );
+        break;
+      case 'exclusive_offers':
+        content = <ExclusiveOffersSection />;
+        break;
       case 'recent':
         if (!recent.length) break;
         content = (
@@ -399,6 +459,9 @@ export default function HomeScreen() {
           />
         );
         break;
+      case 'middle_banner':
+        content = <HomePromoBanner position="middle" />;
+        break;
       case 'destinations':
         content = (
           <>
@@ -429,6 +492,9 @@ export default function HomeScreen() {
         break;
       case 'member':
         content = <MemberBenefitsCard isMember={isMember} onPress={() => requireLogin(() => router.push('/membership'))} />;
+        break;
+      case 'bottom_banner':
+        content = <HomePromoBanner position="bottom" />;
         break;
       case 'connect':
         content = <ConnectCard />;

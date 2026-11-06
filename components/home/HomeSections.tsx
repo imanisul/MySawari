@@ -37,6 +37,12 @@ interface HeroSlideBase {
   code?: string;
   discount?: string;
   vehicleId?: string;
+  position?: 'hero' | 'middle' | 'bottom' | 'position3' | string;
+  destinationType?: string;
+  destinationUrl?: string;
+  destinationScreen?: string;
+  buttonText?: string;
+  badgeText?: string;
 }
 
 interface TextSlide extends HeroSlideBase {
@@ -209,6 +215,9 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
     offers.forEach((offer) => {
       if (!isOfferLive(offer)) return;
 
+      // Only hero position banners appear in the top hero carousel
+      if (offer.position && offer.position !== 'hero') return;
+
       const imageUrl = offer.image?.url || (typeof offer.image === 'string' ? offer.image : null);
       // Hero top carousel features banners, plus image promotions and special deals. Plain text coupon codes stay in Offers & Checkout.
       const isBanner = offer.type === 'banner';
@@ -224,6 +233,12 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
           code: offer.code,
           discount: offer.discount,
           vehicleId: offer.vehicleId,
+          position: offer.position || 'hero',
+          destinationType: offer.destinationType,
+          destinationUrl: offer.destinationUrl,
+          destinationScreen: offer.destinationScreen,
+          buttonText: offer.buttonText,
+          badgeText: offer.badgeText,
         });
       } else if (format === 'combination' && imageUrl) {
         offerSlides.push({
@@ -235,6 +250,12 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
           code: offer.code,
           discount: offer.discount,
           vehicleId: offer.vehicleId,
+          position: offer.position || 'hero',
+          destinationType: offer.destinationType,
+          destinationUrl: offer.destinationUrl,
+          destinationScreen: offer.destinationScreen,
+          buttonText: offer.buttonText,
+          badgeText: offer.badgeText,
         });
       } else {
         // text format
@@ -246,6 +267,12 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
           code: offer.code,
           discount: offer.discount,
           vehicleId: offer.vehicleId,
+          position: offer.position || 'hero',
+          destinationType: offer.destinationType,
+          destinationUrl: offer.destinationUrl,
+          destinationScreen: offer.destinationScreen,
+          buttonText: offer.buttonText,
+          badgeText: offer.badgeText,
         });
       }
     });
@@ -256,20 +283,62 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
   // Adaptive width across compact phones (360dp), modern phones (390-430dp), and tablets (460dp max)
   const cardWidth = Math.min(width - 32, 460);
 
-  const handleSlidePress = useCallback((s: HeroSlide) => {
+  const handleSlidePress = useCallback((s: HeroSlide | any) => {
     Haptics.selectionAsync();
-    if (s.vehicleId) {
-      if (s.code) Clipboard.setStringAsync(s.code);
-      router.push({
-        pathname: '/car-details',
-        params: {
-          id: s.vehicleId,
-          vehicleId: s.vehicleId,
-          ...(s.code ? { promoCode: s.code } : {}),
-        },
+
+    // 1. External website destination
+    if (s.destinationType === 'external' && s.destinationUrl) {
+      Linking.openURL(s.destinationUrl).catch(() => {
+        Alert.alert('Could Not Open Link', `Unable to open: ${s.destinationUrl}`);
       });
       return;
     }
+
+    // 2. Specific Vehicle Details destination
+    if (s.destinationType === 'vehicle' || s.vehicleId) {
+      if (s.code) Clipboard.setStringAsync(s.code);
+      if (s.vehicleId) {
+        router.push({
+          pathname: '/car-details',
+          params: {
+            id: s.vehicleId,
+            vehicleId: s.vehicleId,
+            ...(s.code ? { promoCode: s.code } : {}),
+          },
+        });
+        return;
+      }
+    }
+
+    // 3. Offers & discounts destination
+    if (s.destinationType === 'offers') {
+      router.push('/offers');
+      return;
+    }
+
+    // 4. Offer details destination
+    if (s.destinationType === 'offer_details') {
+      if (s.code) {
+        Clipboard.setStringAsync(s.code);
+        CustomAlert.alert('Code Copied! 🎟️', `Promo code "${s.code}" copied to clipboard! Paste it at checkout.`);
+      }
+      router.push('/offers');
+      return;
+    }
+
+    // 5. Booking page destination
+    if (s.destinationType === 'booking') {
+      router.push('/search');
+      return;
+    }
+
+    // 6. Specified internal app screen destination
+    if (s.destinationType === 'screen' && s.destinationScreen) {
+      router.push(s.destinationScreen as any);
+      return;
+    }
+
+    // Default fallback: copy code if present
     if (s.code) {
       Clipboard.setStringAsync(s.code);
       CustomAlert.alert(
@@ -448,6 +517,118 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
       )}
       {children}
     </LinearGradient>
+  );
+}
+
+// ── Section Promo Banners (Middle & Bottom positions) ────────────────────────
+
+export function HomePromoBanner({ position = 'middle' }: { position?: 'middle' | 'bottom' | 'position3' | string }) {
+  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const { data: offers } = useQuery(offersQueryOptions);
+
+  const banners = useMemo(() => {
+    if (!offers || !Array.isArray(offers)) return [];
+    return offers.filter((o) => {
+      if (!o || !isOfferLive(o) || o.type !== 'banner') return false;
+      if (position === 'position3') {
+        return (
+          o.position === 'position3' ||
+          o.position === 'promo3' ||
+          o.position === '3' ||
+          o.sortOrder === 3
+        );
+      }
+      return o.position === position;
+    });
+  }, [offers, position]);
+
+  if (!banners.length) return null;
+
+  const cardWidth = Math.min(width - 32, 480);
+
+  const handleBannerPress = (b: any) => {
+    Haptics.selectionAsync();
+
+    if (b.destinationType === 'external' && b.destinationUrl) {
+      Linking.openURL(b.destinationUrl).catch(() => {});
+      return;
+    }
+    if ((b.destinationType === 'vehicle' || !b.destinationType) && b.vehicleId) {
+      if (b.code) Clipboard.setStringAsync(b.code);
+      router.push({
+        pathname: '/car-details',
+        params: { id: b.vehicleId, vehicleId: b.vehicleId, ...(b.code ? { promoCode: b.code } : {}) },
+      });
+      return;
+    }
+    if (b.destinationType === 'offers' || b.destinationType === 'offer_details') {
+      if (b.code) Clipboard.setStringAsync(b.code);
+      router.push('/offers');
+      return;
+    }
+    if (b.destinationType === 'booking') {
+      router.push('/search');
+      return;
+    }
+    if (b.destinationType === 'screen' && b.destinationScreen) {
+      router.push(b.destinationScreen as any);
+      return;
+    }
+    if (b.code) {
+      Clipboard.setStringAsync(b.code);
+      CustomAlert.alert('Code Copied! 🎟️', `Promo code "${b.code}" copied to clipboard! Paste at checkout.`);
+    }
+  };
+
+  return (
+    <View style={styles.promoBannerContainer}>
+      {banners.map((b) => {
+        const imageUrl = b.image?.url || (typeof b.image === 'string' ? b.image : null);
+        if (!imageUrl) return null;
+
+        return (
+          <Pressable
+            key={b.id || b._id}
+            accessibilityRole="button"
+            onPress={() => handleBannerPress(b)}
+            style={({ pressed }) => [
+              styles.promoBannerCard,
+              { width: cardWidth },
+              pressed && { opacity: 0.95, transform: [{ scale: 0.99 }] },
+            ]}
+          >
+            <CachedImage
+              source={{ uri: imageUrl }}
+              style={styles.promoBannerPhoto}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+            {(b.title || b.subtitle || b.badgeText || b.buttonText) && (
+              <LinearGradient
+                colors={['transparent', 'rgba(15, 23, 42, 0.82)']}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
+            <View style={styles.promoBannerContent}>
+              {!!b.badgeText && (
+                <View style={styles.promoBannerBadge}>
+                  <Text style={styles.promoBannerBadgeText}>{b.badgeText}</Text>
+                </View>
+              )}
+              {!!b.title && <Text style={styles.promoBannerTitle}>{b.title}</Text>}
+              {!!b.subtitle && <Text style={styles.promoBannerSubtitle}>{b.subtitle}</Text>}
+              {!!b.buttonText && (
+                <View style={styles.promoBannerCtaBtn}>
+                  <Text style={styles.promoBannerCtaText}>{b.buttonText}</Text>
+                  <Feather name="arrow-right" size={12} color="#FFFFFF" />
+                </View>
+              )}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -1148,4 +1329,95 @@ const styles = StyleSheet.create({
   connectLogo: { flex: 1, width: 33.6, maxHeight: 32 },
   // Cap-height trim (leading-trim: cap): 16.5 box → 8.2 (Plus Jakarta Sans: ascent 1.038em, descent 0.222em, cap 0.745em).
   connectTag: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: -4.5, marginBottom: -3.8, textAlign: 'right', alignSelf: 'stretch', includeFontPadding: false },
+
+  // Section Promo Banners (Middle & Bottom positions)
+  promoBannerContainer: {
+    paddingHorizontal: 16,
+    marginTop: 16,
+    alignItems: 'center',
+    gap: 12,
+  },
+  promoBannerCard: {
+    height: 160,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: '#1E293B',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  promoBannerPhoto: {
+    width: '100%',
+    height: '100%',
+  },
+  promoBannerContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 14,
+    justifyContent: 'flex-end',
+  },
+  promoBannerBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFE600',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 6,
+  },
+  promoBannerBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#1E1466',
+    letterSpacing: 0.5,
+  },
+  promoBannerTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  promoBannerSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  promoBannerCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: '#6152D8',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  promoBannerCtaText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  bannerCtaPill: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(97, 82, 216, 0.95)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
+  bannerCtaPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

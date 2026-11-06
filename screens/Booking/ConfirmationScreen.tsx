@@ -11,6 +11,8 @@ import { bookingsQueryOptions } from '@/hooks/useHomeData';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { PricingSummary, tripTotal, shortDate } from '@/components/booking/TripDetailParts';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { MembershipRatingModal } from '@/components/membership/MembershipRatingModal';
+import { shouldPromptMembershipRating } from '@/services/rateApp';
 
 const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
 
@@ -29,8 +31,9 @@ export default function ConfirmationScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { selectedCar, mode, dateRange, duration, pickupTime, returnTime, lastBooking } = useSawari();
+  const { selectedCar, mode, dateRange, duration, pickupTime, returnTime, lastBooking, customer } = useSawari();
   const { pricingQuote } = useQuote();
+  const [showRatingModal, setShowRatingModal] = React.useState(false);
 
   // The new booking shows on Home and in My Trips straight away.
   React.useEffect(() => {
@@ -41,6 +44,29 @@ export default function ConfirmationScreen() {
   const { data: allBookings } = useQuery(bookingsQueryOptions);
   const matched = (allBookings || []).find((x) => (b?.id && x.id === b.id) || (b?.bookingCode && x.bookingCode === b.bookingCode));
   const effective = matched ? { ...b, ...matched } : b;
+
+  React.useEffect(() => {
+    const hasMembershipPurchase = Boolean(
+      (b as any)?.membershipPlan ||
+      (effective as any)?.membershipPlan ||
+      pricingQuote?.membershipPlanToBuy
+    );
+
+    if (hasMembershipPurchase) {
+      let active = true;
+      const timer = setTimeout(async () => {
+        if (!active) return;
+        const should = await shouldPromptMembershipRating(customer?.id);
+        if (should && active) {
+          setShowRatingModal(true);
+        }
+      }, 1500);
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
+    }
+  }, [b, effective, pricingQuote?.membershipPlanToBuy, customer?.id]);
   const rawCode = (effective?.bookingCode || b?.bookingCode || (effective?.id || b?.id)?.slice(-6).toUpperCase() || '').replace(/^#/, '');
   const displayId = rawCode ? `#${rawCode}` : '—';
 
@@ -145,6 +171,12 @@ export default function ConfirmationScreen() {
           </Pressable>
         </View>
       </View>
+
+      <MembershipRatingModal
+        visible={showRatingModal}
+        customerId={customer?.id}
+        onClose={() => setShowRatingModal(false)}
+      />
     </BlurHost>
   );
 }

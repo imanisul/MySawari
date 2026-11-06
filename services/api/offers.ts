@@ -82,7 +82,8 @@ export function isOfferLive(offer: { active?: boolean; startDate?: string | Date
   const starts = offer.startDate ? new Date(offer.startDate).getTime() : NaN;
   if (Number.isFinite(starts) && starts > now) return false;
   const expires = offer.expiryDate ? new Date(offer.expiryDate).getTime() : NaN;
-  return Number.isFinite(expires) && expires >= now;
+  if (Number.isFinite(expires) && expires < now) return false;
+  return true;
 }
 
 /** One shared query, so the home screen and the app-start prefetch use the same cached offers. */
@@ -307,6 +308,8 @@ export interface ExclusiveOffer {
   };
 }
 
+const EXCLUSIVE_OFFERS_CACHE_KEY = '@exclusive_offers_cache_v1';
+
 export const exclusiveOffersQueryOptions = {
   queryKey: ['exclusive-offers'] as const,
   queryFn: async () => {
@@ -323,19 +326,39 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
-        return json.data
+        const live = json.data
           .filter((o: any) => o && isOfferLive(o))
           .map((o: any) => ({
             ...o,
             id: o._id,
             image: plateSafeOfferImage(o.image, o.updatedAt),
           }));
+        AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(live)).catch(() => {});
+        return live;
       }
     }
   } catch (e) {
     console.warn('[Offers] Failed to fetch exclusive offers:', e);
   }
+
+  try {
+    const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
+    if (saved) {
+      const list = JSON.parse(saved);
+      if (Array.isArray(list)) return list.filter((o: any) => o && isOfferLive(o));
+    }
+  } catch {}
+
   return [];
+}
+
+export async function hydrateExclusiveOffers(queryClient: { getQueryData: (k: readonly unknown[]) => unknown; setQueryData: (k: readonly unknown[], d: unknown, o?: { updatedAt: number }) => unknown }) {
+  try {
+    const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
+    if (!saved || queryClient.getQueryData(exclusiveOffersQueryOptions.queryKey)) return;
+    const list = (JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o));
+    queryClient.setQueryData(exclusiveOffersQueryOptions.queryKey, list, { updatedAt: 0 });
+  } catch {}
 }
 
 export async function fetchContentVersion(): Promise<number> {

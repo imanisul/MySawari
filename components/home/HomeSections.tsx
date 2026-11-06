@@ -216,13 +216,24 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
     offers.forEach((offer) => {
       if (!isOfferLive(offer)) return;
 
+      // Special deals and exclusive offers MUST NEVER appear in the home hero banner!
+      // They belong exclusively in the Exclusive Offers section.
+      if (
+        offer.isExclusive ||
+        offer.type === 'special_deal' ||
+        offer.type === 'coupon' ||
+        offer.position === 'exclusive' ||
+        Boolean(offer.promotionalPrice) ||
+        Boolean(offer.dealPrice)
+      ) {
+        return;
+      }
+
       // Only hero position banners appear in the top hero carousel
       if (offer.position && offer.position !== 'hero') return;
 
       const imageUrl = offer.image?.url || (typeof offer.image === 'string' ? offer.image : null);
-      // Hero top carousel features banners, plus image promotions and special deals. Plain text coupon codes stay in Offers & Checkout.
-      const isBanner = offer.type === 'banner';
-      if (!isBanner && !imageUrl && offer.type === 'coupon') return;
+      if (offer.type !== 'banner') return;
 
       const format = offer.displayFormat || (imageUrl && !offer.title ? 'image' : imageUrl && offer.title ? 'combination' : 'text');
 
@@ -531,7 +542,10 @@ export function HomePromoBanner({ position = 'middle' }: { position?: 'middle' |
   const banners = useMemo(() => {
     if (!offers || !Array.isArray(offers)) return [];
     return offers.filter((o) => {
-      if (!o || !isOfferLive(o) || o.type !== 'banner') return false;
+      if (!o || !isOfferLive(o)) return false;
+      // Special deals and exclusive offers MUST NOT appear in home promo banners
+      if (o.type !== 'banner') return false;
+      if (o.isExclusive || o.position === 'exclusive') return false;
       if (position === 'position3') {
         return (
           o.position === 'position3' ||

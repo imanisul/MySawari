@@ -50,6 +50,8 @@ export interface Offer {
   sortOrder?: number;
   updatedAt?: string;
   // Special deal fields
+  isExclusive?: boolean;
+  promotionalPrice?: number;
   vehicleId?: string;
   originalPrice?: number;
   dealPrice?: number;
@@ -104,7 +106,16 @@ export async function fetchOffers(): Promise<Offer[]> {
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
-        const mapped = json.data.filter((offer: any) => offer && isOfferLive(offer)).map((offer: any) => {
+        const mapped = json.data
+          .filter((offer: any) => {
+            if (!offer || !isOfferLive(offer)) return false;
+            // Special deals and exclusive offers belong strictly in the exclusive deals section, NEVER in banners
+            if (offer.isExclusive || offer.type === 'special_deal' || offer.position === 'exclusive') {
+              return false;
+            }
+            return true;
+          })
+          .map((offer: any) => {
           if (offer.type === 'banner') {
             const displayFormat = offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url && offer.title ? 'combination' : 'text');
             return {
@@ -270,7 +281,9 @@ export interface ExclusiveOffer {
   activeClaim?: {
     claimToken: string;
     couponCode: string;
-    vehicleId?: string;
+    isExclusive?: boolean;
+  promotionalPrice?: number;
+  vehicleId?: string;
     dealPrice: number;
     expiresAt: string;
   } | null;

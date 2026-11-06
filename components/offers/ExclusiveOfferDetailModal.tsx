@@ -5,14 +5,16 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   ScrollView,
   ActivityIndicator,
-  Dimensions,
+  LayoutAnimation,
   Platform,
+  Image,
 } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { Image as CachedImage } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
@@ -28,7 +30,53 @@ interface ExclusiveOfferDetailModalProps {
   onClaimSuccess?: (claim: any) => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+type VehicleOption = {
+  vehicleId: string;
+  vehicleName: string;
+  image?: any;
+  dealPrice?: number;
+  originalPrice?: number;
+  carObj?: any;
+};
+
+// Brand tokens (work on both light and dark palettes)
+const ACCENT = '#6152D8';
+const ACCENT_TINT = 'rgba(97, 82, 216, 0.12)';
+const SUCCESS = '#059669';
+const SUCCESS_TINT = 'rgba(5, 150, 105, 0.12)';
+const DANGER = '#DC2626';
+const DANGER_TINT = 'rgba(220, 38, 38, 0.10)';
+
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const idOf = (v: any) => String(v?.id ?? v?._id ?? '');
+const imageOf = (v: any) => v?.image || v?.images?.[0];
+const basePriceOf = (v: any): number | undefined => v?.perDay ?? v?.pricePerDay;
+
+/** Works out what the customer actually pays for one car under this offer. */
+function computeDealPrice(offer: ExclusiveOffer, original?: number, explicit?: number) {
+  if (explicit != null) return explicit;
+  const type = offer.pricingType || 'promotional_price';
+  if (type === 'promotional_price') return offer.promotionalPrice ?? 1;
+  if (original == null) return undefined;
+  if (type === 'fixed_discount') return Math.max(original - (offer.promotionalPrice ?? 500), 0);
+  if (type === 'percentage_discount') {
+    return Math.round(original * (1 - (offer.discountPercent ?? 50) / 100));
+  }
+  return undefined;
+}
+
+function describeTimeLeft(expiry: Date, now: number) {
+  const ms = expiry.getTime() - now;
+  if (ms <= 0) return { text: 'This offer has ended', urgent: true, ended: true };
+  const mins = Math.floor(ms / 60000);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+  if (days >= 2) return { text: `Ends in ${days} days`, urgent: false, ended: false };
+  if (days === 1) return { text: `Ends in 1 day ${hours % 24}h`, urgent: false, ended: false };
+  if (hours >= 1) return { text: `Ends in ${hours}h ${mins % 60}m`, urgent: true, ended: false };
+  return { text: `Ends in ${Math.max(mins, 1)} min`, urgent: true, ended: false };
+}
 
 export function ExclusiveOfferDetailModal({
   offer,
@@ -38,6 +86,7 @@ export function ExclusiveOfferDetailModal({
 }: ExclusiveOfferDetailModalProps) {
   const router = useRouter();
   const p = useDetailsPalette();
+  const insets = useSafeAreaInsets();
   const { isAuthenticated, membership, applyCoupon, selectCar, setDates, setTimes, dateRange } = useSawari();
   const { data: vehicles = [] } = useVehicles();
 
@@ -46,220 +95,203 @@ export function ExclusiveOfferDetailModal({
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [showLogin, setShowLogin] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [now, setNow] = useState(Date.now());
 
-  // Available vehicles list
-  const vehiclesList = useMemo(() => {
-    if (!offer || !vehicles || vehicles.length === 0) return [];
+  const offerId = offer ? String(offer._id || offer.id) : null;
 
-    // 1. If offer applies to all vehicles or has allVehicles toggle enabled
-    if (offer.allVehicles || offer.applicableType === 'all') {
-      return vehicles.map((v: any) => ({
-        vehicleId: String(v.id || v._id),
-        vehicleName: v.name || v.vehicleName || 'Fleet Vehicle',
-        image: v.image || (v.images && v.images[0]),
-        dealPrice: offer.promotionalPrice || 1,
-        originalPrice: v.perDay || v.pricePerDay || 2500,
+  // ---------- Eligible vehicles ----------
+  const vehiclesList: VehicleOption[] = useMemo(() => {
+    if (!offer || !vehicles?.length) return [];
+
+    const fromFleet = (list: any[]) =>
+      list.map((v) => ({
+        vehicleId: idOf(v),
+        vehicleName: v.name || v.vehicleName || 'Fleet vehicle',
+        image: imageOf(v),
+        originalPrice: basePriceOf(v),
+        dealPrice: computeDealPrice(offer, basePriceOf(v)),
         carObj: v,
       }));
-    }
 
-    // 2. Specific vehicle pricing list
-    if (offer.vehiclePrices && offer.vehiclePrices.length > 0) {
+    const findCar = (id: any) => vehicles.find((v: any) => idOf(v) === String(id));
+
+    if (offer.allVehicles || offer.applicableType === 'all') return fromFleet(vehicles);
+
+    if (offer.vehiclePrices?.length) {
       return offer.vehiclePrices.map((vp) => {
-        const found = vehicles.find(
-          (v: any) => String(v.id || v._id) === String(vp.vehicleId)
-        );
+        const found = findCar(vp.vehicleId);
+        const original = vp.originalPrice ?? basePriceOf(found);
         return {
-          vehicleId: vp.vehicleId,
+          vehicleId: String(vp.vehicleId),
           vehicleName: vp.vehicleName || found?.name || found?.vehicleName || 'Vehicle',
-          image: found?.image || (found?.images && found.images[0]),
-          dealPrice: vp.dealPrice,
-          originalPrice: vp.originalPrice || found?.perDay || found?.pricePerDay,
+          image: imageOf(found),
+          originalPrice: original,
+          dealPrice: computeDealPrice(offer, original, vp.dealPrice),
           carObj: found,
         };
       });
     }
 
-    // 3. Applicable vehicle IDs list
-    if (offer.applicableVehicleIds && offer.applicableVehicleIds.length > 0) {
-      return offer.applicableVehicleIds.map((vId) => {
-        const found = vehicles.find(
-          (v: any) => String(v.id || v._id) === String(vId)
-        );
-        return {
-          vehicleId: vId,
-          vehicleName: found?.name || found?.vehicleName || 'Vehicle',
-          image: found?.image || (found?.images && found.images[0]),
-          dealPrice: offer.promotionalPrice || 1,
-          originalPrice: found?.perDay || found?.pricePerDay,
-          carObj: found,
-        };
-      }).filter((item) => item.carObj);
+    if (offer.applicableVehicleIds?.length) {
+      return fromFleet(offer.applicableVehicleIds.map(findCar).filter(Boolean));
     }
 
-    // 4. Single vehicle reference
     if (offer.vehicleId) {
-      const vId = typeof offer.vehicleId === 'object' ? offer.vehicleId._id : offer.vehicleId;
-      const found = vehicles.find(
-        (v: any) => String(v.id || v._id) === String(vId)
-      );
-      if (found) {
-        return [{
-          vehicleId: String(vId),
-          vehicleName: found.name || found.vehicleName,
-          image: found.image || (found.images && found.images[0]),
-          dealPrice: offer.promotionalPrice || 1,
-          originalPrice: found.perDay || found.pricePerDay,
-          carObj: found,
-        }];
-      }
+      const vId = typeof offer.vehicleId === 'object' ? (offer.vehicleId as any)._id : offer.vehicleId;
+      const found = findCar(vId);
+      if (found) return fromFleet([found]);
     }
 
-    // Fallback: If no vehicles restricted, make all fleet vehicles selectable!
-    return vehicles.map((v: any) => ({
-      vehicleId: String(v.id || v._id),
-      vehicleName: v.name || v.vehicleName || 'Fleet Vehicle',
-      image: v.image || (v.images && v.images[0]),
-      dealPrice: offer.promotionalPrice || 1,
-      originalPrice: v.perDay || v.pricePerDay || 2500,
-      carObj: v,
-    }));
+    // No restriction set: the whole fleet is eligible
+    return fromFleet(vehicles);
   }, [offer, vehicles]);
 
-  useEffect(() => {
-    if (offer) {
-      setClaimData(offer.activeClaim || null);
-      setClaimError(null);
-      recordOfferView(offer._id || offer.id);
+  const selectedVehicle =
+    vehiclesList.find((v) => v.vehicleId === selectedVehicleId) ?? vehiclesList[0];
 
-      if (offer.vehiclePrices && offer.vehiclePrices.length > 0) {
-        setSelectedVehicleId(offer.vehiclePrices[0].vehicleId);
-      } else if (offer.vehicleId) {
-        setSelectedVehicleId(typeof offer.vehicleId === 'object' ? offer.vehicleId._id : offer.vehicleId);
-      } else if (offer.applicableVehicleIds && offer.applicableVehicleIds.length > 0) {
-        setSelectedVehicleId(offer.applicableVehicleIds[0]);
-      } else if (vehicles && vehicles.length > 0) {
-        setSelectedVehicleId(String(vehicles[0].id || (vehicles[0] as any)._id));
-      }
-    }
-  }, [offer, vehicles]);
-
-  // Fallback to select first available vehicle if none chosen yet
+  // Reset state whenever a different offer opens
   useEffect(() => {
-    if (!selectedVehicleId && vehiclesList.length > 0) {
-      setSelectedVehicleId(String(vehiclesList[0].vehicleId));
+    if (!offer) return;
+    setClaimData(offer.activeClaim || null);
+    setClaimError(null);
+    setSelectedVehicleId(null);
+    setShowTerms(false);
+  }, [offerId]);
+
+  useEffect(() => {
+    if (visible && offerId) recordOfferView(offerId);
+  }, [visible, offerId]);
+
+  // Keep a valid car selected
+  useEffect(() => {
+    if (!vehiclesList.length) return;
+    if (!selectedVehicleId || !vehiclesList.some((v) => v.vehicleId === selectedVehicleId)) {
+      setSelectedVehicleId(vehiclesList[0].vehicleId);
     }
   }, [vehiclesList, selectedVehicleId]);
 
+  // Tick the countdown once a minute while open
+  useEffect(() => {
+    if (!visible) return;
+    setNow(Date.now());
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, [visible]);
+
   if (!offer) return null;
 
-  // Check membership tier eligibility
+  // ---------- Eligibility ----------
   const userTier = (membership?.plan || '').toLowerCase().trim();
   const isMember = Boolean(userTier && userTier !== 'none');
 
   let isTierEligible = true;
   let eligibilityNote = '';
-
   if (offer.membershipEligibility === 'members_only') {
     isTierEligible = isMember;
-    eligibilityNote = 'Exclusive to active MySawari Club members';
+    eligibilityNote = 'MySawari Club members exclusive';
   } else if (offer.membershipEligibility === 'tier_specific') {
-    const requiredTiers = (offer.eligibleTiers || []).map((t) => t.toLowerCase().trim());
-    isTierEligible = isMember && requiredTiers.includes(userTier);
-    eligibilityNote = `Exclusive to ${requiredTiers.map((t) => t.toUpperCase()).join(' & ')} members`;
+    const required = (offer.eligibleTiers || []).map((t) => t.toLowerCase().trim());
+    isTierEligible = isMember && required.includes(userTier);
+    const names = required.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(' & ');
+    eligibilityNote = `${names} members special`;
   } else if (offer.membershipEligibility === 'non_members_only') {
     isTierEligible = !isMember;
-    eligibilityNote = 'Welcome special for new / non-member customers';
+    eligibilityNote = 'First ride special';
   }
 
-  // Price formatting
+  // ---------- Pricing ----------
   const pricingType = offer.pricingType || 'promotional_price';
   const pricingUnit = offer.pricingUnit === 'per_trip' ? '/trip' : '/day';
 
-  let promoPriceDisplay = '';
+  let offerHeadline = 'Special Deal';
   if (pricingType === 'promotional_price') {
-    promoPriceDisplay = `${formatCurrency(offer.promotionalPrice || 1)}${pricingUnit}`;
+    offerHeadline = `${formatCurrency(offer.promotionalPrice ?? 1)}${pricingUnit}`;
   } else if (pricingType === 'fixed_discount') {
-    promoPriceDisplay = `FLAT ${formatCurrency(offer.promotionalPrice || 500)} OFF`;
+    offerHeadline = `${formatCurrency(offer.promotionalPrice ?? 500)} OFF`;
   } else if (pricingType === 'percentage_discount') {
-    promoPriceDisplay = `${offer.discountPercent || 50}% OFF`;
-  } else {
-    promoPriceDisplay = 'Special Deal';
+    offerHeadline = `${offer.discountPercent ?? 50}% OFF`;
   }
 
-  // Format expiry date
-  let formattedExpiry = '';
-  if (offer.expiryDate) {
-    const d = new Date(offer.expiryDate);
-    formattedExpiry = d.toLocaleDateString('en-IN', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
+  const dealPrice = selectedVehicle?.dealPrice ?? offer.promotionalPrice ?? 1;
+  const originalPrice = selectedVehicle?.originalPrice ?? offer.originalPrice;
+  const savings =
+    dealPrice != null && originalPrice != null && originalPrice > dealPrice
+      ? originalPrice - dealPrice
+      : null;
 
+  // ---------- Expiry ----------
+  const expiry = offer.expiryDate ? new Date(offer.expiryDate) : null;
+  const timeLeft = expiry ? describeTimeLeft(expiry, now) : null;
+  const isEnded = Boolean(timeLeft?.ended);
+
+  const isOvernight = Boolean(
+    offer.isOvernight ||
+    (offer.pickupTime && offer.returnTime && offer.pickupTime.includes('PM') && offer.returnTime.includes('AM'))
+  );
+  const pickupTime = offer.pickupTime || '08:00 PM';
+  const returnTime = offer.returnTime || '08:00 AM';
+
+  const appliedCode = claimData?.couponCode || claimData?.claimToken || offer.code || 'SPECIALDEAL';
+
+  // Banner falls back to the selected car, then any fleet photo
+  const imageUrl =
+    offer.image?.url ||
+    offer.image?.uri ||
+    imageOf(selectedVehicle?.carObj) ||
+    imageOf(vehicles[0]);
+
+  // ---------- Actions ----------
+  const goToMembership = () => {
+    onClose();
+    router.push('/membership');
+  };
 
   const handleClaim = async () => {
     if (!isAuthenticated) {
       setShowLogin(true);
       return;
     }
-
     if (!isTierEligible) {
-      onClose();
-      router.push('/membership');
+      goToMembership();
       return;
     }
 
     setClaiming(true);
     setClaimError(null);
     try {
-      const res = await claimExclusiveOffer(offer._id || offer.id);
+      const res = await claimExclusiveOffer(offerId!);
       if (res.success && res.claim) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setClaimData(res.claim);
         onClaimSuccess?.(res.claim);
       } else {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setClaimError(res.message || 'Could not claim this offer. It may be out of stock.');
+        setClaimError(res.message || 'This offer couldn’t be claimed right now.');
       }
     } catch (err: any) {
-      setClaimError(err.message || 'Error claiming offer');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setClaimError(err?.message || 'Something went wrong. Please try again.');
     } finally {
       setClaiming(false);
     }
   };
 
   const handleProceedToBooking = () => {
-    const couponToApply = claimData?.couponCode || claimData?.claimToken || offer.code;
-    if (couponToApply) {
-      applyCoupon(couponToApply);
-    }
+    if (appliedCode) applyCoupon(appliedCode);
 
-    if (selectedVehicleId && vehicles) {
-      const match = vehicles.find(
-        (v: any) => String(v.id || v._id) === String(selectedVehicleId)
-      ) || vehicles[0];
-      if (match) {
-        selectCar(match);
-      }
-    }
+    const car = selectedVehicle?.carObj || vehicles[0];
+    if (car) selectCar(car);
 
-    // Overnight / Time slot auto-prefill:
-    // (e.g. today night 8:00 PM to tomorrow morning 8:00 AM)
-    const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
-    const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
-    const startStr = `${now.getDate()} ${MONTHS_SHORT[now.getMonth()]}`;
-    const endStr = `${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
+    const range = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
 
-    if (offer.isOvernight || (offer.pickupTime && offer.returnTime)) {
-      setDates(`${startStr} – ${endStr}`, '1 Day');
-      setTimes(offer.pickupTime || '8:00 PM', offer.returnTime || '8:00 AM');
+    if (isOvernight || (offer.pickupTime && offer.returnTime)) {
+      setDates(range, '1 Day');
+      setTimes(pickupTime, returnTime);
     } else if (!dateRange || dateRange.includes('Select')) {
-      setDates(`${startStr} – ${endStr}`, '1 Day');
+      setDates(range, '1 Day');
       setTimes('8:00 AM', '8:00 AM');
     }
 
@@ -268,273 +300,298 @@ export function ExclusiveOfferDetailModal({
       pathname: '/booking',
       params: {
         forSpecificCar: 'true',
-        couponCode: couponToApply || '',
-        isOvernight: offer.isOvernight ? 'true' : 'false',
+        couponCode: appliedCode || '',
+        isOvernight: isOvernight ? 'true' : 'false',
       },
     });
   };
 
-  // Selected car object for dynamic image & details
-  const selectedCarObj = useMemo(() => {
-    return vehiclesList.find((v) => String(v.vehicleId) === String(selectedVehicleId))?.carObj || vehicles[0];
-  }, [vehiclesList, selectedVehicleId, vehicles]);
-
-  // Guaranteed image: If offer banner isn't set, auto-fallback to selected car photo or fleet photo
-  const imageUrl =
-    offer.image?.url ||
-    offer.image?.uri ||
-    selectedCarObj?.image ||
-    (selectedCarObj?.images && selectedCarObj.images[0]) ||
-    vehicles[0]?.image ||
-    (vehicles[0]?.images && vehicles[0].images[0]);
-
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <View style={[styles.modalCard, { backgroundColor: p.page }]}>
-          {/* Header Bar */}
-          <View style={styles.headerRow}>
-            <View style={styles.headerLeft}>
-              <View style={styles.exclusiveBadge}>
-                <Feather name="award" size={13} color="#FFFFFF" />
-                <Text style={styles.exclusiveBadgeText}>EXCLUSIVE OFFER</Text>
-              </View>
-            </View>
-            <TouchableOpacity
-              onPress={onClose}
-              style={[styles.closeBtn, { backgroundColor: p.soft }]}
-              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            >
-              <Feather name="x" size={20} color={p.fg} />
-            </TouchableOpacity>
-          </View>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close offer" />
 
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scrollContent}
+        <View style={[styles.sheet, { backgroundColor: p.page }]}>
+          {/* Grabber indicator */}
+          <View style={styles.grabber} />
+
+          {/* Close button */}
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeBtn}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityLabel="Close"
           >
-            {/* Main Banner / Image */}
-            {imageUrl ? (
-              <View style={styles.imageContainer}>
-                <CachedImage
-                  source={{ uri: imageUrl }}
-                  style={styles.bannerImage}
-                  contentFit="cover"
-                  transition={200}
+            <Feather name="x" size={18} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} bounces={false}>
+            {/* ---------- Clean Hero Image ---------- */}
+            <View style={styles.hero}>
+              {imageUrl ? (
+                <Image
+                  source={typeof imageUrl === 'string' ? { uri: imageUrl } : imageUrl}
+                  style={StyleSheet.absoluteFill}
+                  resizeMode="cover"
                 />
-                <View style={styles.dealOverlayBadge}>
-                  <Text style={styles.dealOverlayText}>{promoPriceDisplay}</Text>
+              ) : (
+                <View style={[StyleSheet.absoluteFill, styles.heroFallback]}>
+                  <Ionicons name="car-sport" size={56} color={ACCENT} />
                 </View>
-                {offer.allVehicles ? (
-                  <View style={styles.allCarsOverlayBadge}>
+              )}
+              <View style={styles.heroScrim} />
+
+              {/* Single floating tag */}
+              <View style={styles.heroTags}>
+                <View style={[styles.heroTag, { backgroundColor: isOvernight ? '#4338CA' : offer.allVehicles ? '#059669' : ACCENT }]}>
+                  {isOvernight ? (
+                    <Feather name="moon" size={12} color="#FFFFFF" />
+                  ) : offer.allVehicles ? (
                     <Ionicons name="car-sport" size={12} color="#FFFFFF" />
-                    <Text style={styles.allCarsOverlayText}>ALL CARS</Text>
-                  </View>
-                ) : null}
-              </View>
-            ) : null}
-
-            {/* Title & Subtitle */}
-            <Text style={[styles.title, { color: p.fg }]}>{offer.title}</Text>
-            {offer.subtitle ? (
-              <Text style={[styles.subtitle, { color: p.sub }]}>{offer.subtitle}</Text>
-            ) : null}
-
-            {/* Overnight / Fixed Time Window Banner */}
-            {(offer.isOvernight || (offer.pickupTime && offer.returnTime)) ? (
-              <View style={styles.overnightCard}>
-                <View style={styles.overnightHeaderRow}>
-                  <Ionicons name={offer.isOvernight ? 'moon' : 'time'} size={17} color="#6152D8" />
-                  <Text style={styles.overnightTitle}>
-                    {offer.timeSlotLabel || (offer.isOvernight ? 'Overnight Deal (8:00 PM – 8:00 AM)' : 'Time-Locked Deal')}
+                  ) : (
+                    <Feather name="tag" size={12} color="#FFFFFF" />
+                  )}
+                  <Text style={styles.heroTagText}>
+                    {isOvernight
+                      ? '🌙 Overnight (8 PM – 8 AM)'
+                      : offer.allVehicles
+                      ? '🚗 All Fleet Cars Eligible'
+                      : '⚡ Special Deal'}
                   </Text>
                 </View>
-                <View style={styles.overnightTimesRow}>
-                  <View style={styles.overnightTimeBox}>
-                    <Text style={styles.overnightTimeLabel}>Pickup</Text>
-                    <Text style={styles.overnightTimeVal}>{offer.pickupTime || '8:00 PM'}</Text>
-                  </View>
-                  <Feather name="arrow-right" size={16} color="#6152D8" />
-                  <View style={styles.overnightTimeBox}>
-                    <Text style={styles.overnightTimeLabel}>Return</Text>
-                    <Text style={styles.overnightTimeVal}>{offer.returnTime || '8:00 AM'}</Text>
-                  </View>
-                </View>
-                <Text style={styles.overnightNote}>
-                  🌙 Overnight rental (tonight to tomorrow morning). Date & hours will be locked automatically.
-                </Text>
               </View>
-            ) : null}
-
-            {/* Membership badge note */}
-            {offer.membershipEligibility !== 'all' ? (
-              <View style={[styles.eligibilityStrip, { backgroundColor: isTierEligible ? '#EFF6FF' : '#FEF2F2' }]}>
-                <Ionicons
-                  name={isTierEligible ? 'star' : 'lock-closed'}
-                  size={16}
-                  color={isTierEligible ? '#2563EB' : '#DC2626'}
-                />
-                <Text
-                  style={[
-                    styles.eligibilityText,
-                    { color: isTierEligible ? '#1D4ED8' : '#B91C1C' },
-                  ]}
-                >
-                  {eligibilityNote}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Transparent Pricing Notice */}
-            <View style={[styles.pricingTransparencyBox, { backgroundColor: p.soft }]}>
-              <View style={styles.pricingHeaderRow}>
-                <Feather name="info" size={15} color="#6152D8" />
-                <Text style={[styles.pricingNoticeTitle, { color: p.fg }]}>Pricing Transparency</Text>
-              </View>
-              <Text style={[styles.pricingNoticeBody, { color: p.sub }]}>
-                The promotional rate ({promoPriceDisplay}) applies strictly to the base vehicle rental. Security deposit, fuel, GST, and doorstep delivery fees are calculated separately at checkout.
-              </Text>
-              {!offer.allowMembershipStacking ? (
-                <Text style={styles.noStackNote}>
-                  • Cannot be combined with standard club membership percentage discounts.
-                </Text>
-              ) : null}
             </View>
 
-            {/* Multi-vehicle picker if applicable */}
-            {vehiclesList.length > 0 ? (
-              <View style={styles.vehicleSection}>
-                <Text style={[styles.sectionHeading, { color: p.fg }]}>
-                  {offer.allVehicles ? 'Select Any Vehicle (All Cars Eligible)' : 'Select Vehicle'}
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.vehicleRow}>
-                  {vehiclesList.map((item) => {
-                    const isSelected = String(item.vehicleId) === String(selectedVehicleId);
-                    return (
-                      <TouchableOpacity
-                        key={item.vehicleId}
-                        onPress={() => setSelectedVehicleId(item.vehicleId)}
-                        style={[
-                          styles.vehicleCard,
-                          { backgroundColor: p.soft, borderColor: isSelected ? '#6152D8' : p.border },
-                          isSelected && styles.vehicleCardSelected,
-                        ]}
-                      >
-                        {item.image ? (
-                          <CachedImage
-                            source={typeof item.image === 'string' ? { uri: item.image } : item.image}
-                            style={styles.vehicleThumb}
-                            contentFit="contain"
-                          />
-                        ) : (
-                          <View style={styles.vehicleThumbPlaceholder}>
-                            <Feather name="truck" size={24} color="#6152D8" />
-                          </View>
-                        )}
-                        <Text style={[styles.vehicleName, { color: p.fg }]} numberOfLines={1}>
-                          {item.vehicleName}
-                        </Text>
-                        <View style={styles.priceRow}>
-                          <Text style={styles.dealPriceText}>
-                            {formatCurrency(item.dealPrice)}{pricingUnit}
-                          </Text>
-                          {item.originalPrice ? (
-                            <Text style={styles.origPriceText}>
-                              {formatCurrency(item.originalPrice)}
-                            </Text>
-                          ) : null}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            ) : null}
+            <View style={styles.body}>
+              {/* ---------- Title & Subtitle ---------- */}
+              <Text style={[styles.title, { color: p.fg }]}>{offer.title}</Text>
+              {offer.subtitle ? (
+                <Text style={[styles.subtitle, { color: p.sub }]}>{offer.subtitle}</Text>
+              ) : null}
 
-            {/* Description & Rules */}
-            {offer.description ? (
-              <View style={styles.descSection}>
-                <Text style={[styles.sectionHeading, { color: p.fg }]}>Offer Details & Terms</Text>
-                <Text style={[styles.descText, { color: p.sub }]}>{offer.description}</Text>
-              </View>
-            ) : null}
-
-            {/* Validity */}
-            {formattedExpiry ? (
-              <View style={styles.expiryRow}>
-                <Feather name="clock" size={14} color={p.sub} />
-                <Text style={[styles.expiryText, { color: p.sub }]}>
-                  Valid till {formattedExpiry}
-                </Text>
-              </View>
-            ) : null}
-
-            {claimError ? (
-              <View style={styles.errorBox}>
-                <Feather name="alert-circle" size={15} color="#DC2626" />
-                <Text style={styles.errorText}>{claimError}</Text>
-              </View>
-            ) : null}
-          </ScrollView>
-
-          {/* Footer Action Button */}
-          <View style={[styles.footerArea, { borderTopColor: p.border }]}>
-            {claimData || offer.code ? (
-              <View style={styles.claimedFooter}>
-                <View style={styles.claimedBadgeRow}>
-                  <Ionicons name="checkmark-circle" size={18} color="#16A34A" />
-                  <Text style={styles.claimedBadgeText}>
-                    {claimData
-                      ? `Offer Claimed! (Code: ${claimData.couponCode || claimData.claimToken})`
-                      : `Coupon Code: ${offer.code} (Auto-Applies)`}
+              {eligibilityNote ? (
+                <View style={[styles.eligibility, { backgroundColor: isTierEligible ? ACCENT_TINT : DANGER_TINT }]}>
+                  <Ionicons name={isTierEligible ? 'star' : 'lock-closed'} size={13} color={isTierEligible ? ACCENT : DANGER} />
+                  <Text style={[styles.eligibilityText, { color: isTierEligible ? ACCENT : DANGER }]}>
+                    {eligibilityNote}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  onPress={handleProceedToBooking}
-                  style={styles.primaryBtn}
-                  activeOpacity={0.88}
-                >
-                  <Text style={styles.primaryBtnText}>Book Now with Offer</Text>
-                  <Feather name="arrow-right" size={18} color="#FFFFFF" />
-                </TouchableOpacity>
+              ) : null}
+
+              {/* ---------- Unified Deal Summary Card (Clean & Proper) ---------- */}
+              <View style={[styles.dealSummaryCard, { backgroundColor: p.soft, borderColor: p.border }]}>
+                {/* Price Row */}
+                <View style={styles.dealPriceHeader}>
+                  <View>
+                    <Text style={[styles.dealPriceLabel, { color: p.sub }]}>Deal Rate</Text>
+                    <View style={styles.dealPriceRow}>
+                      <Text style={styles.dealPriceValue}>
+                        {formatCurrency(dealPrice)}
+                      </Text>
+                      <Text style={[styles.dealPriceUnit, { color: p.sub }]}>{pricingUnit}</Text>
+                      {originalPrice != null && originalPrice > dealPrice ? (
+                        <Text style={styles.dealPriceOriginal}>{formatCurrency(originalPrice)}</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  {savings ? (
+                    <View style={styles.saveBadge}>
+                      <Text style={styles.saveBadgeText}>SAVE {formatCurrency(savings)}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                <View style={[styles.dealDivider, { backgroundColor: p.border }]} />
+
+                {/* 3 Clean Deal Specs Rows */}
+                <View style={styles.dealSpecsList}>
+                  {/* Timing */}
+                  <View style={styles.dealSpecItem}>
+                    <View style={[styles.specIconBox, { backgroundColor: '#EDE9FE' }]}>
+                      <Feather name="clock" size={14} color="#6152D8" />
+                    </View>
+                    <View style={styles.specContent}>
+                      <Text style={[styles.specTitle, { color: p.fg }]}>
+                        {isOvernight
+                          ? `Tonight ${pickupTime} → Tomorrow ${returnTime}`
+                          : offer.pickupTime && offer.returnTime
+                          ? `${offer.pickupTime} → ${offer.returnTime}`
+                          : 'Flexible 24-Hour Rental'}
+                      </Text>
+                      <Text style={[styles.specSub, { color: p.sub }]}>
+                        {isOvernight ? 'Overnight special rental slot' : 'Standard rental booking window'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Vehicles */}
+                  <View style={styles.dealSpecItem}>
+                    <View style={[styles.specIconBox, { backgroundColor: '#DCFCE7' }]}>
+                      <Ionicons name="car-sport" size={14} color="#059669" />
+                    </View>
+                    <View style={styles.specContent}>
+                      <Text style={[styles.specTitle, { color: p.fg }]}>
+                        {offer.allVehicles
+                          ? 'Valid on all fleet cars'
+                          : selectedVehicle?.vehicleName || 'Applicable car selected'}
+                      </Text>
+                      <Text style={[styles.specSub, { color: p.sub }]}>
+                        {offer.allVehicles
+                          ? 'Choose any car with auto-applied offer'
+                          : `${vehiclesList.length} car option(s) available`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Coupon */}
+                  <View style={styles.dealSpecItem}>
+                    <View style={[styles.specIconBox, { backgroundColor: '#FEF3C7' }]}>
+                      <Feather name="tag" size={14} color="#B45309" />
+                    </View>
+                    <View style={styles.specContent}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={[styles.specTitle, { color: p.fg }]}>Coupon: </Text>
+                        <View style={styles.codePill}>
+                          <Text style={styles.codePillText}>{appliedCode}</Text>
+                        </View>
+                      </View>
+                      <Text style={[styles.specSub, { color: '#059669' }]}>
+                        ✓ Applied automatically at checkout
+                      </Text>
+                    </View>
+                  </View>
+                </View>
               </View>
-            ) : !isTierEligible ? (
+
+              {/* ---------- Vehicle Picker (If multiple cars) ---------- */}
+              {vehiclesList.length > 1 ? (
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <Text style={[styles.sectionTitle, { color: p.fg }]}>Select Car</Text>
+                    <Text style={[styles.sectionCount, { color: p.sub }]}>{vehiclesList.length} cars</Text>
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.vehicleRow}
+                    style={styles.vehicleScroller}
+                  >
+                    {vehiclesList.map((item) => {
+                      const isSelected = item.vehicleId === selectedVehicle?.vehicleId;
+                      return (
+                        <TouchableOpacity
+                          key={item.vehicleId}
+                          onPress={() => setSelectedVehicleId(item.vehicleId)}
+                          activeOpacity={0.85}
+                          style={[
+                            styles.vehicleCard,
+                            { backgroundColor: isSelected ? ACCENT_TINT : p.soft, borderColor: isSelected ? ACCENT : p.border },
+                          ]}
+                        >
+                          {isSelected ? (
+                            <View style={styles.vehicleCheck}>
+                              <Feather name="check" size={11} color="#FFFFFF" />
+                            </View>
+                          ) : null}
+
+                          {item.image ? (
+                            <Image
+                              source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+                              style={styles.vehicleThumb}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <View style={styles.vehicleThumb}>
+                              <Ionicons name="car-sport-outline" size={28} color={p.sub} />
+                            </View>
+                          )}
+
+                          <Text style={[styles.vehicleName, { color: p.fg }]} numberOfLines={1}>
+                            {item.vehicleName}
+                          </Text>
+                          <Text style={styles.vehicleDeal}>
+                            {formatCurrency(item.dealPrice ?? dealPrice)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              ) : null}
+
+              {/* ---------- Terms Note (Clean & subtle) ---------- */}
               <TouchableOpacity
                 onPress={() => {
-                  onClose();
-                  router.push('/membership');
+                  LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                  setShowTerms((prev) => !prev);
                 }}
-                style={[styles.primaryBtn, { backgroundColor: '#2563EB' }]}
-                activeOpacity={0.88}
+                style={styles.termsToggle}
+                activeOpacity={0.7}
               >
-                <Ionicons name="star" size={18} color="#FFFFFF" />
-                <Text style={styles.primaryBtnText}>Upgrade Membership to Unlock</Text>
+                <Feather name="info" size={13} color={p.sub} />
+                <Text style={[styles.termsToggleText, { color: p.sub }]}>
+                  {showTerms ? 'Hide terms & conditions' : 'View terms & conditions'}
+                </Text>
+                <Feather name={showTerms ? 'chevron-up' : 'chevron-down'} size={14} color={p.sub} />
               </TouchableOpacity>
-            ) : (
+
+              {showTerms ? (
+                <View style={[styles.termsBox, { backgroundColor: p.soft, borderColor: p.border }]}>
+                  <Text style={[styles.termsText, { color: p.sub }]}>
+                    {offer.description ||
+                      'Rate covers base vehicle rental. Security deposit, fuel, and optional doorstep delivery are added at checkout.'}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </ScrollView>
+
+          {/* ---------- Clean Sticky Footer ---------- */}
+          <View
+            style={[
+              styles.footer,
+              { borderTopColor: p.border, backgroundColor: p.page, paddingBottom: Math.max(insets.bottom, 16) },
+            ]}
+          >
+            {claimError ? (
+              <View style={[styles.footerNotice, { backgroundColor: DANGER_TINT }]}>
+                <Feather name="alert-circle" size={14} color={DANGER} />
+                <Text style={[styles.footerNoticeText, { color: DANGER }]}>{claimError}</Text>
+              </View>
+            ) : null}
+
+            <View style={styles.footerRow}>
+              <View style={styles.footerPrice}>
+                <Text style={[styles.footerPriceValue, { color: p.fg }]} numberOfLines={1}>
+                  {formatCurrency(dealPrice)}
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: p.sub }}>{pricingUnit}</Text>
+                </Text>
+                <Text style={[styles.footerPriceSub, { color: p.sub }]} numberOfLines={1}>
+                  {selectedVehicle?.vehicleName || 'Special rate'}
+                </Text>
+              </View>
+
               <TouchableOpacity
-                onPress={handleClaim}
-                style={styles.primaryBtn}
-                disabled={claiming}
+                onPress={handleProceedToBooking}
                 activeOpacity={0.88}
+                style={[styles.cta, { backgroundColor: isEnded ? p.sub : ACCENT }]}
+                disabled={isEnded}
               >
                 {claiming ? (
                   <ActivityIndicator color="#FFFFFF" size="small" />
                 ) : (
                   <>
-                    <Feather name="gift" size={18} color="#FFFFFF" />
-                    <Text style={styles.primaryBtnText}>Claim Exclusive Offer</Text>
+                    <Text style={styles.ctaText}>Book This Deal</Text>
+                    <Feather name="arrow-right" size={17} color="#FFFFFF" />
                   </>
                 )}
               </TouchableOpacity>
-            )}
+            </View>
           </View>
         </View>
       </View>
+
       <LoginBottomSheet
         visible={showLogin}
         onClose={() => setShowLogin(false)}
@@ -547,317 +604,332 @@ export function ExclusiveOfferDetailModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(8, 6, 24, 0.65)',
     justifyContent: 'flex-end',
   },
-  modalCard: {
+  sheet: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
-    minHeight: '60%',
-    paddingTop: 16,
+    maxHeight: '92%',
+    overflow: 'hidden',
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 12,
+  scrollContent: {
+    paddingBottom: 24,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  exclusiveBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#6152D8',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    gap: 5,
-  },
-  exclusiveBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  grabber: {
+    position: 'absolute',
+    top: 8,
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.7)',
+    zIndex: 2,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    position: 'absolute',
+    top: 14,
+    right: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(20, 16, 48, 0.6)',
+    zIndex: 3,
+  },
+
+  // Hero
+  hero: {
+    height: 190,
+    justifyContent: 'flex-end',
+    backgroundColor: '#1E1B4B',
+  },
+  heroFallback: {
+    backgroundColor: ACCENT_TINT,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  imageContainer: {
-    width: '100%',
-    height: 180,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 16,
-    position: 'relative',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  dealOverlayBadge: {
+  heroScrim: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.25)',
   },
-  dealOverlayText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  allCarsOverlayBadge: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
+  heroTags: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(97, 82, 216, 0.92)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-  },
-  allCarsOverlayText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 11,
-    letterSpacing: 0.5,
-  },
-  overnightCard: {
-    backgroundColor: '#F5F3FF',
-    borderWidth: 1,
-    borderColor: '#DDD6FE',
-    borderRadius: 14,
     padding: 14,
-    marginBottom: 16,
   },
-  overnightHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    marginBottom: 10,
-  },
-  overnightTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#5B21B6',
-  },
-  overnightTimesRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginBottom: 8,
-  },
-  overnightTimeBox: {
-    alignItems: 'center',
-  },
-  overnightTimeLabel: {
-    fontSize: 11,
-    color: '#6B7280',
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  overnightTimeVal: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginTop: 2,
-  },
-  overnightNote: {
-    fontSize: 11,
-    color: '#6D28D9',
-    fontWeight: '500',
-    lineHeight: 16,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 14,
-  },
-  eligibilityStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 10,
-    gap: 8,
-    marginBottom: 14,
-  },
-  eligibilityText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  pricingTransparencyBox: {
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 18,
-  },
-  pricingHeaderRow: {
+  heroTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
   },
-  pricingNoticeTitle: {
-    fontSize: 13,
+  heroTagText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
     fontWeight: '700',
   },
-  pricingNoticeBody: {
+
+  body: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  title: {
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  subtitle: {
+    fontSize: 13.5,
+    lineHeight: 20,
+    marginTop: 4,
+  },
+  eligibility: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  eligibilityText: {
     fontSize: 12,
-    lineHeight: 18,
+    fontWeight: '600',
   },
-  noStackNote: {
+
+  // Deal Summary Card
+  dealSummaryCard: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 16,
+  },
+  dealPriceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  dealPriceLabel: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dealPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginTop: 2,
+  },
+  dealPriceValue: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: SUCCESS,
+  },
+  dealPriceUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  dealPriceOriginal: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    textDecorationLine: 'line-through',
+  },
+  saveBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  saveBadgeText: {
     fontSize: 11,
-    color: '#8B5CF6',
-    fontWeight: '500',
-    marginTop: 6,
-  },
-  vehicleSection: {
-    marginBottom: 18,
-  },
-  sectionHeading: {
-    fontSize: 15,
     fontWeight: '700',
-    marginBottom: 10,
+    color: '#15803D',
   },
-  vehicleRow: {
+  dealDivider: {
+    height: 1,
+    marginVertical: 14,
+  },
+  dealSpecsList: {
     gap: 12,
   },
-  vehicleCard: {
-    width: 140,
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1.5,
+  dealSpecItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  vehicleCardSelected: {
-    backgroundColor: '#F5F3FF',
+  specIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  specContent: {
+    flex: 1,
+  },
+  specTitle: {
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  specSub: {
+    fontSize: 11.5,
+    marginTop: 1,
+  },
+  codePill: {
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  codePillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#6152D8',
+    letterSpacing: 0.5,
+  },
+
+  // Vehicle Picker
+  section: {
+    marginTop: 18,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  sectionCount: {
+    fontSize: 12,
+  },
+  vehicleScroller: {
+    marginHorizontal: -20,
+  },
+  vehicleRow: {
+    gap: 10,
+    paddingHorizontal: 20,
+  },
+  vehicleCard: {
+    width: 130,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 10,
+  },
+  vehicleCheck: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: ACCENT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   vehicleThumb: {
-    width: 100,
-    height: 60,
+    width: '100%',
+    height: 52,
     marginBottom: 6,
-  },
-  vehicleThumbPlaceholder: {
-    width: 100,
-    height: 60,
     alignItems: 'center',
     justifyContent: 'center',
   },
   vehicleName: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 4,
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dealPriceText: {
+  vehicleDeal: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#16A34A',
+    color: SUCCESS,
+    marginTop: 2,
   },
-  origPriceText: {
-    fontSize: 11,
-    color: '#9CA3AF',
-    textDecorationLine: 'line-through',
-  },
-  descSection: {
-    marginBottom: 14,
-  },
-  descText: {
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  expiryRow: {
+
+  // Terms toggle
+  termsToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginTop: 4,
-  },
-  expiryText: {
-    fontSize: 12,
-  },
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FEF2F2',
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#DC2626',
-    fontWeight: '500',
-    flex: 1,
-  },
-  footerArea: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 16,
-  },
-  claimedFooter: {
-    gap: 10,
-  },
-  claimedBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#F0FDF4',
+    marginTop: 16,
     paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
   },
-  claimedBadgeText: {
-    color: '#16A34A',
-    fontWeight: '700',
+  termsToggleText: {
     fontSize: 12,
+    fontWeight: '500',
   },
-  primaryBtn: {
-    height: 50,
-    backgroundColor: '#6152D8',
-    borderRadius: 14,
+  termsBox: {
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 6,
+  },
+  termsText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+
+  // Footer
+  footer: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+  },
+  footerNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  footerNoticeText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  footerPrice: {
+    flexShrink: 1,
+    maxWidth: '45%',
+  },
+  footerPriceValue: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  footerPriceSub: {
+    fontSize: 11.5,
+    marginTop: 1,
+  },
+  cta: {
+    flex: 1,
+    height: 48,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
-  primaryBtnText: {
+  ctaText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',

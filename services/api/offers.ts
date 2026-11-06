@@ -73,9 +73,12 @@ function formatExpiry(dateStr: string): string {
 /**
  * Still usable right now: switched on, approved by admin, and not past its expiry date.
  */
-export function isOfferLive(offer: { active?: boolean; expiryDate?: string | Date; approvalStatus?: string }, now = Date.now()): boolean {
+export function isOfferLive(offer: { active?: boolean; startDate?: string | Date | null; expiryDate?: string | Date; approvalStatus?: string }, now = Date.now()): boolean {
   if (offer.active === false) return false;
   if (offer.approvalStatus && offer.approvalStatus !== 'approved') return false;
+  // Scheduled offers stay hidden until their start date and time.
+  const starts = offer.startDate ? new Date(offer.startDate).getTime() : NaN;
+  if (Number.isFinite(starts) && starts > now) return false;
   const expires = offer.expiryDate ? new Date(offer.expiryDate).getTime() : NaN;
   return Number.isFinite(expires) && expires >= now;
 }
@@ -307,11 +310,13 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
-        return json.data.map((o: any) => ({
-          ...o,
-          id: o._id,
-          image: plateSafeOfferImage(o.image, o.updatedAt),
-        }));
+        return json.data
+          .filter((o: any) => o && isOfferLive(o))
+          .map((o: any) => ({
+            ...o,
+            id: o._id,
+            image: plateSafeOfferImage(o.image, o.updatedAt),
+          }));
       }
     }
   } catch (e) {

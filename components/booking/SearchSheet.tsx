@@ -56,7 +56,7 @@ export function SearchSheet({
             {hasValidDates && !isAvailable && (
               <View style={[styles.errorBox, { backgroundColor: colors.destructive + '12' }]}>
                 <Feather name="alert-circle" size={16} color={colors.destructive} />
-                <Text style={[styles.errorText, { color: colors.destructive }]}>This {selectedCar?.category.toLowerCase()} is not available on your selected dates. {availability.nextAvailableFrom ? `It is next available from ${availability.nextAvailableFrom}.` : 'Please choose different dates.'}</Text>
+                <Text style={[styles.errorText, { color: colors.destructive }]}>This {selectedCar?.category.toLowerCase()} is not available on your selected dates. {availability.availableFrom ? `It is available from ${availability.availableFrom}.` : (availability.nextAvailableFrom ? `It is next available from ${availability.nextAvailableFrom}.` : 'Please choose different dates.')}</Text>
               </View>
             )}
             

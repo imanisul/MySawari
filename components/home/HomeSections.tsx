@@ -863,8 +863,14 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
             <Text style={[styles.pickPrice, { color: p.fg }]}>{formatCurrency(memberPrice ?? car.perDay)}</Text>
             <Text style={[styles.pickPerDay, { color: p.muted }]}>/day</Text>
           </View>
-          <Text style={[styles.pickAvail, { color: available || availability.nextAvailableFrom ? AVAILABLE_GREEN : p.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-            {available ? 'Available now' : availability.nextAvailableFrom ? `Available on ${cardDate(availability.nextAvailableFrom)}` : availability.headline}
+          <Text style={[styles.pickAvail, { color: available || availability.availableFrom || availability.nextAvailableFrom ? AVAILABLE_GREEN : p.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            {available
+              ? 'Available now'
+              : availability.availableFrom
+              ? `Available from ${availability.availableFrom}`
+              : availability.nextAvailableFrom
+              ? `Available on ${cardDate(availability.nextAvailableFrom)}`
+              : availability.headline}
           </Text>
         </View>
       </View>

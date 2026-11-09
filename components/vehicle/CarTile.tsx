@@ -54,6 +54,9 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
             {(() => { 
               const a = car.availability ?? getAvailability(car);
               if (!a.available) {
+                if (a.availableFrom) {
+                  return `${a.headline} · Avail from ${a.availableFrom}`;
+                }
                 if (a.nextAvailableFrom) {
                   return `${a.headline} · Next avail ${a.nextAvailableFrom}`;
                 }

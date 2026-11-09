@@ -89,7 +89,7 @@ export type Car = {
   isPublic?: boolean;
   dbStatus?: string;
   /** Open bookings holding this vehicle (ISO dates, calendar day = UTC date). */
-  bookedRanges?: { start: string; end: string; status?: string }[];
+  bookedRanges?: { start: string; end: string; status?: string; pickupTime?: string; dropTime?: string; returnTime?: string }[];
   /** When a vehicle in service is due back (ISO), if known. */
   maintenanceUntil?: string | null;
   /** Trips taken or under way in the last 90 days (from the server): ranks "Trending vehicles" on Home. */
@@ -481,7 +481,7 @@ const isoToDayNum = (iso?: string | null): number => {
   return isNaN(t) ? NaN : toDayNum(d.getFullYear(), d.getMonth(), d.getDate());
 };
 
-export const TURNOVER_BUFFER_MS = 10 * 60 * 1000; // 10 minutes turnover buffer between trips
+export const TURNOVER_BUFFER_MS = 0; // Turnaround buffer between trips (0 ms enables immediate booking at return time)
 
 /** Parses "8:00 AM", "08:10 AM", "12:30 PM", "8 PM", "14:30" into minutes from midnight (0..1439). */
 export function parseTimeToMinutes(timeStr?: string | null): number | null {
@@ -622,8 +622,25 @@ function buildBlocks(car: Car, today: number): Block[] {
       }
     }
 
-    const startMs = d1.getTime();
-    const endMs = d2.getTime();
+    let startMs = d1.getTime();
+    let endMs = d2.getTime();
+
+    const pickStr = (r as any).pickupTime;
+    if (pickStr) {
+      const pMins = parseTimeToMinutes(pickStr);
+      if (pMins !== null) {
+        startMs = dayNumAndTimeToMs(start, pickStr, pMins);
+      }
+    }
+
+    const dropStr = (r as any).dropTime || (r as any).returnTime;
+    if (dropStr) {
+      const dMins = parseTimeToMinutes(dropStr);
+      if (dMins !== null) {
+        endMs = dayNumAndTimeToMs(end, dropStr, dMins);
+      }
+    }
+
     blocks.push({
       start,
       end,
@@ -754,10 +771,9 @@ export function getAvailability(
 
   const blocks = buildBlocks(car, today);
 
-  // A booking conflicts if its active window + 10-minute turnover buffer intersects the requested window
+  // A booking conflicts if its active window intersects the requested window
   const conflicts = blocks.filter((b) => {
-    const effectiveEndMs = b.endMs === Infinity ? Infinity : b.endMs + TURNOVER_BUFFER_MS;
-    return b.startMs < requestEndMs && effectiveEndMs > requestStartMs;
+    return b.startMs < requestEndMs && b.endMs > requestStartMs;
   });
 
   // Conflicts exist: vehicle is currently busy or overlaps search
@@ -766,18 +782,17 @@ export function getAvailability(
     const base = reason === 'service' ? 'IN SERVICE' : 'ON A TRIP';
     const stayMs = Math.max(2 * 60 * 60 * 1000, requestEndMs - requestStartMs);
 
-    // Candidates for next availability: after each conflicting block's turnover buffer
+    // Candidates for next availability: start of search range, or exactly when each block ends
     const candidateTimes = [
       requestStartMs,
-      ...blocks.map((b) => (b.endMs === Infinity ? Infinity : b.endMs + TURNOVER_BUFFER_MS)),
+      ...blocks.map((b) => b.endMs),
     ]
       .filter((t) => t >= requestStartMs && isFinite(t))
       .sort((a, b) => a - b);
 
     const nextFreeMs = candidateTimes.find((cand) =>
       !blocks.some((b) => {
-        const effEnd = b.endMs === Infinity ? Infinity : b.endMs + TURNOVER_BUFFER_MS;
-        return b.startMs < cand + stayMs && effEnd > cand;
+        return b.startMs < cand + stayMs && b.endMs > cand;
       })
     );
 
@@ -792,8 +807,8 @@ export function getAvailability(
         available: false,
         reason,
         headline: base === 'IN SERVICE' ? 'In service' : 'On a trip',
-        detail: `Next available ${nextAvailableFrom}`,
-        label: `${base} · NEXT ${nextAvailableFrom}`.toUpperCase(),
+        detail: `Next available from ${availableFrom}`,
+        label: `${base} · FROM ${availableFrom}`.toUpperCase(),
         nextAvailableFrom,
         availableFrom,
       };

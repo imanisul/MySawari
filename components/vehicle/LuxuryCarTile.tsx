@@ -48,6 +48,8 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
     } else {
       availableText = `AVAIL · ${availability.startDate} – ONWARDS`.toUpperCase();
     }
+  } else if (availability.availableFrom) {
+    availableText = `${availability.headline} · AVAIL FROM ${availability.availableFrom}`.toUpperCase();
   } else if (availability.nextAvailableFrom) {
     availableText = `${availability.headline} · NEXT AVAIL ${availability.nextAvailableFrom}`.toUpperCase();
   }

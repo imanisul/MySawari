@@ -86,7 +86,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
     <View style={[styles.wrap, style]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${car.name}, ${formatCurrency(car.perDay)} per day${unavailable && availability.nextAvailableFrom ? `, available on ${availability.nextAvailableFrom}` : ''}`}
+        accessibilityLabel={`${car.name}, ${formatCurrency(car.perDay)} per day${unavailable && (availability.availableFrom || availability.nextAvailableFrom) ? `, available from ${availability.availableFrom || availability.nextAvailableFrom}` : ''}`}
         testID={`list-car-${car.id}`}
         onPress={onCarPress}
         style={({ pressed }) => [styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder, opacity: pressed ? 0.92 : 1 }]}
@@ -173,10 +173,14 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
             </View>
             {unavailable ? (
               <View style={styles.linkRow}>
-                <Text style={[styles.availText, { color: availability.nextAvailableFrom ? p.green : p.red }]}>
-                  {availability.nextAvailableFrom ? `Available on ${shortAvail(availability.nextAvailableFrom)}` : availability.headline}
+                <Text style={[styles.availText, { color: availability.availableFrom || availability.nextAvailableFrom ? p.green : p.red }]}>
+                  {availability.availableFrom
+                    ? `Available from ${availability.availableFrom}`
+                    : (availability.nextAvailableFrom
+                        ? `Available on ${shortAvail(availability.nextAvailableFrom)}`
+                        : availability.headline)}
                 </Text>
-                <Feather name="chevron-right" size={13} color={availability.nextAvailableFrom ? p.green : p.red} />
+                <Feather name="chevron-right" size={13} color={availability.availableFrom || availability.nextAvailableFrom ? p.green : p.red} />
               </View>
             ) : (
               <View style={styles.linkRow}>

@@ -148,7 +148,7 @@ export default function CarDetailsScreen() {
   const title = selectedCar ? (year && !selectedCar.name.includes(year) ? `${selectedCar.name} ${year}` : selectedCar.name) : 'Vehicle Details';
 
   const unavailableNote = `${availability.reason === 'service' ? 'Under maintenance' : 'Booked'} for ${requestedLabel}`
-    + (availability.nextAvailableFrom ? ` · Next available ${availability.nextAvailableFrom}` : '');
+    + (availability.availableFrom ? ` · Available from ${availability.availableFrom}` : (availability.nextAvailableFrom ? ` · Next available ${availability.nextAvailableFrom}` : ''));
   // Busy car: other bookings already hold it around the chosen dates — never before dates are chosen.
   const highDemand = hasTrip && isHighDemand(selectedCar, requestedStart, requestedEnd);
 
@@ -349,7 +349,13 @@ export default function CarDetailsScreen() {
         {/* 0 — status, name card, delivery switch, photos, mileage */}
         {/* No entrance animation here: the screen is already sliding in, and a second motion on top of it read as a shake. */}
         <View>
-          <VehicleSummary car={enrichedCar} isAvailable={isAvailable} unavailableNote={unavailableNote} highDemand={highDemand} availableOn={availability.nextAvailableFrom ? longAvail(availability.nextAvailableFrom) : undefined} />
+          <VehicleSummary
+            car={enrichedCar}
+            isAvailable={isAvailable}
+            unavailableNote={unavailableNote}
+            highDemand={highDemand}
+            availableOn={availability.availableFrom ? availability.availableFrom : (availability.nextAvailableFrom ? longAvail(availability.nextAvailableFrom) : undefined)}
+          />
           <View style={{ height: 16 }} />
           <VehicleHeroGallery car={enrichedCar} />
           {/* Figma: 8 below the photos, 8 above the "Need a driver?" card, then 8 and the mileage block's own 8. */}

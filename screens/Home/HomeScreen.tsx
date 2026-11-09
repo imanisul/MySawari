@@ -372,7 +372,7 @@ export default function HomeScreen() {
             <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDestination={() => openDestination()} />
           </View>
         );
-      case 'position3_promo':
+      case 'position3_promo': 
         content = (
           <View style={{ marginTop: 8, marginBottom: 4 }}>
             <HomePromoBanner position="position3" />

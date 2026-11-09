@@ -17,13 +17,13 @@ import type { RecentSearch } from '@/utils/recentSearches';
 import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
 import { openStorePage } from '@/services/rateApp';
-import LowestPriceIcon from '@/assets/images/benefit_lowest_price.svg';
-import UnlimitedKmIcon from '@/assets/images/benefit_unlimited_km.svg';
-import WellMaintainedIcon from '@/assets/images/benefit_well_maintained.svg';
-import ZeroDepositIcon from '@/assets/images/benefit_zero_deposit.svg';
-import ZeroCancellationIcon from '@/assets/images/benefit_zero_cancellation.svg';
-import WalletCoinsIcon from '@/assets/images/wallet_coins.svg';
-import ReferHandCoinIcon from '@/assets/images/refer_hand_coin.svg';
+import LowestPriceIcon from '@/assets/images/benefit_lowest_price.png';
+import UnlimitedKmIcon from '@/assets/images/benefit_unlimited_km.png';
+import WellMaintainedIcon from '@/assets/images/benefit_well_maintained.png';
+import ZeroDepositIcon from '@/assets/images/benefit_zero_deposit.png';
+import ZeroCancellationIcon from '@/assets/images/benefit_zero_cancellation.png';
+import WalletCoinsIcon from '@/assets/images/wallet_coins.png';
+import ReferHandCoinIcon from '@/assets/images/refer_hand_coin.png';
 import HomeTabCarIcon from '@/assets/images/home_tab_car.svg';
 import HomeTabBikeIcon from '@/assets/images/home_tab_bike.svg';
 import MilestoneCoinIcon from '@/assets/images/milestone_coin.svg';
@@ -402,7 +402,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
           style={({ pressed }) => [styles.walletPill, pressed && { opacity: 0.85 }]}
         >
           <Text style={styles.walletText}>{cash}</Text>
-          <WalletCoinsIcon width={12} height={12} />
+          <Image source={WalletCoinsIcon} style={{ width: 12, height: 12 }} resizeMode="contain" />
         </Pressable>
       </View>
 
@@ -645,7 +645,7 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       style={({ pressed }) => [styles.refer, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.9 }]}
     >
       <View style={[styles.referIconWrap, { backgroundColor: p.iconBg }]}>
-        <ReferHandCoinIcon width={24} height={24} />
+        <Image source={ReferHandCoinIcon} style={styles.referIcon} resizeMode="contain" />
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.referTop}>
@@ -935,31 +935,31 @@ const BENEFITS = [
   {
     title: 'Lowest Price',
     sub: 'Guaranteed low rates',
-    Icon: LowestPriceIcon,
-    size: 20,
+    image: LowestPriceIcon,
+    size: 24,
   },
   {
     title: 'Unlimited KM',
     sub: 'Unlimited on 1+ day trips',
-    Icon: UnlimitedKmIcon,
+    image: UnlimitedKmIcon,
     size: 24,
   },
   {
     title: 'Well Maintained',
     sub: 'Regularly serviced',
-    Icon: WellMaintainedIcon,
+    image: WellMaintainedIcon,
     size: 24,
   },
   {
     title: 'Zero Deposit',
     sub: 'No security deposit',
-    Icon: ZeroDepositIcon,
+    image: ZeroDepositIcon,
     size: 24,
   },
   {
     title: 'Zero cancellation/rescheduling fees',
     sub: '100% refund up to 24 hours before your trip',
-    Icon: ZeroCancellationIcon,
+    image: ZeroCancellationIcon,
     size: 24,
     wide: true,
   },
@@ -972,8 +972,7 @@ export function BenefitsGrid() {
       {BENEFITS.map((b) => (
         <View key={b.title} style={[styles.benefit, b.wide && { flexBasis: '100%' }]} accessible accessibilityLabel={`${b.title}, ${b.sub}`}>
           <View style={styles.benefitCircle}>
-            {/* <Image source={b.image} style={{ width: b.size, height: b.size }} resizeMode="contain" /> */}
-            <b.Icon width={b.size} height={b.size} />
+            <Image source={b.image} style={{ width: b.size, height: b.size }} resizeMode="contain" />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.benefitTitle, { color: p.fg }]} numberOfLines={1}>{b.title}</Text>

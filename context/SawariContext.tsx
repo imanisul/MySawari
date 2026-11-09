@@ -173,7 +173,9 @@ const FavoritesContext = createContext<FavoritesValue>({ favorites: [], toggleFa
 export const useIsDarkMode = () => useContext(ThemeContext);
 export const useFavorites = () => useContext(FavoritesContext);
 
-
+const INACTIVITY_TIMEOUT_DAYS = 38;
+const INACTIVITY_TIMEOUT_MS = INACTIVITY_TIMEOUT_DAYS * 24 * 60 * 60 * 1000;
+const LAST_ACTIVE_KEY = '@mysawari_last_active_at';
 
 export function SawariProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -364,6 +366,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     const { DeviceEventEmitter } = require('react-native');
     const sessionExpiryListener = DeviceEventEmitter.addListener('onSessionExpired', async () => {
       invalidateWalletCache(); // never show one account's balance to the next
+      AsyncStorage.removeItem(LAST_ACTIVE_KEY).catch(() => {});
       if (isMounted) {
         setIsAuthenticated(false);
         setCustomer({ id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: '' });
@@ -416,21 +419,43 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    // Coming back to the app after moving around → refresh the auto-detected location.
+    // Coming back to the app after moving around → refresh location and verify inactivity timeout.
     const appStateSub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') detectGps(true);
+      if (state === 'active') {
+        detectGps(true);
+        AsyncStorage.getItem(LAST_ACTIVE_KEY).then((storedVal) => {
+          if (storedVal) {
+            const lastActiveTime = parseInt(storedVal, 10);
+            if (!isNaN(lastActiveTime) && (Date.now() - lastActiveTime > INACTIVITY_TIMEOUT_MS)) {
+              // Inactive for 38 days or more: auto logout!
+              SecureStore.deleteItemAsync('auth_token').catch(() => {});
+              SecureStore.deleteItemAsync('refresh_token').catch(() => {});
+              SecureStore.deleteItemAsync('user_id').catch(() => {});
+              AsyncStorage.removeItem(LAST_ACTIVE_KEY).catch(() => {});
+              invalidateWalletCache();
+              if (isMounted) {
+                setIsAuthenticated(false);
+                setCustomer({ id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: '' });
+              }
+              return;
+            }
+          }
+          AsyncStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())).catch(() => {});
+        }).catch(() => {});
+      }
     });
 
     (async () => {
       try {
         // Fetch independent initial data concurrently
-        const [permissionsVal, token, userId, themeVal, storedSelectedDate, storedDateRange] = await Promise.all([
+        const [permissionsVal, token, userId, themeVal, storedSelectedDate, storedDateRange, storedLastActive] = await Promise.all([
           AsyncStorage.getItem('@has_seen_permissions'),
           SecureStore.getItemAsync('auth_token'),
           SecureStore.getItemAsync('user_id'),
           AsyncStorage.getItem('@app_theme_dark'),
           AsyncStorage.getItem('@sawari_selected_date'),
-          AsyncStorage.getItem('@sawari_date_range')
+          AsyncStorage.getItem('@sawari_date_range'),
+          AsyncStorage.getItem(LAST_ACTIVE_KEY)
         ]);
         
         if (isMounted) {
@@ -485,6 +510,27 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         }
         
         if (token && userId) {
+          const now = Date.now();
+          if (storedLastActive) {
+            const lastActiveTime = parseInt(storedLastActive, 10);
+            if (!isNaN(lastActiveTime) && (now - lastActiveTime > INACTIVITY_TIMEOUT_MS)) {
+              // Inactive for 38 days or more: auto logout!
+              await Promise.all([
+                SecureStore.deleteItemAsync('auth_token').catch(() => {}),
+                SecureStore.deleteItemAsync('refresh_token').catch(() => {}),
+                SecureStore.deleteItemAsync('user_id').catch(() => {}),
+                AsyncStorage.removeItem(LAST_ACTIVE_KEY).catch(() => {})
+              ]);
+              if (isMounted) {
+                setIsAuthenticated(false);
+                setCustomer({ id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: '' });
+                setIsAuthLoading(false);
+              }
+              return;
+            }
+          }
+          AsyncStorage.setItem(LAST_ACTIVE_KEY, String(now)).catch(() => {});
+
           // For a fully decoupled frontend, read the locally saved customer info
           const storedProfile = await AsyncStorage.getItem(`@customer_info_${userId}`);
           
@@ -1004,6 +1050,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             SecureStore.setItemAsync('auth_token', String(token)),
             refreshToken ? SecureStore.setItemAsync('refresh_token', String(refreshToken)) : Promise.resolve(),
             SecureStore.setItemAsync('user_id', String(user.id)),
+            AsyncStorage.setItem(LAST_ACTIVE_KEY, String(Date.now())),
           ]);
           
           const newCustomer = {
@@ -1072,6 +1119,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           await SecureStore.deleteItemAsync('auth_token');
           await SecureStore.deleteItemAsync('refresh_token');
           await SecureStore.deleteItemAsync('user_id');
+          await AsyncStorage.removeItem(LAST_ACTIVE_KEY).catch(() => {});
 
 
           if (customer?.mobile) {

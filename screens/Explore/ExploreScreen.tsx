@@ -265,11 +265,11 @@ const styles = StyleSheet.create({
   seg: { flexDirection: 'row', borderWidth: 1, borderRadius: 8, padding: 2 },
   segItem: { height: 28, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   segText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5 },
-  searchRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 12 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginTop: 12 },
   // Figma: 40px field, 9/12 padding, 9 between icon and text, 1px Primary/blue-50 border, 8px radius.
-  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
+  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 39, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
   searchText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, paddingVertical: 0 },
-  sortBtn: { width: 48, height: 40, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sortBtn: { width: 48, height: 39, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   // Figma: chips 36 high, 8 apart, padding 6/8, 1px Primary/blue-50 border, 8px radius, 13/20 weight-500 text.
   // The chips frame pads 8 below, and the card list under it pads 8 above: the first card starts 16 below the chips.
   chips: { gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },

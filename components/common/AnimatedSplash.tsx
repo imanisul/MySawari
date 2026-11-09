@@ -148,13 +148,10 @@ export function AnimatedSplash({
     };
   }, []);
 
-  // Compute duration in ms: default 3.5 seconds
+  // Brand splash is capped at 1.2s whatever the Operation app's Flash screen setting says; it exits earlier once data is ready.
   const durationMs = useMemo(() => {
     const sec = Number(config?.durationSeconds);
-    if (!isNaN(sec) && sec >= 1 && sec <= 12) {
-      return sec * 1000;
-    }
-    return 3500;
+    return !isNaN(sec) && sec >= 1 && sec <= 12 ? Math.min(sec * 1000, 1200) : 1200;
   }, [config?.durationSeconds]);
 
   // If splash screen is explicitly disabled by admin, complete immediately
@@ -173,23 +170,23 @@ export function AnimatedSplash({
     // Fade in brand container
     Animated.timing(brandOpacity, {
       toValue: 1,
-      duration: 350,
+      duration: 250,
       useNativeDriver: true,
     }).start();
 
     // Staggered entrance for logo, title & tagline
-    Animated.stagger(100, [
+    Animated.stagger(60, [
       Animated.parallel([
-        Animated.timing(logoOpacity, { toValue: 1, duration: 450, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
         Animated.spring(logoScale, { toValue: 1, tension: 22, friction: 6, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 350, useNativeDriver: true }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.timing(titleY, { toValue: 0, duration: 250, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(taglineOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(taglineY, { toValue: 0, duration: 350, useNativeDriver: true }),
+        Animated.timing(taglineOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.timing(taglineY, { toValue: 0, duration: 250, useNativeDriver: true }),
       ]),
     ]).start();
 
@@ -288,7 +285,7 @@ export function AnimatedSplash({
 
     Animated.timing(overlayOpacity, {
       toValue: 0,
-      duration: 380,
+      duration: 240,
       easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start(() => {

@@ -98,8 +98,8 @@ export function AddressPickerSheet({ visible, kind, saved, onClose, onPick, onAd
               style={({ pressed }) => [styles.row, { backgroundColor: p.soft, borderColor: p.segBorder }, pressed && { opacity: 0.8 }]}
             >
               <View style={{ flex: 1 }}>
-                <Text style={[styles.rowName, { color: p.fg }]} numberOfLines={1}>{loc.label ? `${loc.label} - ${loc.name}` : loc.name}</Text>
-                <Text style={[styles.rowAddr, { color: p.muted }]} numberOfLines={1}>{loc.address}</Text>
+                <Text style={[styles.rowName, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{loc.label ? `${loc.label} - ${loc.name}` : loc.name}</Text>
+                <Text style={[styles.rowAddr, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{loc.address}</Text>
               </View>
               <Feather name="chevron-right" size={20} color={p.muted} />
             </Pressable>

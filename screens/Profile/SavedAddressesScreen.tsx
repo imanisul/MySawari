@@ -104,7 +104,7 @@ export default function SavedAddressesScreen() {
                   <Ionicons name={icon(a.label) as any} size={17} color={p.sub} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{a.label || a.name}</Text>
+                  <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{a.label || a.name}</Text>
                   <Text style={[styles.addr, { color: p.muted }]} numberOfLines={3}>{a.label ? `${a.name}, ${a.address}` : a.address}</Text>
                   {!!a.phone && <Text style={[styles.addr, { color: p.muted }]}>Phone number: +91 {a.phone}</Text>}
                 </View>

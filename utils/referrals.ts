@@ -1,4 +1,6 @@
-import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import type { Step } from '@/components/profile/ProfileParts';
@@ -19,6 +21,14 @@ export type Referral = {
   joinedAt?: string;
   tripDate?: string;
   route?: string;
+  vehicleName?: string;
+};
+
+export type PartnerQR = {
+  token: string;
+  batchName?: string;
+  assignedAt?: string;
+  businessName?: string;
 };
 
 function stageOf(r: any): RefStage {
@@ -55,18 +65,63 @@ export function normalizeReferral(r: any, i: number): Referral {
     joinedAt: r?.joinedAt || r?.registeredAt || (r?.status && String(r.status).toUpperCase() !== 'INVITED' ? r?.signupAt : undefined),
     tripDate: r?.tripDate || r?.bookingDate || r?.completedAt || r?.tripCompletedAt,
     route: routeOf(r),
+    vehicleName: typeof r?.vehicleName === 'string' && r.vehicleName.trim() ? r.vehicleName.trim() : undefined,
   };
 }
 
-/** The customer's referrals (shared by My Referrals and Referral Reward, so the detail opens instantly). */
+/**
+ * The customer's referrals (shared by My Referrals and Referral Reward, so the detail opens instantly).
+ * The last list is kept on the phone: the screen draws it at once and the fresh one replaces it when it arrives,
+ * so opening My Referrals never starts from a loading skeleton after the first time.
+ */
 export function useReferrals() {
   const { customer, isAuthenticated } = useSawari();
+  const qc = useQueryClient();
+  const key = ['referrals', customer?.id];
+  const storeKey = `@referrals_${customer?.id}`;
+
+  useEffect(() => {
+    if (!customer?.id) return;
+    AsyncStorage.getItem(storeKey).then((saved) => {
+      if (saved && !qc.getQueryData(key)) qc.setQueryData(key, JSON.parse(saved), { updatedAt: 0 });
+    }).catch(() => {});
+  }, [customer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return useQuery({
-    queryKey: ['referrals', customer?.id],
-    queryFn: async () => ((await API.getReferrals(customer.id)) || []).map(normalizeReferral) as Referral[],
+    queryKey: key,
+    queryFn: async () => {
+      const rawList = await API.getReferrals(customer.id);
+      const list = ((rawList as any[]) || []).map(normalizeReferral) as Referral[];
+      if (rawList && Array.isArray((rawList as any).assignedQRs)) {
+        (list as any).assignedQRs = (rawList as any).assignedQRs;
+      }
+      AsyncStorage.setItem(storeKey, JSON.stringify(list)).catch(() => {});
+      return list;
+    },
     enabled: isAuthenticated === true && !!customer?.id,
     staleTime: 60 * 1000,
   });
+}
+
+/**
+ * Hook to fetch physical QR stickers assigned to the partner by operations executives.
+ */
+export function usePartnerQRs() {
+  const { customer, isAuthenticated } = useSawari();
+  return useQuery({
+    queryKey: ['partner-qrs', customer?.id],
+    queryFn: async () => {
+      const qrs = await API.getPartnerQRs();
+      return (qrs || []) as PartnerQR[];
+    },
+    enabled: isAuthenticated === true && !!customer?.id,
+    staleTime: 60 * 1000,
+  });
+}
+
+/** Starts loading the referrals in the background (Profile calls it), so My Referrals opens already filled. */
+export function usePrefetchReferrals() {
+  useReferrals();
 }
 
 const ORDER: RefStage[] = ['registered', 'booked', 'ongoing', 'processing', 'credited'];

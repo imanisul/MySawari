@@ -125,11 +125,11 @@ export default function RefundsScreen() {
                     <View style={[styles.tag, { borderColor: p.border }]}>
                       <Text style={[styles.tagText, { color: p.muted }]}>Cancelled</Text>
                     </View>
-                    <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{b.vehicleName}</Text>
-                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1}>
+                    <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{b.vehicleName}</Text>
+                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {shortDate(b.pickupDate)}, {b.pickupTime || '10:00 AM'} → {shortDate(b.returnDate)}, {b.dropTime || '10:00 AM'}
                     </Text>
-                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1}>{driverLabel(b.driverMode)} • {days} day{days === 1 ? '' : 's'}</Text>
+                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{driverLabel(b.driverMode)} • {days} day{days === 1 ? '' : 's'}</Text>
                     <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(tripTotal(b))}</Text>
                   </View>
                 </View>

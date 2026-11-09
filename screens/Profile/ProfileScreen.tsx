@@ -11,6 +11,7 @@ import { useSawari } from '@/context/SawariContext';
 import { useBottomNavHeight } from '@/hooks/useBottomNavHeight';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { getAutoApplyCash, setAutoApplyCash } from '@/utils/cashPreference';
+import { usePrefetchReferrals } from '@/utils/referrals';
 import { DesignToggle } from '@/components/profile/ProfileParts';
 import { openStorePage } from '@/services/rateApp';
 import { ModalBlur } from '@/components/common/ModalBlur';
@@ -19,9 +20,9 @@ import { ModalBlur } from '@/components/common/ModalBlur';
 // list of account rows with dashed dividers.
 
 const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
-// Page background: linear-gradient(180deg, #6152D8 0%, #9C90F3 20%) of the 852px frame, i.e. flat #9C90F3 from y=170 down.
-const HEADER = ['#6152D8', '#9C90F3', '#9C90F3'] as const;
-const PURPLE = '#6152D8';
+// Page background: brand navy (the logo's #323E71) fading to a lighter navy by y=170, flat from there down.
+const HEADER = ['#323E71', '#4B5A9E', '#4B5A9E'] as const;
+const PURPLE = '#323E71';
 
 type PlanKey = 'starter' | 'plus' | 'pro';
 const PLANS: Record<PlanKey, { name: string; pct: string; yearly: string; icon: any; next?: PlanKey }> = {
@@ -46,6 +47,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
   const { customer, sawariCash, walletBalance, isAuthenticated, membership, fetchWallet, logout } = useSawari();
+  usePrefetchReferrals(); // My Referrals then opens already filled
   const [showLogin, setShowLogin] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -157,9 +159,9 @@ export default function ProfileScreen() {
                   <Feather name="more-vertical" size={24} color="#FFFFFF" />
                 </Pressable>
               </View>
-              <Text style={styles.name} numberOfLines={1}>{customer.name?.trim() || 'Add your name'}</Text>
+              <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{customer.name?.trim() || 'Add your name'}</Text>
               {!!customer.mobile && <Text style={styles.contact}>{maskMobile(customer.mobile)}</Text>}
-              {!!customer.email && <Text style={styles.contact} numberOfLines={1}>{customer.email}</Text>}
+              {!!customer.email && <Text style={styles.contact} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{customer.email}</Text>}
             </>
           ) : (
             <>
@@ -198,7 +200,7 @@ export default function ProfileScreen() {
                     <Stars />
                   )}
                 </View>
-                <Text style={[styles.memberTitle, { color: p.fg }]}>{plan ? `Save up to ${plan.yearly}/year` : 'Explore our membership'}</Text>
+                <Text style={[styles.memberTitle, { color: p.fg, fontSize: Math.min(15, screenW / 26) }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{plan ? `Save up to ${plan.yearly}/year` : 'Explore our membership'}</Text>
               </View>
               {(!plan || plan.next) && (
                 <View style={styles.upgrade}>
@@ -243,7 +245,7 @@ export default function ProfileScreen() {
                         <Text style={[styles.cashChipText, { color: p.navy }]}>{inr0(sawariCash)} available</Text>
                       </View>
                     ) : (
-                      !!r.sub && <Text style={[styles.rowSub, { color: p.muted }]} numberOfLines={1}>{r.sub}</Text>
+                      !!r.sub && <Text style={[styles.rowSub, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{r.sub}</Text>
                     )}
                   </View>
                   {r.cash ? (
@@ -379,7 +381,7 @@ const styles = StyleSheet.create({
   planName: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
   offChip: { height: 20, paddingHorizontal: 8, borderRadius: 24, justifyContent: 'center' },
   offChipText: { fontFamily: FONT.bold, fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
-  upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#6B5AED', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#323E71', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
   upgradeText: { fontFamily: FONT.bold, fontSize: 11, lineHeight: 17, color: '#FFFFFF' },
   memberTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
   memberSub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20 },

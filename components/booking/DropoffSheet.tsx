@@ -175,8 +175,8 @@ function Row({ p, title, sub, onPress, icon }: { p: ReturnType<typeof useDetails
         {icon === 'plus' ? <Feather name="plus" size={16} color={p.sub} /> : <FontAwesome5 name="map-marker-alt" size={15} color={p.muted} />}
       </View>
       <View style={styles.rowText}>
-        <Text style={[styles.rowTitle, { color: p.fg }]} numberOfLines={1}>{title}</Text>
-        <Text style={[styles.rowSub, { color: p.muted }]} numberOfLines={1}>{sub}</Text>
+        <Text style={[styles.rowTitle, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
+        <Text style={[styles.rowSub, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{sub}</Text>
       </View>
       <Feather name="chevron-right" size={18} color={p.muted} />
     </Pressable>

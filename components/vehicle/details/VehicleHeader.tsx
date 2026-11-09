@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Share } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Share, Platform } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
+import { BACKEND_URL, API } from '@/services/backend/api';
+import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from './detailsPalette';
 
 /** Car name + trip dates (tap to edit) · favourite · share. */
@@ -19,9 +21,22 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
   const handleShare = async () => {
     Haptics.selectionAsync();
     try {
+      // A public page (not the app itself) so chat apps can draw a card with the car's name, price and photo, and
+      // so the link still works for someone without the app installed.
+      const url = `${BACKEND_URL.replace(/\/api\/?$/, '')}/share/car/${selectedCar.id}`;
+      const price = selectedCar.perDay ? ` from ${formatCurrency(selectedCar.perDay)}/day` : '';
+
+      // Auto-fetch dynamic Play Store & App Store links (cached < 1ms)
+      const config = await API.getAppConfig().catch(() => null);
+      const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
+      const appStore = config?.appStoreUrl || 'https://apps.apple.com/app/id6829408836';
+
+      const message = `Check out the ${title} on MySawari${price}!\n\n🚗 Car link: ${url}\n\n📲 Download the MySawari App:\nAndroid: ${playStore}\niOS: ${appStore}`;
+
       await Share.share({
-        message: `Check out the ${title} on MySawari! Rent it now for an amazing trip.`,
+        message,
         title: `Rent ${title} on MySawari`,
+        ...(Platform.OS === 'ios' ? { url } : {}),
       });
     } catch (error: any) {
       if (__DEV__) console.warn('Vehicle sharing dismissed or failed');
@@ -62,20 +77,20 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
               align-items:center`), so the date line below always starts at the same y whatever the
               name is. Long names get an ellipsis instead of wrapping into the trip row. */}
           <View style={styles.titleBox}>
-            <Text style={[styles.title, { color: p.fg }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.title, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
           </View>
           {/* Frame 96: the date line and the 28×12 Edit chip sit 6 apart inside a 2px column. Each is
               centred in its own fixed-height box (Medium/xs → 16px, Edit → 12px), so the row stays exactly
               17px tall and an over-long label ellipses instead of wrapping or shifting Edit sideways. */}
           <View style={styles.tripRow}>
             <View style={styles.tripBox}>
-              <Text style={[styles.trip, { color: p.sub }]} numberOfLines={1}>{tripLabel}</Text>
+              <Text style={[styles.trip, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tripLabel}</Text>
             </View>
             {/* Frame 97: 28×12 -- a 10px pen, 2px, then the underlined label. Fixed width, never wraps. */}
             <View style={styles.editBtn}>
               <Feather name="edit" size={10} color={p.navy} style={styles.editIcon} />
               <View style={styles.editBox}>
-                <Text style={[styles.editText, { color: p.navy }]} numberOfLines={1}>Edit</Text>
+                <Text style={[styles.editText, { color: p.navy }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Edit</Text>
               </View>
             </View>
           </View>

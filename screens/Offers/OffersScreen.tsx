@@ -26,13 +26,16 @@ function couponTitle(c: Coupon) {
   return c.minimumBooking > 0 ? `${off} on bookings above ${n(c.minimumBooking)} Rupees` : `${off} on your trip`;
 }
 
-/** "30th Feb '26" */
+/** Formats exact date and time e.g. "Valid until 15th nov'26 · 11:59 PM" */
 function until(iso: string) {
+  if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
   const day = d.getDate();
   const suf = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-  return `${day}${suf} ${d.toLocaleString('en-GB', { month: 'short' }).toLowerCase()}’${String(d.getFullYear()).slice(2)}`;
+  const dateStr = `${day}${suf} ${d.toLocaleString('en-GB', { month: 'short' }).toLowerCase()}’${String(d.getFullYear()).slice(2)}`;
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return `${dateStr} · ${timeStr}`;
 }
 
 /**

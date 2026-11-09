@@ -98,7 +98,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
         <Text style={[styles.tabText, { color: mode === 'pickup' ? colors.primaryText : colors.mutedForeground }]}>
           Deliver To
         </Text>
-        <Text style={[styles.tabSubText, { color: colors.foreground }]} numberOfLines={1}>
+        <Text style={[styles.tabSubText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {pickupLocation ? pickupLocation.name : 'Select Location'}
         </Text>
       </Pressable>
@@ -109,7 +109,7 @@ export function LocationSheet({ isReturn, isDestination }: { isReturn?: boolean;
         <Text style={[styles.tabText, { color: mode === 'return' ? colors.primaryText : colors.mutedForeground }]}>
           Collect From
         </Text>
-        <Text style={[styles.tabSubText, { color: colors.foreground }]} numberOfLines={1}>
+        <Text style={[styles.tabSubText, { color: colors.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
           {returnAddress ? returnAddress.name : 'Select Location'}
         </Text>
       </Pressable>

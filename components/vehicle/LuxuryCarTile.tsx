@@ -123,7 +123,7 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
 
       {/* Details */}
       <View style={styles.details}>
-        <Text numberOfLines={1} style={[styles.carName, { color: colors.foreground }]}>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.carName, { color: colors.foreground }]}>
           {car.name}
         </Text>
         <View style={styles.specsRow}>
@@ -149,7 +149,7 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
             color={availability.available ? colors.success : colors.destructive}
           />
           <Text
-            numberOfLines={1}
+            numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}
             style={{ flexShrink: 1, fontFamily: 'Inter_600SemiBold', fontSize: 11, color: availability.available ? colors.success : colors.destructive }}
           >
             {availability.detail}

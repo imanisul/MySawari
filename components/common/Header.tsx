@@ -149,8 +149,8 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: 1,
     justifyContent: 'center',
-    backgroundColor: '#EEEBFD',
-    borderColor: '#C9C2F7',
+    backgroundColor: '#EEF0F7',
+    borderColor: '#D5D9EA',
   },
   cashText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: '#2F3E75' },
   bellButton: {

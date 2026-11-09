@@ -1,6 +1,7 @@
 // App entry. Push handling that must work while the app is closed is set up here, before the router loads:
 // when a push arrives for a killed app, Android starts this bundle headless (no screens), so anything that
 // lives in app/_layout.tsx would never run.
+import './utils/scaleText'; // first, so every screen's styles are created after the text scaling is in place
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 

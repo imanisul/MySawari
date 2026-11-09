@@ -48,11 +48,17 @@ export default function ReferralRewardScreen() {
         <ScrollView contentContainerStyle={styles.content}>
           <View style={[styles.card, { borderColor: p.segBorder, backgroundColor: p.page }]}>
             <View style={styles.info}>
-              <Text style={[styles.friend, { color: p.fg }]} numberOfLines={1} accessibilityRole="header">Friend: {ref.name}</Text>
+              <Text style={[styles.friend, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} accessibilityRole="header">Friend: {ref.name}</Text>
+              {!!ref.vehicleName && (
+                <View style={styles.line}>
+                  <Feather name="navigation" size={16} color={p.muted} />
+                  <Text style={[styles.lineText, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Car: {ref.vehicleName}</Text>
+                </View>
+              )}
               {!!ref.route && (
                 <View style={styles.line}>
                   <Feather name="map-pin" size={16} color={p.muted} />
-                  <Text style={[styles.lineText, { color: p.muted }]} numberOfLines={1}>{ref.route}</Text>
+                  <Text style={[styles.lineText, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{ref.route}</Text>
                 </View>
               )}
               <View style={styles.line}>

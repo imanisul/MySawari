@@ -34,7 +34,7 @@ import {
  */
 
 const OTP_LENGTH = 6;
-const RESEND_SECONDS = 60;
+const RESEND_SECONDS = 30;
 const HAS_LOGGED_IN_KEY = '@mysawari_has_logged_in_before';
 // Read once when the app starts, so the sheet knows on its very first frame whether to ask for the terms
 // (it used to show the tick for a moment on every open until the saved flag arrived, which jumped the layout).
@@ -93,8 +93,8 @@ const LIGHT = {
 const group = (m: string) => (m.length <= 5 ? m : `${m.slice(0, 5)} ${m.slice(5)}`);
 /** "+91 73563 56XXX" — the last three digits hidden, as in the design. */
 const masked = (m: string) => `+91 ${m.slice(0, 5)} ${m.slice(5, 7)}XXX`;
-/** The typed code without the gaps kept for skipped boxes. */
-const digitsOf = (v: string) => v.replace(/\s/g, '');
+/** The typed code without any non-digits or hidden formatting characters. */
+const digitsOf = (v: string) => String(v || '').replace(/\D/g, '').slice(0, OTP_LENGTH);
 const isOtpError = (msg: string) => /\botp\b|incorrect|invalid/i.test(msg) && !/referral/i.test(msg);
 
 const formatAuthError = (err: any): string => {
@@ -134,6 +134,7 @@ export function LoginBottomSheet({
   // Focus the number field once the sheet has finished sliding up. With autoFocus the keyboard rose while the sheet
   // was still moving, and the two motions fought each other (the "shake").
   const phoneRef = useRef<TextInput>(null);
+  const isVerifyingRef = useRef(false);
   const stepAnim = useRef(new Animated.Value(1)).current;
   const sheetAnim = useRef(new Animated.Value(SHEET_OFFSET)).current;
   const doneScale = useRef(new Animated.Value(0)).current;
@@ -341,7 +342,7 @@ export function LoginBottomSheet({
   const [detectedClipOtp, setDetectedClipOtp] = useState<string | null>(null);
 
   const checkClipboardForOtp = async () => {
-    if (step !== 'otp' || loading) return;
+    if (step !== 'otp' || loading || isVerifyingRef.current) return;
     try {
       const hasString = await Clipboard.hasStringAsync();
       if (!hasString) return;
@@ -350,7 +351,10 @@ export function LoginBottomSheet({
       const detected = extractOtpCode(text);
       if (detected && detected.length === OTP_LENGTH) {
         setDetectedClipOtp(detected);
-        if (detected !== lastDetectedOtp.current && !otp) {
+        // Only auto-submit if text explicitly contains verification context (e.g. from WhatsApp / SMS)
+        // and user hasn't already entered a code
+        const hasOtpContext = /(?:mysawari|sawari|verification|otp|code|whatsapp)/i.test(text);
+        if (hasOtpContext && detected !== lastDetectedOtp.current && !otp) {
           lastDetectedOtp.current = detected;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           setOtp(detected);
@@ -382,7 +386,7 @@ export function LoginBottomSheet({
   useEffect(() => { LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut); }, [error]);
 
   const sendOtp = async () => {
-    if (mobile.length !== 10 || (isFirstTime && !termsAccepted) || loading) return;
+    if (mobile.length !== 10 || (isFirstTime && !termsAccepted) || loading || isVerifyingRef.current) return;
     Haptics.selectionAsync().catch(() => {});
     setLoading(true); setError(null);
     try {
@@ -396,7 +400,8 @@ export function LoginBottomSheet({
       }
       setOtpId(res.otpId || null);
       setOtp('');
-      setResendIn(RESEND_SECONDS);
+      const cooldown = typeof res.cooldownSec === 'number' && res.cooldownSec > 0 ? res.cooldownSec : RESEND_SECONDS;
+      setResendIn(cooldown);
       setStep('otp');
 
       // Direct auto-fetch if returned (dev/reviewer mode)
@@ -410,20 +415,27 @@ export function LoginBottomSheet({
         }, 500);
       }
     } catch (e: any) {
-      setError(e?.message || 'Could not send the code. Please check your number and try again.');
+      const msg = String(e?.message || '');
+      const waitMatch = msg.match(/wait\s+(\d+)\s+sec/i);
+      if (waitMatch && waitMatch[1]) {
+        const waitSec = parseInt(waitMatch[1], 10);
+        if (waitSec > 0) setResendIn(waitSec);
+      }
+      setError(msg || 'Could not send the code. Please check your number and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   const resend = async () => {
-    if (resendIn > 0 || loading) return;
+    if (resendIn > 0 || loading || isVerifyingRef.current) return;
     setLoading(true); setError(null);
     try {
       const res = await API.sendOtp(mobile);
       setOtpId(res.otpId || null);
       setOtp('');
-      setResendIn(RESEND_SECONDS);
+      const cooldown = typeof res.cooldownSec === 'number' && res.cooldownSec > 0 ? res.cooldownSec : RESEND_SECONDS;
+      setResendIn(cooldown);
       if (res.otp && String(res.otp).length === OTP_LENGTH) {
         const autoOtp = String(res.otp);
         setTimeout(() => {
@@ -434,7 +446,13 @@ export function LoginBottomSheet({
         }, 500);
       }
     } catch (e: any) {
-      setError(e?.message || 'Could not resend the code. Please try again.');
+      const msg = String(e?.message || '');
+      const waitMatch = msg.match(/wait\s+(\d+)\s+sec/i);
+      if (waitMatch && waitMatch[1]) {
+        const waitSec = parseInt(waitMatch[1], 10);
+        if (waitSec > 0) setResendIn(waitSec);
+      }
+      setError(msg || 'Could not resend the code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -443,20 +461,25 @@ export function LoginBottomSheet({
   // ── Step 2: code ──
   const verify = async (raw = otp) => {
     const code = digitsOf(raw);
-    if (code.length !== OTP_LENGTH || loading) return;
+    if (code.length !== OTP_LENGTH || isVerifyingRef.current || loading) return;
+    isVerifyingRef.current = true;
     setError(null);
     setLoading(true);
     if (!isExisting) {
       // A new customer's code is checked here, once, so a wrong or expired code is found now — not after
       // they have filled in their name and referral code. The account is created together with the name (next step).
       try {
-        await API.checkOtp(mobile, code, otpId || undefined);
+        const checkRes = await API.checkOtp(mobile, code, otpId || undefined);
+        if (checkRes?.matchedOtpId) {
+          setOtpId(checkRes.matchedOtpId);
+        }
         setStep('profile');
       } catch (e: any) {
         setError(formatAuthError(e));
         setOtp('');
       } finally {
         setLoading(false);
+        isVerifyingRef.current = false;
       }
       return;
     }
@@ -472,15 +495,17 @@ export function LoginBottomSheet({
       setOtp('');
     } finally {
       setLoading(false);
+      isVerifyingRef.current = false;
     }
   };
 
   // ── Step 3: profile (new customers) ──
   const emailOk = !email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  const canCreate = name.trim().length >= 2 && confirmed && emailOk && !loading;
+  const canCreate = name.trim().length >= 2 && confirmed && emailOk && !loading && !isVerifyingRef.current;
 
   const createAccount = async () => {
-    if (!canCreate) return;
+    if (!canCreate || isVerifyingRef.current) return;
+    isVerifyingRef.current = true;
     Haptics.selectionAsync().catch(() => {});
     setLoading(true); setError(null);
     try {
@@ -505,6 +530,7 @@ export function LoginBottomSheet({
       }
     } finally {
       setLoading(false);
+      isVerifyingRef.current = false;
     }
   };
 
@@ -531,11 +557,12 @@ export function LoginBottomSheet({
         if (step === 'done') return;
         if (viewingPolicy) {
           setViewingPolicy(null);
-        } else if (step === 'otp' || step === 'profile') {
-          back();
-        } else if (!loading && !required) {
+        } else if (loading) {
+          // wait for the request to finish
+        } else if (!required) {
           onClose();
-        } else if (required && step === 'phone') {
+        } else {
+          // Phone button back never returns to the number step; only "Change" on the code step goes back.
           BackHandler.exitApp();
         }
       }}
@@ -562,16 +589,16 @@ export function LoginBottomSheet({
               <Text style={[styles.copy, { color: ui.copy }]}>We'll use your phone number to verify your account. No spam, we promise.</Text>
 
               {!!pendingReferral && (
-                <View style={[styles.naviBanner, { backgroundColor: isDarkMode ? '#1E1B4B' : '#EEF2FF', borderColor: isDarkMode ? '#3730A3' : '#C7D2FE' }]}>
+                <View style={[styles.naviBanner, { backgroundColor: isDarkMode ? '#1F2747' : '#EEF0F7', borderColor: isDarkMode ? '#262F57' : '#D5D9EA' }]}>
                   <View style={styles.naviBannerLeft}>
-                    <View style={[styles.naviIconCircle, { backgroundColor: '#4F46E5' }]}>
+                    <View style={[styles.naviIconCircle, { backgroundColor: '#323E71' }]}>
                       <Feather name="gift" size={13} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={[styles.naviBannerTitle, { color: isDarkMode ? '#E0E7FF' : '#1E1B4B' }]} numberOfLines={1}>
+                      <Text style={[styles.naviBannerTitle, { color: isDarkMode ? '#E3E6F1' : '#1F2747' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                         Referred by <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{pendingReferral.referrerName}</Text>
                       </Text>
-                      <Text style={[styles.naviBannerSub, { color: isDarkMode ? '#A5B4FC' : '#4338CA' }]} numberOfLines={1}>
+                      <Text style={[styles.naviBannerSub, { color: isDarkMode ? '#A5B4FC' : '#323E71' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                         {pendingReferral.rewardText || '100 SawariCash on signup'} • Applied
                       </Text>
                     </View>
@@ -656,9 +683,7 @@ export function LoginBottomSheet({
           {step === 'otp' && (
             <>
               <View style={styles.otpHead}>
-                <Pressable onPress={back} style={[styles.round, { backgroundColor: ui.roundBtn }]} accessibilityRole="button" accessibilityLabel="Back">
-                  <Feather name="chevron-left" size={24} color={ui.copy} />
-                </Pressable>
+                <View style={styles.round} />
                 <Text style={[styles.title, styles.center, { color: ui.title, flex: 1 }]}>Verify your account</Text>
                 {required ? <View style={styles.round} /> : (
                 <Pressable onPress={() => !loading && onClose()} style={[styles.round, { backgroundColor: ui.fieldBg }]} accessibilityRole="button" accessibilityLabel="Close">

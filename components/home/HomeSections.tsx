@@ -17,19 +17,21 @@ import type { RecentSearch } from '@/utils/recentSearches';
 import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
 import { openStorePage } from '@/services/rateApp';
-import LowestPriceIcon from '@/assets/images/benefit_lowest_price.svg';
-import UnlimitedKmIcon from '@/assets/images/benefit_unlimited_km.svg';
-import WellMaintainedIcon from '@/assets/images/benefit_well_maintained.svg';
-import ZeroDepositIcon from '@/assets/images/benefit_zero_deposit.svg';
-import ZeroCancellationIcon from '@/assets/images/benefit_zero_cancellation.svg';
-import WalletCoinsIcon from '@/assets/images/wallet_coins.svg';
-import ReferHandCoinIcon from '@/assets/images/refer_hand_coin.svg';
 import HomeTabCarIcon from '@/assets/images/home_tab_car.svg';
 import HomeTabBikeIcon from '@/assets/images/home_tab_bike.svg';
-import MilestoneCoinIcon from '@/assets/images/milestone_coin.svg';
 
 // Home page (Figma "Home"): purple banner, refer strip, Cars / Bikes search card, then the sections below.
-export const HOME_PURPLE = '#6152D8';
+/** Icons pre-sized to 4x their display size (smooth on every phone, unlike a 512 px picture shrunk 20x at draw time). */
+const ICON = {
+  walletCoins: require('@/assets/images/icons/wallet_coins.png'),
+  referHandCoin: require('@/assets/images/icons/refer_hand_coin.png'),
+  milestoneCoin: require('@/assets/images/icons/milestone_coin.png'),
+};
+function PicIcon({ source, size }: { source: any; size: number }) {
+  return <CachedImage source={source} style={{ width: size, height: size }} contentFit="contain" transition={0} accessible={false} />;
+}
+
+export const HOME_PURPLE = '#323E71';
 
 // ── Top banner ───────────────────────────────────────────────────────────────
 
@@ -64,7 +66,15 @@ interface ComboSlide extends HeroSlideBase {
   sub: string[];
 }
 
-type HeroSlide = TextSlide | ImageSlide | ComboSlide;
+interface FlashSlide extends HeroSlideBase {
+  kind: 'flash';
+}
+
+type HeroSlide = TextSlide | ImageSlide | ComboSlide | FlashSlide;
+
+// The ₹1 flash sale slide goes after every other banner.
+const withFlash = (list: HeroSlide[]): HeroSlide[] => [...list, FLASH_SLIDE];
+const FLASH_SLIDE: FlashSlide = { id: 'flash-sale', kind: 'flash', destinationType: 'screen', destinationScreen: '/flash-sale' };
 
 // Default brand slides if no backend offers or to complement active offers.
 const DEFAULT_SLIDES: HeroSlide[] = [
@@ -134,7 +144,7 @@ function Sunburst({ width, height, cy }: { width: number; height: number; cy: nu
 // copies (SVG filters on text are unreliable on Android). Widths are fixed to the design's.
 const ARC_W = 337.86;
 const ARC_H = 128.95;
-const SHADOW = { dx: 3, dy: 5, color: '#1E1466' };
+const SHADOW = { dx: 3, dy: 5, color: '#1E2547' };
 // Rings of offsets around the shadow's centre; inner copies darker, outer fainter → a soft edge.
 const SHADOW_TAPS = [
   { r: 0, n: 1, o: 0.08 },
@@ -209,7 +219,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
   const { data: offers } = useQuery(offersQueryOptions);
 
   const slides = useMemo<HeroSlide[]>(() => {
-    if (!offers || !Array.isArray(offers)) return DEFAULT_SLIDES;
+    if (!offers || !Array.isArray(offers)) return withFlash(DEFAULT_SLIDES);
 
     const offerSlides: HeroSlide[] = [];
 
@@ -289,7 +299,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
       }
     });
 
-    return offerSlides.length > 0 ? [...offerSlides, ...DEFAULT_SLIDES] : DEFAULT_SLIDES;
+    return withFlash([...DEFAULT_SLIDES, ...offerSlides]);
   }, [offers]);
 
   // Adaptive width across compact phones (360dp), modern phones (390-430dp), and tablets (460dp max)
@@ -364,28 +374,38 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
   useEffect(() => {
     if (slide >= slides.length && slides.length > 0) {
       setSlide(0);
+      pos.current = 0;
       pager.current?.scrollTo({ x: 0, animated: false });
     }
   }, [slides.length, slide]);
 
-  // Slides move on their own every 4.5 s, but never while the customer is swiping them.
+  // Slides move on their own every 4.5 s, always the same way (next banner slides in from the right), never while the
+  // customer is swiping. After the last banner a copy of the first one slides in, then the pager jumps back to the real
+  // first without animation, so it never sweeps backwards across all the banners.
+  const pos = useRef(0);
+  const count = slides.length;
   useEffect(() => {
-    if (slides.length <= 1) return;
+    if (count <= 1) return;
+    let reset: ReturnType<typeof setTimeout> | undefined;
     const t = setInterval(() => {
       if (touching.current) return;
-      setSlide((s) => {
-        const next = (s + 1) % slides.length;
-        pager.current?.scrollTo({ x: next * width, animated: true });
-        return next;
-      });
+      pos.current += 1;
+      pager.current?.scrollTo({ x: pos.current * width, animated: true });
+      setSlide(pos.current % count);
+      if (pos.current >= count) {
+        reset = setTimeout(() => {
+          pos.current = 0;
+          pager.current?.scrollTo({ x: 0, animated: false });
+        }, 600);
+      }
     }, 4500);
-    return () => clearInterval(t);
-  }, [slides.length, width]);
+    return () => { clearInterval(t); if (reset) clearTimeout(reset); };
+  }, [count, width]);
 
   return (
-    // linear-gradient(180deg, #6152D8 0%, #CEC9F3 100%) — the design's two stops, no mid-tones.
+    // linear-gradient(180deg, #323E71 0%, #C9CFE6 100%) — the design's two stops, no mid-tones.
     <LinearGradient
-      colors={[HOME_PURPLE, '#CEC9F3']}
+      colors={[HOME_PURPLE, '#C9CFE6']}
       style={{ paddingTop: topInset, paddingBottom: 16 }}
       onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
     >
@@ -403,7 +423,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
             <Text style={styles.city}>{city}</Text>
             <Feather name="chevron-right" size={15} color="#FFFFFF" />
           </Pressable>
-          <Text style={styles.brandLine} numberOfLines={1}>MySawari - Self Drive Car Rental Guwahati, Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019</Text>
+          <Text style={styles.brandLine} numberOfLines={1} ellipsizeMode="tail">MySawari - Self Drive Car Rental Guwahati, Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -413,7 +433,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
           style={({ pressed }) => [styles.walletPill, pressed && { opacity: 0.85 }]}
         >
           <Text style={styles.walletText}>{cash}</Text>
-          <WalletCoinsIcon width={12} height={12} />
+          <PicIcon source={ICON.walletCoins} size={12} />
         </Pressable>
       </View>
 
@@ -423,11 +443,38 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onScrollBeginDrag={() => { touching.current = true; }}
-        onMomentumScrollEnd={(e) => { touching.current = false; setSlide(Math.round(e.nativeEvent.contentOffset.x / width)); }}
+        onMomentumScrollEnd={(e) => {
+          touching.current = false;
+          let i = Math.round(e.nativeEvent.contentOffset.x / width);
+          if (i >= count) { i = 0; pager.current?.scrollTo({ x: 0, animated: false }); } // swiped onto the copy of the first banner
+          pos.current = i;
+          setSlide(i);
+        }}
       >
-        {slides.map((s, index) => (
+        {(count > 1 ? [...slides, slides[0]] : slides).map((s, index) => (
           <View key={`${s.id}-${index}`} style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-            {s.kind === 'image' ? (
+            {s.kind === 'flash' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Flash sale at 1 rupee. Book now"
+                onPress={() => handleSlidePress(s)}
+                style={({ pressed }) => [styles.flashCard, { width: cardWidth }, pressed && { opacity: 0.95, transform: [{ scale: 0.99 }] }]}
+              >
+                <LinearGradient colors={['#E11D48', '#F97316']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+                <View style={styles.flashTag}>
+                  <Feather name="zap" size={11} color="#E11D48" />
+                  <Text style={styles.flashTagText}>FLASH SALE</Text>
+                </View>
+                <View style={styles.flashRow}>
+                  <Text style={styles.flashAt}>Rent at just</Text>
+                  <Text style={styles.flashPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>₹1</Text>
+                </View>
+                <View style={styles.flashBtn}>
+                  <Text style={styles.flashBtnText}>Book now</Text>
+                  <Feather name="arrow-right" size={14} color="#E11D48" />
+                </View>
+              </Pressable>
+            ) : s.kind === 'image' ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Promotional banner"
@@ -438,12 +485,12 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
                   pressed && { opacity: 0.95, transform: [{ scale: 0.99 }] },
                 ]}
               >
-                <Image source={{ uri: s.imageUrl }} style={styles.imageSlidePhoto} resizeMode="cover" />
+                <CachedImage source={{ uri: s.imageUrl }} style={styles.imageSlidePhoto} contentFit="cover" cachePolicy="memory-disk" transition={0} />
                 {!!s.code && (
                   <View style={styles.bannerCodePill}>
-                    <Feather name="scissors" size={10} color="#6152D8" />
+                    <Feather name="scissors" size={10} color="#323E71" />
                     <Text style={styles.bannerCodeText}>CODE: {s.code}</Text>
-                    <Feather name="copy" size={9} color="#6152D8" />
+                    <Feather name="copy" size={9} color="#323E71" />
                   </View>
                 )}
                 {!!s.discount && (
@@ -463,9 +510,9 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
                   pressed && { opacity: 0.95, transform: [{ scale: 0.99 }] },
                 ]}
               >
-                <Image source={{ uri: s.imageUrl }} style={styles.imageSlidePhoto} resizeMode="cover" />
+                <CachedImage source={{ uri: s.imageUrl }} style={styles.imageSlidePhoto} contentFit="cover" cachePolicy="memory-disk" transition={0} />
                 <LinearGradient
-                  colors={['rgba(28, 20, 90, 0.45)', 'rgba(28, 20, 90, 0.85)']}
+                  colors={['rgba(38, 47, 87, 0.45)', 'rgba(38, 47, 87, 0.85)']}
                   style={StyleSheet.absoluteFill}
                 />
                 <View style={styles.comboContent}>
@@ -476,7 +523,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
                     {s.sub.map((t, i) => (
                       <React.Fragment key={`${t}-${i}`}>
                         {i > 0 && <View style={styles.subDot} />}
-                        <Text style={styles.sub}>{t}</Text>
+                        <Text style={styles.sub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{t}</Text>
                       </React.Fragment>
                     ))}
                   </View>
@@ -502,7 +549,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
                   {s.sub.map((t, i) => (
                     <React.Fragment key={`${t}-${i}`}>
                       {i > 0 && <View style={styles.subDot} />}
-                      <Text style={styles.sub}>{t}</Text>
+                      <Text style={styles.sub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{t}</Text>
                     </React.Fragment>
                   ))}
                 </View>
@@ -651,6 +698,8 @@ export function HomePromoBanner({ position = 'middle' }: { position?: 'middle' |
 
 export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: () => void }) {
   const p = useDetailsPalette();
+  // Text scales with the screen width (390 = design width) so it fits one line on small and large phones alike.
+  const k = Math.min(Math.max(useWindowDimensions().width / 390, 0.85), 1.2);
   return (
     <Pressable
       accessibilityRole="button"
@@ -659,17 +708,17 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       style={({ pressed }) => [styles.refer, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.9 }]}
     >
       <View style={[styles.referIconWrap, { backgroundColor: p.iconBg }]}>
-        <ReferHandCoinIcon width={24} height={24} />
+        <PicIcon source={ICON.referHandCoin} size={24} />
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.referTop}>
-          <Text style={[styles.referTitle, { color: p.fg }]}>Refer & Earn Up to  {earnText} /Month!</Text>
+          <Text style={[styles.referTitle, { color: p.fg, fontSize: 11 * k, lineHeight: 19.5 * k }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Refer & Earn Up to {earnText}/Month!</Text>
           <View style={[styles.referBtn, { backgroundColor: p.navy }]}>
             <Text style={styles.referBtnText}>Refer</Text>
             <Feather name="arrow-right" size={8} color="#FFFFFF" />
           </View>
         </View>
-        <Text style={[styles.referSub, { color: p.muted }]} numberOfLines={1}>Earn 10% every time your friends complete a trip!</Text>
+        <Text style={[styles.referSub, { color: p.muted, fontSize: 10 * k, lineHeight: 16.5 * k }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Earn 10% every time your friends complete a trip!</Text>
       </View>
     </Pressable>
   );
@@ -677,10 +726,11 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
 
 // ── Cars / Bikes + destination ───────────────────────────────────────────────
 
-export function HomeSearchCard({ vehicleType, onType, onDestination }: {
+export function HomeSearchCard({ vehicleType, onType, onDates }: {
   vehicleType: 'car' | 'bike';
   onType: (t: 'car' | 'bike') => void;
-  onDestination: () => void;
+  /** Opens the calendar to pick the rental dates. */
+  onDates: () => void;
 }) {
   const p = useDetailsPalette();
   // `slot` is the Figma image frame (45 wide, no gap before the label); `art` is where the exported
@@ -712,16 +762,16 @@ export function HomeSearchCard({ vehicleType, onType, onDestination }: {
       </View>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Select your destination"
-        onPress={() => { Haptics.selectionAsync(); onDestination(); }}
+        accessibilityLabel="Choose Your Rental Dates"
+        onPress={() => { Haptics.selectionAsync(); onDates(); }}
         style={({ pressed }) => [
           styles.destBox,
           { backgroundColor: p.page, borderColor: p.deliveryBorder },
           pressed && { opacity: 0.85 },
         ]}
       >
-        <Image source={require('@/assets/images/search_icon.png')} style={[styles.destIcon, { tintColor: p.muted }]} resizeMode="contain" />
-        <Text style={[styles.destText, { color: p.muted }]}>Select your Destination</Text>
+        <Feather name="calendar" size={20} color={p.muted} />
+        <Text style={[styles.destText, { color: p.muted }]} numberOfLines={1}>Choose Your Rental Dates</Text>
       </Pressable>
     </View>
   );
@@ -744,15 +794,15 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
       ]}
     >
       <View style={{ flex: 1 }}>
-        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1}>{search.dropoff.name}</Text>
+        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{search.dropoff.name}</Text>
         <View style={styles.tripLine}>
           <Feather name="calendar" size={11} color={p.muted} />
-          <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{search.dateRange}</Text>
+          <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{search.dateRange}</Text>
         </View>
         {!!time && (
           <View style={styles.tripLine}>
             <Feather name="clock" size={11} color={p.muted} />
-            <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1}>{time}</Text>
+            <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{time}</Text>
           </View>
         )}
       </View>
@@ -809,21 +859,16 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
             <Text style={styles.pickTagText}>Best for {tag}</Text>
           </View>
         )}
-        {images.length > 1 && (
-          <View style={styles.pickDots}>
-            {images.slice(0, 5).map((_, i) => <View key={i} style={[styles.pickDot, i === shown % 5 && styles.pickDotOn]} />)}
-          </View>
-        )}
       </View>
       <View style={styles.pickBody}>
         <View style={styles.pickTitleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.pickName, { color: p.fg }]} numberOfLines={1}>{year && !title.includes(year) ? `${title} ${year}` : title}</Text>
+            <Text style={[styles.pickName, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{year && !title.includes(year) ? `${title} ${year}` : title}</Text>
             <View style={styles.pickMetaRow}>
               {meta.map((m, i) => (
                 <React.Fragment key={m}>
                   {i > 0 && <View style={[styles.pickMetaDot, { backgroundColor: p.muted }]} />}
-                  <Text style={[styles.pickMeta, { color: p.muted }]} numberOfLines={1}>{m}</Text>
+                  <Text style={[styles.pickMeta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{m}</Text>
                 </React.Fragment>
               ))}
             </View>
@@ -838,8 +883,9 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
         <View style={styles.pickPriceRow}>
           <View style={styles.pickPrices}>
             <Text style={[styles.pickPrice, { color: p.fg }]}>{formatCurrency(memberPrice ?? car.perDay)}</Text>
+            <Text style={[styles.pickPerDay, { color: p.muted }]}>/day</Text>
           </View>
-          <Text style={[styles.pickAvail, { color: available || availability.nextAvailableFrom ? AVAILABLE_GREEN : p.red }]} numberOfLines={1}>
+          <Text style={[styles.pickAvail, { color: available || availability.nextAvailableFrom ? AVAILABLE_GREEN : p.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {available ? 'Available now' : availability.nextAvailableFrom ? `Available on ${cardDate(availability.nextAvailableFrom)}` : availability.headline}
           </Text>
         </View>
@@ -892,13 +938,13 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
         {stops.slice(0, 3).map((m, i) => {
           const reached = done >= m;
           return (
-            <View key={i} style={[styles.mark, { left: `${(i / 3) * 100}%`, borderColor: reached ? HOME_PURPLE : '#6152D852', backgroundColor: reached ? HOME_PURPLE : '#FFFFFF' }]}>
+            <View key={i} style={[styles.mark, { left: `${(i / 3) * 100}%`, borderColor: reached ? HOME_PURPLE : '#323E7152', backgroundColor: reached ? HOME_PURPLE : '#FFFFFF' }]}>
               <Text style={[styles.markText, { color: reached ? '#FFFFFF' : p.muted }]}>{m}</Text>
             </View>
           );
         })}
         <View style={[styles.coin, { left: '100%' }]}>
-          <MilestoneCoinIcon width={12} height={12} />
+          <PicIcon source={ICON.milestoneCoin} size={12} />
         </View>
       </View>
 
@@ -949,31 +995,31 @@ const BENEFITS = [
   {
     title: 'Lowest Price',
     sub: 'Guaranteed low rates',
-    Icon: LowestPriceIcon,
+    image: require('@/assets/images/icons/benefit_lowest_price.png'),
     size: 20,
   },
   {
     title: 'Unlimited KM',
     sub: 'Unlimited on 1+ day trips',
-    Icon: UnlimitedKmIcon,
+    image: require('@/assets/images/icons/benefit_unlimited_km.png'),
     size: 24,
   },
   {
     title: 'Well Maintained',
     sub: 'Regularly serviced',
-    Icon: WellMaintainedIcon,
+    image: require('@/assets/images/icons/benefit_well_maintained.png'),
     size: 24,
   },
   {
     title: 'Zero Deposit',
     sub: 'No security deposit',
-    Icon: ZeroDepositIcon,
+    image: require('@/assets/images/icons/benefit_zero_deposit.png'),
     size: 24,
   },
   {
     title: 'Zero cancellation/rescheduling fees',
     sub: '100% refund up to 24 hours before your trip',
-    Icon: ZeroCancellationIcon,
+    image: require('@/assets/images/icons/benefit_zero_cancellation.png'),
     size: 24,
     wide: true,
   },
@@ -987,11 +1033,11 @@ export function BenefitsGrid() {
         <View key={b.title} style={[styles.benefit, b.wide && { flexBasis: '100%' }]} accessible accessibilityLabel={`${b.title}, ${b.sub}`}>
           <View style={styles.benefitCircle}>
             {/* <Image source={b.image} style={{ width: b.size, height: b.size }} resizeMode="contain" /> */}
-            <b.Icon width={b.size} height={b.size} />
+            <PicIcon source={b.image} size={b.size} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[styles.benefitTitle, { color: p.fg }]} numberOfLines={1}>{b.title}</Text>
-            <Text style={[styles.benefitSub, { color: p.muted }]} numberOfLines={1}>{b.sub}</Text>
+            <Text style={[styles.benefitTitle, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{b.title}</Text>
+            <Text style={[styles.benefitSub, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{b.sub}</Text>
           </View>
         </View>
       ))}
@@ -1033,8 +1079,8 @@ export function RateUsCard() {
         <Text style={[styles.rateTitle, { color: p.fg }]} numberOfLines={1}>Enjoying MySawari?</Text>
         <View style={styles.rateLine}>
           {[0, 1, 2, 3, 4].map((i) => <Ionicons key={i} name="star" size={14} color="#F5B301" />)}
-          <Text style={[styles.rateSub, { color: p.muted }]} numberOfLines={1}>Rate us on the {store}</Text>
         </View>
+        <Text style={[styles.rateSub, { color: p.muted }]}>Rate us on the {store}</Text>
       </View>
       <View style={[styles.rateBtn, { backgroundColor: HOME_PURPLE }]}>
         <Text style={styles.rateBtnText}>Rate</Text>
@@ -1086,21 +1132,29 @@ export function ConnectCard() {
 }
 
 const styles = StyleSheet.create({
+  flashCard: { height: 148, borderRadius: 16, overflow: 'hidden', marginVertical: 4, paddingHorizontal: 18, justifyContent: 'center', gap: 6, backgroundColor: '#E11D48' },
+  flashTag: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, height: 22, paddingHorizontal: 10, borderRadius: 11, backgroundColor: '#FFE600' },
+  flashTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, lineHeight: 16, letterSpacing: 0.8, color: '#E11D48' },
+  flashRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  flashAt: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#FFFFFF', paddingBottom: 12 },
+  flashPrice: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 52, lineHeight: 60, color: '#FFFFFF' },
+  flashBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, height: 30, paddingHorizontal: 14, borderRadius: 15, backgroundColor: '#FFFFFF' },
+  flashBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, lineHeight: 16, color: '#E11D48' },
   // Banner
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 8 },  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   city: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
   brandLine: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
-  walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
+  walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#EEF0F7', borderWidth: 1, borderColor: '#D5D9EA' },
   walletCoin: { width: 12, height: 12 },
   walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#2F3E75' },
   headlineBlock: { alignItems: 'center', marginTop: 12 },
   // Figma: the promises start 117 below the headline block's top, i.e. 12 up into its 128.95 height.
-  subRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -12, paddingHorizontal: 8 },
+  subRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: -12, paddingVertical: 4, paddingHorizontal: 8, minHeight: 25, alignSelf: 'stretch' },
   subDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#FFFFFF' },
   // The design's three promises: Semibold/xs in Neutral/50 (#F9F9FB), 6px apart.
-  sub: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#F9F9FB' },
+  sub: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#F9F9FB', flexShrink: 1 },
   // Figma: 36×4 track rgba(234,236,241,0.4) with a 12×4 Primary/blue-50 thumb.
   pager: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(234,236,241,0.4)', marginTop: 12, marginBottom: 10 },
   thumb: { position: 'absolute', top: 0, width: 12, height: 4, borderRadius: 20, backgroundColor: '#EAECF1' },
@@ -1110,10 +1164,10 @@ const styles = StyleSheet.create({
     height: 148,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#3E2EA6',
+    backgroundColor: '#262F57',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.25)',
-    shadowColor: '#1E1466',
+    shadowColor: '#1E2547',
     shadowOpacity: 0.25,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -1148,7 +1202,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
     lineHeight: 14,
-    color: '#6152D8',
+    color: '#323E71',
     letterSpacing: 0.5,
   },
   bannerDiscountBadge: {
@@ -1169,17 +1223,17 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 11,
     lineHeight: 14,
-    color: '#1E1466',
+    color: '#1E2547',
     textTransform: 'uppercase',
   },
   comboSlideCard: {
     height: 148,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#3E2EA6',
+    backgroundColor: '#262F57',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.25)',
-    shadowColor: '#1E1466',
+    shadowColor: '#1E2547',
     shadowOpacity: 0.25,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -1195,9 +1249,13 @@ const styles = StyleSheet.create({
   comboSubRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     marginTop: -16,
+    paddingVertical: 4,
     paddingHorizontal: 8,
+    minHeight: 25,
+    alignSelf: 'stretch',
   },
   comboCodePill: {
     flexDirection: 'row',
@@ -1296,10 +1354,6 @@ const styles = StyleSheet.create({
   pickImageWrap: { height: 144, borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
   pickTag: { position: 'absolute', top: 4, left: 4, height: 20, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 20 },
   pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#FFFFFF' },
-  // Dots: the current one is a 12×4 white pill, the others 4×4 Neutral/300, 5 apart.
-  pickDots: { position: 'absolute', bottom: 4, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 5 },
-  pickDot: { width: 4, height: 4, borderRadius: 20, backgroundColor: '#D4D4D4' },
-  pickDotOn: { width: 12, height: 4, backgroundColor: '#FFFFFF' },
   // 4 below the photo, then 6 between the title row and the price row (Figma gaps).
   pickBody: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 6 },
   pickTitleRow: { flexDirection: 'row', alignItems: 'center', height: 37 },
@@ -1313,6 +1367,7 @@ const styles = StyleSheet.create({
   // Figma trims both prices to cap height (leading-trim: cap), so their bottoms are the baseline.
   pickPrices: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   // Cap-height trim from Plus Jakarta Sans metrics (ascent 1.038em, descent 0.222em, cap 0.745em): 22.5 box → 11.2.
+  pickPerDay: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginBottom: -4, includeFontPadding: false },
   pickPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: -6.2, marginBottom: -5.1, includeFontPadding: false },
   pickStrike: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 14, marginTop: -3.3, marginBottom: -2.5, includeFontPadding: false },
   pickStrikeLine: { position: 'absolute', left: -1, right: -2, top: '50%', marginTop: -0.5, height: 1 },
@@ -1328,7 +1383,7 @@ const styles = StyleSheet.create({
   track: { height: 16, marginTop: 12, marginHorizontal: 8, justifyContent: 'center' },
   trackRail: { position: 'absolute', left: 0, right: 0, height: 6, borderRadius: 3, overflow: 'hidden' },
   trackLine: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
-  mark: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowColor: '#6152D8', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
+  mark: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center', shadowColor: '#323E71', shadowOpacity: 0.35, shadowRadius: 3, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
   markText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 7.5, lineHeight: 10, includeFontPadding: false },
   // Figma: a 16px mark like the others, gold-tinted (rgba(251,188,4,.1) over white) with a soft gold glow, holding the 12px star coin.
   coin: { position: 'absolute', width: 16, height: 16, marginLeft: -8, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FEF8E5', shadowColor: '#FBBC04', shadowOpacity: 0.28, shadowRadius: 2, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
@@ -1352,7 +1407,8 @@ const styles = StyleSheet.create({
   benefitSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Membership
-  member: { marginHorizontal: 16, marginTop: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 12 },
+  // Figma: 361x65 card, 10/8 padding, 12 gap; width follows the screen (16 side margins), height grows with the text.
+  member: { marginHorizontal: 16, marginTop: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, gap: 12, justifyContent: 'center', alignItems: 'stretch' },
   memberHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 3 },
   memberTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, flexShrink: 1 },
   memberBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 22, paddingHorizontal: 10, borderRadius: 31 },
@@ -1361,10 +1417,10 @@ const styles = StyleSheet.create({
   rateBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   rateTitle: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 15, lineHeight: 22.5 },
   rateLine: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 2 },
-  rateSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginLeft: 6, flexShrink: 1 },
+  rateSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, lineHeight: 18, marginTop: 2 },
   rateBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, minHeight: 26, paddingHorizontal: 10, borderRadius: 13 },
   rateBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, lineHeight: 15, color: '#FFFFFF' },
-  memberSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 3 },
+  memberSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Connect
   connect: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginHorizontal: 16, marginTop: 16, minHeight: 77, borderWidth: 1, borderRadius: 12, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 },
@@ -1386,10 +1442,10 @@ const styles = StyleSheet.create({
   promoBannerPhoto: { width: '100%', height: '100%' },
   promoBannerContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, justifyContent: 'flex-end' },
   promoBannerBadge: { alignSelf: 'flex-start', backgroundColor: '#FFE600', paddingHorizontal: 8, minHeight: 20, justifyContent: 'center', borderRadius: 20, marginBottom: 6 },
-  promoBannerBadgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#1E1466' },
+  promoBannerBadgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#1E2547' },
   promoBannerTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
   promoBannerSubtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, color: 'rgba(255, 255, 255, 0.85)' },
-  promoBannerCtaBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 8, backgroundColor: '#6152D8', paddingHorizontal: 12, minHeight: 28, borderRadius: 20 },
+  promoBannerCtaBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 8, backgroundColor: '#323E71', paddingHorizontal: 12, minHeight: 28, borderRadius: 20 },
   promoBannerCtaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16, color: '#FFFFFF' },
   bannerCtaPill: {
     position: 'absolute',
@@ -1398,7 +1454,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(97, 82, 216, 0.95)',
+    backgroundColor: 'rgba(50, 62, 113, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,

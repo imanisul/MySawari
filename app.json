@@ -71,6 +71,26 @@
           "data": [
             {
               "scheme": "https",
+              "host": "mysawari.com",
+              "pathPrefix": "/r"
+            },
+            {
+              "scheme": "https",
+              "host": "mysawari.in",
+              "pathPrefix": "/r"
+            },
+            {
+              "scheme": "https",
+              "host": "mysawari.app",
+              "pathPrefix": "/r"
+            },
+            {
+              "scheme": "https",
+              "host": "mysawari.com",
+              "pathPrefix": "/ref"
+            },
+            {
+              "scheme": "https",
               "host": "mysawari.in",
               "pathPrefix": "/ref"
             },

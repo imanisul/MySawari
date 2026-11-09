@@ -39,16 +39,10 @@ import { PostTripReviewPrompt } from '@/components/booking/PostTripReviewPrompt'
 import { PushNotificationHandler } from '@/components/notifications/PushNotificationHandler';
 import * as Location from 'expo-location';
 import { API } from '@/services/backend/api';
-import { handleDeepLinkReferralUrl } from '@/utils/referralLinkHandler';
+import { handleDeepLinkReferralUrl, detectInstallReferrer } from '@/utils/referralLinkHandler';
 import { BottomNavigation } from '@/components/navigation/BottomNavigation';
 import { preloadFlashScreenConfig } from '@/services/api/flashScreen';
-import { Text, TextInput } from 'react-native';
 
-// Large system font sizes must not push text out of fixed-size cards, pills and buttons: scale up to 1.2x at most
-// (individual texts can still set their own maxFontSizeMultiplier).
-for (const C of [Text, TextInput] as any[]) {
-  C.defaultProps = { ...C.defaultProps, maxFontSizeMultiplier: 1.2 };
-}
 
 // Pre-hydrate flash screen settings immediately so only the PROPER ONE ever appears
 preloadFlashScreenConfig().catch(() => {});
@@ -278,6 +272,7 @@ function AppGate({
 
   // Capture referral deep link URLs (e.g. car-rental-mobile://refer?code=... or universal link)
   useEffect(() => {
+    detectInstallReferrer().catch(() => {}); // Android: the invite code Google Play kept from the install link
     Linking.getInitialURL().then((url) => {
       if (url) handleDeepLinkReferralUrl(url);
     }).catch(() => {});

@@ -127,8 +127,8 @@ export default function ConfirmationScreen() {
                 <LoadingImage source={selectedCar.image} style={StyleSheet.absoluteFill} contentFit="cover" />
               </View>
               <View style={{ flex: 1, minWidth: 0 }}>
-                {!!selectedCar.manufacturer && <Text style={[styles.brand, { color: p.muted }]} numberOfLines={1}>{selectedCar.manufacturer}</Text>}
-                <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1}>{b?.vehicleName || selectedCar.name}</Text>
+                {!!selectedCar.manufacturer && <Text style={[styles.brand, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{selectedCar.manufacturer}</Text>}
+                <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{b?.vehicleName || selectedCar.name}</Text>
                 <Text style={[styles.meta, { color: p.muted }]} numberOfLines={2}>{from} → {to}</Text>
                 <Text style={[styles.meta, { color: p.muted }]}>{driver}  •  {days} day{days === 1 ? '' : 's'}</Text>
                 <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(total)}</Text>

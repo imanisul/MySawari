@@ -42,7 +42,7 @@ type VehicleOption = {
 };
 
 // Brand tokens (work on both light and dark palettes)
-const ACCENT = '#6152D8';
+const ACCENT = '#323E71';
 const ACCENT_TINT = 'rgba(97, 82, 216, 0.12)';
 const SUCCESS = '#059669';
 const SUCCESS_TINT = 'rgba(5, 150, 105, 0.12)';
@@ -78,6 +78,15 @@ function describeTimeLeft(expiry: Date, now: number) {
   if (days === 1) return { text: `Ends in 1 day ${hours % 24}h`, urgent: false, ended: false };
   if (hours >= 1) return { text: `Ends in ${hours}h ${mins % 60}m`, urgent: true, ended: false };
   return { text: `Ends in ${Math.max(mins, 1)} min`, urgent: true, ended: false };
+}
+
+function formatOfferDateTime(isoString?: string | Date | null, explicitTime?: string) {
+  if (!isoString) return '-';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '-';
+  const datePart = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  const timePart = explicitTime && explicitTime !== 'Immediate' ? explicitTime : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  return `${datePart} · ${timePart}`;
 }
 
 export function ExclusiveOfferDetailModal({
@@ -235,7 +244,9 @@ export function ExclusiveOfferDetailModal({
       ? originalPrice - dealPrice
       : null;
 
-  // ---------- Expiry ----------
+  // ---------- Expiry & Scheduling ----------
+  const startDate = offer.startDate ? new Date(offer.startDate) : null;
+  const isUpcoming = Boolean(startDate && !isNaN(startDate.getTime()) && startDate.getTime() > now);
   const expiry = offer.expiryDate ? new Date(offer.expiryDate) : null;
   const timeLeft = expiry ? describeTimeLeft(expiry, now) : null;
   const isEnded = Boolean(timeLeft?.ended);
@@ -306,7 +317,23 @@ export function ExclusiveOfferDetailModal({
     const range = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
     let tripRange = dateRange;
 
-    if (isOvernight || (offer.pickupTime && offer.returnTime)) {
+    // Staff decided rental period prefill
+    if (offer.rentalStartDate && offer.rentalEndDate) {
+      const sDate = new Date(offer.rentalStartDate);
+      const eDate = new Date(offer.rentalEndDate);
+      const travelRange = `${sDate.getDate()} ${MONTHS_SHORT[sDate.getMonth()]} – ${eDate.getDate()} ${MONTHS_SHORT[eDate.getMonth()]}`;
+      const daysCount = offer.rentalDays || Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / 86400000));
+      setDates(travelRange, `${daysCount} ${daysCount === 1 ? 'Day' : 'Days'}`);
+      setTimes(offer.rentalStartTime || pickupTime, offer.rentalEndTime || returnTime);
+      tripRange = travelRange;
+    } else if (offer.rentalDays && offer.rentalDays > 1) {
+      const daysCount = offer.rentalDays;
+      const endD = new Date(today.getTime() + daysCount * 24 * 3600 * 1000);
+      const travelRange = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${endD.getDate()} ${MONTHS_SHORT[endD.getMonth()]}`;
+      setDates(travelRange, `${daysCount} Days`);
+      setTimes(offer.rentalStartTime || pickupTime, offer.rentalEndTime || returnTime);
+      tripRange = travelRange;
+    } else if (isOvernight || (offer.pickupTime && offer.returnTime)) {
       setDates(range, '1 Day');
       setTimes(pickupTime, returnTime);
       tripRange = range;
@@ -415,7 +442,7 @@ export function ExclusiveOfferDetailModal({
 
               {/* Single floating tag */}
               <View style={styles.heroTags}>
-                <View style={[styles.heroTag, { backgroundColor: isOvernight ? '#4338CA' : offer.allVehicles ? '#059669' : ACCENT }]}>
+                <View style={[styles.heroTag, { backgroundColor: isOvernight ? '#4B5A9E' : offer.allVehicles ? '#059669' : ACCENT }]}>
                   {isOvernight ? (
                     <Feather name="moon" size={12} color="#FFFFFF" />
                   ) : offer.allVehicles ? (
@@ -450,6 +477,46 @@ export function ExclusiveOfferDetailModal({
                 </View>
               ) : null}
 
+              {/* ---------- Specific Deal Validity & Activation Schedule Card ---------- */}
+              <View style={[styles.validityCard, { backgroundColor: p.soft, borderColor: p.border }]}>
+                <View style={styles.validityCardHeader}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Feather name="calendar" size={14} color="#323E71" />
+                    <Text style={[styles.validityCardTitle, { color: p.fg }]}>Offer Validity Schedule</Text>
+                  </View>
+                  <View style={[styles.statusPill, { backgroundColor: isEnded ? '#FEE2E2' : isUpcoming ? '#EDE9FE' : '#DCFCE7' }]}>
+                    <Text style={[styles.statusPillText, { color: isEnded ? '#DC2626' : isUpcoming ? '#323E71' : '#059669' }]}>
+                      {isEnded ? 'EXPIRED' : isUpcoming ? 'UPCOMING' : 'ACTIVE NOW'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.validityGrid}>
+                  <View style={styles.validityCol}>
+                    <Text style={[styles.validityColLabel, { color: p.sub }]}>ACTIVATES FROM</Text>
+                    <Text style={[styles.validityColVal, { color: p.fg }]}>
+                      {offer.startDate ? formatOfferDateTime(offer.startDate, offer.startTime) : 'Active Now'}
+                    </Text>
+                  </View>
+                  <View style={[styles.validityColDivider, { backgroundColor: p.border }]} />
+                  <View style={styles.validityCol}>
+                    <Text style={[styles.validityColLabel, { color: p.sub }]}>VALID UP TO</Text>
+                    <Text style={[styles.validityColVal, { color: p.fg }]}>
+                      {offer.expiryDate ? formatOfferDateTime(offer.expiryDate, offer.endTime) : 'Ongoing'}
+                    </Text>
+                  </View>
+                </View>
+
+                {timeLeft && !isEnded ? (
+                  <View style={[styles.timeLeftRow, { backgroundColor: timeLeft.urgent ? '#FEF2F2' : '#F8FAFC' }]}>
+                    <Feather name="clock" size={12} color={timeLeft.urgent ? '#DC2626' : '#323E71'} />
+                    <Text style={[styles.timeLeftRowText, { color: timeLeft.urgent ? '#DC2626' : '#323E71' }]}>
+                      {isUpcoming ? 'Offer activates soon' : timeLeft.text}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
               {/* ---------- Unified Deal Summary Card (Clean & Proper) ---------- */}
               <View style={[styles.dealSummaryCard, { backgroundColor: p.soft, borderColor: p.border }]}>
                 {/* Price Row */}
@@ -477,21 +544,45 @@ export function ExclusiveOfferDetailModal({
 
                 {/* 3 Clean Deal Specs Rows */}
                 <View style={styles.dealSpecsList}>
-                  {/* Timing */}
+                  {/* Rental Handover Timing */}
                   <View style={styles.dealSpecItem}>
-                    <View style={[styles.specIconBox, { backgroundColor: '#EDE9FE' }]}>
-                      <Feather name="clock" size={14} color="#6152D8" />
+                    <View style={[styles.specIconBox, { backgroundColor: '#E8EBF4' }]}>
+                      <Feather name="clock" size={14} color="#323E71" />
                     </View>
                     <View style={styles.specContent}>
                       <Text style={[styles.specTitle, { color: p.fg }]}>
-                        {isOvernight
-                          ? `Tonight ${pickupTime} → Tomorrow ${returnTime}`
-                          : offer.pickupTime && offer.returnTime
-                          ? `${offer.pickupTime} → ${offer.returnTime}`
-                          : 'Flexible 24-Hour Rental'}
+                        {(() => {
+                          if (offer.rentalStartDate && offer.rentalEndDate) {
+                            const rs = new Date(offer.rentalStartDate);
+                            const re = new Date(offer.rentalEndDate);
+                            const rsStr = rs.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                            const reStr = re.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                            const tStart = offer.rentalStartTime || offer.pickupTime || '09:00 AM';
+                            const tEnd = offer.rentalEndTime || offer.returnTime || '09:00 AM';
+                            const dDays = offer.rentalDays || Math.max(1, Math.round((re.getTime() - rs.getTime()) / 86400000));
+                            return `${rsStr}, ${tStart} → ${reStr}, ${tEnd} (${dDays} ${dDays === 1 ? 'Day' : 'Days'})`;
+                          }
+                          if (offer.rentalDays && offer.rentalDays > 1) {
+                            return `${offer.rentalDays} Days Rental · Pickup ${offer.pickupTime || '09:00 AM'} / Return ${offer.returnTime || '09:00 AM'}`;
+                          }
+                          if (isOvernight) {
+                            return `Tonight ${pickupTime} → Tomorrow ${returnTime} (12 Hours)`;
+                          }
+                          if (offer.pickupTime && offer.returnTime) {
+                            return `Handover: ${offer.pickupTime} → Return: ${offer.returnTime}`;
+                          }
+                          return 'Flexible 24-Hour Rental Cycle';
+                        })()}
                       </Text>
                       <Text style={[styles.specSub, { color: p.sub }]}>
-                        {isOvernight ? 'Overnight special rental slot' : 'Standard rental booking window'}
+                        {(() => {
+                          if (offer.rentalPeriodLabel) return offer.rentalPeriodLabel.replace(/\s*(→|->|➔|➜)\s*/g, ' to ');
+                          if (offer.rentalStartDate && offer.rentalEndDate) return 'Decided rental travel period for this offer';
+                          if (offer.rentalDays && offer.rentalDays > 1) return `Fixed ${offer.rentalDays}-day self-drive rental duration`;
+                          if (isOvernight) return 'Specific overnight car handover timing';
+                          if (offer.timeSlotLabel) return offer.timeSlotLabel;
+                          return 'Standard rental pickup and return window';
+                        })()}
                       </Text>
                     </View>
                   </View>
@@ -561,7 +652,7 @@ export function ExclusiveOfferDetailModal({
                             </View>
                           )}
 
-                          <Text style={[styles.vehicleName, { color: p.fg }]} numberOfLines={1}>
+                          <Text style={[styles.vehicleName, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                             {item.vehicleName}
                           </Text>
                           <Text style={styles.vehicleDeal}>
@@ -617,11 +708,11 @@ export function ExclusiveOfferDetailModal({
 
             <View style={styles.footerRow}>
               <View style={styles.footerPrice}>
-                <Text style={[styles.footerPriceValue, { color: p.fg }]} numberOfLines={1}>
+                <Text style={[styles.footerPriceValue, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   {formatCurrency(dealPrice)}
                   <Text style={{ fontSize: 13, fontWeight: '500', color: p.sub }}>{pricingUnit}</Text>
                 </Text>
-                <Text style={[styles.footerPriceSub, { color: p.sub }]} numberOfLines={1}>
+                <Text style={[styles.footerPriceSub, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                   {selectedVehicle?.vehicleName || 'Special rate'}
                 </Text>
               </View>
@@ -697,7 +788,7 @@ const styles = StyleSheet.create({
   hero: {
     height: 190,
     justifyContent: 'flex-end',
-    backgroundColor: '#1E1B4B',
+    backgroundColor: '#1F2747',
   },
   heroFallback: {
     backgroundColor: ACCENT_TINT,
@@ -840,17 +931,17 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   codePill: {
-    backgroundColor: '#EDE9FE',
+    backgroundColor: '#E8EBF4',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: '#D5D9EA',
   },
   codePillText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#6152D8',
+    color: '#323E71',
     letterSpacing: 0.5,
   },
 
@@ -987,5 +1078,67 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  validityCard: {
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  validityCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  validityCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  statusPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  statusPillText: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  validityGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  validityCol: {
+    flex: 1,
+  },
+  validityColDivider: {
+    width: 1,
+    height: 32,
+    marginHorizontal: 10,
+  },
+  validityColLabel: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  validityColVal: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  timeLeftRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 2,
+  },
+  timeLeftRowText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

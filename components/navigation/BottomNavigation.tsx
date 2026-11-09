@@ -206,7 +206,7 @@ function HelpButton() {
         style={({ pressed }) => [styles.help, isDarkMode && { backgroundColor: colors.card, borderColor: colors.border }, pressed && { opacity: 0.85 }]}
       >
         <HeadsetIcon color={helpColor} />
-        <Text style={[styles.navLabel, { color: helpColor }]} numberOfLines={1} maxFontSizeMultiplier={1.15}>Help</Text>
+        <Text style={[styles.navLabel, { color: helpColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.15}>Help</Text>
       </Pressable>
     </View>
   );

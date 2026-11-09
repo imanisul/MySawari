@@ -57,7 +57,7 @@ export function ScratchCard({ children, onReveal, revealed = false }: { children
         {/* The foil is a grid of tiles; rubbing removes them, so the prize underneath shows through. */}
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
           {Array.from({ length: ROWS * COLS }, (_, i) => (
-            cleared.has(i) ? null : <View key={i} style={[styles.tile, { left: (i % COLS) * TILE, top: Math.floor(i / COLS) * TILE, backgroundColor: (Math.floor(i / COLS) + (i % COLS)) % 2 ? '#4E4FB8' : '#5B5FC7' }]} />
+            cleared.has(i) ? null : <View key={i} style={[styles.tile, { left: (i % COLS) * TILE, top: Math.floor(i / COLS) * TILE, backgroundColor: (Math.floor(i / COLS) + (i % COLS)) % 2 ? '#323E71' : '#4B5A9E' }]} />
           ))}
         </View>
         {cleared.size === 0 && (

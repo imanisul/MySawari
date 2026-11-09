@@ -11,7 +11,7 @@ import type { PendingCard } from '@/hooks/useRideJourney';
 import { ScratchCard } from './ScratchCard';
 
 const F = { medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
-const CONFETTI = ['#2F3E75', '#6152D8', '#FBBC04', '#C9C2F7', '#FFFFFF'];
+const CONFETTI = ['#2F3E75', '#323E71', '#FBBC04', '#D5D9EA', '#FFFFFF'];
 
 /**
  * The scratch-card popup (welcome gift, ride milestones). The prize is credited as SawariCash only once the card is
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
   prizeLabel: { fontFamily: F.medium, fontSize: 12, color: '#747EA3' },
   prize: { fontFamily: F.bold, fontSize: 34, color: '#2F3E75', lineHeight: 42 },
   prizeSub: { fontFamily: F.semibold, fontSize: 13, color: '#008758' },
-  link: { fontFamily: F.medium, fontSize: 12, color: '#6152D8', textDecorationLine: 'underline' },
+  link: { fontFamily: F.medium, fontSize: 12, color: '#323E71', textDecorationLine: 'underline' },
   ok: { fontFamily: F.medium, fontSize: 13, color: '#008758', textAlign: 'center' },
   err: { fontFamily: F.medium, fontSize: 12, color: '#C62828', textAlign: 'center' },
   btn: { alignSelf: 'stretch', height: 46, borderRadius: 12, backgroundColor: '#2F3E75', alignItems: 'center', justifyContent: 'center' },

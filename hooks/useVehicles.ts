@@ -52,6 +52,18 @@ function prefetchVehicleImages(vehicles: any[]) {
   }
 }
 
+/** Warms every photo of one car (its gallery), called when the car is tapped so they are ready as its page opens. */
+export function prefetchCarGallery(car: any) {
+  try {
+    const urls = ((car?.images as any[]) || [])
+      .map((i) => (typeof i === 'string' ? i : i?.uri))
+      .filter((u): u is string => typeof u === 'string' && !!u && !prefetchedImages.has(u));
+    if (!urls.length) return;
+    urls.forEach((u) => prefetchedImages.add(u));
+    Image.prefetch(urls, 'memory-disk').catch(() => false);
+  } catch {}
+}
+
 export const vehiclesQueryOptions = {
   queryKey: VEHICLES_KEY,
   queryFn: async () => {

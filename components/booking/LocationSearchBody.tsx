@@ -307,7 +307,7 @@ export function LocationSearchBody({
             </View>
             <View style={[styles.resultTextContainer, styles.resultText]}>
               <Text style={[styles.resultTitle, { color: ui.title }]}>Use current location</Text>
-              <Text style={[styles.resultSub, { color: ui.muted }]} numberOfLines={1}>
+              <Text style={[styles.resultSub, { color: ui.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 {loading ? 'Finding you...' : 'Fetch location using GPS'}
               </Text>
             </View>
@@ -349,10 +349,10 @@ export function LocationSearchBody({
                   <PinIcon color={ui.pin} hole={ui.hole} />
                 </View>
                 <View style={[styles.resultTextContainer, styles.resultText]}>
-                  <Text style={[styles.resultTitle, { color: ui.title }]} numberOfLines={1}>
+                  <Text style={[styles.resultTitle, { color: ui.title }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {mainText}
                   </Text>
-                  <Text style={[styles.resultSub, { color: ui.muted }]} numberOfLines={1}>
+                  <Text style={[styles.resultSub, { color: ui.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     {subText}
                   </Text>
                 </View>

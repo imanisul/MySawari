@@ -595,6 +595,10 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
       response = await normalizeResponse(response);
     }
 
+    if (token && response.ok) {
+      AsyncStorage.setItem('@mysawari_last_active_at', String(Date.now())).catch(() => {});
+    }
+
     return response;
   };
 
@@ -1529,6 +1533,18 @@ export const API = {
     }
   },
 
+  /** The wallet as last known (this session's copy, else the saved one), or null: for showing something at once. */
+  async peekWallet(): Promise<any | null> {
+    if (walletCache) return walletCache.data;
+    if (!walletSnapshotKey) return null;
+    try {
+      const saved = await AsyncStorage.getItem(walletSnapshotKey);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  },
+
   /** Starts saving wallet snapshots for this customer (after login) / removes the saved one (logout). */
   setWalletSnapshotUser(customerId: string | null) {
     if (!customerId && walletSnapshotKey) AsyncStorage.removeItem(walletSnapshotKey).catch(() => {});
@@ -1862,6 +1878,8 @@ export const API = {
           referralDiscountAmount: res.data.bonusSawariCash ?? 100,
           referralDiscountType: 'FLAT',
           referralShareUrl: res.data.shareBaseUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
+          playStoreUrl: res.data.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
+          appStoreUrl: res.data.appStoreUrl || 'https://apps.apple.com/app/id6829408836',
         };
       }
     } catch {
@@ -1873,6 +1891,8 @@ export const API = {
       referralDiscountAmount: 100,
       referralDiscountType: 'FLAT',
       referralShareUrl: 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
+      playStoreUrl: 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
+      appStoreUrl: 'https://apps.apple.com/app/id6829408836',
     };
   },
 
@@ -1931,6 +1951,7 @@ export const API = {
         isExistingUser: data.data?.isExistingUser,
         otpId: data.data?.otpId,
         expiresInSec: data.data?.expiresInSec,
+        cooldownSec: data.data?.cooldownSec || 30,
         otp: data.data?.otp,
       };
     } catch (e: any) {
@@ -1949,7 +1970,7 @@ export const API = {
     }, OTP_TIMEOUT_MS);
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'Failed to verify OTP');
-    return true;
+    return data.data || { verified: true };
   },
 
   /**
@@ -2102,13 +2123,32 @@ export const API = {
    */
   async getReferrals(userId: string) {
     try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-referrals`);
+      const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-referrals?full=true`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to fetch referrals');
-      return data.data || [];
+      if (data.data && Array.isArray(data.data.referrals)) {
+        const list = data.data.referrals;
+        (list as any).assignedQRs = data.data.assignedQRs || [];
+        return list;
+      }
+      return Array.isArray(data.data) ? data.data : [];
     } catch (e: any) {
       if (__DEV__) console.warn('getReferrals error:', e?.message);
       throw e; // the screen shows a retry; an empty list would look like "you referred nobody"
+    }
+  },
+
+  /**
+   * GET /api/auth/my-partner-qrs — fetch assigned physical QR stickers for this partner
+   */
+  async getPartnerQRs() {
+    try {
+      const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-partner-qrs`);
+      const data = await response.json();
+      if (!response.ok) return [];
+      return data.data || [];
+    } catch {
+      return [];
     }
   },
 
@@ -2137,6 +2177,7 @@ export const API = {
     referrerName: string;
     rewardText: string;
     bonusSawariCash?: number;
+    isPartnerQr?: boolean;
   }> {
     const cleanCode = (code || '').trim().toUpperCase();
     if (!cleanCode || cleanCode.length < 3) {

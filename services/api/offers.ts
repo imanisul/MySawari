@@ -4,6 +4,16 @@ import { formatCurrency } from '@/services/backend/pricingEngine';
 import { BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch } from '@/services/backend/api';
 
 /** Deal / offer photos usually show a fleet vehicle, so they go through plate processing too. */
+import { Image as CachedImage } from 'expo-image';
+
+/** Downloads offer / banner pictures into the image cache as soon as the list arrives, so they draw instantly. */
+function prefetchOfferImages(list: any[]) {
+  const urls = list
+    .map((o) => (typeof o?.image === 'string' ? o.image : o?.image?.uri || o?.image?.url))
+    .filter((u): u is string => typeof u === 'string' && /^https?:/.test(u));
+  if (urls.length) CachedImage.prefetch(urls, 'memory-disk').catch(() => false);
+}
+
 function plateSafeOfferImage(image: any, updatedAt?: string | Date) {
   const raw = typeof image === 'string' ? image : image?.url;
   if (!raw) return undefined;
@@ -36,6 +46,7 @@ export interface Offer {
   applicableVehicleIds?: string[];
   applicableCategories?: string[];
   startDate?: string;
+  startTime?: string;
   minimumBooking?: number;
   discountType?: 'FLAT' | 'PERCENTAGE';
   discountValue?: number;
@@ -57,6 +68,7 @@ export interface Offer {
   dealPrice?: number;
   discountPercent?: number;
   expiryDate?: string;
+  endTime?: string;
   active?: boolean;
   approvalStatus?: 'approved' | 'pending_approval' | 'rejected' | string;
 }
@@ -75,12 +87,13 @@ function formatExpiry(dateStr: string): string {
 /**
  * Still usable right now: switched on, approved by admin, and not past its expiry date.
  */
-export function isOfferLive(offer: { active?: boolean; startDate?: string | Date | null; expiryDate?: string | Date; approvalStatus?: string }, now = Date.now()): boolean {
+export function isOfferLive(offer: { active?: boolean; startDate?: string | Date | null; expiryDate?: string | Date; approvalStatus?: string }, now = Date.now(), serverDecidesStart = false): boolean {
   if (offer.active === false) return false;
   if (offer.approvalStatus && offer.approvalStatus !== 'approved') return false;
   // Scheduled offers stay hidden until their start date and time.
   const starts = offer.startDate ? new Date(offer.startDate).getTime() : NaN;
-  if (Number.isFinite(starts) && starts > now) return false;
+  // Member early-access deals start later for everyone else; the exclusive endpoint already filters them, so it skips this check.
+  if (!serverDecidesStart && Number.isFinite(starts) && starts > now) return false;
   const expires = offer.expiryDate ? new Date(offer.expiryDate).getTime() : NaN;
   if (Number.isFinite(expires) && expires < now) return false;
   return true;
@@ -93,7 +106,8 @@ export const offersQueryOptions = {
   queryKey: ['offers'] as const,
   queryFn: async () => {
     const offers = await fetchOffers();
-    AsyncStorage.setItem(OFFERS_CACHE_KEY, JSON.stringify(offers)).catch(() => {});
+    AsyncStorage.setItem(OFFERS_CACHE_KEY, JSON.stringify(offers)).catch(() => { });
+    prefetchOfferImages(offers);
     return offers;
   },
   staleTime: 20 * 1000,
@@ -117,114 +131,114 @@ export async function fetchOffers(): Promise<Offer[]> {
             return true;
           })
           .map((offer: any) => {
-          if (offer.type === 'banner') {
-            const displayFormat = offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url && offer.title ? 'combination' : 'text');
-            return {
-              id: `banner-${offer._id}`,
-              _id: offer._id,
-              type: 'banner',
-              title: offer.title || '',
-              subtitle: offer.subtitle || '',
-              code: offer.code || '',
-              discount: offer.discount || '',
-              displayFormat,
-              lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
-              gradientColors: offer.gradientColors || ['#6152D8', '#8B5CF6'],
-              icon: offer.icon || 'tag',
-              image: plateSafeOfferImage(offer.image, offer.updatedAt),
-              expiry: offer.expiryDate ? formatExpiry(offer.expiryDate) : '',
-              expiryDate: offer.expiryDate,
-              startDate: offer.startDate,
-              description: offer.description || '',
-              applicableType: offer.applicableType || 'all',
-              applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
-              applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
-              position: offer.position || 'position3',
-              destinationType: offer.destinationType || (offer.vehicleId ? 'vehicle' : 'none'),
-              destinationUrl: offer.destinationUrl || '',
-              destinationScreen: offer.destinationScreen || '',
-              buttonText: offer.buttonText || '',
-              badgeText: offer.badgeText || '',
-              sortOrder: offer.sortOrder || 0,
-              vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
-              active: offer.active,
-              approvalStatus: offer.approvalStatus,
-              updatedAt: offer.updatedAt,
-            };
-          } else if (offer.type === 'coupon') {
-          const isFlat = offer.discountType === 'FLAT';
-          const discount = isFlat ? `${formatCurrency(offer.discountValue)} OFF` : `${offer.discountValue}% OFF`;
-          const subtitle = offer.subtitle || (isFlat
-            ? `Flat ${formatCurrency(offer.discountValue)} off on bookings above ${formatCurrency(offer.minimumBooking)}`
-            : `${offer.discountValue}% off${offer.maximumDiscount ? ` (up to ${formatCurrency(offer.maximumDiscount)})` : ''} on bookings above ${formatCurrency(offer.minimumBooking)}`);
+            if (offer.type === 'banner') {
+              const displayFormat = offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url && offer.title ? 'combination' : 'text');
+              return {
+                id: `banner-${offer._id}`,
+                _id: offer._id,
+                type: 'banner',
+                title: offer.title || '',
+                subtitle: offer.subtitle || '',
+                code: offer.code || '',
+                discount: offer.discount || '',
+                displayFormat,
+                lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
+                gradientColors: offer.gradientColors || ['#323E71', '#4B5A9E'],
+                icon: offer.icon || 'tag',
+                image: plateSafeOfferImage(offer.image, offer.updatedAt),
+                expiry: offer.expiryDate ? formatExpiry(offer.expiryDate) : '',
+                expiryDate: offer.expiryDate,
+                startDate: offer.startDate,
+                description: offer.description || '',
+                applicableType: offer.applicableType || 'all',
+                applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
+                applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
+                position: offer.position || 'position3',
+                destinationType: offer.destinationType || (offer.vehicleId ? 'vehicle' : 'none'),
+                destinationUrl: offer.destinationUrl || '',
+                destinationScreen: offer.destinationScreen || '',
+                buttonText: offer.buttonText || '',
+                badgeText: offer.badgeText || '',
+                sortOrder: offer.sortOrder || 0,
+                vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
+                active: offer.active,
+                approvalStatus: offer.approvalStatus,
+                updatedAt: offer.updatedAt,
+              };
+            } else if (offer.type === 'coupon') {
+              const isFlat = offer.discountType === 'FLAT';
+              const discount = isFlat ? `${formatCurrency(offer.discountValue)} OFF` : `${offer.discountValue}% OFF`;
+              const subtitle = offer.subtitle || (isFlat
+                ? `Flat ${formatCurrency(offer.discountValue)} off on bookings above ${formatCurrency(offer.minimumBooking)}`
+                : `${offer.discountValue}% off${offer.maximumDiscount ? ` (up to ${formatCurrency(offer.maximumDiscount)})` : ''} on bookings above ${formatCurrency(offer.minimumBooking)}`);
 
-          return {
-            id: `coupon-${offer.code}`,
-            _id: offer._id,
-            type: 'coupon',
-            title: offer.title,
-            subtitle,
-            discount,
-            code: offer.code,
-            displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
-            lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
-            expiry: formatExpiry(offer.expiryDate),
-            expiryDate: offer.expiryDate,
-            startDate: offer.startDate,
-            description: offer.description || '',
-            minimumBooking: offer.minimumBooking,
-            discountType: offer.discountType,
-            discountValue: offer.discountValue,
-            maximumDiscount: offer.maximumDiscount,
-            applicableType: offer.applicableType || 'all',
-            applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
-            applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
-            vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
-            gradientColors: offer.gradientColors || ['#6178D8', '#8B5CF6'],
-            icon: offer.icon || 'tag',
-            image: plateSafeOfferImage(offer.image, offer.updatedAt),
-            active: offer.active,
-            approvalStatus: offer.approvalStatus,
-            updatedAt: offer.updatedAt,
-          };
-        } else {
-          // special_deal — pass through as-is with minimal transforms
-          return {
-            id: `deal-${offer._id}`,
-            _id: offer._id,
-            type: 'special_deal',
-            title: offer.title,
-            subtitle: offer.subtitle,
-            description: offer.description || '',
-            discount: offer.discountPercent ? `${offer.discountPercent}% OFF` : '',
-            code: offer.code || '',
-            displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
-            lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
-            expiry: formatExpiry(offer.expiryDate),
-            expiryDate: offer.expiryDate,
-            startDate: offer.startDate,
-            applicableType: 'specific_vehicles',
-            applicableVehicleIds: [String(offer.vehicleId)],
-            vehicleId: String(offer.vehicleId),
-            gradientColors: offer.gradientColors || ['#FF416C', '#FF4B2B'],
-            icon: offer.icon || 'zap',
-            image: plateSafeOfferImage(offer.image, offer.updatedAt),
-            originalPrice: offer.originalPrice,
-            dealPrice: offer.dealPrice,
-            discountPercent: offer.discountPercent,
-            active: offer.active,
-            approvalStatus: offer.approvalStatus,
-            updatedAt: offer.updatedAt,
-          };
-        }
-        return undefined as any;
-      }).filter(Boolean);
-      return mapped;
+              return {
+                id: `coupon-${offer.code}`,
+                _id: offer._id,
+                type: 'coupon',
+                title: offer.title,
+                subtitle,
+                discount,
+                code: offer.code,
+                displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
+                lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
+                expiry: formatExpiry(offer.expiryDate),
+                expiryDate: offer.expiryDate,
+                startDate: offer.startDate,
+                description: offer.description || '',
+                minimumBooking: offer.minimumBooking,
+                discountType: offer.discountType,
+                discountValue: offer.discountValue,
+                maximumDiscount: offer.maximumDiscount,
+                applicableType: offer.applicableType || 'all',
+                applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
+                applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
+                vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
+                gradientColors: offer.gradientColors || ['#6178D8', '#4B5A9E'],
+                icon: offer.icon || 'tag',
+                image: plateSafeOfferImage(offer.image, offer.updatedAt),
+                active: offer.active,
+                approvalStatus: offer.approvalStatus,
+                updatedAt: offer.updatedAt,
+              };
+            } else {
+              // special_deal — pass through as-is with minimal transforms
+              return {
+                id: `deal-${offer._id}`,
+                _id: offer._id,
+                type: 'special_deal',
+                title: offer.title,
+                subtitle: offer.subtitle,
+                description: offer.description || '',
+                discount: offer.discountPercent ? `${offer.discountPercent}% OFF` : '',
+                code: offer.code || '',
+                displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
+                lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
+                expiry: formatExpiry(offer.expiryDate),
+                expiryDate: offer.expiryDate,
+                startDate: offer.startDate,
+                applicableType: 'specific_vehicles',
+                applicableVehicleIds: [String(offer.vehicleId)],
+                vehicleId: String(offer.vehicleId),
+                gradientColors: offer.gradientColors || ['#FF416C', '#FF4B2B'],
+                icon: offer.icon || 'zap',
+                image: plateSafeOfferImage(offer.image, offer.updatedAt),
+                originalPrice: offer.originalPrice,
+                dealPrice: offer.dealPrice,
+                discountPercent: offer.discountPercent,
+                active: offer.active,
+                approvalStatus: offer.approvalStatus,
+                updatedAt: offer.updatedAt,
+              };
+            }
+            return undefined as any;
+          }).filter(Boolean);
+        return mapped;
+      }
     }
+  } catch {
+    // Offline or network error: fall back to cached offers
   }
-} catch {
-  // Offline or network error: fall back to cached offers
-}
 
   try {
     const saved = await AsyncStorage.getItem(OFFERS_CACHE_KEY);
@@ -232,7 +246,7 @@ export async function fetchOffers(): Promise<Offer[]> {
       const list = JSON.parse(saved);
       if (Array.isArray(list)) return list.filter((o) => o && isOfferLive(o));
     }
-  } catch {}
+  } catch { }
 
   return [];
 }
@@ -247,7 +261,7 @@ export async function hydrateOffers(queryClient: { getQueryData: (k: readonly un
     if (!saved || queryClient.getQueryData(offersQueryOptions.queryKey)) return;
     const list = (JSON.parse(saved) as any[]).filter((o) => o && (!o.expiryDate || isOfferLive(o)));
     queryClient.setQueryData(offersQueryOptions.queryKey, list, { updatedAt: 0 });
-  } catch {}
+  } catch { }
 }
 
 export interface VehiclePriceItem {
@@ -283,13 +297,15 @@ export interface ExclusiveOffer {
     claimToken: string;
     couponCode: string;
     isExclusive?: boolean;
-  promotionalPrice?: number;
-  vehicleId?: string;
+    promotionalPrice?: number;
+    vehicleId?: string;
     dealPrice: number;
     expiresAt: string;
   } | null;
   startDate?: string;
+  startTime?: string;
   expiryDate?: string;
+  endTime?: string;
   earlyAccessHours?: number;
   isMemberEarlyAccess?: boolean;
   vehicleId?: any;
@@ -300,6 +316,14 @@ export interface ExclusiveOffer {
   returnTime?: string;
   isOvernight?: boolean;
   timeSlotLabel?: string;
+  rentalPeriodMode?: 'preset' | 'specific_dates' | 'duration_days' | 'flexible';
+  rentalStartDate?: string;
+  rentalStartTime?: string;
+  rentalEndDate?: string;
+  rentalEndTime?: string;
+  rentalDays?: number;
+  rentalHours?: number;
+  rentalPeriodLabel?: string;
   analytics?: {
     views?: number;
     clicks?: number;
@@ -327,17 +351,19 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
         const live = json.data
-          .filter((o: any) => o && isOfferLive(o))
+          .filter((o: any) => o && isOfferLive(o, Date.now(), true))
           .map((o: any) => ({
             ...o,
             id: o._id,
             image: plateSafeOfferImage(o.image, o.updatedAt),
           }));
         AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(live)).catch(() => {});
+        prefetchOfferImages(live);
         return live;
       }
-    } else if (res.status < 500) {
-      // The server answered and has no list for us (say 404): the saved copy would only bring back deleted offers.
+    }
+    // A definite answer from the server (e.g. 404/403) means no offers: drop the stale cache instead of showing deleted deals.
+    if (res.status < 500) {
       AsyncStorage.removeItem(EXCLUSIVE_OFFERS_CACHE_KEY).catch(() => {});
       return [];
     }
@@ -349,7 +375,7 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
     const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
     if (saved) {
       const list = JSON.parse(saved);
-      if (Array.isArray(list)) return list.filter((o: any) => o && isOfferLive(o));
+      if (Array.isArray(list)) return list.filter((o: any) => o && isOfferLive(o, Date.now(), true));
     }
   } catch {}
 
@@ -360,9 +386,25 @@ export async function hydrateExclusiveOffers(queryClient: { getQueryData: (k: re
   try {
     const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
     if (!saved || queryClient.getQueryData(exclusiveOffersQueryOptions.queryKey)) return;
-    const list = (JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o));
+    const list = (JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o, Date.now(), true));
     queryClient.setQueryData(exclusiveOffersQueryOptions.queryKey, list, { updatedAt: 0 });
   } catch {}
+}
+
+/** The car a deal is for, when it targets one specific vehicle that is in the given list. */
+export function specificCarOf(offer: any, vehicles: any[]): any | undefined {
+  if (!offer || offer.allVehicles || offer.applicableType === 'all' || !vehicles?.length) return undefined;
+  const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
+  const ids = [
+    ...(offer.vehiclePrices || []).map((p: any) => asId(p.vehicleId)),
+    ...(offer.applicableVehicleIds || []).map(asId),
+    asId(offer.vehicleId),
+  ].filter(Boolean);
+  for (const id of ids) {
+    const car = vehicles.find((v: any) => String(v.id ?? v._id) === id);
+    if (car) return car;
+  }
+  return undefined;
 }
 
 export async function fetchContentVersion(): Promise<number> {
@@ -372,7 +414,7 @@ export async function fetchContentVersion(): Promise<number> {
       const json = await res.json();
       if (json.success && json.version) return Number(json.version);
     }
-  } catch {}
+  } catch { }
   return 0;
 }
 
@@ -394,24 +436,5 @@ export async function recordOfferView(offerId: string): Promise<void> {
     await fetchWithAuth(`${BACKEND_URL}/offers/exclusive/${offerId}/view`, {
       method: 'POST',
     });
-  } catch {}
-}
-
-/**
- * The car (or bike) a deal is for, from the live fleet. Only for deals on specific vehicles: a deal for all cars
- * has no single car, so it returns undefined. Looks through the deal's own prices, then its car list, then its car.
- */
-export function specificCarOf(offer: any, vehicles: any[]): any | undefined {
-  if (!offer || offer.allVehicles || offer.applicableType === 'all' || !vehicles?.length) return undefined;
-  const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
-  const ids = [
-    ...(offer.vehiclePrices || []).map((p: any) => asId(p.vehicleId)),
-    ...(offer.applicableVehicleIds || []).map(asId),
-    asId(offer.vehicleId),
-  ].filter(Boolean);
-  for (const id of ids) {
-    const car = vehicles.find((v: any) => String(v.id ?? v._id) === id);
-    if (car) return car;
-  }
-  return undefined;
+  } catch { }
 }

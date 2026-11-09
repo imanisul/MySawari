@@ -228,7 +228,7 @@ export function ExclusiveOfferDetailModal({
   const pricingType = offer.pricingType || 'promotional_price';
   const pricingUnit = offer.pricingUnit === 'per_trip' ? '/trip' : '/day';
 
-  let offerHeadline = 'Exclusive offer';
+  let offerHeadline = 'Flash sale';
   if (pricingType === 'promotional_price') {
     offerHeadline = `${formatCurrency(offer.promotionalPrice ?? 1)}${pricingUnit}`;
   } else if (pricingType === 'fixed_discount') {
@@ -455,7 +455,7 @@ export function ExclusiveOfferDetailModal({
                       ? '🌙 Overnight (8 PM – 8 AM)'
                       : offer.allVehicles
                       ? '🚗 All Fleet Cars Eligible'
-                      : '⚡ Exclusive offer'}
+                      : '⚡ Flash sale'}
                   </Text>
                 </View>
               </View>
@@ -481,8 +481,8 @@ export function ExclusiveOfferDetailModal({
               <View style={[styles.validityCard, { backgroundColor: p.soft, borderColor: p.border }]}>
                 <View style={styles.validityCardHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Feather name="calendar" size={14} color="#323E71" />
-                    <Text style={[styles.validityCardTitle, { color: p.fg }]}>Offer Validity Schedule</Text>
+                    <Feather name="zap" size={14} color="#E11D48" />
+                    <Text style={[styles.validityCardTitle, { color: p.fg }]}>Flash Sale Schedule</Text>
                   </View>
                   <View style={[styles.statusPill, { backgroundColor: isEnded ? '#FEE2E2' : isUpcoming ? '#EDE9FE' : '#DCFCE7' }]}>
                     <Text style={[styles.statusPillText, { color: isEnded ? '#DC2626' : isUpcoming ? '#323E71' : '#059669' }]}>

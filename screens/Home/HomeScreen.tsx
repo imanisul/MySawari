@@ -300,7 +300,7 @@ export default function HomeScreen() {
   // The search box opens the rental-date calendar; its Search button then lists the vehicles free for those dates.
   const openDates = useCallback(() => {
     setBookingSource('home');
-    router.push('/dates');
+    router.push({ pathname: '/dates', params: { fresh: 'true' } });
   }, [router, setBookingSource]);
 
   const openDestination = useCallback((q?: string) => {
@@ -333,7 +333,7 @@ export default function HomeScreen() {
 
     router.push({
       pathname: '/dates',
-      params: { fromDestination: 'true', forSpecificCar: 'true' },
+      params: { fromDestination: 'true', forSpecificCar: 'true', fresh: 'true' },
     });
   }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 

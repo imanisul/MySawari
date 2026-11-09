@@ -68,7 +68,7 @@ export function PushNotificationHandler() {
           });
         });
       });
-    } else if (data?.type === 'exclusive_offer' || data?.type === 'exclusive') {
+    } else if (data?.type === 'exclusive_offer' || data?.type === 'exclusive' || data?.type === 'flash_sale') {
       router.push({ pathname: '/', params: { openExclusiveOfferId: offerId } });
     } else if (offerId) {
       router.push({ pathname: '/offers', params: { offerId, ...(promoCode ? { promoCode } : {}) } });

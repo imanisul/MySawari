@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Reanimated, { FadeIn } from 'react-native-reanimated';
+import Reanimated from 'react-native-reanimated';
 import { Car, dayNumToLabel, getAvailability, parseDayLabel, splitDateRange, todayDayNum } from '@/utils/sawari';
 import { useVehicles } from '@/hooks/useVehicles';
 import { useSawari } from '@/context/SawariContext';
@@ -157,7 +157,8 @@ export default function SearchResultsScreen() {
 
   // The first cards rise in once, when results first appear. Cards re-mounted while scrolling (the list
   // unmounts far-off rows and mounts them again) must not replay it — that replay was the "shaking".
-  const introDone = useRef(false);
+  // Already-loaded data (opened from cache) skips it too: fading cards in from nothing reads as a blink.
+  const introDone = useRef(!isLoading);
   useEffect(() => {
     if (isLoading || filteredCars.length === 0 || introDone.current) return;
     const t = setTimeout(() => { introDone.current = true; }, 600);
@@ -282,9 +283,9 @@ export default function SearchResultsScreen() {
         keyExtractor={(c: Car) => c.id}
         renderItem={renderCar}
         ListEmptyComponent={isLoading ? (
-          <Reanimated.View entering={FadeIn.duration(200)}>
+          <View>
             {[0, 1, 2].map((i) => <CarCardSkeleton key={i} index={i} />)}
-          </Reanimated.View>
+          </View>
         ) : (
           <SearchEmptyState
             kind={emptyKind}

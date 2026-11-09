@@ -199,17 +199,17 @@ export function ExclusiveOffersSection() {
         );
         discountBadgeText = `${discountPct}% OFF`;
       } else {
-        discountBadgeText = 'EXCLUSIVE';
+        discountBadgeText = 'FLASH DEAL';
       }
     } else if (item.pricingType === 'fixed_discount') {
       promoPriceDisplay = `FLAT ${formatCurrency(item.promotionalPrice || 500)} OFF`;
-      discountBadgeText = 'DISCOUNT';
+      discountBadgeText = 'FLASH DISCOUNT';
     } else if (item.pricingType === 'percentage_discount') {
       promoPriceDisplay = `${item.discountPercent || 50}% OFF`;
       discountBadgeText = `${item.discountPercent || 50}% OFF`;
     } else {
       promoPriceDisplay = 'Custom Deal';
-      discountBadgeText = 'SPECIAL';
+      discountBadgeText = 'FLASH DEAL';
     }
 
     // Membership badge logic
@@ -224,7 +224,7 @@ export function ExclusiveOffersSection() {
     } else if (item.membershipEligibility === 'non_members_only') {
       badgeLabel = 'FIRST RIDE';
     } else {
-      badgeLabel = 'SPECIAL OFFER';
+      badgeLabel = 'FLASH SALE';
     }
 
     const isOvernight = Boolean(
@@ -325,8 +325,8 @@ export function ExclusiveOffersSection() {
                   : isAllCars
                   ? '#059669'
                   : isMemberDeal
-                  ? '#2563EB'
-                  : '#323E71',
+                  ? '#D97706'
+                  : '#E11D48',
               },
             ]}
           >
@@ -337,14 +337,14 @@ export function ExclusiveOffersSection() {
             ) : isMemberDeal ? (
               <Ionicons name="star" size={10} color="#FFFFFF" />
             ) : (
-              <Feather name="tag" size={10} color="#FFFFFF" />
+              <Feather name="zap" size={10} color="#FFFFFF" />
             )}
             <Text style={styles.dealTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {isOvernight
                 ? '8 PM – 8 AM Deal'
                 : isAllCars
                 ? 'All Fleet Cars'
-                : discountBadgeText || badgeLabel}
+                : discountBadgeText || badgeLabel || 'Flash Sale'}
             </Text>
           </View>
         </View>
@@ -417,7 +417,14 @@ export function ExclusiveOffersSection() {
     <View style={styles.container}>
       {/* Section Header */}
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">Exclusive Offers</Text>
+        <View style={styles.titleWithZap}>
+          <Feather name="zap" size={17} color="#E11D48" />
+          <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">Flash Sale</Text>
+        </View>
+        <View style={styles.liveTag}>
+          <View style={styles.liveDot} />
+          <Text style={styles.liveTagText}>LIVE</Text>
+        </View>
       </View>
 
       {/* Cards List */}
@@ -461,7 +468,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 12,
   },
-  sectionTitle: { fontFamily: F.semi, fontSize: 15, lineHeight: 22.5 },
+  titleWithZap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  sectionTitle: { fontFamily: F.semi, fontSize: 16, lineHeight: 24, letterSpacing: -0.2 },
+  liveTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: 12 },
+  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E11D48' },
+  liveTagText: { fontFamily: F.semi, fontSize: 10, color: '#E11D48', letterSpacing: 0.5 },
   verifiedBadge: { backgroundColor: '#F3F4FA', paddingHorizontal: 8, minHeight: 20, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: '#D5D9EA' },
   verifiedBadgeText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#323E71' },
   listContainer: { paddingHorizontal: 16, gap: 8 },

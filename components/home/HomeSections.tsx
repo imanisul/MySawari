@@ -17,6 +17,13 @@ import type { RecentSearch } from '@/utils/recentSearches';
 import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
 import { SOCIAL_LINKS } from '@/constants/social';
 import { openStorePage } from '@/services/rateApp';
+import LowestPriceIcon from '@/assets/images/benefit_lowest_price.png';
+import UnlimitedKmIcon from '@/assets/images/benefit_unlimited_km.png';
+import WellMaintainedIcon from '@/assets/images/benefit_well_maintained.png';
+import ZeroDepositIcon from '@/assets/images/benefit_zero_deposit.png';
+import ZeroCancellationIcon from '@/assets/images/benefit_zero_cancellation.png';
+import WalletCoinsIcon from '@/assets/images/wallet_coins.png';
+import ReferHandCoinIcon from '@/assets/images/refer_hand_coin.png';
 import HomeTabCarIcon from '@/assets/images/home_tab_car.svg';
 import HomeTabBikeIcon from '@/assets/images/home_tab_bike.svg';
 
@@ -966,31 +973,31 @@ const BENEFITS = [
   {
     title: 'Lowest Price',
     sub: 'Guaranteed low rates',
-    image: require('@/assets/images/icons/benefit_lowest_price.png'),
-    size: 20,
+    image: LowestPriceIcon,
+    size: 24,
   },
   {
     title: 'Unlimited KM',
     sub: 'Unlimited on 1+ day trips',
-    image: require('@/assets/images/icons/benefit_unlimited_km.png'),
+    image: UnlimitedKmIcon,
     size: 24,
   },
   {
     title: 'Well Maintained',
     sub: 'Regularly serviced',
-    image: require('@/assets/images/icons/benefit_well_maintained.png'),
+    image: WellMaintainedIcon,
     size: 24,
   },
   {
     title: 'Zero Deposit',
     sub: 'No security deposit',
-    image: require('@/assets/images/icons/benefit_zero_deposit.png'),
+    image: ZeroDepositIcon,
     size: 24,
   },
   {
     title: 'Zero cancellation/rescheduling fees',
     sub: '100% refund up to 24 hours before your trip',
-    image: require('@/assets/images/icons/benefit_zero_cancellation.png'),
+    image: ZeroCancellationIcon,
     size: 24,
     wide: true,
   },

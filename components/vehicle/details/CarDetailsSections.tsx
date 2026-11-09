@@ -138,55 +138,24 @@ function MileageIcon({ source, size, p }: { source: ImageSourcePropType; size: n
  * `tripDays` is the chosen trip's length; the row that applies to it is marked "Your booking".
  * Without dates both rows stay neutral, since neither one is the customer's rule yet.
  */
-export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; tripDays?: number }) {
+export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; tripDays?: number } = {}) {
   const p = useDetailsPalette();
-  const hasTrip = typeof tripDays === 'number' && tripDays >= 1;
-  const oneDayOn = hasTrip && tripDays === 1;
-  const multiDayOn = hasTrip && (tripDays as number) >= 2;
   return (
     // Figma frame: padding 8/16/12, 12 between the title and the card.
     <View style={[styles.block, { paddingTop: 8, paddingBottom: 12 }]}>
-      <SectionTitle>Mileage limits</SectionTitle>
+      <SectionTitle>Mileage policy</SectionTitle>
       <View style={[styles.card, styles.mileCard, { backgroundColor: p.soft, borderColor: p.strongBorder }]}>
         <View style={styles.mileRow}>
-          <MileageIcon source={require('@/assets/images/mileage_calendar.png')} size={18} p={p} />
+          <MileageIcon source={require('@/assets/images/mileage_road.png')} size={22} p={p} />
           <View style={{ flex: 1 }}>
             <View style={styles.mileHead}>
-              <Text style={[styles.mileTitle, { color: p.fg }]}>1-Day Booking</Text>
-              {oneDayOn && <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Your booking</Text></View>}
+              <Text style={[styles.mileTitle, { color: p.fg }]}>Unlimited Kilometres</Text>
+              <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Included</Text></View>
             </View>
-            <Text style={[styles.mileSub, { color: p.muted }]}>Incl. {INCLUDED_KM_ONE_DAY} km  •  Extra km at ₹{EXTRA_KM_RATE}/km.</Text>
-          </View>
-        </View>
-        <View style={styles.mileRow}>
-          <MileageIcon source={require('@/assets/images/mileage_road.png')} size={20} p={p} />
-          <View style={{ flex: 1 }}>
-            <View style={styles.mileHead}>
-              <Text style={[styles.mileTitle, { color: p.fg }]}>2+ Day Booking</Text>
-              {multiDayOn && <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Your booking</Text></View>}
-            </View>
-            <Text style={[styles.mileSub, { color: p.muted }]}>Unlimited kilometres</Text>
+            <Text style={[styles.mileSub, { color: p.muted }]}>Drive freely with no distance cap and zero extra kilometre charges.</Text>
           </View>
         </View>
       </View>
-
-      {!!onAddDay && (
-        <View style={[styles.addDayCard, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.addDayTitle, { color: p.fg }]}>Need more time on the road?</Text>
-            <Text style={[styles.addDaySub, { color: p.muted }]}>Add 1 day to unlock unlimited kilometres.</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Add 1 day to this trip"
-            onPress={onAddDay}
-            style={({ pressed }) => [styles.addDayBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
-          >
-            <Feather name="plus" size={16} color={p.onNavy} />
-            <Text style={[styles.addDayBtnText, { color: p.onNavy }]}>Add 1 day</Text>
-          </Pressable>
-        </View>
-      )}
     </View>
   );
 }
@@ -621,7 +590,7 @@ const WHY = [
   { title: 'Lowest rent in the market', desc: 'Our daily rates are 200-500 lesser than the market rates' },
   { title: 'Well maintained vehicles', desc: 'Being the largest car/bike rental company in Guwahati, we have in-house maintenance team to keep our vehicles maintained all the time' },
   { title: 'True roadside assistance', desc: 'We have a dedicated support and roadside assistance team and we actually provide roadside assistance, not just claim' },
-  { title: 'Unlimited kilometres', desc: 'Trips should not have limits, hence we provide unlimited km for all bookings of 2 days or longer duration' },
+  { title: 'Unlimited kilometres', desc: 'Trips should not have limits, hence we provide unlimited kilometres on all our bookings' },
   { title: 'Zero cancellation/rescheduling fees', desc: 'We provide 100% refund for cancellations till 24 hours prior to trip start time & charge zero fees for rescheduling' },
   { title: 'Wide variety of vehicles', desc: 'Being the largest car/bike rental company, we offer a wide variety of options to choose from' },
   { title: 'No hidden charges', desc: "We don't apply any hidden charges. Our rates are super transparent. What you see is what you pay." },
@@ -788,15 +757,14 @@ export function CancellationPolicy({ freeCancelUntil }: { freeCancelUntil?: stri
 
 const INCLUDED = [
   'Car rental - Vehicle rental for the selected duration',
-  '300 km for 1 day booking and unlimited km for 2 days or longer bookings',
+  'Unlimited kilometres - Drive freely with no distance caps',
   'Roadside assistance - support during your trip',
   'Taxes & applicable charges - Included in the displayed rental price',
 ];
 const NOT_INCLUDED = [
-  'Fuel - Fuel costs are paid by the renter',
+  'Fuel - Fuel costs are paid by the renter (return at same level)',
   'Tolls & parking - Any toll, parking, or entry charges',
   'Traffic fines - Fines or penalties during the rental',
-  'Extra kilometres - Charges apply if you exceed included KM limit (only for single day booking)',
   'Damage charges - Charges for damages to the vehicle',
   'Driver fees - Fees for a driver if you need one',
   'Additional services - Any optional add-ons selected during booking',

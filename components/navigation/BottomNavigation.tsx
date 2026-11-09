@@ -14,7 +14,22 @@ import { shadows } from '@/constants/shadows';
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 type IconProps = { color: string; fill: string; active: boolean };
-type Route = '/' | '/explore' | '/bookings' | '/profile';
+type Route = '/' | '/explore' | '/top-deals' | '/bookings' | '/profile';
+
+function TopDealsIcon({ color, fill, active }: IconProps) {
+  return (
+    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M13 2L3 14H12L11 22L21 10H12L13 2Z"
+        fill={active ? color : 'none'}
+        stroke={color}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
 
 // Icons render at 24pt (design, 1pt strokes): 24-unit icons use STROKE, 18-unit icons are scaled up by 4/3 and use STROKE_18.
 const ICON = 24;
@@ -220,6 +235,7 @@ const ALL_ITEMS: {
 }[] = [
   { id: 'home', label: 'Home', route: '/', Icon: HomeIcon },
   { id: 'explore', label: 'Explore', route: '/explore', Icon: ExploreIcon },
+  { id: 'top-deals', label: 'Top Deals', route: '/top-deals', Icon: TopDealsIcon },
   { id: 'bookings', label: 'My Trips', route: '/bookings', Icon: ActivityIcon },
   { id: 'profile', label: 'Profile', route: '/profile', Icon: ProfileIcon },
 ];
@@ -311,8 +327,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
     height: BOTTOM_NAV_CONTENT_HEIGHT,
-    padding: 8,
-    gap: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    gap: 2,
     boxShadow: NAV_SHADOW,
   },
   helpCol: { alignItems: 'center' },

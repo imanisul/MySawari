@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, Share, Platform } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Share, Platform, Alert } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,7 +11,17 @@ import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from './detailsPalette';
 
 /** Car name + trip dates (tap to edit) · favourite · share. */
-export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string; tripLabel: string; onEditTrip: () => void }) {
+export function VehicleHeader({
+  title,
+  tripLabel,
+  onEditTrip,
+  isDatesLocked,
+}: {
+  title: string;
+  tripLabel: string;
+  onEditTrip?: () => void;
+  isDatesLocked?: boolean;
+}) {
   const p = useDetailsPalette();
   const router = useRouter();
   const { selectedCar, favorites, toggleFavorite } = useSawari();
@@ -68,8 +78,14 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
         {/* The whole name + dates block opens the trip editor, not just the small "Edit" label. */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`${title}, ${tripLabel}. Edit trip`}
-          onPress={onEditTrip}
+          accessibilityLabel={`${title}, ${tripLabel}.${isDatesLocked ? ' Fixed dates deal' : ' Edit trip'}`}
+          onPress={() => {
+            if (isDatesLocked) {
+              Alert.alert('Fixed Schedule Deal', 'Rental dates and times are locked for this special deal and cannot be modified.');
+              return;
+            }
+            onEditTrip?.();
+          }}
           hitSlop={6}
           style={({ pressed }) => [styles.titleCol, pressed && { opacity: 0.7 }]}
         >
@@ -86,11 +102,13 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
             <View style={styles.tripBox}>
               <Text style={[styles.trip, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tripLabel}</Text>
             </View>
-            {/* Frame 97: 28×12 -- a 10px pen, 2px, then the underlined label. Fixed width, never wraps. */}
+            {/* Frame 97: 28×12 -- a 10px pen / lock, 2px, then the label. Fixed width, never wraps. */}
             <View style={styles.editBtn}>
-              <Feather name="edit" size={10} color={p.navy} style={styles.editIcon} />
+              <Feather name={isDatesLocked ? 'lock' : 'edit'} size={10} color={isDatesLocked ? p.sub : p.navy} style={styles.editIcon} />
               <View style={styles.editBox}>
-                <Text style={[styles.editText, { color: p.navy }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Edit</Text>
+                <Text style={[styles.editText, { color: isDatesLocked ? p.sub : p.navy }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                  {isDatesLocked ? 'Fixed' : 'Edit'}
+                </Text>
               </View>
             </View>
           </View>

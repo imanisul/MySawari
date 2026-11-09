@@ -115,6 +115,6 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     payableNow: q.onlinePayableNow ?? Math.min(BOOKING_ADVANCE_AMOUNT, final),
     sawariCashUsed: q.sawariCashUsed || 0,
     balance: q.remainingRentalAmount,
-    kmText: q.rentalDays >= 2 ? 'Unlimited km' : 'Incl. 300 km',
+    kmText: 'Unlimited km',
   };
 }

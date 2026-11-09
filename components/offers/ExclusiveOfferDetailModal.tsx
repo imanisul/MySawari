@@ -381,7 +381,16 @@ export function ExclusiveOfferDetailModal({
         const [startLabel, endLabel] = splitDateRange(tripRange);
         if (getAvailability(liveCar, startLabel, endLabel).available) {
           onClose();
-          router.push({ pathname: '/booking', params: { couponCode: appliedCode || '', isOvernight: isOvernight ? 'true' : 'false' } });
+          router.push({
+            pathname: '/booking',
+            params: {
+              couponCode: appliedCode || '',
+              isOvernight: isOvernight ? 'true' : 'false',
+              lockDates: 'true',
+              isFixedDates: 'true',
+              offerId: offerId || '',
+            },
+          });
           return;
         }
       } finally {
@@ -399,6 +408,8 @@ export function ExclusiveOfferDetailModal({
         promoCode: appliedCode || '',
         offerId: offerId || '',
         isOvernight: isOvernight ? 'true' : 'false',
+        lockDates: 'true',
+        isFixedDates: 'true',
         pickupTime,
         returnTime,
       },

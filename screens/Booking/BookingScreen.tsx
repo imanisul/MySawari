@@ -66,7 +66,15 @@ export default function BookingScreen() {
   useTrackTripProgress('booking'); // Recent searches resume this trip on this page
   const p = useDetailsPalette();
   const router = useRouter();
-  const params = useLocalSearchParams<{ couponCode?: string; isOvernight?: string }>();
+  const params = useLocalSearchParams<{
+    couponCode?: string;
+    isOvernight?: string;
+    lockDates?: string;
+    isFixedDates?: string;
+    isTopDeal?: string;
+    offerId?: string;
+  }>();
+  const isDatesLocked = params.isFixedDates === 'true' || params.lockDates === 'true' || params.isTopDeal === 'true' || !!params.offerId;
   const insets = useSafeAreaInsets();
   const {
     mode, setMode, selectedCar, pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested,
@@ -325,9 +333,18 @@ export default function BookingScreen() {
               {/* Rental duration */}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={isMissingDates ? 'Select your dates' : `${days} day rental duration. Edit dates`}
-                onPress={() => router.push({ pathname: '/dates', params: { returnBack: 'true' } })}
-                style={({ pressed }) => [styles.duration, { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4' }, pressed && { opacity: 0.7 }]}
+                accessibilityLabel={isDatesLocked ? 'Fixed dates rental duration' : (isMissingDates ? 'Select your dates' : `${days} day rental duration. Edit dates`)}
+                onPress={() => {
+                  if (isDatesLocked) {
+                    Alert.alert(
+                      'Fixed Schedule Deal',
+                      'The travel dates and times are locked for this special deal and cannot be modified.'
+                    );
+                    return;
+                  }
+                  router.push({ pathname: '/dates', params: { returnBack: 'true' } });
+                }}
+                style={({ pressed }) => [styles.duration, { backgroundColor: '#F4F6FA', borderColor: '#E7EAF4' }, pressed && !isDatesLocked && { opacity: 0.7 }]}
               >
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -335,6 +352,11 @@ export default function BookingScreen() {
                     {params.isOvernight === 'true' && (
                       <View style={{ backgroundColor: '#E8EBF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                         <Text style={{ fontSize: 10, fontWeight: '700', color: '#4B5A9E' }}>🌙 OVERNIGHT</Text>
+                      </View>
+                    )}
+                    {isDatesLocked && (
+                      <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>⚡ FIXED DEAL</Text>
                       </View>
                     )}
                   </View>
@@ -345,8 +367,10 @@ export default function BookingScreen() {
                   )}
                 </View>
                 <View style={styles.edit}>
-                  <Feather name="edit" size={17} color={p.navy} />
-                  <Text style={[styles.editText, { color: p.navy }]}>Edit</Text>
+                  <Feather name={isDatesLocked ? 'lock' : 'edit'} size={16} color={isDatesLocked ? p.sub : p.navy} />
+                  <Text style={[styles.editText, { color: isDatesLocked ? p.sub : p.navy }]}>
+                    {isDatesLocked ? 'Locked' : 'Edit'}
+                  </Text>
                 </View>
               </Pressable>
 

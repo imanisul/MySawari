@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { Animated, Dimensions, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager } from 'react-native';
+import { Animated, Dimensions, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager, Alert } from 'react-native';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -63,9 +63,13 @@ export default function CarDetailsScreen() {
     isOvernight?: string;
     pickupTime?: string;
     returnTime?: string;
+    isFixedDates?: string;
+    lockDates?: string;
+    isTopDeal?: string;
   }>();
   const { id: paramCarId, vehicleId: paramVehicleId, offerId: paramOfferId, promoCode: paramPromoCode } = params;
   const targetCarId = paramCarId || paramVehicleId;
+  const isDatesLocked = params.isFixedDates === 'true' || params.lockDates === 'true' || !!paramOfferId || params.isTopDeal === 'true';
   const { data: fetchedVehicles = [], isLoading: isFleetLoading } = useVehicles();
   const {
     selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate,
@@ -157,6 +161,13 @@ export default function CarDetailsScreen() {
   const [barHeight, setBarHeight] = useState(165 + Math.max(insets.bottom, 12));
 
   const openDates = () => {
+    if (isDatesLocked) {
+      Alert.alert(
+        'Fixed Schedule Deal',
+        'The travel dates and times are locked for this special deal and cannot be modified.'
+      );
+      return;
+    }
     Haptics.selectionAsync();
     router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
@@ -164,6 +175,13 @@ export default function CarDetailsScreen() {
   // "Check Availability": date & time first, then the location page, then back here with the price. The policy
   // tick and Book Now come after that; it never jumps ahead to the payment page.
   const checkAvailability = () => {
+    if (isDatesLocked) {
+      Alert.alert(
+        'Fixed Schedule Deal',
+        'The travel dates and times are locked for this special deal and cannot be modified.'
+      );
+      return;
+    }
     Haptics.selectionAsync();
     router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true' } });
   };
@@ -177,7 +195,7 @@ export default function CarDetailsScreen() {
       return;
     }
     const isMissingEnd = !endStr || endStr.includes('Select');
-    if (!hasTrip || isMissingEnd) {
+    if ((!hasTrip || isMissingEnd) && !isDatesLocked) {
       router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true', thenBook: 'true' } });
     } else if (!dropoff?.name) {
       router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true', thenBook: 'true' } });
@@ -187,22 +205,13 @@ export default function CarDetailsScreen() {
         params: {
           couponCode: appliedCouponCode || paramPromoCode || targetOffer?.code || '',
           isOvernight: params.isOvernight || '',
+          lockDates: isDatesLocked ? 'true' : undefined,
+          isFixedDates: isDatesLocked ? 'true' : undefined,
+          isTopDeal: params.isTopDeal || undefined,
+          offerId: paramOfferId || '',
         },
       });
     }
-  };
-
-  // One-day trip → two days (unlimited km). Availability re-checks for the new dates on the next render.
-  // With no dates chosen yet, it opens the date picker instead.
-  const handleAddDay = () => {
-    if (!hasTrip) {
-      openDates();
-      return;
-    }
-    Haptics.selectionAsync();
-    const nextEnd = requestedEnd! + 1;
-    const days = tripDays + 1;
-    setDates(`${dayNumToLabel(requestedStart!)} – ${dayNumToLabel(nextEnd)}`, `${days} Days`);
   };
 
   useEffect(() => {
@@ -326,7 +335,7 @@ export default function CarDetailsScreen() {
     <Animated.View style={{ flex: 1, opacity: fadeIn }}>
     <BlurTargetProvider target={blurTarget}>
       <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
-        <VehicleHeader title={title} tripLabel={tripLabel} onEditTrip={openDates} />
+        <VehicleHeader title={title} tripLabel={tripLabel} onEditTrip={openDates} isDatesLocked={isDatesLocked} />
 
       <BlurTargetView ref={blurTarget} style={{ flex: 1 }}>
       <ScrollView
@@ -348,11 +357,7 @@ export default function CarDetailsScreen() {
           <DriverCard />
           <View style={{ height: 8 }} />
 
-          {/* Marks which rule this trip falls under; "Add 1 day" is hidden for 2+ day trips, which are already unlimited. */}
-          <MileageLimits
-            tripDays={hasTrip ? tripDays : undefined}
-            onAddDay={!hasTrip || tripDays === 1 ? handleAddDay : undefined}
-          />
+          <MileageLimits />
           <View style={{ height: 8 }} />
         </View>
 

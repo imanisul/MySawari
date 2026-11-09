@@ -121,8 +121,12 @@ export interface AvailabilityInfo {
   reason?: 'booked' | 'service' | 'rented';
   /** First day the vehicle is free for the requested length of stay (only when unavailable). */
   nextAvailableFrom?: string;
+  /** Exact time/datetime the vehicle becomes available (e.g. "8:10 AM" or "12 Nov, 8:10 AM"). */
+  availableFrom?: string;
   /** Last free day before the next booking (only when available and a booking follows). */
   freeUntil?: string;
+  /** Today only: the car is free until a booking that starts later today, e.g. "8:10 AM". */
+  freeTill?: string;
 }
 
 /**
@@ -472,9 +476,58 @@ export const todayDayNum = () => {
 
 const isoToDayNum = (iso?: string | null): number => {
   if (!iso) return NaN;
-  const t = new Date(iso).getTime();
-  return isNaN(t) ? NaN : Math.floor(t / DAY_MS);
+  const d = new Date(iso);
+  const t = d.getTime();
+  return isNaN(t) ? NaN : toDayNum(d.getFullYear(), d.getMonth(), d.getDate());
 };
+
+export const TURNOVER_BUFFER_MS = 10 * 60 * 1000; // 10 minutes turnover buffer between trips
+
+/** Parses "8:00 AM", "08:10 AM", "12:30 PM", "8 PM", "14:30" into minutes from midnight (0..1439). */
+export function parseTimeToMinutes(timeStr?: string | null): number | null {
+  if (!timeStr) return null;
+  const s = timeStr.trim().toUpperCase();
+  const m12 = s.match(/^(\d{1,2})(?::(\d{2}))?\s*(AM|PM)$/);
+  if (m12) {
+    let hours = parseInt(m12[1], 10);
+    const minutes = m12[2] ? parseInt(m12[2], 10) : 0;
+    const ampm = m12[3];
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+    return hours * 60 + minutes;
+  }
+  const m24 = s.match(/^(\d{1,2}):(\d{2})$/);
+  if (m24) {
+    const hours = parseInt(m24[1], 10);
+    const minutes = parseInt(m24[2], 10);
+    return hours * 60 + minutes;
+  }
+  return null;
+}
+
+/** Formats a Date object or timestamp into 12-hour format e.g. "8:10 AM" or "12:00 PM". */
+export function formatTime12(dateOrMs: Date | number): string {
+  const d = typeof dateOrMs === 'number' ? new Date(dateOrMs) : dateOrMs;
+  let hours = d.getHours();
+  const minutes = d.getMinutes();
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const mm = minutes < 10 ? `0${minutes}` : `${minutes}`;
+  return `${hours}:${mm} ${ampm}`;
+}
+
+/** Combines calendar day number and time string into exact local millisecond timestamp. */
+export function dayNumAndTimeToMs(dayNum: number, timeStr?: string | null, defaultMinutes = 480): number {
+  const d = new Date(dayNum * DAY_MS);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth();
+  const date = d.getUTCDate();
+  const mins = parseTimeToMinutes(timeStr) ?? defaultMinutes;
+  const hours = Math.floor(mins / 60);
+  const minutes = mins % 60;
+  return new Date(year, month, date, hours, minutes, 0, 0).getTime();
+}
 
 export const dayNumToLabel = (n: number) => {
   const d = new Date(n * DAY_MS);
@@ -543,16 +596,24 @@ export function isHighDemand(car: Car | undefined | null, tripStart: number | nu
   return around.length >= 2;
 }
 
-type Block = { start: number; end: number; kind: 'booked' | 'service' | 'rented' };
+type Block = {
+  start: number;
+  end: number;
+  kind: 'booked' | 'service' | 'rented';
+  startMs: number;
+  endMs: number;
+};
 
 function buildBlocks(car: Car, today: number): Block[] {
   const blocks: Block[] = [];
 
   for (const r of car.bookedRanges || []) {
-    const start = isoToDayNum(r.start);
-    const end = isoToDayNum(r.end);
+    const d1 = new Date(r.start);
+    const d2 = new Date(r.end);
+    const start = toDayNum(d1.getFullYear(), d1.getMonth(), d1.getDate());
+    const end = toDayNum(d2.getFullYear(), d2.getMonth(), d2.getDate());
     if (isNaN(start) || isNaN(end) || end < today) continue; // past bookings don't matter
-    
+
     // If the backend includes the status, ignore cancelled/completed bookings
     if (r.status) {
       const st = r.status.toLowerCase();
@@ -560,48 +621,79 @@ function buildBlocks(car: Car, today: number): Block[] {
         continue;
       }
     }
-    
-    blocks.push({ start, end, kind: 'booked' });
+
+    const startMs = d1.getTime();
+    const endMs = d2.getTime();
+    blocks.push({
+      start,
+      end,
+      kind: 'booked',
+      startMs: isNaN(startMs) ? dayNumAndTimeToMs(start, '00:00 AM', 0) : startMs,
+      endMs: isNaN(endMs) ? dayNumAndTimeToMs(end, '11:59 PM', 1439) : endMs,
+    });
   }
 
   const dbStatus = (car.dbStatus || '').toLowerCase();
-  
+
   if (dbStatus === 'service' || dbStatus === 'maintenance') {
     // Unavailable only for the period it was marked in maintenance for. Once that date has passed the vehicle shows
     // as available again, even if the workshop status was never changed back. With no end date recorded at all
     // the duration is unknown, so it stays unavailable until someone sets one.
     const until = isoToDayNum(car.maintenanceUntil);
-    if (isNaN(until)) blocks.push({ start: today, end: Infinity, kind: 'service' });
-    else if (until >= today) blocks.push({ start: today, end: until, kind: 'service' });
+    const untilMs = car.maintenanceUntil ? new Date(car.maintenanceUntil).getTime() : Infinity;
+    if (isNaN(until)) {
+      blocks.push({ start: today, end: Infinity, kind: 'service', startMs: Date.now(), endMs: Infinity });
+    } else if (until >= today) {
+      blocks.push({
+        start: today,
+        end: until,
+        kind: 'service',
+        startMs: Date.now(),
+        endMs: isNaN(untilMs) ? dayNumAndTimeToMs(until, '11:59 PM', 1439) : untilMs,
+      });
+    }
   } else if (
     (dbStatus === 'rent' || dbStatus === 'booked') &&
     !blocks.some(b => b.start <= today && b.end >= today)
   ) {
     // Marked as out on rent but with no booking on record: unavailable today only.
-    blocks.push({ start: today, end: today, kind: 'rented' });
+    blocks.push({
+      start: today,
+      end: today,
+      kind: 'rented',
+      startMs: dayNumAndTimeToMs(today, '00:00 AM', 0),
+      endMs: dayNumAndTimeToMs(today, '11:59 PM', 1439),
+    });
   }
 
   // --- Mock Database Compatibility ---
-  // Some mock cars define their availability via availabilityDate and availableToDate
-  // instead of explicit bookedRanges. We must respect these by creating virtual blocks.
-  
   if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
     const availStart = parseDayLabel(car.availabilityDate);
     if (availStart !== null && availStart > today) {
-      // Car is NOT available from today until the day before availabilityDate
-      blocks.push({ start: today, end: availStart - 1, kind: 'booked' });
+      blocks.push({
+        start: today,
+        end: availStart - 1,
+        kind: 'booked',
+        startMs: dayNumAndTimeToMs(today, '00:00 AM', 0),
+        endMs: dayNumAndTimeToMs(availStart - 1, '11:59 PM', 1439),
+      });
     }
   }
 
   if (car.availableToDate) {
     const availEnd = parseDayLabel(car.availableToDate);
     if (availEnd !== null && availEnd >= today) {
-      // Car is NOT available after availableToDate
-      blocks.push({ start: availEnd + 1, end: Infinity, kind: 'booked' });
+      blocks.push({
+        start: availEnd + 1,
+        end: Infinity,
+        kind: 'booked',
+        startMs: dayNumAndTimeToMs(availEnd + 1, '00:00 AM', 0),
+        endMs: Infinity,
+      });
     }
   }
 
-  return blocks.sort((a, b) => a.start - b.start);
+  return blocks.sort((a, b) => a.startMs - b.startMs);
 }
 
 const overlaps = (b: Block, start: number, end: number) => b.start <= end && b.end >= start;
@@ -617,74 +709,164 @@ export function carTitle(car: Pick<Car, 'displayName' | 'name' | 'manufacturer' 
 }
 
 /**
- * Is this vehicle free for the chosen dates, and if so for how long / if not,
- * when is it next free? With no dates chosen it answers for today.
+ * Is this vehicle free for the chosen dates and times, and if so for how long / if not,
+ * when is it next free?
+ * - Accurate time-wise & day-wise availability with 10-minute turnover buffer.
+ * - If a car is booked from 8:00 AM, searching from 8:00 AM will never show it as available.
+ * - When a trip ends at 8:00 AM, turnover buffer makes the vehicle available from 8:10 AM.
+ * - Searching from 8:00 AM shows availability till the customer's next booking date and time.
  */
-export function getAvailability(car: Car | undefined | null, startLabel?: string, endLabel?: string): AvailabilityInfo {
+export function getAvailability(
+  car: Car | undefined | null,
+  startLabel?: string,
+  endLabel?: string,
+  pickupTime?: string,
+  returnTime?: string
+): AvailabilityInfo {
   if (!car) return { available: false, label: 'ON A TRIP', headline: 'On a trip', detail: '' };
   if (car.isPublic === false) return { available: false, label: 'INTERNAL', headline: 'Not available', detail: 'Internal vehicle only' };
 
   const today = todayDayNum();
+  const now = Date.now();
   const start = parseDayLabel(startLabel);
   const hasDates = start !== null;
   const rawStart = hasDates ? start! : today;
   const windowStart = Math.max(rawStart, today);
   const parsedEnd = hasDates ? parseDayLabel(endLabel, windowStart) : null;
   const windowEnd = parsedEnd !== null ? parsedEnd : windowStart;
-  const stayDays = windowEnd - windowStart + 1;
+
+  const defaultPickupMins = 8 * 60; // 08:00 AM
+  const defaultReturnMins = 20 * 60; // 08:00 PM
+  let requestStartMs: number;
+  let requestEndMs: number;
+
+  if (hasDates) {
+    requestStartMs = dayNumAndTimeToMs(windowStart, pickupTime, defaultPickupMins);
+    requestEndMs = dayNumAndTimeToMs(windowEnd, returnTime, defaultReturnMins);
+    if (requestEndMs <= requestStartMs) {
+      requestEndMs = requestStartMs + 2 * 60 * 60 * 1000;
+    }
+  } else {
+    // Browsing without specific dates (e.g. Explore initial view) -> check from current moment
+    requestStartMs = now;
+    requestEndMs = now + 4 * 60 * 60 * 1000;
+  }
 
   const blocks = buildBlocks(car, today);
-  const conflicts = blocks.filter(b => overlaps(b, windowStart, windowEnd));
 
-  if (conflicts.length === 0) {
-    const next = blocks.find(b => b.start > windowEnd);
-    const freeUntil = next ? next.start - 1 : undefined;
-    const untilText = freeUntil !== undefined ? ` · FREE TILL ${dayNumToLabel(freeUntil)}` : '';
-    const headline = hasDates
-      ? `Available for ${dayNumToLabel(windowStart)}${windowEnd > windowStart ? ` – ${dayNumToLabel(windowEnd)}` : ''}`
-      : 'Available now';
-    const detail = freeUntil !== undefined ? `Continuously available until ${dayNumToLabel(freeUntil)}` : '';
-    const fromText = hasDates ? dayNumToLabel(windowStart) : 'now';
-    const rangeHeadline =
-      freeUntil === undefined
-        ? (hasDates ? `Available from ${fromText}` : 'Available now')
-        : freeUntil <= windowStart
-          ? (hasDates ? `Available ${fromText} only` : 'Available today only')
-          : `Available ${fromText} – ${dayNumToLabel(freeUntil)}`;
+  // A booking conflicts if its active window + 10-minute turnover buffer intersects the requested window
+  const conflicts = blocks.filter((b) => {
+    const effectiveEndMs = b.endMs === Infinity ? Infinity : b.endMs + TURNOVER_BUFFER_MS;
+    return b.startMs < requestEndMs && effectiveEndMs > requestStartMs;
+  });
+
+  // Conflicts exist: vehicle is currently busy or overlaps search
+  if (conflicts.length > 0) {
+    const reason = conflicts[0].kind;
+    const base = reason === 'service' ? 'IN SERVICE' : 'ON A TRIP';
+    const stayMs = Math.max(2 * 60 * 60 * 1000, requestEndMs - requestStartMs);
+
+    // Candidates for next availability: after each conflicting block's turnover buffer
+    const candidateTimes = [
+      requestStartMs,
+      ...blocks.map((b) => (b.endMs === Infinity ? Infinity : b.endMs + TURNOVER_BUFFER_MS)),
+    ]
+      .filter((t) => t >= requestStartMs && isFinite(t))
+      .sort((a, b) => a - b);
+
+    const nextFreeMs = candidateTimes.find((cand) =>
+      !blocks.some((b) => {
+        const effEnd = b.endMs === Infinity ? Infinity : b.endMs + TURNOVER_BUFFER_MS;
+        return b.startMs < cand + stayMs && effEnd > cand;
+      })
+    );
+
+    if (nextFreeMs !== undefined) {
+      const nextDate = new Date(nextFreeMs);
+      const nextDayNum = toDayNum(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
+      const nextAvailableFrom = dayNumToLabel(nextDayNum);
+      const formattedTime = formatTime12(nextDate);
+      const availableFrom = nextDayNum === windowStart ? formattedTime : `${nextAvailableFrom}, ${formattedTime}`;
+
+      return {
+        available: false,
+        reason,
+        headline: base === 'IN SERVICE' ? 'In service' : 'On a trip',
+        detail: `Next available ${nextAvailableFrom}`,
+        label: `${base} · NEXT ${nextAvailableFrom}`.toUpperCase(),
+        nextAvailableFrom,
+        availableFrom,
+      };
+    }
+
     return {
-      available: true,
-      startDate: hasDates ? dayNumToLabel(windowStart) : 'Today',
-      headline,
-      rangeHeadline,
-      detail,
-      label: `${headline}${untilText}`.toUpperCase(),
-      freeUntil: freeUntil !== undefined ? dayNumToLabel(freeUntil) : undefined,
+      available: false,
+      reason,
+      headline: base === 'IN SERVICE' ? 'In service' : 'On a trip',
+      detail: '',
+      label: base,
     };
   }
 
-  // Unavailable — find the earliest start where the whole stay fits.
-  const candidates = [windowStart, ...blocks.map(b => b.end + 1)].filter(c => c >= windowStart && isFinite(c)).sort((a, b) => a - b);
-  const nextStart = candidates.find(c => !blocks.some(b => overlaps(b, c, c + stayDays - 1)));
+  // Vehicle is AVAILABLE for requested range!
+  // Look for the next upcoming booking/service that starts after or during the requested range
+  const nextUpcoming = blocks.find((b) => b.startMs >= requestStartMs);
+  let freeUntil: string | undefined;
+  let freeUntilDayNum: number | undefined;
+  let freeTill: string | undefined;
 
-  const reason = conflicts[0].kind;
-  const base = reason === 'service' ? 'IN SERVICE' : 'ON A TRIP';
+  if (nextUpcoming && isFinite(nextUpcoming.startMs)) {
+    const nextDate = new Date(nextUpcoming.startMs);
+    freeUntilDayNum = toDayNum(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
+    freeUntil = dayNumToLabel(freeUntilDayNum);
+    const timeStr = formatTime12(nextDate);
+    freeTill = freeUntilDayNum === windowStart ? timeStr : `${freeUntil}, ${timeStr}`;
+  }
+
+  const untilText = freeUntil !== undefined ? ` · FREE TILL ${freeUntil.toUpperCase()}` : '';
+  const headline = hasDates
+    ? `Available for ${dayNumToLabel(windowStart)}${windowEnd > windowStart ? ` – ${dayNumToLabel(windowEnd)}` : ''}`
+    : 'Available now';
+  const detail = freeUntil !== undefined ? `Continuously available until ${freeUntil}` : '';
+
+  const fromText = hasDates ? dayNumToLabel(windowStart) : 'now';
+  const rangeHeadline =
+    freeUntil === undefined
+      ? (hasDates ? `Available from ${fromText}` : 'Available now')
+      : (freeUntilDayNum !== undefined && freeUntilDayNum <= windowStart)
+        ? (hasDates ? `Available ${fromText} only` : 'Available today only')
+        : `Available ${fromText} – ${freeUntil}`;
+
   return {
-    available: false,
-    reason,
-    headline: base === 'IN SERVICE' ? 'In service' : 'On a trip',
-    detail: nextStart !== undefined ? `Next available ${dayNumToLabel(nextStart)}` : '',
-    label: (nextStart !== undefined ? `${base} · NEXT ${dayNumToLabel(nextStart)}` : base).toUpperCase(),
-    nextAvailableFrom: nextStart !== undefined ? dayNumToLabel(nextStart) : undefined,
+    available: true,
+    startDate: hasDates ? dayNumToLabel(windowStart) : 'Today',
+    headline,
+    rangeHeadline,
+    detail,
+    label: `${headline}${untilText}`.toUpperCase(),
+    freeUntil,
+    freeTill,
   };
 }
 
-export const checkCarAvailability = (car: Car | undefined | null, selectedStartDate: string, selectedEndDate?: string): boolean =>
-  getAvailability(car, selectedStartDate, selectedEndDate).available;
+export const checkCarAvailability = (
+  car: Car | undefined | null,
+  selectedStartDate: string,
+  selectedEndDate?: string,
+  pickupTime?: string,
+  returnTime?: string
+): boolean => getAvailability(car, selectedStartDate, selectedEndDate, pickupTime, returnTime).available;
 
 /** Attaches `availability` / `isAvailable` for the dates being viewed. */
-export function withAvailability(cars: Car[], startLabel?: string, endLabel?: string): Car[] {
+export function withAvailability(
+  cars: Car[],
+  startLabel?: string,
+  endLabel?: string,
+  pickupTime?: string,
+  returnTime?: string
+): Car[] {
   return cars.map(car => {
-    const availability = getAvailability(car, startLabel, endLabel);
+    const availability = getAvailability(car, startLabel, endLabel, pickupTime, returnTime);
     return { ...car, isAvailable: availability.available, availability };
   });
 }

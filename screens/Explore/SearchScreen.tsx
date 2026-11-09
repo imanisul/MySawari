@@ -94,10 +94,10 @@ export default function SearchResultsScreen() {
   // Vehicles of the searched kind that are free for the whole trip (workshop vehicles excluded).
   const freeCars = useMemo(() => (fetchedCars || [])
     .filter((c) => (vehicleType === 'bike' ? c.type === 'Bike' : c.type === 'Car' || !c.type))
-    .map((c) => ({ ...c, availability: getAvailability(c, startLabel, hasRange ? endLabel : undefined) }))
+    .map((c) => ({ ...c, availability: getAvailability(c, startLabel, hasRange ? endLabel : undefined, pickupTime, returnTime) }))
     .filter((c) => c.availability.available)
     .map((c) => ({ ...c, isAvailable: true })),
-  [fetchedCars, vehicleType, startLabel, endLabel, hasRange]);
+  [fetchedCars, vehicleType, startLabel, endLabel, hasRange, pickupTime, returnTime]);
 
   const activeFilterCount = countActive(filters);
   const reviewRating = useVehicleRatings(freeCars, sort === 'rating' || !!filters.rating || showFilter);
@@ -129,7 +129,7 @@ export default function SearchResultsScreen() {
         if (candidate < today) continue;
         const s = dayNumToLabel(candidate);
         const e = dayNumToLabel(candidate + length);
-        if (pool.some((c) => getAvailability(c, s, e).available)) return { start: s, end: e };
+        if (pool.some((c) => getAvailability(c, s, e, pickupTime, returnTime).available)) return { start: s, end: e };
       }
     }
     return null;

@@ -115,7 +115,7 @@ export default function CarDetailsScreen() {
   // Same rule as the lists: free for the chosen dates (or today if none chosen).
   const [startStr, endStr] = splitDateRange(effectiveDateRange);
   const liveCar = useLiveCar(selectedCar);
-  const availability = getAvailability(liveCar, startStr, endStr);
+  const availability = getAvailability(liveCar, startStr, endStr, pickupTime, returnTime);
   const isAvailable = availability.available;
 
   // Enrich the car with the computed availability so child components can access nextAvailableFrom etc.

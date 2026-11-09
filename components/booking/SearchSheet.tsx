@@ -20,7 +20,7 @@ export function SearchSheet({
   buttonLabel?: string;
 }) {
   const colors = useColors();
-  const { dateRange, dropoff, selectedCar, isDeliveryRequested, pickup, deliveryMode, returnAddress } = useSawari();
+  const { dateRange, dropoff, selectedCar, isDeliveryRequested, pickup, deliveryMode, returnAddress, pickupTime, returnTime } = useSawari();
   
   const [startStr, endStr] = dateRange.split(' – ');
   const hasValidDates = !!(startStr && endStr && startStr !== 'Select' && endStr !== 'Select');
@@ -32,7 +32,7 @@ export function SearchSheet({
   }
 
   // Check if selected car is available on these dates
-  const availability = getAvailability(selectedCar, startStr, endStr);
+  const availability = getAvailability(selectedCar, startStr, endStr, pickupTime, returnTime);
   const isAvailable = availability.available;
   
   return (

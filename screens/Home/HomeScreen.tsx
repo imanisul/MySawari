@@ -123,6 +123,7 @@ export default function HomeScreen() {
     vehicleType, setVehicleType, customer, selectedCar, selectCar, isAuthenticated, isAuthLoading, setBookingSource, dateRange,
     membership, fetchWallet, syncNotifications, sawariCash, unreadCount, earnSawariCash, isDarkMode,
     dropoff, setDropoff, setDates, setTimes, setMode, setIsDeliveryRequested, setDeliveryMode, setPickup, setReturnAddress,
+    pickupTime, returnTime,
   } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   // The city shown at the top; tapping it opens the picker (one city for now, more later).
@@ -202,7 +203,7 @@ export default function HomeScreen() {
 
   const typeName = vehicleType === 'bike' ? 'Bike' : 'Car';
   const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
-  const withAvail = useCallback((v: any) => { const availability = getAvailability(v, startStr, endStr); return { ...v, availability, isAvailable: availability.available }; }, [startStr, endStr]);
+  const withAvail = useCallback((v: any) => { const availability = getAvailability(v, startStr, endStr, pickupTime, returnTime); return { ...v, availability, isAvailable: availability.available }; }, [startStr, endStr, pickupTime, returnTime]);
 
   // Recent Searches: only what this customer looked at (newest first, with the trip it was viewed for), never filler.
   const recent = useMemo(() => viewedIds

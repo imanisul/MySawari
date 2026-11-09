@@ -35,7 +35,7 @@ export default function ExploreScreen() {
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
   // Cars or bikes, as chosen on Home.
-  const { setBookingSource, vehicleType: homeType, setDropoff, setDates, duration } = useSawari();
+  const { setBookingSource, vehicleType: homeType, setDropoff, setDates, duration, pickupTime, returnTime } = useSawari();
   const isBike = homeType === 'bike';
   const CHIPS = chipsFor(isBike);
 
@@ -91,9 +91,9 @@ export default function ExploreScreen() {
   // Availability is worked out once per vehicle list, so filtering and sorting reuse the same card objects
   // (new objects on every change made every card redraw).
   const withAvailability = useMemo(() => baseCars.map((car: Car) => {
-    const availability = getAvailability(car);
+    const availability = getAvailability(car, undefined, undefined, pickupTime, returnTime);
     return { ...car, isAvailable: availability.available, availability };
-  }), [baseCars]);
+  }), [baseCars, pickupTime, returnTime]);
 
   const filteredCars = useMemo(() => {
     const query = debouncedQuery.trim().toLowerCase();

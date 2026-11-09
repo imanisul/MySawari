@@ -66,15 +66,7 @@ interface ComboSlide extends HeroSlideBase {
   sub: string[];
 }
 
-interface FlashSlide extends HeroSlideBase {
-  kind: 'flash';
-}
-
-type HeroSlide = TextSlide | ImageSlide | ComboSlide | FlashSlide;
-
-// The ₹1 flash sale slide goes after every other banner.
-const withFlash = (list: HeroSlide[]): HeroSlide[] => [...list, FLASH_SLIDE];
-const FLASH_SLIDE: FlashSlide = { id: 'flash-sale', kind: 'flash', destinationType: 'screen', destinationScreen: '/flash-sale' };
+type HeroSlide = TextSlide | ImageSlide | ComboSlide;
 
 // Default brand slides if no backend offers or to complement active offers.
 const DEFAULT_SLIDES: HeroSlide[] = [
@@ -219,7 +211,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
   const { data: offers } = useQuery(offersQueryOptions);
 
   const slides = useMemo<HeroSlide[]>(() => {
-    if (!offers || !Array.isArray(offers)) return withFlash(DEFAULT_SLIDES);
+    if (!offers || !Array.isArray(offers)) return DEFAULT_SLIDES;
 
     const offerSlides: HeroSlide[] = [];
 
@@ -299,7 +291,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
       }
     });
 
-    return withFlash([...DEFAULT_SLIDES, ...offerSlides]);
+    return [...DEFAULT_SLIDES, ...offerSlides];
   }, [offers]);
 
   // Adaptive width across compact phones (360dp), modern phones (390-430dp), and tablets (460dp max)
@@ -453,28 +445,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
       >
         {(count > 1 ? [...slides, slides[0]] : slides).map((s, index) => (
           <View key={`${s.id}-${index}`} style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-            {s.kind === 'flash' ? (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Flash sale at 1 rupee. Book now"
-                onPress={() => handleSlidePress(s)}
-                style={({ pressed }) => [styles.flashCard, { width: cardWidth }, pressed && { opacity: 0.95, transform: [{ scale: 0.99 }] }]}
-              >
-                <LinearGradient colors={['#E11D48', '#F97316']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-                <View style={styles.flashTag}>
-                  <Feather name="zap" size={11} color="#E11D48" />
-                  <Text style={styles.flashTagText}>FLASH SALE</Text>
-                </View>
-                <View style={styles.flashRow}>
-                  <Text style={styles.flashAt}>Rent at just</Text>
-                  <Text style={styles.flashPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>₹1</Text>
-                </View>
-                <View style={styles.flashBtn}>
-                  <Text style={styles.flashBtnText}>Book now</Text>
-                  <Feather name="arrow-right" size={14} color="#E11D48" />
-                </View>
-              </Pressable>
-            ) : s.kind === 'image' ? (
+            {s.kind === 'image' ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Promotional banner"
@@ -1132,14 +1103,6 @@ export function ConnectCard() {
 }
 
 const styles = StyleSheet.create({
-  flashCard: { height: 148, borderRadius: 16, overflow: 'hidden', marginVertical: 4, paddingHorizontal: 18, justifyContent: 'center', gap: 6, backgroundColor: '#E11D48' },
-  flashTag: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 4, height: 22, paddingHorizontal: 10, borderRadius: 11, backgroundColor: '#FFE600' },
-  flashTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 11, lineHeight: 16, letterSpacing: 0.8, color: '#E11D48' },
-  flashRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  flashAt: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#FFFFFF', paddingBottom: 12 },
-  flashPrice: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 52, lineHeight: 60, color: '#FFFFFF' },
-  flashBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, height: 30, paddingHorizontal: 14, borderRadius: 15, backgroundColor: '#FFFFFF' },
-  flashBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 12, lineHeight: 16, color: '#E11D48' },
   // Banner
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 8 },  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   city: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },

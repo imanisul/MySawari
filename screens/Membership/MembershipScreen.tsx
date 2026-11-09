@@ -53,20 +53,20 @@ const PLANS: PlanDef[] = [
   {
     key: 'starter', name: 'Starter', price: 999, pctLabel: '5%', perTripCap: 499, annualCap: 10000,
     icon: require('@/assets/images/plan_starter.png'), iconSize: 16,
-    art: require('@/assets/images/membership_art_starter.png'), headerTop: '#6759DB', headerBottom: '#796CE3', lightHeader: false,
-    accent: '#2F3E75', innerBorder: '#E0DDFB',
+    art: require('@/assets/images/membership_art_starter.png'), headerTop: '#323E71', headerBottom: '#4B5A9E', lightHeader: false,
+    accent: '#323E71', innerBorder: '#D9DDEC',
   },
   {
     key: 'plus', name: 'Plus', price: 1999, pctLabel: '10%', perTripCap: 799, annualCap: 15000,
     icon: require('@/assets/images/plan_plus.png'), iconSize: 17,
-    art: require('@/assets/images/membership_art_plus.png'), headerTop: '#F1F1FD', headerBottom: '#F5F5FD', lightHeader: true,
-    accent: '#6152D8', innerBorder: '#E0DDFB',
+    art: require('@/assets/images/membership_art_plus.png'), headerTop: '#323E71', headerBottom: '#4B5A9E', lightHeader: false,
+    accent: '#323E71', innerBorder: '#D9DDEC',
   },
   {
     key: 'pro', name: 'Pro', price: 2999, pctLabel: '12.5%', perTripCap: 999, annualCap: 20000,
     icon: require('@/assets/images/plan_pro.png'), iconSize: 16,
-    art: require('@/assets/images/membership_art_pro.png'), headerTop: '#F2F8F6', headerBottom: '#F7FBF9', lightHeader: true,
-    accent: '#64B403', innerBorder: '#B0DACB',
+    art: require('@/assets/images/membership_art_pro.png'), headerTop: '#323E71', headerBottom: '#4B5A9E', lightHeader: false,
+    accent: '#323E71', innerBorder: '#D9DDEC',
   },
 ];
 
@@ -83,7 +83,7 @@ function activeOnly(raw: any): ActiveMembership | null {
 }
 const tierIndex = (key?: string | null) => PLANS.findIndex((p) => p.key === key);
 
-const PURPLE = '#6152D8';
+const PURPLE = '#323E71';
 const GREEN = '#008758';
 // Header art files are 786 × 520 (393 × 260 at 2x); the white card inside them is placed by these fractions.
 const ART_RATIO = 520 / 786;
@@ -140,9 +140,9 @@ export default function MembershipScreen() {
   const fetchMembership = useCallback(async () => {
     setChecking(true);
     try {
-      const wallet: any = await API.getWallet(true).catch(() => ({ failed: true }));
-      if (!wallet?.failed) {
-        setMembership(activeOnly(wallet?.membership));
+      const result = await API.getMembership();
+      if (!result.failed) {
+        setMembership(activeOnly(result.membership));
       }
     } catch {
       // Background check failed; keep known state
@@ -192,14 +192,11 @@ export default function MembershipScreen() {
   // "Subscribe" pressed with no plan picked: ask for one instead of guessing.
   const [needPick, setNeedPick] = useState(false);
   useEffect(() => {
-    if (selected) {
-      setNeedPick(false);
-      if (isAuthenticated) {
-        const def = getPlanDef(selected);
-        if (def?.price) API.prefetchRazorpayOrder(def.price);
-      }
-    }
-  }, [selected, isAuthenticated]);
+    if (selected) setNeedPick(false);
+    // The order for the plan the button will buy (the pick, or a member's next plan up) is created before the tap.
+    const price = (selected ? getPlanDef(selected) : activePlan ? offered[0] : undefined)?.price;
+    if (isAuthenticated && price) API.prefetchRazorpayOrder(price);
+  }, [selected, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (loading) return;
@@ -302,25 +299,6 @@ export default function MembershipScreen() {
     );
   }
 
-  if (checkoutStatus === 'PAYMENT_PENDING' && razorpayOrder) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <RazorpayCheckoutWebView
-          orderId={razorpayOrder.orderId}
-          amount={razorpayOrder.amountPaise}
-          currency="INR"
-          name="MySawari Membership"
-          description={`Activate ${getPlanDef(activating!)?.name} Plan`}
-          themeColor={colors.navy || '#111A2B'}
-          razorpayKey={razorpayOrder.keyId}
-          onSuccess={handleRazorpaySuccess}
-          onFailure={handleCancelPayment}
-          onClose={handleCancelPayment}
-        />
-      </View>
-    );
-  }
-
   if (checkoutStatus === 'VERIFYING') {
     return (
       <PaymentProgress
@@ -338,10 +316,11 @@ export default function MembershipScreen() {
   // nothing picked). A non-member with nothing picked sees "Subscribe" and is asked to choose.
   const target = selectedPlan ?? (activePlan ? offered[0] : undefined);
   const lightHeader = !!activePlan?.lightHeader;
-  const headerTop = activePlan ? activePlan.headerTop : '#6556DA';
-  const headerBottom = activePlan ? activePlan.headerBottom : '#7365E0';
+  const headerTop = activePlan ? activePlan.headerTop : '#323E71';
+  const headerBottom = activePlan ? activePlan.headerBottom : '#4B5A9E';
   const ctaLabel = target ? (activePlan ? `Upgrade to ${target.name}` : `Get ${target.name}`) : 'Subscribe';
   const showCta = offered.length > 0;
+  const payOpen = checkoutStatus === 'PAYMENT_PENDING' && !!razorpayOrder;
   const ctaSpace = showCta ? 53 + 16 + Math.max(insets.bottom, 12) : insets.bottom + 24;
   const onCta = () => {
     if (target) { handleActivate(target.key); return; }
@@ -375,7 +354,8 @@ export default function MembershipScreen() {
               <MemberCard plan={activePlan} totalSaved={membership.totalSaved || 0} width={width} progress={progressAnim} />
             ) : (
               <>
-                <Image source={require('@/assets/images/membership_stars.png')} style={{ width, height: width * STARS_RATIO, marginTop: 23.5 }} resizeMode="stretch" fadeDuration={0} accessible={false} />
+                {/* Transparent stars: the header's brand navy shows behind them (the old picture had a purple background baked in). */}
+                <Image source={require('@/assets/images/membership_stars_brand.png')} style={{ alignSelf: 'center', width: width * STARS_RATIO * (580 / 200), height: width * STARS_RATIO, marginTop: 23.5 }} resizeMode="contain" fadeDuration={0} accessible={false} />
                 <Text maxFontSizeMultiplier={1.2} numberOfLines={1} adjustsFontSizeToFit style={styles.heroTitle} accessibilityRole="header">Get Membership</Text>
                 <Text style={styles.heroSub}>Unlock premium features</Text>
               </>
@@ -423,11 +403,11 @@ export default function MembershipScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={target ? `${ctaLabel}, ${formatCurrency(target.price)} a year` : 'Subscribe, choose a plan first'}
-              disabled={!!activating || checking}
+              disabled={!!activating}
               onPress={onCta}
-              style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, (pressed || !!activating || checking) && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, (pressed || !!activating) && { opacity: 0.85 }]}
             >
-              {activating || checking ? <ActivityIndicator color="#FFFFFF" /> : <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.ctaText}>{ctaLabel}</Text>}
+              {activating ? <ActivityIndicator color="#FFFFFF" /> : <Text maxFontSizeMultiplier={1.2} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.ctaText}>{ctaLabel}</Text>}
             </Pressable>
           </View>
         </View>
@@ -498,6 +478,35 @@ export default function MembershipScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Payment sheet: mounted (hidden) from the moment the page opens, exactly like booking, so Razorpay's page is
+          already loaded and opens the instant the order exists. */}
+      {isAuthenticated && showCta && (
+        <View
+          style={payOpen ? [StyleSheet.absoluteFill, { zIndex: 50, backgroundColor: colors.background }] : { position: 'absolute', width: 1, height: 1, opacity: 0 }}
+          pointerEvents={payOpen ? 'auto' : 'none'}
+        >
+          <RazorpayCheckoutWebView
+            visible={payOpen}
+            orderId={razorpayOrder?.orderId}
+            amount={razorpayOrder?.amountPaise}
+            currency="INR"
+            name="MySawari"
+            description={activating ? `Activate ${getPlanDef(activating)?.name} Plan` : 'MySawari Membership'}
+            themeColor={colors.navy || '#111A2B'}
+            razorpayKey={razorpayOrder?.keyId}
+            // Same details as booking sends: Razorpay uses the mobile number to put this customer's usual method first.
+            prefill={{
+              name: customer?.name || undefined,
+              contact: customer?.mobile || undefined,
+              email: customer?.email || undefined,
+            }}
+            onSuccess={handleRazorpaySuccess}
+            onFailure={handleCancelPayment}
+            onClose={handleCancelPayment}
+          />
+        </View>
+      )}
     </BlurHost>
   );
 }
@@ -523,8 +532,8 @@ function MemberCard({ plan, totalSaved, width, progress }: { plan: PlanDef; tota
       >
         <Text {...T} numberOfLines={1} adjustsFontSizeToFit style={[styles.innerTitle, { color: plan.accent, fontSize: fs(19), lineHeight: fs(26) }]}>{plan.name} Member</Text>
         <View style={[styles.usedRow, { marginTop: fs(4) }]}>
-          <Text {...T} numberOfLines={1} style={[styles.usedText, { fontSize: fs(11), lineHeight: fs(16.5) }]}>{usedPct}% saving used</Text>
-          <Text {...T} numberOfLines={1} style={[styles.usedText, { fontSize: fs(11), lineHeight: fs(16.5) }]}>{formatCurrency(totalSaved)}/{formatCurrency(plan.annualCap)}</Text>
+          <Text {...T} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.usedText, { fontSize: fs(11), lineHeight: fs(16.5) }]}>{usedPct}% saving used</Text>
+          <Text {...T} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.usedText, { fontSize: fs(11), lineHeight: fs(16.5) }]}>{formatCurrency(totalSaved)}/{formatCurrency(plan.annualCap)}</Text>
         </View>
         <View style={[styles.track, { marginTop: fs(4), height: fs(6), borderRadius: fs(3) }]}>
           <Animated.View style={[styles.fill, { backgroundColor: plan.accent, width: progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
@@ -538,7 +547,7 @@ function MemberCard({ plan, totalSaved, width, progress }: { plan: PlanDef; tota
       </View>
       <View style={styles.capPillWrap} pointerEvents="none">
         <View style={[styles.capPill, { height: fs(19.5), minWidth: fs(116), paddingHorizontal: fs(8), borderRadius: fs(10) }]}>
-          <Text {...T} numberOfLines={1} style={[styles.capPillText, { fontSize: fs(8.5) }]}>Max {formatCurrency(plan.perTripCap)} savings per trip</Text>
+          <Text {...T} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.capPillText, { fontSize: fs(8.5) }]}>Max {formatCurrency(plan.perTripCap)} savings per trip</Text>
         </View>
       </View>
     </View>
@@ -565,7 +574,7 @@ function PlanRow({ plan, on, onPress }: { plan: PlanDef; on: boolean; onPress: (
     ? { bg: PURPLE, border: PURPLE, text: '#FFFFFF', sub: 'rgba(255,255,255,0.85)', radioOn: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' }, dot: PURPLE, radioOff: { backgroundColor: '#FFFFFF', borderColor: '#FFFFFF' } }
     : plan.key === 'pro'
       ? { bg: p.greenBg, border: p.proBorder, text: p.fg, sub: p.muted, radioOn: { backgroundColor: GREEN, borderColor: GREEN }, dot: '#FFFFFF', radioOff: { backgroundColor: '#FFFFFF', borderColor: p.radioRing } }
-      : { bg: p.page, border: p.memberBorder, text: p.fg, sub: p.muted, radioOn: { backgroundColor: PURPLE, borderColor: PURPLE }, dot: '#FFFFFF', radioOff: { backgroundColor: '#FFFFFF', borderColor: p.radioRing } };
+      : { bg: p.page, border: '#D9DDEC', text: p.fg, sub: p.muted, radioOn: { backgroundColor: PURPLE, borderColor: PURPLE }, dot: '#FFFFFF', radioOff: { backgroundColor: '#FFFFFF', borderColor: p.radioRing } };
   return (
     <Animated.View style={[{ transform: [{ scale }] }, on && [styles.planOn, { shadowColor: plan.key === 'pro' ? GREEN : PURPLE }]]}>
     <Pressable
@@ -585,7 +594,7 @@ function PlanRow({ plan, on, onPress }: { plan: PlanDef; on: boolean; onPress: (
           <Image source={plan.icon} style={{ width: plan.iconSize, height: plan.iconSize }} resizeMode="contain" />
           <Text maxFontSizeMultiplier={1.3} style={[styles.planName, { color: look.text }]}>{plan.name}</Text>
           <View style={styles.offChip}>
-            <Text maxFontSizeMultiplier={1.2} numberOfLines={1} style={styles.offChipText}>{plan.pctLabel} off every trip</Text>
+            <Text maxFontSizeMultiplier={1.2} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.offChipText}>{plan.pctLabel} off every trip</Text>
           </View>
         </View>
         {/* Wraps to a second line on narrow phones / large text instead of being cut off. */}
@@ -594,7 +603,7 @@ function PlanRow({ plan, on, onPress }: { plan: PlanDef; on: boolean; onPress: (
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text maxFontSizeMultiplier={1.3} style={[styles.planPrice, { color: look.text }]} numberOfLines={1}>{formatCurrency(plan.price)}</Text>
+        <Text maxFontSizeMultiplier={1.3} style={[styles.planPrice, { color: look.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatCurrency(plan.price)}</Text>
         <Text maxFontSizeMultiplier={1.3} style={[styles.planSub, { color: look.sub }]}>/year</Text>
       </View>
     </Pressable>
@@ -627,7 +636,7 @@ const styles = StyleSheet.create({
   fill: { height: '100%', borderRadius: 3, minWidth: 6 },
   dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3 },
   footWrap: { flex: 1, justifyContent: 'center' },
-  dash: { width: 4, height: 1, backgroundColor: '#E0DDFB' },
+  dash: { width: 4, height: 1, backgroundColor: '#D9DDEC' },
   innerFoot: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5, color: '#737373', textAlign: 'center' },
   capPillWrap: { position: 'absolute', left: 0, right: 0, top: '37.4%', alignItems: 'center' },
   capPill: { height: 19.5, minWidth: 116, paddingHorizontal: 8, borderRadius: 10, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },

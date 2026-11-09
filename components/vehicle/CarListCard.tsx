@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { prefetchCarGallery } from '@/hooks/useVehicles';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
@@ -46,9 +47,10 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
   const p = useDetailsPalette();
   const { favorites, toggleFavorite } = useFavorites();
   const { width: windowWidth } = useWindowDimensions();
-  // Photo width known synchronously (screen − 16 margins − 4 card padding each side).
+  // Photo width known synchronously: screen − 16 margin − 1 border − 4 card padding, each side (= 42). The photo
+  // list snaps to its own width, so a page even 1–2 px wider than that left a growing gap at the start of each image.
   // Calculated once on render without onLayout state jumps so scrolling never stutters.
-  const width = Math.max(0, windowWidth - 40);
+  const width = Math.max(0, windowWidth - 42);
   const [slide, setSlide] = useState(0);
 
   const availability = car.availability ?? getAvailability(car);
@@ -119,7 +121,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
           )}
           {!!tag && (
             <View style={[styles.tag, { backgroundColor: p.navy }]}>
-              <Text style={styles.tagText} numberOfLines={1}>Best for {tag}</Text>
+              <Text style={styles.tagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Best for {tag}</Text>
             </View>
           )}
           <Pressable
@@ -144,12 +146,12 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
         <View style={styles.body}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{car.name}</Text>
+              <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{car.name}</Text>
               <View style={styles.metaRow}>
                 {meta.map((m, i) => (
                   <React.Fragment key={m}>
                     {i > 0 && <View style={[styles.metaDot, { backgroundColor: p.muted }]} />}
-                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1}>{m}</Text>
+                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{m}</Text>
                   </React.Fragment>
                 ))}
               </View>
@@ -212,6 +214,7 @@ export const CarListCard = React.memo(function CarListCard(props: CarListCardPro
       return;
     }
     select(pr.car);
+    prefetchCarGallery(pr.car);
     clearMembershipPopupShown(pr.car.id);
     const dateRange = pr.effectiveDateRange ?? global;
     const isDateSelected = !!dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';

@@ -215,7 +215,7 @@ export function WriteReviewBottomSheet({
         onContentSizeChange={(_, h) => setContentHeight(h)}
       >
         {!!vehicleName && (
-          <Text numberOfLines={1} style={[styles.intro, { color: colors.mutedForeground }]}>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.intro, { color: colors.mutedForeground }]}>
             Thanks for riding with the {vehicleName}. Tell others how it went.
           </Text>
         )}

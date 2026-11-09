@@ -408,21 +408,13 @@ function PlanOptions({ title, plans, tripRent }: { title: string; plans: typeof 
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.planPrice, { color: text }]} numberOfLines={1}>{formatCurrency(plan.price)}</Text>
+                  <Text style={[styles.planPrice, { color: text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatCurrency(plan.price)}</Text>
                   <Text style={[styles.planSub, { color: sub }]}>/year</Text>
                 </View>
               </Pressable>
             );
           })}
         </View>
-        {!!chosen && (
-          <View style={styles.addedRow}>
-            <Ionicons name="checkmark-circle" size={14} color={p.green} />
-            <Text style={[styles.addedText, { color: p.sub }]}>
-              {chosen.name} membership ({formatCurrency(chosen.price)}/year) is added to your payment. Tap it again to remove.
-            </Text>
-          </View>
-        )}
       </View>
 
       {celebrate && (
@@ -483,7 +475,7 @@ export function ReviewsStrip({ car }: { car: Car }) {
                 ))}
               </View>
               <Text style={[styles.reviewRating, { color: p.navy }]}>{r.rating.toFixed(1)}</Text>
-              <Text style={[styles.reviewer, { color: p.fg }]} numberOfLines={1}>{r.userName}</Text>
+              <Text style={[styles.reviewer, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{r.userName}</Text>
             </View>
             <Text style={[styles.reviewText, { color: p.sub }]} numberOfLines={3}>“{r.text.trim()}”</Text>
           </View>
@@ -521,7 +513,7 @@ export function RealTrips({ car }: { car: Car }) {
             {!!ph.place && (
               <BlurView intensity={25} tint="light" style={styles.placeChip}>
                 <Ionicons name="location" size={10} color="#FFFFFF" />
-                <Text style={styles.placeText} numberOfLines={1}>{formatPlace(ph.place)}</Text>
+                <Text style={styles.placeText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{formatPlace(ph.place)}</Text>
               </BlurView>
             )}
           </Pressable>
@@ -611,7 +603,7 @@ export function FeatureList({ car }: { car: Car }) {
                 {!!f && (
                   <>
                     <Ionicons name="checkmark-circle" size={12.5} color={p.green} />
-                    <Text style={[styles.featureText, { color: p.muted }]} numberOfLines={1}>{f}</Text>
+                    <Text style={[styles.featureText, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{f}</Text>
                   </>
                 )}
               </View>
@@ -648,6 +640,7 @@ export function WhyRent() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const [contentH, setContentH] = useState(0);
   const viewH = WHY_LIST_HEIGHT;
+  const whyLight = p.page === '#FFFFFF'; // brand-navy tints in light mode; dark mode keeps its palette
   const thumbH = contentH > viewH ? WHY_THUMB_HEIGHT : 0; // fixed size, as in the design
   const thumbY = scrollY.interpolate({
     inputRange: [0, Math.max(1, contentH - viewH)],
@@ -657,23 +650,23 @@ export function WhyRent() {
 
   return (
     <View style={styles.block}>
-      {/* linear-gradient(236.34deg, #D1CCF9 -14.94%, #F0EFFD 67.82%) on a 361×307 card: the line runs from
-          (1.04, 0.08) to (-0.04, 0.92) of the card, and the colour at its start is #D1CCF9 already 15% of the way
-          to #F0EFFD (#D7D2FA), reaching #F0EFFD at 67.82%. */}
+      {/* linear-gradient(236.34deg, #D5D9EA -14.94%, #EEF0F7 67.82%) on a 361×307 card: the line runs from
+          (1.04, 0.08) to (-0.04, 0.92) of the card, and the colour at its start is #D5D9EA already 15% of the way
+          to #EEF0F7 (#D5D9EA), reaching #EEF0F7 at 67.82%. */}
       <LinearGradient
-        colors={['#D7D2FA', p.purpleBg, p.purpleBg]}
+        colors={whyLight ? ['#D5D9EA', '#EEF0F7', '#EEF0F7'] : ['#D5D9EA', p.purpleBg, p.purpleBg]}
         locations={[0, 0.6782, 1]}
         start={{ x: 1.042, y: 0.075 }}
         end={{ x: -0.042, y: 0.925 }}
-        style={[styles.whyCard, { borderColor: p.memberBorder }]}
+        style={[styles.whyCard, { borderColor: whyLight ? '#D5D9EA' : p.memberBorder }]}
       >
-        {/* Figma "Ellipse 4": a 151×147 #9C90F3 blob, blurred 67, centred about 58 in from the right edge and 13 above the
+        {/* Figma "Ellipse 4": a 151×147 #4B5A9E blob, blurred 67, centred about 58 in from the right edge and 13 above the
             card's top. Drawn as a soft radial wash from that point (SVG filters are unreliable on Android). */}
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
             <RadialGradient id="whyGlow" cx="84%" cy="-4%" rx="42%" ry="48%" fx="84%" fy="-4%">
-              <Stop offset="0" stopColor={p.purpleGlow} stopOpacity="0.6" />
-              <Stop offset="1" stopColor={p.purpleGlow} stopOpacity="0" />
+              <Stop offset="0" stopColor={whyLight ? '#4B5A9E' : p.purpleGlow} stopOpacity="0.6" />
+              <Stop offset="1" stopColor={whyLight ? '#4B5A9E' : p.purpleGlow} stopOpacity="0" />
             </RadialGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#whyGlow)" />
@@ -692,7 +685,7 @@ export function WhyRent() {
           >
             {WHY.map((w) => (
               <View key={w.title} style={styles.whyRow}>
-                <View style={[styles.whyCheck, { backgroundColor: p.purpleCheck }]}>
+                <View style={[styles.whyCheck, { backgroundColor: whyLight ? '#323E71' : p.purpleCheck }]}>
                   <Feather name="check" size={11} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -733,7 +726,7 @@ export function LocationCard({ deliveryAddress }: { deliveryAddress?: string | n
             MySawari - Self Drive Car Rental Guwahati, Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019
           </Text>
           {!!deliveryAddress && (
-            <Text style={[styles.locAddr, { color: p.navy, marginTop: 6 }]} numberOfLines={1}>Delivered to: {deliveryAddress}</Text>
+            <Text style={[styles.locAddr, { color: p.navy, marginTop: 6 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Delivered to: {deliveryAddress}</Text>
           )}
         </View>
         <View style={styles.mapTile}>
@@ -1037,7 +1030,7 @@ const styles = StyleSheet.create({
   radioOn: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#FFFFFF' },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8.5, flexWrap: 'wrap' },
   planName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
-  planOn: { shadowColor: '#6152D8', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  planOn: { shadowColor: '#323E71', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   planRadio: { width: 15, height: 15, borderRadius: 7.5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   planRadioDot: { width: 5.5, height: 5.5, borderRadius: 3 },
   addedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 },

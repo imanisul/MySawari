@@ -49,7 +49,7 @@ export function VehicleSummary({ car, isAvailable, unavailableNote, highDemand, 
     <View style={styles.container}>
       {!isAvailable ? (
         <View style={[styles.banner, { backgroundColor: p.redBg, borderColor: p.redBorder }]}>
-          <Text style={[styles.bannerText, { color: p.red }]}>{unavailableNote || 'Not available for these dates'}</Text>
+          <Text style={[styles.bannerText, { color: p.red }]} numberOfLines={2}>{unavailableNote || 'Not available for these dates'}</Text>
         </View>
       ) : highDemand ? (
         <View style={[styles.banner, { backgroundColor: p.demandBg, borderColor: p.demandBorder }]}>
@@ -223,7 +223,7 @@ function DeliveryOptions() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.locLabel, { color: p.muted }]}>{r.label}</Text>
                 {r.value ? (
-                  <Text style={[styles.locValue, { color: p.fg }]} numberOfLines={1}>{r.value}</Text>
+                  <Text style={[styles.locValue, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{r.value}</Text>
                 ) : (
                   <Text style={[styles.locAdd, { color: p.navy }]}>Add address</Text>
                 )}
@@ -300,11 +300,11 @@ const styles = StyleSheet.create({
   // RN has no box-sizing, so this is the 359 content width -- 361 minus both strokes -- pinned rather than
   // stretched, which keeps the strip exactly as designed on every device instead of tracking the gutters.
   // Padding is 10px 0 only: no side inset, the row centres its items, gap 10 between them.
-  banner: { borderWidth: 1, borderRadius: 8, alignSelf: 'center', width: 359, height: 39, paddingVertical: 10,
+  banner: { borderWidth: 1, borderRadius: 8, alignSelf: 'center', width: 359, minHeight: 39, paddingVertical: 10, paddingHorizontal: 8,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   // Medium/xs: 11px on a 16.5px line, "Gold/Text" #B58703.
   bannerIcon: { fontSize: 11, lineHeight: 16.5 },
-  bannerText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, textAlign: 'center' },
+  bannerText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, textAlign: 'center', flexShrink: 1 },
   // Figma "Car Detail + Rating": 361×82 border-box, padding 10/12/12, 8 between the details and the rating.
   summaryCard: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 82, borderWidth: 1, borderRadius: 10, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12 },
   brand: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11 },

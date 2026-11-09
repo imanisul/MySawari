@@ -158,7 +158,7 @@ export default function PaymentScreen() {
             {!isDeliveryRequested ? (
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Destination</Text>
-                <Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
+                <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
                   {dropoff?.name || 'Select Destination'}
                 </Text>
               </View>
@@ -167,7 +167,7 @@ export default function PaymentScreen() {
                 {(deliveryMode === 'both' || deliveryMode === 'delivery') && (
                   <View style={[styles.row, { marginTop: 12 }]}>
                     <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Pickup</Text>
-                    <Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
                       {pricingQuote && pricingQuote.pickupCharge > 0 ? pricingQuote.pickupLocationName : 'Select Location'}
                     </Text>
                   </View>
@@ -175,7 +175,7 @@ export default function PaymentScreen() {
                 {(deliveryMode === 'both' || deliveryMode === 'return') && (
                   <View style={[styles.row, { marginTop: 12 }]}>
                     <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Return</Text>
-                    <Text numberOfLines={1} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={{ color: colors.foreground, fontFamily: 'Inter_500Medium', flexShrink: 1, marginLeft: 16, textAlign: 'right' }}>
                       {pricingQuote && pricingQuote.dropCharge > 0 ? pricingQuote.dropLocationName : 'Select Location'}
                     </Text>
                   </View>

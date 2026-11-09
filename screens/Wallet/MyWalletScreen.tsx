@@ -54,10 +54,7 @@ export default function MyWalletScreen() {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [showWithdraw, setShowWithdraw] = useState(false);
 
-  const load = useCallback(async () => {
-    const w: any = await API.getWallet(true);
-    if (w?.failed) { setFailed(true); return; }
-    setFailed(false);
+  const apply = useCallback((w: any) => {
     const txs: Tx[] = (w.transactions || []).map((t: any, i: number) => ({
       id: String(t.id || t._id || i),
       type: String(t.type || '').toLowerCase(),
@@ -75,6 +72,17 @@ export default function MyWalletScreen() {
       return live ? new Set([live.id]) : cur;
     });
   }, []);
+
+  // Stale-while-revalidate: the wallet already known (this session's, else the one saved on the phone) is drawn at
+  // once, with no skeleton; the fresh one replaces it as soon as the server answers.
+  const load = useCallback(async () => {
+    const known = await API.peekWallet();
+    if (known && !known.failed) { setFailed(false); apply(known); }
+    const w: any = await API.getWallet(true);
+    if (w?.failed) { if (!known) setFailed(true); return; }
+    setFailed(false);
+    apply(w);
+  }, [apply]);
 
   useFocusEffect(useCallback(() => { if (isAuthenticated) load(); }, [isAuthenticated, load]));
 
@@ -196,7 +204,7 @@ export default function MyWalletScreen() {
               <View key={t.id} style={[styles.card, styles.cardTop, { borderColor: p.segBorder }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.when, { color: p.fg }]}>{longStamp(t.date)}</Text>
-                  <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1}>
+                  <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                     <Text style={{ color: credit ? p.green : p.red }}>{credit ? '+' : '−'}{rupees(Math.abs(t.amount))}</Text>
                     {t.label ? `  •  ${t.label}` : ''}
                   </Text>

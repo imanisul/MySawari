@@ -14,9 +14,10 @@ import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet } from '@/components';
 import { API } from '@/services/backend/api';
 import { isPastSearch, removeRecentSearch, RecentSearch } from '@/utils/recentSearches';
-import { useVehicles } from '@/hooks/useVehicles';
+import { useVehicles, prefetchCarGallery } from '@/hooks/useVehicles';
 import { recentlyViewedQueryOptions, recentSearchesQueryOptions } from '@/hooks/useHomeData';
 import { Reveal } from '@/components/common/Reveal';
+import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
 import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
@@ -190,7 +191,7 @@ export default function HomeScreen() {
   // No "Set Location" popup on opening the app: the customer picks a destination from the search card
   // ("Select your Destination") when they want to.
 
-  const { data: fetchedVehicles = [], refetch: refetchVehicles } = useVehicles();
+  const { data: fetchedVehicles = [], refetch: refetchVehicles, isLoading: vehiclesLoading } = useVehicles();
 
   // ── Top picks: vehicles the customer viewed (resume where they left), then curated favourites ──
   const recentKey = isAuthenticated ? customer?.id : null;
@@ -264,6 +265,7 @@ export default function HomeScreen() {
 
   const openPick = useCallback((item: any) => {
     selectCar(item);
+    prefetchCarGallery(item);
     setBookingSource('home');
     // The car's details page only: location, dates and time are asked again, so booking never starts from an old trip.
     setDropoff(null);
@@ -293,6 +295,12 @@ export default function HomeScreen() {
   }, [fetchedVehicles]);
 
   const isMember = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
+
+  // The search box opens the rental-date calendar; its Search button then lists the vehicles free for those dates.
+  const openDates = useCallback(() => {
+    setBookingSource('home');
+    router.push('/dates');
+  }, [router, setBookingSource]);
 
   const openDestination = useCallback((q?: string) => {
     setBookingSource('home');
@@ -339,9 +347,9 @@ export default function HomeScreen() {
     'milestone',
     'middle_banner',
     'destinations',
-    'rate_us',
-    'benefits',
     'member',
+    'benefits',
+    'rate_us',
     'bottom_banner',
     'connect',
     'footer',
@@ -369,7 +377,7 @@ export default function HomeScreen() {
       case 'search_card':
         return (
           <View style={[styles.sheet, { backgroundColor: p.page, borderColor: p.deliveryBorder }]}>
-            <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDestination={() => openDestination()} />
+            <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDates={openDates} />
           </View>
         );
       case 'position3_promo': 
@@ -402,6 +410,18 @@ export default function HomeScreen() {
         );
         break;
       case 'picks':
+        if (!picks.length && vehiclesLoading) {
+          // The My Trips placeholder, returned without the fade-in so it is on screen from the first frame.
+          return (
+            <>
+              <HomeSectionTitle title="Top Picks" />
+              <View style={{ paddingHorizontal: 16 }}>
+                <BookingSkeleton index={0} />
+                <BookingSkeleton index={1} />
+              </View>
+            </>
+          );
+        }
         if (!picks.length) break;
         content = (
           <>
@@ -503,7 +523,7 @@ export default function HomeScreen() {
     }
     if (!content) return null;
     return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, milestone, journey, claimable, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, vehiclesLoading, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>

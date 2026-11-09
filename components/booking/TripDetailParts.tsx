@@ -133,7 +133,7 @@ export function BookingCard({
         <View style={[styles.cardInfo, { minHeight: compact ? 86 : 116 }]}>
           {!compact && <StatusTag kind={tagFor(booking)} />}
           <View style={{ gap: 0 }}>
-            <Text style={[styles.carName, { color: c.foreground }]} numberOfLines={1}>{booking.vehicleName}</Text>
+            <Text style={[styles.carName, { color: c.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{booking.vehicleName}</Text>
             <View style={styles.dotRow}>
               <Text style={[styles.meta, { color: c.mutedForeground }]}>{driverLabel(booking.driverMode)}</Text>
               <View style={[styles.dot, { backgroundColor: c.mutedForeground }]} />
@@ -146,7 +146,7 @@ export function BookingCard({
             )}
           </View>
           <View style={[styles.idChip, { backgroundColor: c.segBorder }]}>
-            <Text style={[styles.idText, { color: c.navy }]} numberOfLines={1}>
+            <Text style={[styles.idText, { color: c.navy }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               Booking ID: {booking.bookingCode || booking.id.slice(-6).toUpperCase()}
             </Text>
           </View>
@@ -257,7 +257,7 @@ export function TripTimeline({ booking }: { booking: BookingSnapshot }) {
                 <Text style={[styles.stopLine, { color: c.mutedForeground }]}>{st.time}</Text>
               </View>
             )}
-            <Text style={[styles.stopLine, { color: c.mutedForeground }]} numberOfLines={1}>{st.place}</Text>
+            <Text style={[styles.stopLine, { color: c.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{st.place}</Text>
           </View>
         </View>
       ))}
@@ -265,9 +265,14 @@ export function TripTimeline({ booking }: { booking: BookingSnapshot }) {
   );
 }
 
+/** The refund amount: the refund record's figure first (it is the one that is paid out), else the booking's. */
+export function refundAmountOf(b: BookingSnapshot): number {
+  return Number(b.pendingRefund?.refundAmount ?? b.refundAmount ?? 0) || 0;
+}
+
 /** Where a cancelled booking's refund stands, from the refund record on the server. */
 export function refundStage(b: BookingSnapshot): 'none' | 'received' | 'approved' | 'refunded' | 'rejected' {
-  if (!((b.refundAmount || 0) > 0) && !b.pendingRefund) return 'none';
+  if (!(refundAmountOf(b) > 0) && !b.pendingRefund) return 'none';
   const st = String(b.pendingRefund?.status || b.refundStatus || 'pending').toLowerCase();
   if (st === 'rejected') return 'rejected';
   if (st === 'refunded' || st === 'completed' || st === 'processed') return 'refunded';
@@ -297,10 +302,10 @@ export function RefundTimeline({ booking }: { booking: BookingSnapshot }) {
     { title: 'Request Received', lines: ['Your cancellation request has been received.'], done: true, color: RECEIVED },
     rejected
       ? { title: 'Refund Rejected', lines: [booking.pendingRefund?.rejectionReason || 'Your refund request was not approved.'], done: true, tone: 'danger' }
-      : { title: 'Refund Approved', lines: [approved ? 'Your refund has been approved.' : 'Your cancellation request will be reviewed.'], done: approved },
+      : { title: 'Refund Approved', lines: [approved ? `Your refund of ${rupees(refundAmountOf(booking))} has been approved.` : 'Your cancellation request will be reviewed.'], done: approved },
   ];
   if (!rejected) {
-    steps.push({ title: 'Refund Completed', lines: ['Your refund has reached your original payment method.'], done: refunded, color: '#008758' });
+    steps.push({ title: 'Refund Completed', lines: [refunded ? `${rupees(refundAmountOf(booking))} has been refunded to your original payment method.` : `${rupees(refundAmountOf(booking))} will reach your original payment method.`], done: refunded, color: '#008758' });
   }
   return <Timeline steps={steps} />;
 }
@@ -355,7 +360,7 @@ export function PricingSummary({ booking }: { booking: BookingSnapshot }) {
       {cancelled ? (
         <>
           {(b.cancellationFee || 0) > 0 && <Row label="Cancellation fee" value={rupees(b.cancellationFee)} quiet />}
-          <Row label="Refund amount" value={rupees(b.refundAmount)} accent={(b.refundAmount || 0) > 0} quiet />
+          <Row label="Refund amount" value={rupees(refundAmountOf(b))} accent={refundAmountOf(b) > 0} quiet />
         </>
       ) : (
         <Row label={paidAtPickup ? 'Paid at pickup' : 'Pay at pickup'} value={rupees(paidAtPickup ? atPickup : b.remainingRentalAmount)} quiet />

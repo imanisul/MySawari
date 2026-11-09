@@ -36,7 +36,7 @@ export default function SafetyScreen() {
       title: 'Verified Customer Identity',
       description: 'We ensure a safe ecosystem by strictly verifying the identities and licenses of all users on the platform.',
       icon: 'user-check',
-      color: '#A78BFA'
+      color: '#6C7BC0'
     }
   ];
 

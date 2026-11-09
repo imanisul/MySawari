@@ -151,7 +151,7 @@ export default function EditProfileScreen() {
             onPress={() => (f === 'mobile' ? changeMobile() : start(f))}
             style={[styles.box, styles.readRow, { borderColor: p.border, backgroundColor: p.soft }]}
           >
-            <Text style={[styles.value, { color: value ? p.sub : p.muted }]} numberOfLines={1}>{value || placeholder}</Text>
+            <Text style={[styles.value, { color: value ? p.sub : p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{value || placeholder}</Text>
             {saved === f ? (
               <Feather name="check" size={16} color={p.green} />
             ) : (

@@ -24,7 +24,7 @@ import { RefundTrackingModal } from '@/components/booking/RefundTrackingModal';
 import { BlurTargetProvider } from '@/components/common/BlurTargetContext';
 import { BookingDetailSkeleton } from '@/components/loading/ScreenSkeletons';
 import {
-  ActionRow, BookingCard, FONT, HelpCard, PricingSummary, RefundTimeline, SectionTitle, TripTimeline, pickupMoment, refundStage, rupees, shortDate,
+  ActionRow, BookingCard, FONT, HelpCard, PricingSummary, RefundTimeline, SectionTitle, TripTimeline, pickupMoment, refundStage, refundAmountOf, rupees, shortDate,
 } from '@/components/booking/TripDetailParts';
 
 const SUPPORT_EMAIL = 'support@mysawari.in';
@@ -325,11 +325,17 @@ export default function BookingDetailScreen() {
                 {/* While the refund is on its way, the payout details (UPI / bank) can still be checked or changed. */}
                 {(stage === 'received' || stage === 'approved') && (
                   <Pressable onPress={() => setShowRefundTrack(true)} hitSlop={6} style={styles.linkRow} accessibilityRole="button">
-                    <Text style={[styles.link, { color: c.blue }]}>Refund of {rupees(s.refundAmount)} · payout details</Text>
+                    <Text style={[styles.link, { color: c.blue }]}>Refund of {rupees(refundAmountOf(s))} · payout details</Text>
                     <Feather name="chevron-right" size={13} color={c.blue} />
                   </Pressable>
                 )}
                 </View>
+                {stage === 'refunded' && (
+                  <View style={[styles.box, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4', borderRadius: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+                    <Text style={[styles.helpTitle, { color: c.foreground }]}>Refund amount</Text>
+                    <Text style={[styles.helpTitle, { color: '#008758' }]}>{rupees(refundAmountOf(s))} refunded</Text>
+                  </View>
+                )}
                 {finished && (
                   <View style={[styles.box, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4', gap: 2, borderRadius: 8 }]}>
                     <Text style={[styles.helpTitle, { color: c.foreground }]}>Need help with your refund?</Text>
@@ -393,7 +399,7 @@ export default function BookingDetailScreen() {
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.tipTitle, { color: c.foreground }]}>{item.title}</Text>
-                      <Text style={[styles.body, { color: c.mutedForeground }]} numberOfLines={1}>{item.body}</Text>
+                      <Text style={[styles.body, { color: c.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.body}</Text>
                     </View>
                   </View>
                 ))}
@@ -404,18 +410,18 @@ export default function BookingDetailScreen() {
           {/* Pickup & handover (Figma: lavender card, purple ticks) */}
           {(upcoming || ongoing) && (
             <LinearGradient
-              colors={['#D7D2FA', '#F0EFFD', '#F0EFFD']}
+              colors={['#D5D9EA', '#EEF0F7', '#EEF0F7']}
               locations={[0, 0.6782, 1]}
               start={{ x: 1.042, y: 0.075 }}
               end={{ x: -0.042, y: 0.925 }}
-              style={[styles.why, { borderColor: '#D1CCF9' }]}
+              style={[styles.why, { borderColor: '#D5D9EA' }]}
             >
-              {/* Figma "Ellipse 4": the blurred #9C90F3 blob top-right, drawn as a radial wash (same as the car page). */}
+              {/* Figma "Ellipse 4": the blurred #4B5A9E blob top-right, drawn as a radial wash (same as the car page). */}
               <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
                 <Defs>
                   <RadialGradient id="tripGlow" cx="84%" cy="-4%" rx="42%" ry="48%" fx="84%" fy="-4%">
-                    <Stop offset="0" stopColor="#9C90F3" stopOpacity="0.6" />
-                    <Stop offset="1" stopColor="#9C90F3" stopOpacity="0" />
+                    <Stop offset="0" stopColor="#4B5A9E" stopOpacity="0.6" />
+                    <Stop offset="1" stopColor="#4B5A9E" stopOpacity="0" />
                   </RadialGradient>
                 </Defs>
                 <Rect x="0" y="0" width="100%" height="100%" fill="url(#tripGlow)" />
@@ -481,7 +487,7 @@ function Banner({ tone, title, body }: { tone: 'info' | 'active' | 'pending' | '
   if (tone === 'info') {
     return (
       <View style={[styles.banner, styles.bannerLine, { backgroundColor: '#F4F6FA' }]}>
-        <Text style={[styles.rowTitle, { color: fg }]} numberOfLines={1}>{title}</Text>
+        <Text style={[styles.rowTitle, { color: fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
       </View>
     );
   }
@@ -567,7 +573,7 @@ const styles = StyleSheet.create({
   whyTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
   whyRow: { flexDirection: 'row', gap: 8 },
   whyTickBox: { width: 24, paddingTop: 4 },
-  whyTick: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center' },
+  whyTick: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#323E71', alignItems: 'center', justifyContent: 'center' },
   whyItem: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
   whyBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
 

@@ -82,7 +82,7 @@ export function SearchCard({
         >
           <Feather name="flag" size={18} color={colors.blue} />
           <View style={styles.fieldContent}>
-            <Text numberOfLines={1} style={[styles.fieldValue, styles.largeFieldValue, { color: !dropoff?.name ? colors.mutedForeground : colors.foreground }]}>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.fieldValue, styles.largeFieldValue, { color: !dropoff?.name ? colors.mutedForeground : colors.foreground }]}>
               {dropoff?.name || 'Select destination'}
             </Text>
           </View>
@@ -110,7 +110,7 @@ export function SearchCard({
           >
             <Feather name="calendar" size={14} color={colors.blue} />
             <View style={styles.fieldContent}>
-              <Text numberOfLines={1} style={[styles.fieldValue, { color: startStr && startStr !== 'Select' ? colors.foreground : colors.mutedForeground }]}>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.fieldValue, { color: startStr && startStr !== 'Select' ? colors.foreground : colors.mutedForeground }]}>
                 {startStr && startStr !== 'Select' ? `${startStr}, ${pickupTime.replace(' AM', '').replace(' PM', '')}` : 'Start'}
               </Text>
             </View>
@@ -133,7 +133,7 @@ export function SearchCard({
           >
             <Feather name="calendar" size={14} color={colors.blue} />
             <View style={styles.fieldContent}>
-              <Text numberOfLines={1} style={[styles.fieldValue, { color: endStr && endStr !== 'Select' ? colors.foreground : colors.mutedForeground }]}>
+              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.fieldValue, { color: endStr && endStr !== 'Select' ? colors.foreground : colors.mutedForeground }]}>
                 {endStr && endStr !== 'Select' ? `${endStr}, ${returnTime.replace(' AM', '').replace(' PM', '')}` : 'Return'}
               </Text>
             </View>
@@ -202,7 +202,7 @@ export function SearchCard({
                 >
                   <Feather name="map-pin" size={14} color={colors.primaryText} />
                   <View style={styles.fieldContent}>
-                    <Text numberOfLines={1} style={[styles.fieldValue, { color: pickup?.name ? colors.foreground : colors.mutedForeground }]}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.fieldValue, { color: pickup?.name ? colors.foreground : colors.mutedForeground }]}>
                       {pickup?.name || 'Search address'}
                     </Text>
                   </View>
@@ -227,7 +227,7 @@ export function SearchCard({
                 >
                   <Feather name="map-pin" size={14} color={colors.primaryText} />
                   <View style={styles.fieldContent}>
-                    <Text numberOfLines={1} style={[styles.fieldValue, { color: returnAddress?.name ? colors.foreground : colors.mutedForeground }]}>
+                    <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.fieldValue, { color: returnAddress?.name ? colors.foreground : colors.mutedForeground }]}>
                       {returnAddress?.name || 'Search address'}
                     </Text>
                   </View>

@@ -7,7 +7,42 @@ import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, PF, rupees, shortDay } from '@/components/profile/ProfileParts';
-import { useReferrals, referralNote, Referral } from '@/utils/referrals';
+import { useReferrals, usePartnerQRs, referralNote, referralSteps, Referral } from '@/utils/referrals';
+
+const SHORT: Record<string, string> = {
+  Registered: 'Joined',
+  'Trip booked': 'Booked',
+  'Trip ongoing': 'On trip',
+  'Reward processing': 'Processing',
+  'Reward credited': 'Credited',
+  'Trip Cancelled': 'Cancelled',
+};
+
+/** Small one-line tracker: a dot per stage joined by a line, filled up to where this friend has got to. */
+function MiniTracker({ item }: { item: Referral }) {
+  const p = useDetailsPalette();
+  const steps = referralSteps(item);
+  const colorOf = (state: string) => (state === 'success' ? p.green : state === 'error' ? p.red : state === 'done' ? p.navy : p.strongBorder);
+  return (
+    <View style={styles.tracker} accessible={false}>
+      {steps.map((st, i) => {
+        const on = st.state !== 'todo';
+        return (
+          <View key={st.title} style={styles.trackStep}>
+            <View style={styles.trackLineRow}>
+              <View style={[styles.trackLine, { backgroundColor: i === 0 ? 'transparent' : on ? colorOf(st.state) : p.strongBorder }]} />
+              <View style={[styles.trackDot, on ? { backgroundColor: colorOf(st.state), borderColor: colorOf(st.state) } : { borderColor: p.strongBorder, backgroundColor: p.page }]}>
+                {on && <Feather name={st.state === 'error' ? 'x' : 'check'} size={8} color="#FFFFFF" />}
+              </View>
+              <View style={[styles.trackLine, { backgroundColor: i === steps.length - 1 ? 'transparent' : steps[i + 1].state !== 'todo' ? colorOf(steps[i + 1].state) : p.strongBorder }]} />
+            </View>
+            <Text style={[styles.trackLabel, { color: on ? p.fg : p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{SHORT[st.title] || st.title}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
 
 /**
  * Figma "My Referrals" (Profile → Referral Tracking): totals (friends referred, trips completed, rewards
@@ -17,18 +52,40 @@ export default function MyReferralsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
   const { data: refs = [], isLoading, isError, refetch, isRefetching } = useReferrals();
+  const { data: partnerQRs = [] } = usePartnerQRs();
 
   const completed = refs.filter((r) => r.stage === 'processing' || r.stage === 'credited').length;
   const earned = refs.reduce((s, r) => s + (r.stage === 'credited' ? r.amount : 0), 0);
 
   const meta = (r: Referral) => {
     if (r.stage === 'not_joined') return 'Not joined yet';
-    const joined = r.joinedAt ? `Joined MySawari on ${shortDay(r.joinedAt)}` : 'Joined MySawari';
-    return r.route ? `${joined}  •  ${r.route}` : joined;
+    const joined = r.joinedAt ? `Joined ${shortDay(r.joinedAt)}` : 'Joined MySawari';
+    const parts: string[] = [];
+    if (r.vehicleName) parts.push(`🚗 ${r.vehicleName}`);
+    if (r.route) parts.push(r.route);
+    parts.push(joined);
+    return parts.join('  •  ');
   };
 
   const Stats = (
     <View>
+      {partnerQRs.length > 0 && (
+        <View style={styles.partnerBanner}>
+          <View style={styles.partnerBannerRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+              <Feather name="tag" size={16} color="#323E71" />
+              <Text style={styles.partnerTitle}>Partner QR Sticker</Text>
+            </View>
+            <View style={styles.partnerPill}>
+              <Text style={styles.partnerPillText}>{partnerQRs[0].token}</Text>
+            </View>
+          </View>
+          <Text style={styles.partnerSub}>
+            Assigned QR sticker. Guests scanning your sticker link here and earn you commission on every booking.
+          </Text>
+        </View>
+      )}
+
       <View style={[styles.stats, { backgroundColor: p.soft, borderColor: p.border }]}>
         <Text style={[styles.statLabel, { color: p.sub }]}>Total friends referred</Text>
         <Text style={[styles.statBig, { color: p.fg }]}>{refs.length} {refs.length === 1 ? 'friend' : 'friends'}</Text>
@@ -74,10 +131,11 @@ export default function MyReferralsScreen() {
                     <Feather name="user" size={16} color={p.fg} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{item.name}</Text>
-                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1}>{meta(item)}</Text>
+                    <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.name}</Text>
+                    <Text style={[styles.meta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{meta(item)}</Text>
                   </View>
                 </View>
+                {item.stage !== 'not_joined' && <MiniTracker item={item} />}
                 {!!note && <Text style={[styles.note, { color: note.tone === 'green' ? p.green : p.sub }]}>{note.text}</Text>}
               </Pressable>
             );
@@ -109,6 +167,45 @@ export default function MyReferralsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   content: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 40 },
+  partnerBanner: {
+    backgroundColor: '#EEF0F7',
+    borderWidth: 1,
+    borderColor: '#D5D9EA',
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingTop: 11,
+    paddingBottom: 11,
+    marginBottom: 14,
+  },
+  partnerBannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  partnerTitle: {
+    fontFamily: PF.medium,
+    fontSize: 13.5,
+    color: '#312E81',
+  },
+  partnerPill: {
+    backgroundColor: '#323E71',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  partnerPillText: {
+    fontFamily: PF.semibold,
+    fontSize: 12.5,
+    color: '#FFFFFF',
+    letterSpacing: 1,
+  },
+  partnerSub: {
+    fontFamily: PF.regular,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: '#323E71',
+    marginTop: 6,
+  },
   stats: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingTop: 14, paddingBottom: 13 },
   statLabel: { fontFamily: PF.regular, fontSize: 12.5 },
   statBig: { fontFamily: PF.medium, fontSize: 23, lineHeight: 32, marginTop: 4 },
@@ -122,6 +219,12 @@ const styles = StyleSheet.create({
   name: { fontFamily: PF.medium, fontSize: 14.5 },
   meta: { fontFamily: PF.regular, fontSize: 12, marginTop: 3 },
   note: { fontFamily: PF.regular, fontSize: 12.5, marginTop: 9 },
+  tracker: { flexDirection: 'row', marginTop: 12 },
+  trackStep: { flex: 1, alignItems: 'center' },
+  trackLineRow: { flexDirection: 'row', alignItems: 'center', width: '100%' },
+  trackLine: { flex: 1, height: 2 },
+  trackDot: { width: 14, height: 14, borderRadius: 7, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  trackLabel: { fontFamily: PF.medium, fontSize: 9.5, marginTop: 5 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 60 },
   emptyTitle: { fontFamily: PF.medium, fontSize: 18.5, marginTop: 12 },
   emptySub: { fontFamily: PF.regular, fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 10, paddingHorizontal: 12 },

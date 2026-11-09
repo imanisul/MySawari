@@ -12,15 +12,13 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoginBottomSheet } from '@/components';
 import { useSawari } from '@/context/SawariContext';
-import { API } from '@/services/backend/api';
+import { API, BACKEND_URL } from '@/services/backend/api';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { FaqList } from '@/components/vehicle/details/CarDetailsSections';
 import { PF } from '@/components/profile/ProfileParts';
+import { usePartnerQRs } from '@/utils/referrals';
 
-const DEFAULT_STORE_BASE = Platform.OS === 'ios'
-  ? 'https://mysawari.app'
-  : 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-const PURPLE = '#6152D8';
+const PURPLE = '#323E71';
 
 /** Light rays fanning out from below the avatars (design hero). */
 function Rays({ width, height, cy }: { width: number; height: number; cy: number }) {
@@ -50,6 +48,7 @@ export default function ReferEarnScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { customer, isAuthenticated, updateCustomer } = useSawari();
+  const { data: partnerQRs = [] } = usePartnerQRs();
   const [config, setConfig] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -65,22 +64,18 @@ export default function ReferEarnScreen() {
   }, [isAuthenticated, customer.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const code = customer.referralCode || '';
-  const rawBaseUrl = (config?.referralShareUrl || DEFAULT_STORE_BASE).trim();
 
-  // Dynamically format link: handles Google Play Store referrer format or standard URL query format
-  const link = useMemo(() => {
-    if (!code) return rawBaseUrl;
-    if (rawBaseUrl.includes('play.google.com')) {
-      return `${rawBaseUrl}&referrer=code%3D${encodeURIComponent(code)}`;
-    }
-    const sep = rawBaseUrl.includes('?') ? '&' : '?';
-    return `${rawBaseUrl}${sep}code=${encodeURIComponent(code)}`;
-  }, [rawBaseUrl, code]);
+  // One link for everyone: this page sends an iPhone friend to the App Store and an Android friend to Google Play on
+  // its own, copies the invite code for them, and shows who invited them.
+  const link = useMemo(
+    () => (code ? `${BACKEND_URL}/auth/refer/${encodeURIComponent(code)}` : ''),
+    [code],
+  );
 
   const shortLink = link.replace(/^https?:\/\//, '');
   const pct = config?.referralRewardType === 'PERCENTAGE' && config?.referralRewardAmount ? `${config.referralRewardAmount}%` : '10%';
   const friendGets = '100 SawariCash';
-  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\nDownload or open MySawari:\n${link}\n\n(Referral code: *${code}*)`;
+  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\n📲 Download the app:\n${link}\n\n(Referral code: *${code}*)`;
 
   const faqs = useMemo(() => [
     { q: 'How does the Refer & Earn program work?', a: `Share your personal invite link or code. When your friend signs up and completes their trip, you earn ${pct} commission of their total trip amount directly in your wallet.` },
@@ -138,7 +133,7 @@ export default function ReferEarnScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }} showsVerticalScrollIndicator={false}>
           {/* ── Hero ── */}
           <View style={{ height: cardTop + 123 }}>
-            <LinearGradient colors={['#5546D9', '#9A8EF1']} style={[styles.heroBg, { height: heroH }]}>
+            <LinearGradient colors={['#323E71', '#4B5A9E']} style={[styles.heroBg, { height: heroH }]}>
               <Rays width={width} height={heroH} cy={cardTop - 14} />
             </LinearGradient>
             <Pressable
@@ -155,16 +150,42 @@ export default function ReferEarnScreen() {
             </Pressable>
             <View style={[styles.heroCard, { top: cardTop, backgroundColor: p.page, borderColor: p.purpleBorder }]}>
               <Text style={[styles.heroTitle, { color: PURPLE }]} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>Invite Friends. Earn {pct} Commission.</Text>
-              <Text style={[styles.heroSub, { color: p.sub }]}>Earn {pct} of your friend's total trip amount as wallet cash — withdraw directly to your bank account anytime!</Text>
+              <Text style={[styles.heroSub, { color: p.sub, fontSize: Math.min(12.5, width / 31), lineHeight: Math.min(17.5, width / 22) }]} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.85}>Earn {pct} of your friend's total trip amount as wallet cash — withdraw to your bank account anytime!</Text>
             </View>
             <View accessible={false} style={[styles.avatars, { top: cardTop - 46, left: (width - 152) / 2 }]}>
-              <Image source={require('@/assets/images/refer_avatar_2.jpg')} style={[styles.avatar, { left: 0, top: 10, borderColor: '#D1CCF9' }]} />
-              <Image source={require('@/assets/images/refer_avatar_1.jpg')} style={[styles.avatar, { left: 96, top: 10, borderColor: '#D1CCF9' }]} />
+              <Image source={require('@/assets/images/refer_avatar_2.jpg')} style={[styles.avatar, { left: 0, top: 10, borderColor: '#D5D9EA' }]} />
+              <Image source={require('@/assets/images/refer_avatar_1.jpg')} style={[styles.avatar, { left: 96, top: 10, borderColor: '#D5D9EA' }]} />
               <Image source={require('@/assets/images/refer_avatar_3.jpg')} style={[styles.avatarMid, { left: 44 }]} />
             </View>
           </View>
 
           <View style={styles.body}>
+            {/* ── Partner QR Sticker (if assigned) ── */}
+            {partnerQRs.length > 0 && (
+              <View style={[styles.partnerCard, { backgroundColor: '#EEF0F7', borderColor: '#D5D9EA' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                    <Feather name="tag" size={17} color="#323E71" />
+                    <Text style={{ fontFamily: PF.bold, fontSize: 13.5, color: '#312E81' }}>Partner QR: {partnerQRs[0].token}</Text>
+                  </View>
+                  <Pressable
+                    onPress={async () => {
+                      await Clipboard.setStringAsync(`https://mysawari.com/r/${partnerQRs[0].token}`);
+                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1800);
+                    }}
+                    style={{ backgroundColor: '#323E71', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                  >
+                    <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#FFFFFF' }}>Copy Link</Text>
+                  </Pressable>
+                </View>
+                <Text style={{ fontFamily: PF.regular, fontSize: 11.5, lineHeight: 16, color: '#323E71', marginTop: 6 }}>
+                  Physical QR sticker assigned to your counter. Guests who scan your sticker get automatically linked to your account.
+                </Text>
+              </View>
+            )}
+
             {/* ── How it works ── */}
             <View style={[styles.how, { backgroundColor: p.soft, borderColor: p.border }]}>
               <Text style={[styles.howTitle, { color: p.fg }]}>How It Works</Text>
@@ -206,8 +227,8 @@ export default function ReferEarnScreen() {
         <BottomBlur height={56} fadeTo={p.page} style={{ top: -56, bottom: undefined }} />
         {isAuthenticated && !!code && (
           <Pressable accessibilityRole="button" accessibilityLabel={`Copy invite link ${shortLink}`} onPress={copy} style={styles.linkRow} hitSlop={6}>
-            <Text style={[styles.linkLabel, { color: p.muted }]}>Invite Link : </Text>
-            <Text style={[styles.link, { color: p.navy }]} numberOfLines={1}>{shortLink}</Text>
+            <Text style={[styles.linkLabel, { color: p.muted }]} numberOfLines={1}>Invite Link :</Text>
+            <Text style={[styles.link, { color: p.muted }]} numberOfLines={1} ellipsizeMode="tail">{shortLink}</Text>
             <Feather name={copied ? 'check' : 'copy'} size={14} color={copied ? p.green : p.navy} />
           </Pressable>
         )}
@@ -255,10 +276,18 @@ const styles = StyleSheet.create({
   // Three overlapping photos from the design: two side ones lower, the centre one larger, on top, white ring.
   avatar: { position: 'absolute', width: 56, height: 56, borderRadius: 28, borderWidth: 1 },
   avatarMid: { position: 'absolute', top: 0, width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, borderColor: '#FFFFFF' },
-  heroCard: { position: 'absolute', left: 33, right: 33, height: 123, borderWidth: 1, borderRadius: 12, paddingTop: 31, paddingHorizontal: 14, alignItems: 'center' },
+  heroCard: { position: 'absolute', left: 33, right: 33, height: 123, borderWidth: 1, borderRadius: 12, paddingTop: 24, paddingHorizontal: 14, overflow: 'hidden', alignItems: 'center' },
   heroTitle: { fontFamily: PF.semibold, fontSize: 20, lineHeight: 28, textAlign: 'center' },
-  heroSub: { fontFamily: PF.regular, fontSize: 12.5, lineHeight: 17.5, textAlign: 'center', marginTop: 14 },
+  heroSub: { fontFamily: PF.regular, fontSize: 12.5, lineHeight: 17.5, textAlign: 'center', marginTop: 8 },
   body: { paddingHorizontal: 16, paddingTop: 9 },
+  partnerCard: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 13,
+    paddingTop: 12,
+    paddingBottom: 12,
+    marginBottom: 14,
+  },
   how: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingTop: 15, paddingBottom: 13 },
   howTitle: { fontFamily: PF.medium, fontSize: 16, lineHeight: 22, marginBottom: 12 },
   howRow: { flexDirection: 'row', gap: 12 },
@@ -274,8 +303,9 @@ const styles = StyleSheet.create({
   faqTitle: { fontFamily: PF.medium, fontSize: 16, marginTop: 20, marginBottom: 12 },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 13, boxShadow: '0px -6px 18px rgba(47, 62, 117, 0.07)' },
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 12, paddingHorizontal: 4 },
-  linkLabel: { fontFamily: PF.regular, fontSize: 12.5 },
-  link: { fontFamily: PF.medium, fontSize: 12.5, textDecorationLine: 'underline', flexShrink: 1, marginRight: 6 },
+  // Figma: Plus Jakarta Sans medium 11/16.5, Neutral/500 (#737373), centred; the whole line is one grey text.
+  linkLabel: { fontFamily: PF.medium, fontSize: 11, lineHeight: 16.5 },
+  link: { fontFamily: PF.medium, fontSize: 11, lineHeight: 16.5, flexShrink: 1, marginLeft: 2, marginRight: 4 },
   footerBtns: { flexDirection: 'row', gap: 12 },
   wa: { flex: 1, height: 54, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   waLogo: { width: 25, height: 25, borderRadius: 12.5, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },

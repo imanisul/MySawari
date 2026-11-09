@@ -61,23 +61,6 @@ const monthWeeks = (year: number, month: number) => {
   return weeks;
 };
 
-function PinOutline({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-      <Path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" stroke={color} strokeWidth={1.44} strokeLinecap="round" strokeLinejoin="round" />
-      <Circle cx={12} cy={10} r={3} stroke={color} strokeWidth={1.44} />
-    </Svg>
-  );
-}
-
-function Chevron({ color }: { color: string }) {
-  return (
-    <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-      <Path d="M7.5 15L12.5 10L7.5 5" stroke={color} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
 // Figma wheel: 142pt window, selected row 40pt in the middle, neighbours 30pt rows 2pt apart
 // (centre-to-centre 37pt), faded out towards both edges.
 const ROW = 37;
@@ -440,34 +423,6 @@ export function DatesSheet() {
     <View style={[styles.page, { backgroundColor: ui.page }]}>
       {/* One fixed screen, not a scrolling page: only the month list inside the calendar scrolls. */}
       <View style={[styles.content, { flex: 1, paddingTop: insets.top + 8 }]}>
-        <View style={styles.topNavRow}>
-          {/* <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            hitSlop={10}
-            onPress={() => router.back()}
-            style={({ pressed }) => [
-              styles.backBtn,
-              { backgroundColor: isDarkMode ? colors.card : '#F5F6FA', borderColor: ui.border },
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <Feather name="chevron-left" size={22} color={ui.text} />
-          </Pressable> */}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Change destination"
-            onPress={() => { router.push({ pathname: '/dropoff', params: { returnBack: 'true' } }); }}
-            style={[styles.destField, { flex: 1, borderColor: ui.border }]}
-          >
-            <PinOutline color={dropoff?.name ? ui.muted : ui.muted} />
-            <Text style={[styles.destText, { color: dropoff?.name ? ui.muted : ui.muted }]} numberOfLines={1}>
-              {dropoff?.name || 'Select your Destination'}
-            </Text>
-            <Chevron color={ui.muted} />
-          </Pressable>
-        </View>
-
         <View style={styles.titleRow}>
           <Text style={[styles.title, { color: ui.text }]}>Select your date & time</Text>
           <Pressable onPress={handleClear} hitSlop={10} accessibilityRole="button">
@@ -634,7 +589,7 @@ export function DatesSheet() {
           onPress={handleApply}
           style={({ pressed }) => [styles.cta, { backgroundColor: ui.navy }, !canApply && styles.ctaDisabled, pressed && { opacity: 0.9 }]}
         >
-          <Text style={[styles.ctaText, { color: ui.onNavy }]} numberOfLines={1}>
+          <Text style={[styles.ctaText, { color: ui.onNavy }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {returnBack === 'true' || forSpecificCar === 'true' || fromDestination === 'true' ? 'Confirm Dates' : 'Search'}
           </Text>
         </Pressable>

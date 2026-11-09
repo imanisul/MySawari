@@ -161,7 +161,7 @@ export function RefundTrackingModal({
   const badgeColor = isRefunded
     ? '#10B981'
     : isApproved
-    ? '#4F46E5'
+    ? '#323E71'
     : isRejected
     ? '#EF4444'
     : '#F59E0B';
@@ -169,7 +169,7 @@ export function RefundTrackingModal({
   const badgeBg = isRefunded
     ? '#D1FAE5'
     : isApproved
-    ? '#EEF2FF'
+    ? '#EEF0F7'
     : isRejected
     ? '#FEE2E2'
     : '#FEF3C7';
@@ -349,7 +349,7 @@ export function RefundTrackingModal({
                   <MaterialCommunityIcons
                     name={refund?.refundType === 'bank_account' ? 'bank' : 'cellphone-wireless'}
                     size={20}
-                    color="#4F46E5"
+                    color="#323E71"
                     style={{ marginRight: 8 }}
                   />
                   <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>
@@ -363,7 +363,7 @@ export function RefundTrackingModal({
                     style={styles.editBtn}
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
-                    <Feather name="edit-2" size={13} color="#4F46E5" />
+                    <Feather name="edit-2" size={13} color="#323E71" />
                     <Text style={styles.editBtnText}>Edit</Text>
                   </TouchableOpacity>
                 )}
@@ -448,7 +448,7 @@ export function RefundTrackingModal({
                   ) : (
                     <View style={{ paddingVertical: 4, gap: 4 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Feather name="refresh-cw" size={14} color="#4F46E5" />
+                        <Feather name="refresh-cw" size={14} color="#323E71" />
                         <Text style={[styles.payoutVal, { color: colors.foreground, fontFamily: 'Outfit-SemiBold' }]}>
                           Original Payment Method
                         </Text>
@@ -466,7 +466,7 @@ export function RefundTrackingModal({
                     <TouchableOpacity
                       style={[
                         styles.typeBtn,
-                        editType === 'original_payment' && { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
+                        editType === 'original_payment' && { backgroundColor: '#323E71', borderColor: '#323E71' },
                       ]}
                       onPress={() => setEditType('original_payment')}
                     >
@@ -483,7 +483,7 @@ export function RefundTrackingModal({
                     <TouchableOpacity
                       style={[
                         styles.typeBtn,
-                        editType === 'upi' && { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
+                        editType === 'upi' && { backgroundColor: '#323E71', borderColor: '#323E71' },
                       ]}
                       onPress={() => setEditType('upi')}
                     >
@@ -500,7 +500,7 @@ export function RefundTrackingModal({
                     <TouchableOpacity
                       style={[
                         styles.typeBtn,
-                        editType === 'bank_account' && { backgroundColor: '#4F46E5', borderColor: '#4F46E5' },
+                        editType === 'bank_account' && { backgroundColor: '#323E71', borderColor: '#323E71' },
                       ]}
                       onPress={() => setEditType('bank_account')}
                     >
@@ -626,7 +626,7 @@ export function RefundTrackingModal({
 
             {/* Note */}
             <View style={[styles.noteBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="info" size={15} color="#4F46E5" style={{ marginTop: 2, marginRight: 8 }} />
+              <Feather name="info" size={15} color="#323E71" style={{ marginTop: 2, marginRight: 8 }} />
               <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
                 Refunds are processed to the specified payout method within 24–48 business hours after approval by Mysawari.
               </Text>
@@ -736,10 +736,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0F7',
     gap: 4,
   },
-  editBtnText: { color: '#4F46E5', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  editBtnText: { color: '#323E71', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   payoutDetailsBox: {
     backgroundColor: 'rgba(150,150,150,0.05)',
     borderRadius: 10,

@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, useQuery } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
-import { offersQueryOptions, hydrateOffers } from '@/services/api/offers';
+import { offersQueryOptions, hydrateOffers, exclusiveOffersQueryOptions, hydrateExclusiveOffers } from '@/services/api/offers';
 
 import { Image } from 'expo-image';
 
@@ -50,6 +50,18 @@ function prefetchVehicleImages(vehicles: any[]) {
   } catch (e: any) {
     if (__DEV__) console.warn('Failed to prefetch images:', e?.message);
   }
+}
+
+/** Warms every photo of one car (its gallery), called when the car is tapped so they are ready as its page opens. */
+export function prefetchCarGallery(car: any) {
+  try {
+    const urls = ((car?.images as any[]) || [])
+      .map((i) => (typeof i === 'string' ? i : i?.uri))
+      .filter((u): u is string => typeof u === 'string' && !!u && !prefetchedImages.has(u));
+    if (!urls.length) return;
+    urls.forEach((u) => prefetchedImages.add(u));
+    Image.prefetch(urls, 'memory-disk').catch(() => false);
+  } catch {}
 }
 
 export const vehiclesQueryOptions = {
@@ -101,6 +113,7 @@ export function primeVehicles(queryClient: QueryClient) {
   // Offers start loading now too, so Exclusive Offers / Special Deals are already there when Home
   // appears instead of popping in (and pushing the page down) a moment later.
   hydrateOffers(queryClient).finally(() => queryClient.prefetchQuery({ ...offersQueryOptions, staleTime: 0 }).catch(() => {}));
+  hydrateExclusiveOffers(queryClient).finally(() => queryClient.prefetchQuery({ ...exclusiveOffersQueryOptions, staleTime: 0 }).catch(() => {}));
   
   AsyncStorage.getItem(STORAGE_KEY).then((cached) => {
     if (cached) {

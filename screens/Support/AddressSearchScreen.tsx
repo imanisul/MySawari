@@ -180,8 +180,8 @@ export default function AddressSearchScreen() {
               <Ionicons name="location" size={20} color="#A3A3A3" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{item.label ? `${item.label} - ${item.name}` : item.name}</Text>
-              <Text style={[styles.addr, { color: p.muted }]} numberOfLines={1}>{item.address}</Text>
+              <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.label ? `${item.label} - ${item.name}` : item.name}</Text>
+              <Text style={[styles.addr, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.address}</Text>
             </View>
             {opening === item.id ? <ActivityIndicator size="small" color={p.muted} /> : <Feather name="chevron-right" size={20} color={p.muted} />}
           </Pressable>

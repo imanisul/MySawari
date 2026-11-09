@@ -18,7 +18,7 @@ export function ScreenHeader({ title, divider, onBack, right }: { title: string;
       <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={onBack ?? (() => safeBack(router))} hitSlop={8} style={[styles.back, { backgroundColor: p.iconBg }]}>
         <Feather name="chevron-left" size={24} color={p.muted} />
       </Pressable>
-      <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header" numberOfLines={1}>{title}</Text>
+      <Text style={[styles.title, { color: p.fg }]} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
       {right}
     </View>
   );

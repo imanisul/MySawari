@@ -181,7 +181,7 @@ export default function SearchResultsScreen() {
     <View style={{ gap: 12, paddingBottom: 4 }}>
       {/* Zero Security Deposit */}
       <View style={[styles.strip, { backgroundColor: p.greenBg, borderColor: p.greenBorder }]}>
-        <Text style={[styles.stripText, { color: p.green }]}>👌 Zero Security Deposit</Text>
+        <Text style={[styles.stripText, { color: p.green }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>👌 Zero Security Deposit</Text>
       </View>
 
       {/* Search + sort */}
@@ -249,9 +249,9 @@ export default function SearchResultsScreen() {
           <Feather name="chevron-left" size={20} color={p.sub} />
         </Pressable>
         <View style={styles.topText}>
-          <Text style={[styles.dest, { color: p.fg }]} numberOfLines={1}>{dropoff?.name || `Available ${vehicleWord}s`}</Text>
+          <Text style={[styles.dest, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dropoff?.name || `Available ${vehicleWord}s`}</Text>
           <View style={styles.countRow}>
-            <Text style={[styles.count, { color: p.sub }]} numberOfLines={1}>
+            <Text style={[styles.count, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {isLoading ? `Finding available ${vehicleWord}s…` : `Showing ${count} ${plural} available`}
             </Text>
             {/* Fixed-size slot: the background refresh spinner never nudges the header while scrolling. */}
@@ -341,10 +341,10 @@ const styles = StyleSheet.create({
   dateDivider: { width: 1, alignSelf: 'stretch', marginVertical: 2 },
   strip: { borderWidth: 1, borderRadius: 8, height: 39, alignItems: 'center', justifyContent: 'center' },
   stripText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 },
-  searchRow: { flexDirection: 'row', gap: 8 },
-  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 40, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 39, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
   searchText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, paddingVertical: 0 },
-  sortBtn: { width: 48, height: 40, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  sortBtn: { width: 48, height: 39, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   chips: { gap: 6, paddingHorizontal: 16 },
   chip: { height: 30, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 10 },

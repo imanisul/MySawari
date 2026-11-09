@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
+import { Platform } from 'react-native';
 import { API } from '@/services/backend/api';
 
 export const PENDING_REFERRAL_KEY = '@mysawari_pending_referral';
@@ -10,6 +11,7 @@ export interface PendingReferral {
   referrerName: string;
   rewardText: string;
   bonusSawariCash?: number;
+  isPartnerQr?: boolean;
   detectedAt: number;
 }
 
@@ -25,8 +27,8 @@ export function extractReferralCode(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 3) return null;
 
-  // 1. URL Path format: https://mysawari.in/ref/CODE, mysawari://ref/CODE, /referral/CODE, /invite/CODE
-  const urlPathMatch = trimmed.match(/(?:ref|referral|invite)\/([A-Za-z0-9_-]{4,20})/i);
+  // 1. URL Path format: https://mysawari.com/r/CODE, https://mysawari.in/ref/CODE, mysawari://ref/CODE, /r/CODE, /ref/CODE, /referral/CODE, /invite/CODE
+  const urlPathMatch = trimmed.match(/(?:ref|referral|invite|r)\/([A-Za-z0-9_-]{4,20})/i);
   if (urlPathMatch && urlPathMatch[1]) {
     const code = urlPathMatch[1].toUpperCase();
     if (!/^\d+$/.test(code)) return code;
@@ -84,12 +86,14 @@ export async function savePendingReferral(data: {
   referrerName: string;
   rewardText?: string;
   bonusSawariCash?: number;
+  isPartnerQr?: boolean;
 }): Promise<PendingReferral> {
   const item: PendingReferral = {
     code: data.code.trim().toUpperCase(),
     referrerName: data.referrerName || 'MySawari Member',
     rewardText: data.rewardText || '100 SawariCash on signup',
     bonusSawariCash: data.bonusSawariCash || 100,
+    isPartnerQr: Boolean(data.isPartnerQr),
     detectedAt: Date.now(),
   };
   try {
@@ -148,6 +152,7 @@ export async function handleDeepLinkReferralUrl(url: string): Promise<PendingRef
         referrerName: validated.referrerName,
         rewardText: validated.rewardText,
         bonusSawariCash: validated.bonusSawariCash,
+        isPartnerQr: (validated as any).isPartnerQr,
       });
     }
   } catch (err) {
@@ -193,10 +198,41 @@ export async function detectReferralFromClipboard(): Promise<PendingReferral | n
         referrerName: validated.referrerName,
         rewardText: validated.rewardText,
         bonusSawariCash: validated.bonusSawariCash,
+        isPartnerQr: (validated as any).isPartnerQr,
       });
     }
   } catch (err) {
     // Non-blocking: silently ignore errors so app launch is never disrupted
+  }
+  return null;
+}
+
+const INSTALL_REFERRER_DONE_KEY = '@mysawari_install_referrer_done';
+
+/**
+ * Android only, once per install: Google Play remembers the `referrer` from the invite link the app was installed
+ * from (the invite page puts the friend's code in it), so the code reaches the app even if the clipboard did not.
+ */
+export async function detectInstallReferrer(): Promise<PendingReferral | null> {
+  if (Platform.OS !== 'android') return null;
+  try {
+    if (await AsyncStorage.getItem(INSTALL_REFERRER_DONE_KEY)) return null;
+    const Application = require('expo-application');
+    const referrer: string = await Application.getInstallReferrerAsync();
+    await AsyncStorage.setItem(INSTALL_REFERRER_DONE_KEY, '1');
+    const code = extractReferralCode(referrer ? `?${referrer}` : '');
+    if (!code) return null;
+    const validated = await API.validateReferralCode(code);
+    if (validated && validated.valid) {
+      return await savePendingReferral({
+        code: validated.referralCode || code,
+        referrerName: validated.referrerName,
+        rewardText: validated.rewardText,
+        bonusSawariCash: validated.bonusSawariCash,
+      });
+    }
+  } catch {
+    // Not installed from Play, an older build without the module, or offline: the clipboard route still works.
   }
   return null;
 }

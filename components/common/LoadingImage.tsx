@@ -229,7 +229,8 @@ export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageP
         source={optimizedSource}
         cachePolicy="memory-disk"
         allowDownscaling={true}
-        transition={props.transition ?? 250}
+        // a photo already on the phone appears instantly; only a first-time download fades in
+        transition={isAlreadyLoaded ? 0 : (props.transition ?? 250)}
         onLoad={(e) => {
           if (srcKey) loadedUris.add(srcKey);
           setReady(true);

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, Animated, Image } from 'react-native';
+import { Pressable, StyleSheet, Text, View, Animated } from 'react-native';
+import { Image as CachedImage } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { usePressAnimation } from '@/hooks/usePressAnimation';
 import { shadows } from '@/constants/shadows';
@@ -32,10 +33,10 @@ export const OfferCard = React.memo(function OfferCard({ offer, onPress }: { off
         ]}
       >
         {offer.image && (
-          <Image source={offer.image} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <CachedImage source={offer.image} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={0} />
         )}
         <LinearGradient
-          colors={offer.image ? ['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)'] : (offer.gradientColors || ['#6152D8', '#8B5CF6'])}
+          colors={offer.image ? ['rgba(0,0,0,0.3)', 'rgba(0,0,0,0.85)'] : (offer.gradientColors || ['#323E71', '#4B5A9E'])}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.gradient}
@@ -51,7 +52,7 @@ export const OfferCard = React.memo(function OfferCard({ offer, onPress }: { off
         </View>
 
         {/* Title & subtitle */}
-        <Text style={styles.title} numberOfLines={1}>{offer.title}</Text>
+        <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{offer.title}</Text>
         <Text style={styles.subtitle} numberOfLines={2}>{offer.subtitle}</Text>
 
         <View style={styles.bottomRow}>

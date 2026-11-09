@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Image as CachedImage } from 'expo-image';
 import {
   View,
   Text,
@@ -6,28 +7,42 @@ import {
   FlatList,
   TouchableOpacity,
   Dimensions,
-  Image,
 } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
-import { formatCurrency } from '@/services/backend/pricingEngine';
+import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
   ExclusiveOffer,
   exclusiveOffersQueryOptions,
   recordOfferView,
+  specificCarOf,
 } from '@/services/api/offers';
 import { ExclusiveOfferDetailModal } from '@/components/offers/ExclusiveOfferDetailModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 246; // same width as the Top Picks cards
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function ExclusiveOffersSection() {
+  const router = useRouter();
   const p = useDetailsPalette();
-  const { membership } = useSawari();
+  const {
+    membership,
+    selectCar,
+    setDates,
+    setTimes,
+    dateRange,
+    applyCoupon,
+    setDropoff,
+    setPickup,
+    dropoff,
+    pickup,
+    selectedCar,
+  } = useSawari();
   const { data: vehicles = [] } = useVehicles();
   const params = useLocalSearchParams<{ openExclusiveOfferId?: string }>();
 
@@ -36,18 +51,27 @@ export function ExclusiveOffersSection() {
 
   const { data: offers = [], refetch } = useQuery(exclusiveOffersQueryOptions);
 
-  // Auto-open modal if deep-linked via push notification
+  // Directly navigate to car details if deep-linked via push notification
   useEffect(() => {
     if (params?.openExclusiveOfferId && offers.length > 0) {
       const match = offers.find(
         (o) => String(o._id || o.id) === String(params.openExclusiveOfferId)
       );
       if (match) {
-        setSelectedOffer(match);
-        setModalVisible(true);
+        handleCardPress(match);
       }
     }
   }, [params?.openExclusiveOfferId, offers]);
+
+  // An offer that was deleted (or ended) while its page is open closes the page instead of staying on screen.
+  useEffect(() => {
+    if (!modalVisible || !selectedOffer) return;
+    const id = String(selectedOffer._id || selectedOffer.id);
+    if (!offers.some((o) => String(o._id || o.id) === id)) {
+      setModalVisible(false);
+      setSelectedOffer(null);
+    }
+  }, [offers, modalVisible, selectedOffer]);
 
   if (!offers || offers.length === 0) {
     return null;
@@ -58,8 +82,106 @@ export function ExclusiveOffersSection() {
 
   const handleCardPress = (offer: ExclusiveOffer) => {
     recordOfferView(offer._id || offer.id);
-    setSelectedOffer(offer);
-    setModalVisible(true);
+
+    // 1. Resolve target vehicle
+    let targetCar: any = null;
+    if (offer.vehicleId) {
+      const vId =
+        typeof offer.vehicleId === 'object'
+          ? String((offer.vehicleId as any)._id || (offer.vehicleId as any).id)
+          : String(offer.vehicleId);
+      targetCar = vehicles.find((v: any) => String(v.id || v._id) === vId);
+    }
+    if (!targetCar && Array.isArray(offer.vehiclePrices) && offer.vehiclePrices.length > 0) {
+      const vId = String(offer.vehiclePrices[0].vehicleId);
+      targetCar = vehicles.find((v: any) => String(v.id || v._id) === vId);
+    }
+    if (!targetCar && Array.isArray(offer.applicableVehicleIds) && offer.applicableVehicleIds.length > 0) {
+      const vId = String(offer.applicableVehicleIds[0]);
+      targetCar = vehicles.find((v: any) => String(v.id || v._id) === vId);
+    }
+    if (!targetCar) {
+      targetCar = (selectedCar && selectedCar.id !== 'seltos') ? selectedCar : vehicles[0];
+    }
+
+    if (targetCar) {
+      selectCar(targetCar);
+    }
+
+    // 2. Pre-fill dates and times
+    const isOvernight = Boolean(
+      offer.isOvernight ||
+      (offer.pickupTime && offer.returnTime && offer.pickupTime.includes('PM') && offer.returnTime.includes('AM'))
+    );
+    const pickupT = offer.pickupTime || (isOvernight ? '08:00 PM' : '08:00 AM');
+    const returnT = offer.returnTime || (isOvernight ? '08:00 AM' : '08:00 AM');
+
+    const today = new Date();
+    const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
+    const range = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
+
+    if (offer.rentalStartDate && offer.rentalEndDate) {
+      const sDate = new Date(offer.rentalStartDate);
+      const eDate = new Date(offer.rentalEndDate);
+      const travelRange = `${sDate.getDate()} ${MONTHS_SHORT[sDate.getMonth()]} – ${eDate.getDate()} ${MONTHS_SHORT[eDate.getMonth()]}`;
+      const daysCount = offer.rentalDays || Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / 86400000));
+      setDates(travelRange, `${daysCount} ${daysCount === 1 ? 'Day' : 'Days'}`);
+      setTimes(offer.rentalStartTime || pickupT, offer.rentalEndTime || returnT);
+    } else if (offer.rentalDays && offer.rentalDays > 1) {
+      const daysCount = offer.rentalDays;
+      const endD = new Date(today.getTime() + daysCount * 24 * 3600 * 1000);
+      const travelRange = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${endD.getDate()} ${MONTHS_SHORT[endD.getMonth()]}`;
+      setDates(travelRange, `${daysCount} Days`);
+      setTimes(offer.rentalStartTime || pickupT, offer.rentalEndTime || returnT);
+    } else if (isOvernight || (offer.pickupTime && offer.returnTime)) {
+      setDates(range, '1 Day');
+      setTimes(pickupT, returnT);
+    } else if (!dateRange || dateRange.includes('Select')) {
+      setDates(range, '1 Day');
+      setTimes('08:00 AM', '08:00 AM');
+    }
+
+    // 3. Auto-apply coupon code
+    if (offer.code) {
+      applyCoupon(offer.code.trim().toUpperCase());
+    }
+
+    // 4. Default pickup & destination if empty so booking does not block
+    if (!dropoff?.name) {
+      setDropoff({
+        id: 'city_trip',
+        name: 'Local City Trip',
+        address: 'City limits / Self-drive destination',
+        latitude: 26.1412,
+        longitude: 91.7645,
+        source: 'database',
+      });
+    }
+    if (!pickup?.name) {
+      setPickup({
+        id: 'hub_pickup',
+        name: MYSAWARI_HUB_NAME,
+        address: 'MySawari Hub, Kahilipara',
+        latitude: 26.1412,
+        longitude: 91.7645,
+        source: 'database',
+      });
+    }
+
+    // 5. Navigate directly to /car-details with zero intermediate ads or popup text
+    const carId = targetCar ? String(targetCar.id || (targetCar as any)._id) : '';
+    router.push({
+      pathname: '/car-details',
+      params: {
+        id: carId,
+        vehicleId: carId,
+        promoCode: offer.code || '',
+        offerId: offer._id || offer.id,
+        isOvernight: isOvernight ? 'true' : 'false',
+        pickupTime: pickupT,
+        returnTime: returnT,
+      },
+    });
   };
 
   const renderOfferCard = ({ item }: { item: ExclusiveOffer }) => {
@@ -111,6 +233,37 @@ export function ExclusiveOffersSection() {
     );
     const isAllCars = Boolean(item.allVehicles || item.applicableType === 'all');
 
+    // Live validity & scheduling text
+    const startDateObj = item.startDate ? new Date(item.startDate) : null;
+    const expiryDateObj = item.expiryDate ? new Date(item.expiryDate) : null;
+    const nowTime = Date.now();
+
+    let validityBadgeText = '';
+    let isUpcoming = false;
+
+    if (startDateObj && !isNaN(startDateObj.getTime()) && startDateObj.getTime() > nowTime) {
+      isUpcoming = true;
+      const sDateStr = startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const sTimeStr = item.startTime && item.startTime !== 'Immediate'
+        ? item.startTime
+        : startDateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      validityBadgeText = `Starts ${sDateStr}, ${sTimeStr}`;
+    } else if (expiryDateObj && !isNaN(expiryDateObj.getTime())) {
+      const msLeft = expiryDateObj.getTime() - nowTime;
+      const hoursLeft = Math.floor(msLeft / 3600000);
+      const eDateStr = expiryDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const eTimeStr = item.endTime
+        ? item.endTime
+        : expiryDateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      if (hoursLeft < 24 && hoursLeft >= 0) {
+        validityBadgeText = `Ends today ${eTimeStr}`;
+      } else if (hoursLeft < 48 && hoursLeft >= 24) {
+        validityBadgeText = `Ends tomorrow ${eTimeStr}`;
+      } else {
+        validityBadgeText = `Valid till ${eDateStr}, ${eTimeStr}`;
+      }
+    }
+
     // Resolve car image with priority: item.image -> specific vehicle photo -> first fleet vehicle photo
     const vehicleImage =
       (typeof item.vehicleId === 'object' ? item.vehicleId?.images?.[0] : null) ||
@@ -122,7 +275,23 @@ export function ExclusiveOffersSection() {
         : null) ||
       vehicles[0]?.image;
 
-    const imageUrl = item.image?.url || item.image?.uri || vehicleImage;
+    // A deal on specific cars shows that car's own photo; others use the deal's banner.
+    const dealCar = specificCarOf(item, vehicles);
+    const dealCarImage = dealCar?.image || dealCar?.images?.[0];
+    const imageUrl = dealCarImage || item.image?.url || item.image?.uri || vehicleImage;
+
+    const resolvedVehicleName =
+      (typeof item.vehicleId === 'object'
+        ? (item.vehicleId?.displayName || item.vehicleId?.vehicleName || item.vehicleId?.name)
+        : null) ||
+      (typeof item.vehicleId === 'string'
+        ? vehicles.find((v: any) => String(v.id || v._id) === item.vehicleId)?.name
+        : null) ||
+      (Array.isArray(item.vehiclePrices) && item.vehiclePrices.length > 0
+        ? (item.vehiclePrices[0].vehicleName ||
+            vehicles.find((v: any) => String(v.id || v._id) === String(item.vehiclePrices![0].vehicleId))?.name)
+        : null) ||
+      (isAllCars ? 'All Fleet Cars' : vehicles[0]?.name || 'Available Fleet');
 
     return (
       <TouchableOpacity
@@ -133,14 +302,16 @@ export function ExclusiveOffersSection() {
         {/* Banner Thumbnail */}
         <View style={styles.thumbnailContainer}>
           {imageUrl ? (
-            <Image
+            <CachedImage
               source={typeof imageUrl === 'string' ? { uri: imageUrl } : imageUrl}
               style={styles.thumbnailImage}
-              resizeMode="cover"
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={0}
             />
           ) : (
-            <View style={[styles.thumbnailPlaceholder, { backgroundColor: '#EDE9FE' }]}>
-              <Feather name="gift" size={32} color="#6152D8" />
+            <View style={[styles.thumbnailPlaceholder, { backgroundColor: '#E8EBF4' }]}>
+              <Feather name="gift" size={32} color="#323E71" />
             </View>
           )}
 
@@ -150,12 +321,12 @@ export function ExclusiveOffersSection() {
               styles.dealTag,
               {
                 backgroundColor: isOvernight
-                  ? '#4338CA'
+                  ? '#4B5A9E'
                   : isAllCars
                   ? '#059669'
                   : isMemberDeal
                   ? '#2563EB'
-                  : '#6152D8',
+                  : '#323E71',
               },
             ]}
           >
@@ -168,7 +339,7 @@ export function ExclusiveOffersSection() {
             ) : (
               <Feather name="tag" size={10} color="#FFFFFF" />
             )}
-            <Text style={styles.dealTagText} numberOfLines={1}>
+            <Text style={styles.dealTagText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {isOvernight
                 ? '8 PM – 8 AM Deal'
                 : isAllCars
@@ -180,33 +351,61 @@ export function ExclusiveOffersSection() {
 
         {/* Content Info */}
         <View style={styles.cardInfo}>
-          <Text style={[styles.cardTitle, { color: p.fg }]} numberOfLines={1}>
+          {/* Prominently Mentioned Vehicle Name */}
+          <View style={styles.vehicleNameRow}>
+            <Ionicons name="car-sport" size={13} color="#323E71" />
+            <Text style={[styles.vehicleNameText, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {resolvedVehicleName}
+            </Text>
+          </View>
+
+          <Text style={[styles.cardTitle, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {item.title}
           </Text>
           {item.subtitle ? (
-            <Text style={[styles.cardSubtitle, { color: p.sub }]} numberOfLines={1}>
+            <Text style={[styles.cardSubtitle, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {item.subtitle}
             </Text>
           ) : isOvernight ? (
-            <Text style={[styles.cardSubtitle, { color: '#7E22CE' }]} numberOfLines={1}>
-              Tonight 8 PM to 8 AM • Auto-applied code
+            <Text style={[styles.cardSubtitle, { color: '#323E71' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              Tonight 8 PM to 8 AM
             </Text>
           ) : isAllCars ? (
-            <Text style={[styles.cardSubtitle, { color: '#059669' }]} numberOfLines={1}>
+            <Text style={[styles.cardSubtitle, { color: '#059669' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               Applicable on all fleet cars
             </Text>
+          ) : null}
+
+          {/* Validity & Time Window Pill */}
+          {validityBadgeText ? (
+            <View style={[styles.validityRow, { backgroundColor: isUpcoming ? '#EEF2FF' : '#F0FDF4' }]}>
+              <Feather name={isUpcoming ? "calendar" : "clock"} size={10} color={isUpcoming ? "#4F46E5" : "#059669"} />
+              <Text style={[styles.validityText, { color: isUpcoming ? "#4F46E5" : "#059669" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                {validityBadgeText}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Decided Rental Period Badge */}
+          {item.rentalPeriodLabel ? (
+            <View style={[styles.validityRow, { backgroundColor: '#F1F5F9', marginTop: 3 }]}>
+              <Feather name="navigation" size={10} color="#323E71" />
+              <Text style={[styles.validityText, { color: '#323E71', fontWeight: '600' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                Trip: {item.rentalPeriodLabel.replace(/\s*(→|->|➔|➜)\s*/g, ' to ')}
+              </Text>
+            </View>
           ) : null}
 
           {/* Price Block */}
           <View style={styles.priceContainer}>
             <View style={styles.priceRow}>
-              <Text style={styles.dealPrice} numberOfLines={1}>{promoPriceDisplay}</Text>
+              <Text style={styles.dealPrice} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{promoPriceDisplay}</Text>
               {origPriceDisplay ? (
                 <Text style={styles.originalPrice}>{origPriceDisplay}</Text>
               ) : null}
             </View>
             <View style={styles.claimArrowBtn}>
-              <Feather name="arrow-right" size={13} color="#6152D8" />
+              <Feather name="arrow-right" size={13} color="#323E71" />
             </View>
           </View>
         </View>
@@ -219,9 +418,6 @@ export function ExclusiveOffersSection() {
       {/* Section Header */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">Exclusive Offers</Text>
-        <View style={styles.verifiedBadge}>
-          <Text style={styles.verifiedBadgeText}>Special deals</Text>
-        </View>
       </View>
 
       {/* Cards List */}
@@ -266,8 +462,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionTitle: { fontFamily: F.semi, fontSize: 15, lineHeight: 22.5 },
-  verifiedBadge: { backgroundColor: '#F5F3FF', paddingHorizontal: 8, minHeight: 20, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: '#DDD6FE' },
-  verifiedBadgeText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#6152D8' },
+  verifiedBadge: { backgroundColor: '#F3F4FA', paddingHorizontal: 8, minHeight: 20, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: '#D5D9EA' },
+  verifiedBadgeText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#323E71' },
   listContainer: { paddingHorizontal: 16, gap: 8 },
   card: { width: CARD_WIDTH, borderRadius: 12, borderWidth: 1, padding: 2, overflow: 'hidden' },
   thumbnailContainer: { width: '100%', height: 144, borderRadius: 8, overflow: 'hidden' },
@@ -276,11 +472,15 @@ const styles = StyleSheet.create({
   dealTag: { position: 'absolute', top: 6, left: 6, minHeight: 22, maxWidth: '85%', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, borderRadius: 20, gap: 4 },
   dealTagText: { fontFamily: F.semi, fontSize: 9.5, lineHeight: 13, color: '#FFFFFF' },
   cardInfo: { paddingHorizontal: 6, paddingTop: 8, paddingBottom: 6 },
+  vehicleNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 },
+  vehicleNameText: { fontFamily: F.semi, fontSize: 12, lineHeight: 16, color: '#111827' },
   cardTitle: { fontFamily: F.semi, fontSize: 13, lineHeight: 19.5 },
   cardSubtitle: { fontFamily: F.med, fontSize: 11, lineHeight: 16.5, marginTop: 1 },
   priceContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, flexShrink: 1 },
   dealPrice: { fontFamily: F.semi, fontSize: 15, lineHeight: 22.5, color: '#059669' },
   originalPrice: { fontFamily: F.med, fontSize: 11, color: '#9CA3AF', textDecorationLine: 'line-through' },
-  claimArrowBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F5F3FF', alignItems: 'center', justifyContent: 'center' },
+  validityRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, paddingHorizontal: 6, paddingVertical: 2.5, borderRadius: 6, alignSelf: 'flex-start' },
+  validityText: { fontFamily: F.semi, fontSize: 10, lineHeight: 14 },
+  claimArrowBtn: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#F3F4FA', alignItems: 'center', justifyContent: 'center' },
 });

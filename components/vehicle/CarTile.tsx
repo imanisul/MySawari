@@ -35,7 +35,7 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
       </View>
       <View style={[styles.carTileCopy]}>
         <View style={styles.carHeader}>
-          <Text numberOfLines={1} style={[styles.carName, { color: colors.foreground }]}>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.carName, { color: colors.foreground }]}>
             {car.name}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>

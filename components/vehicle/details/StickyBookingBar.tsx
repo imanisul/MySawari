@@ -182,7 +182,7 @@ function Breakup({ price }: { price: ReadyPrice }) {
   const atPickup = Math.max(0, price.balance);
   const Row = ({ label, value, tone }: { label: string; value: string; tone?: 'strong' | 'green' }) => (
     <View style={styles.bRow}>
-      <Text style={[styles.bLabel, { color: p.muted }]} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.bLabel, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
       <Text style={[styles.bValue, { color: tone === 'green' ? p.green : tone === 'strong' ? p.fg : p.muted }, tone === 'strong' && styles.bStrong]}>{value}</Text>
     </View>
   );
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   perDay: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' },
   dot: { width: 3, height: 3, borderRadius: 1.5 },
-  // Figma "Membership Tags": 18 high pill (radius 100), 1px #D1CCF9 border, #F0EFFD fill, padding 3 / 8 — so a 10px line.
+  // Figma "Membership Tags": 18 high pill (radius 100), 1px #D5D9EA border, #EEF0F7 fill, padding 3 / 8 — so a 10px line.
   chip: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3, height: 18, justifyContent: 'center', alignItems: 'center' },
   chipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 10, includeFontPadding: false },
   meta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },

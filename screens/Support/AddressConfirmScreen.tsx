@@ -145,6 +145,8 @@ export default function AddressConfirmScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const searchOpenRef = useRef(false);
   const searchInput = useRef<TextInput>(null);
+  const saveRef = useRef<View>(null);
+  const liftRef = useRef(0);
   const { results: found, loading: searching, failed: searchFailed, resolve } = usePlaceSearch(searchOpen ? search : '');
   const [jumping, setJumping] = useState<string | null>(null);
   // The place picked in search: when the map settles on it, its own name and address are used (instead of
@@ -155,7 +157,23 @@ export default function AddressConfirmScreen() {
   useEffect(() => {
     // iOS: lift the card above the keyboard (Android resizes the window itself). Not for the map search,
     // whose results show at the top while the card is hidden.
-    if (Platform.OS !== 'ios') return;
+    if (Platform.OS !== 'ios') {
+      // Android: lift the card so the Save button stays above the keyboard. Measured on the button itself (it is the
+      // lowest thing the customer needs); 0 extra when the window already resized. 24 spare plus the bottom bar covers the status/navigation-bar offset.
+      const showA = Keyboard.addListener('keyboardDidShow', (e) => {
+        if (searchOpenRef.current) return;
+        const lift = (toValue: number) => { liftRef.current = toValue; Animated.timing(kb, { toValue: -toValue, duration: 160, useNativeDriver: true }).start(); };
+        // Measured twice: again after the keyboard and card have settled. The position read includes the lift already applied.
+        [60, 400].forEach((ms) => setTimeout(() => {
+          saveRef.current?.measureInWindow((_x, y, _w, h) => {
+            const covered = y + h + 40 + insets.bottom - e.endCoordinates.screenY;
+            lift(Math.max(0, covered + liftRef.current));
+          });
+        }, ms));
+      });
+      const hideA = Keyboard.addListener('keyboardDidHide', () => { liftRef.current = 0; Animated.timing(kb, { toValue: 0, duration: 160, useNativeDriver: true }).start(); });
+      return () => { showA.remove(); hideA.remove(); };
+    }
     const show = Keyboard.addListener('keyboardWillShow', (e) => { if (!searchOpenRef.current) Animated.timing(kb, { toValue: -(e.endCoordinates.height - insets.bottom), duration: e.duration || 220, useNativeDriver: true }).start(); });
     const hide = Keyboard.addListener('keyboardWillHide', (e) => Animated.timing(kb, { toValue: 0, duration: e.duration || 220, useNativeDriver: true }).start());
     return () => { show.remove(); hide.remove(); };
@@ -409,8 +427,8 @@ export default function AddressConfirmScreen() {
           </View>
         ) : (
           <Pressable accessibilityRole="search" accessibilityLabel={`${place.name}. Tap to search another place`} onPress={() => openSearch(true)} style={styles.placeText}>
-            <Text style={styles.placeName} numberOfLines={1}>{resolving ? 'Finding the address…' : place.name}</Text>
-            <Text style={styles.placeAddr} numberOfLines={1}>{place.address || 'Move the map to put the pin on your address.'}</Text>
+            <Text style={styles.placeName} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{resolving ? 'Finding the address…' : place.name}</Text>
+            <Text style={styles.placeAddr} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{place.address || 'Move the map to put the pin on your address.'}</Text>
           </Pressable>
         )}
       </View>
@@ -433,8 +451,8 @@ export default function AddressConfirmScreen() {
                   <Ionicons name="location" size={16} color="#A3A3A3" />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.resultName, { color: p.fg }]} numberOfLines={1}>{item.name}</Text>
-                  {!!item.address && <Text style={[styles.resultAddr, { color: p.muted }]} numberOfLines={1}>{item.address}</Text>}
+                  <Text style={[styles.resultName, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.name}</Text>
+                  {!!item.address && <Text style={[styles.resultAddr, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{item.address}</Text>}
                 </View>
                 {jumping === item.id && <ActivityIndicator size="small" color={p.muted} />}
               </Pressable>
@@ -511,6 +529,7 @@ export default function AddressConfirmScreen() {
         )}
 
         <Pressable
+          ref={saveRef}
           accessibilityRole="button"
           onPress={confirm}
           disabled={resolving || moving}

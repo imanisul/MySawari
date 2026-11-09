@@ -18,7 +18,7 @@ import { LoadingImage } from '@/components/common/LoadingImage';
 import { ExtendBookingSheet } from '@/components/booking/ExtendBookingSheet';
 import { ReviewModal, ReviewTrip } from '@/components/booking/ReviewModal';
 import { useDetailsPalette, DetailsPalette } from '@/components/vehicle/details/detailsPalette';
-import { FONT, shortDate, driverLabel } from '@/components/booking/TripDetailParts';
+import { FONT, shortDate, driverLabel, refundAmountOf, refundStage } from '@/components/booking/TripDetailParts';
 
 /**
  * Activity (design: "Activity" list). Underlined tabs, then one card per booking: photo, status tag, name,
@@ -298,11 +298,16 @@ function TripCard({ p, booking: b, image, canRate, onOpen, onRate, onExtend, onB
           <View style={[styles.tag, { backgroundColor: t.bg, borderColor: t.border }]}>
             <Text style={[styles.tagText, { color: t.fg }]}>{t.label}</Text>
           </View>
-          <Text style={[styles.name, { color: p.fg }]} numberOfLines={1}>{b.vehicleName}</Text>
-          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1}>
+          <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{b.vehicleName}</Text>
+          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {shortDate(b.pickupDate)}, {b.pickupTime || '10:00 AM'} → {shortDate(b.returnDate)}, {b.dropTime || '10:00 AM'}
           </Text>
-          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1}>{driverLabel(b.driverMode)} • {days} day{days === 1 ? '' : 's'}</Text>
+          <Text style={[styles.meta, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{driverLabel(b.driverMode)} • {days} day{days === 1 ? '' : 's'}</Text>
+          {kind === 'cancelled' && refundAmountOf(b) > 0 && (
+            <Text style={[styles.meta, { color: refundStage(b) === 'refunded' ? '#008758' : p.sub, fontFamily: FONT.semibold }]} numberOfLines={1}>
+              {refundStage(b) === 'refunded' ? 'Refunded' : refundStage(b) === 'rejected' ? 'Refund rejected' : 'Refund in progress'} · ₹{refundAmountOf(b).toLocaleString('en-IN')}
+            </Text>
+          )}
           <View style={styles.linksRow}>
             {canRate ? (
               <Pressable onPress={onRate} hitSlop={6} style={[styles.rateBtn, { borderColor: p.navy }]} accessibilityRole="button">

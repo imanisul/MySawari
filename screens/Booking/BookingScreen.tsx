@@ -300,7 +300,7 @@ export default function BookingScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       {!!selectedCar.manufacturer && <Text style={[styles.brand, { color: p.muted }]}>{selectedCar.manufacturer}</Text>}
-                      <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1}>{title}</Text>
+                      <Text style={[styles.carName, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{title}</Text>
                     </View>
                     {!!selectedCar.rating && (
                       <View style={[styles.rating, { backgroundColor: p.navy }]}>
@@ -309,7 +309,7 @@ export default function BookingScreen() {
                       </View>
                     )}
                   </View>
-                  <Text style={[styles.carMeta, { color: p.muted }]} numberOfLines={1}>{meta.join('  •  ')}</Text>
+                  <Text style={[styles.carMeta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{meta.join('  •  ')}</Text>
                   <Pressable accessibilityRole="button" accessibilityLabel={`${mode}, change driving option`} onPress={chooseDriver} hitSlop={6}>
                     <Text style={[styles.carMeta, { color: p.muted }]}>{mode}  •  {days} day{days === 1 ? '' : 's'}</Text>
                   </Pressable>
@@ -333,13 +333,13 @@ export default function BookingScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
                     {params.isOvernight === 'true' && (
-                      <View style={{ backgroundColor: '#EDE9FE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#6D28D9' }}>🌙 OVERNIGHT</Text>
+                      <View style={{ backgroundColor: '#E8EBF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#4B5A9E' }}>🌙 OVERNIGHT</Text>
                       </View>
                     )}
                   </View>
                   {!isMissingDates && (
-                    <Text style={[styles.durationSub, { color: p.sub }]} numberOfLines={1}>
+                    <Text style={[styles.durationSub, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {longWhen(startStr, pickupTime)}  →  {longWhen(endStr, returnTime)}
                     </Text>
                   )}
@@ -375,7 +375,7 @@ export default function BookingScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.stopTitle, { color: p.fg }]}>Pickup{!isMissingDates ? ` · ${dayAndTime(startStr, pickupTime)}` : ''}</Text>
-                    <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={1}>
+                    <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {deliverPickup ? `Doorstep delivery · ${pickupWhere}${ready?.pickupCharge ? ` · +${formatCurrency(ready.pickupCharge)}` : ''}` : pickupWhere}
                     </Text>
                   </View>
@@ -397,7 +397,7 @@ export default function BookingScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.stopTitle, { color: p.fg }]}>Destination</Text>
-                    <Text style={[styles.stopSub, { color: isMissingDestination ? p.red : p.sub }]} numberOfLines={1}>
+                    <Text style={[styles.stopSub, { color: isMissingDestination ? p.red : p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {destinationWhere}
                     </Text>
                   </View>
@@ -418,7 +418,7 @@ export default function BookingScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.stopTitle, { color: p.fg }]}>Return{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
-                    <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1}>
+                    <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {collectReturn ? `Doorstep collection · ${returnWhere}${ready?.dropCharge ? ` · +${formatCurrency(ready.dropCharge)}` : ''}` : returnWhere}
                     </Text>
                   </View>
@@ -554,7 +554,7 @@ export default function BookingScreen() {
                                 </View>
                               )}
                             </View>
-                            <Text style={[styles.planSub, { color: sub }]} numberOfLines={1}>{pl.pctLabel} off every trip  •  Save up to ₹{pl.annual}/year</Text>
+                            <Text style={[styles.planSub, { color: sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{pl.pctLabel} off every trip  •  Save up to ₹{pl.annual}/year</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end' }}>
                             <Text style={[styles.planPrice, { color: text }]}>{formatCurrency(pl.price)}</Text>

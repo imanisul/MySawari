@@ -274,7 +274,7 @@ function SpecBox({ icon, label, value, colors }: { icon: React.ComponentProps<ty
       <View style={[styles.specIconWrap, { backgroundColor: colors.tintLight }]}>
         <Feather name={icon} size={16} color={colors.primaryText} />
       </View>
-      <Text numberOfLines={1} style={[styles.specLabel, { color: colors.mutedForeground }]}>{label}</Text>
+      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.specLabel, { color: colors.mutedForeground }]}>{label}</Text>
       <Text numberOfLines={2} style={[styles.specValue, { color: colors.foreground }]}>{value}</Text>
     </View>
   );
@@ -376,7 +376,7 @@ export function GallerySection({ car }: { car: Car }) {
                       {p.place || 'Guest trip'}
                     </Text>
                   </View>
-                  <Text numberOfLines={1} style={[styles.guestBy, { color: colors.mutedForeground }]}>by {p.by}</Text>
+                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.guestBy, { color: colors.mutedForeground }]}>by {p.by}</Text>
                 </View>
               </Pressable>
             ))}

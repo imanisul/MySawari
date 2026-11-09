@@ -10,7 +10,7 @@ export function useTripColors() {
   const base = useColors();
   const { isDarkMode } = useSawari();
   if (isDarkMode) {
-    return { ...base, primary: '#3E509A', primaryForeground: '#FFFFFF', primaryText: '#A5B6FF', navy: '#3E509A', lime: '#8B7CF6', blue: '#A5B6FF', segBorder: '#263551' };
+    return { ...base, primary: '#3E509A', primaryForeground: '#FFFFFF', primaryText: '#A5B6FF', navy: '#3E509A', lime: '#6C7BC0', blue: '#A5B6FF', segBorder: '#263551' };
   }
   return {
     ...base,
@@ -24,7 +24,7 @@ export function useTripColors() {
     primaryForeground: '#FFFFFF',
     primaryText: '#262626',
     navy: '#2F3E75',
-    lime: '#6152D8',
+    lime: '#323E71',
     blue: '#2F3E75',
     segBorder: '#EAECF1',
     lightBlue: '#F4F6FA',

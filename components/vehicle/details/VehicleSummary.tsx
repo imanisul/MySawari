@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   // both rows. No tracking tweak -- the role specifies none.
   name: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 25, letterSpacing: 0, marginTop: 2 },
   metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 4 },
-  meta: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11 },
+  meta: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
   metaDot: { width: 2.5, height: 2.5, borderRadius: 1.25, marginHorizontal: 7 },
   // Rating: 28px navy pill (padding 4/9/4/10, 2 between the number and the 14px star), review count 4 below.
   ratingCol: { alignItems: 'center', gap: 4 },
@@ -342,6 +342,6 @@ const styles = StyleSheet.create({
   keepText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 12 },
   track: { width: 38, height: 20, borderRadius: 10, padding: 2, justifyContent: 'center' },
   thumb: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 2 },
-  deliveryTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
-  deliverySub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  deliveryTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, paddingBottom:8 },
+  deliverySub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 20 },
 });

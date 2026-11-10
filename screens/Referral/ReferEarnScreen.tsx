@@ -120,7 +120,10 @@ export default function ReferEarnScreen() {
     { t: 'They Sign Up & Book', s: 'Your friend signs up with your invite code and gets 100 SawariCash in their wallet.' },
     { t: `Earn ${pct} Commission in Wallet`, s: `When your friend completes their trip, you earn ${pct} commission of their total trip amount directly in your wallet, ready to withdraw to your bank account.` },
   ];
+  // TODO: Match the Figma step copy; these longer descriptions wrap differently and change the card height.
 
+  // TODO: Match Figma hero geometry (393px frame): 230px background, 265px hero wrapper, card top at 139px.
+  // The safe-area-derived values below currently make the hero taller and place the card lower.
   // Measured from the design (393 wide): purple header 182 below the status bar, the white card 88 from its
   // bottom edge, 123 tall; the photos sit 46 above the card.
   const heroH = insets.top + 182;
@@ -150,7 +153,7 @@ export default function ReferEarnScreen() {
             </Pressable>
             <View style={[styles.heroCard, { top: cardTop, backgroundColor: p.page, borderColor: p.purpleBorder }]}>
               <Text style={[styles.heroTitle, { color: PURPLE }]} accessibilityRole="header" numberOfLines={1} adjustsFontSizeToFit>Invite Friends. Earn {pct} Commission.</Text>
-              <Text style={[styles.heroSub, { color: p.sub, fontSize: Math.min(12.5, width / 31), lineHeight: Math.min(17.5, width / 22) }]} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.85}>Earn {pct} of your friend's total trip amount as wallet cash — withdraw to your bank account anytime!</Text>
+              <Text style={[styles.heroSub, { color: p.muted, fontSize: Math.min(12.5, width / 31), lineHeight: Math.min(17.5, width / 22) }]} numberOfLines={3} adjustsFontSizeToFit minimumFontScale={0.85}>Earn {pct} of your friend's total trip amount as wallet cash — withdraw to your bank account anytime!</Text>
             </View>
             <View accessible={false} style={[styles.avatars, { top: cardTop - 46, left: (width - 152) / 2 }]}>
               <Image source={require('@/assets/images/refer_avatar_2.jpg')} style={[styles.avatar, { left: 0, top: 10, borderColor: '#D5D9EA' }]} />
@@ -217,6 +220,7 @@ export default function ReferEarnScreen() {
             </Pressable>
 
             <Text style={[styles.faqTitle, { color: p.fg }]}>FAQs</Text>
+            {/* TODO: The Figma frame shows 4 FAQ rows in a different order; this list renders 6 and changes page height. */}
             <FaqList items={faqs} openFirst={false} />
           </View>
         </ScrollView>
@@ -276,9 +280,11 @@ const styles = StyleSheet.create({
   // Three overlapping photos from the design: two side ones lower, the centre one larger, on top, white ring.
   avatar: { position: 'absolute', width: 56, height: 56, borderRadius: 28, borderWidth: 1 },
   avatarMid: { position: 'absolute', top: 0, width: 64, height: 64, borderRadius: 32, borderWidth: 1.5, borderColor: '#FFFFFF' },
+  // TODO: Match Figma hero card: 10px radius, 12px horizontal/32px top/16px bottom padding, 12px content gap;
+  // title 19px Bold and subtitle 11px Medium (currently 20px SemiBold and 12.5px Regular).
   heroCard: { position: 'absolute', left: 33, right: 33, height: 123, borderWidth: 1, borderRadius: 12, paddingTop: 24, paddingHorizontal: 14, overflow: 'hidden', alignItems: 'center' },
-  heroTitle: { fontFamily: PF.semibold, fontSize: 20, lineHeight: 28, textAlign: 'center' },
-  heroSub: { fontFamily: PF.regular, fontSize: 12.5, lineHeight: 17.5, textAlign: 'center', marginTop: 8 },
+  heroTitle: { fontFamily: PF.bold, fontSize: 19, lineHeight: 28, textAlign: 'center' },
+  heroSub: { fontFamily: PF.medium, fontSize: 11, lineHeight: 17.5, textAlign: 'center', marginTop: 8 },
   body: { paddingHorizontal: 16, paddingTop: 9 },
   partnerCard: {
     borderWidth: 1,
@@ -288,19 +294,26 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     marginBottom: 14,
   },
+  // TODO: Match Figma's 12px card padding and typography: heading 15px/22.5px SemiBold, step title and body 11px/16.5px
+  // SemiBold/Medium (currently 13px inset/15px top, 16px Medium, 12.5px/17px Medium, and 12px/17px Regular).
   how: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingTop: 15, paddingBottom: 13 },
-  howTitle: { fontFamily: PF.medium, fontSize: 16, lineHeight: 22, marginBottom: 12 },
+  howTitle: { fontFamily: PF.semibold, fontSize: 16, lineHeight: 22, marginBottom: 12 },
   howRow: { flexDirection: 'row', gap: 12 },
   howRail: { width: 11, alignItems: 'center' },
   // Dot on the subtitle's first line (design), the dashed line runs from it to the next dot.
   howDot: { position: 'absolute', top: 21, width: 11, height: 11, borderRadius: 5.5 },
   howLine: { position: 'absolute', top: 27, bottom: -27, left: 5, borderLeftWidth: 1, borderStyle: 'dashed' },
-  howStep: { fontFamily: PF.medium, fontSize: 12.5, lineHeight: 17 },
-  howSub: { fontFamily: PF.regular, fontSize: 12, lineHeight: 17 },
+  howStep: { fontFamily: PF.semibold, fontSize: 12.5, lineHeight: 17 },
+  howSub: { fontFamily: PF.medium, fontSize: 11, lineHeight: 17 },
+  // TODO: Match Figma history row: 12px/10px padding, 8px radius, and 15px SemiBold label (currently fixed 57px height,
+  // 10px radius, and 16px Medium label).
   history: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 10, height: 57, paddingHorizontal: 12, marginTop: 17 },
   historyIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   historyText: { flex: 1, fontFamily: PF.medium, fontSize: 16 },
+  // TODO: Match Figma FAQ title: 15px SemiBold and 8px section padding (currently 16px Medium and 20px top margin).
   faqTitle: { fontFamily: PF.medium, fontSize: 16, marginTop: 20, marginBottom: 12 },
+  // TODO: Match Figma footer spacing: 8px top padding, 4px link-row vertical padding, and an 8px link-to-button gap;
+  // current top padding/margin are 13px/12px and the link row has no vertical padding.
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 16, paddingTop: 13, boxShadow: '0px -6px 18px rgba(47, 62, 117, 0.07)' },
   linkRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 12, paddingHorizontal: 4 },
   // Figma: Plus Jakarta Sans medium 11/16.5, Neutral/500 (#737373), centred; the whole line is one grey text.
@@ -309,6 +322,7 @@ const styles = StyleSheet.create({
   footerBtns: { flexDirection: 'row', gap: 12 },
   wa: { flex: 1, height: 54, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   waLogo: { width: 25, height: 25, borderRadius: 12.5, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  // TODO: Match Figma CTA: 17px SemiBold label and a 50px share button (currently 18.5px Medium and 54px).
   waText: { fontFamily: PF.medium, fontSize: 18.5, color: '#FFFFFF' },
   shareBtn: { width: 54, height: 54, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 });

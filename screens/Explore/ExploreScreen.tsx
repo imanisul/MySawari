@@ -267,15 +267,15 @@ const styles = StyleSheet.create({
   segText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5 },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, marginTop: 12 },
   // Figma: 40px field, 9/12 padding, 9 between icon and text, 1px Primary/blue-50 border, 8px radius.
-  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 39, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
-  searchText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, paddingVertical: 0 },
-  sortBtn: { width: 48, height: 39, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 49, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
+  searchText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 20, paddingVertical: 0 },
+  sortBtn: { width: 58, height: 49, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   // Figma: chips 36 high, 8 apart, padding 6/8, 1px Primary/blue-50 border, 8px radius, 13/20 weight-500 text.
   // The chips frame pads 8 below, and the card list under it pads 8 above: the first card starts 16 below the chips.
   chips: { gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
   chip: { height: 36, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4 },
-  filterChipFixed: { width: 70 },
+  filterChipFixed: { width: 70, height:38 },
   chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   empty: { borderWidth: 1, borderRadius: 12, marginHorizontal: 16, marginTop: 8, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, marginTop: 6 },

@@ -151,7 +151,7 @@ export default function BookingScreen() {
   // Checked against the live fleet, not the copy saved when the car was tapped.
   const { data: liveVehicles } = useVehicles();
   const liveCar = useLiveCar(liveVehicles?.find((v) => v.id === selectedCar.id) || selectedCar);
-  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr);
+  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr, pickupTime, returnTime);
 
   /** Pickup at the hub or delivered; return at the hub or collected — kept in the context's delivery mode. */
   const setService = (pick: boolean, ret: boolean) => {
@@ -349,16 +349,6 @@ export default function BookingScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={[styles.durationTitle, { color: p.fg }]}>{isMissingDates ? 'Select your dates' : `${days} Day${days === 1 ? '' : 's'} Rental Duration`}</Text>
-                    {params.isOvernight === 'true' && (
-                      <View style={{ backgroundColor: '#E8EBF4', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#4B5A9E' }}>🌙 OVERNIGHT</Text>
-                      </View>
-                    )}
-                    {isDatesLocked && (
-                      <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>⚡ FIXED DEAL</Text>
-                      </View>
-                    )}
                   </View>
                   {!isMissingDates && (
                     <Text style={[styles.durationSub, { color: p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>

@@ -1,4 +1,5 @@
 import { useSawari, useQuote } from '@/context/SawariContext';
+import { useIsTopDeal, TOP_DEAL_KM, TOP_DEAL_EXTRA_KM_RATE } from './topDealKm';
 import { BOOKING_ADVANCE_AMOUNT } from '@/services/backend/pricingEngine';
 
 const PLAN_NAMES: Record<string, string> = { starter: 'Starter', plus: 'Plus', pro: 'Pro' };
@@ -54,6 +55,7 @@ export type TripPrice =
  */
 export function useTripPrice(hasTrip: boolean): TripPrice {
   const { selectedCar, membership } = useSawari();
+  const topDeal = useIsTopDeal();
   const { pricingQuote: q, isQuoteLoading, quoteError, refreshQuote } = useQuote();
   const perDay = selectedCar?.perDay || 0;
 
@@ -115,6 +117,6 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     payableNow: q.onlinePayableNow ?? Math.min(BOOKING_ADVANCE_AMOUNT, final),
     sawariCashUsed: q.sawariCashUsed || 0,
     balance: q.remainingRentalAmount,
-    kmText: 'Unlimited km',
+    kmText: topDeal ? `${TOP_DEAL_KM} km, then ₹${TOP_DEAL_EXTRA_KM_RATE}/km` : 'Unlimited km',
   };
 }

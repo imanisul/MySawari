@@ -7,6 +7,7 @@ import Svg, { Defs, RadialGradient, Stop, Rect, Path } from 'react-native-svg';
 import { Image } from 'expo-image';
 import type { ImageSourcePropType } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useIsTopDeal, TOP_DEAL_KM, TOP_DEAL_EXTRA_KM_RATE } from './topDealKm';
 import * as Haptics from '@/utils/haptics';
 import { useQuery } from '@tanstack/react-query';
 import { PhotoViewer } from '@/components/common/PhotoViewer';
@@ -140,6 +141,7 @@ function MileageIcon({ source, size, p }: { source: ImageSourcePropType; size: n
  */
 export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; tripDays?: number } = {}) {
   const p = useDetailsPalette();
+  const topDeal = useIsTopDeal();
   return (
     // Figma frame: padding 8/16/12, 12 between the title and the card.
     <View style={[styles.block, { paddingTop: 8, paddingBottom: 12 }]}>
@@ -149,10 +151,10 @@ export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; t
           <MileageIcon source={require('@/assets/images/mileage_road.png')} size={22} p={p} />
           <View style={{ flex: 1 }}>
             <View style={styles.mileHead}>
-              <Text style={[styles.mileTitle, { color: p.fg }]}>Unlimited Kilometres</Text>
+              <Text style={[styles.mileTitle, { color: p.fg }]}>{topDeal ? `${TOP_DEAL_KM} Kilometres` : 'Unlimited Kilometres'}</Text>
               <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Included</Text></View>
             </View>
-            <Text style={[styles.mileSub, { color: p.muted }]}>Drive freely with no distance cap and zero extra kilometre charges.</Text>
+            <Text style={[styles.mileSub, { color: p.muted }]}>{topDeal ? `Top Deal includes up to ${TOP_DEAL_KM} km. Every extra km is ₹${TOP_DEAL_EXTRA_KM_RATE}.` : 'Drive freely with no distance cap and zero extra kilometre charges.'}</Text>
           </View>
         </View>
       </View>
@@ -605,6 +607,8 @@ const WHY_THUMB_HEIGHT = 42;
 
 export function WhyRent() {
   const p = useDetailsPalette();
+  const topDeal = useIsTopDeal();
+  const why = topDeal ? WHY.map((w) => (w.title === 'Unlimited kilometres' ? { title: `${TOP_DEAL_KM} km included`, desc: `Top Deals include up to ${TOP_DEAL_KM} km. After that every extra km is ₹${TOP_DEAL_EXTRA_KM_RATE}.` } : w)) : WHY;
   // Slim custom scrollbar (the native one can't be coloured or placed like the design's).
   const scrollY = useRef(new Animated.Value(0)).current;
   const [contentH, setContentH] = useState(0);
@@ -652,7 +656,7 @@ export function WhyRent() {
             onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
             scrollEventThrottle={16}
           >
-            {WHY.map((w) => (
+            {why.map((w) => (
               <View key={w.title} style={styles.whyRow}>
                 <View style={[styles.whyCheck, { backgroundColor: whyLight ? '#323E71' : p.purpleCheck }]}>
                   <Feather name="check" size={11} color="#FFFFFF" />
@@ -772,6 +776,8 @@ const NOT_INCLUDED = [
 
 export function Inclusions() {
   const p = useDetailsPalette();
+  const topDeal = useIsTopDeal();
+  const included = topDeal ? INCLUDED.map((t) => (t.startsWith('Unlimited kilometres') ? `${TOP_DEAL_KM} km included - Extra kilometres are ₹${TOP_DEAL_EXTRA_KM_RATE} per km` : t)) : INCLUDED;
   return (
     // Figma frame: padding 8/16, 12 between the two cards.
     <View style={[styles.block, { gap: 12, paddingTop: 8, paddingBottom: 8 }]}>
@@ -781,7 +787,7 @@ export function Inclusions() {
           <Ionicons name="thumbs-up" size={16} color={p.green} />
           <Text style={[styles.incTitle, { color: p.fg }]}>Inclusions</Text>
         </View>
-        <Bullets items={INCLUDED} p={p} />
+        <Bullets items={included} p={p} />
       </LinearGradient>
       <LinearGradient colors={[p.page, p.redBg]} style={[styles.card, styles.incCard, { borderColor: p.redBorder }]}>
         <View style={styles.incHead}>

@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   carName: { fontFamily: 'Inter_600SemiBold', fontSize: 16 },
   carPrice: { fontFamily: 'Inter_600SemiBold', fontSize: 15 },
   carSubHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  carType: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  carType: { fontFamily: 'Inter_500Medium', fontSize: 11 },
   carPriceSuffix: { fontFamily: 'Inter_400Regular', fontSize: 11 },
   availableRow: { alignItems: 'center', flexDirection: 'row', marginTop: 6 },
   availableDot: { borderRadius: 99, height: 6, marginRight: 6, width: 6 },

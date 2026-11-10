@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   stats: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingTop: 14, paddingBottom: 13 },
-  statLabel: { fontFamily: PF.regular, fontSize: 12.5 },
+  statLabel: { fontFamily: PF.medium, fontSize: 13 },
   statBig: { fontFamily: PF.medium, fontSize: 23, lineHeight: 32, marginTop: 4 },
   statRow: { flexDirection: 'row', gap: 12, marginTop: 10 },
   statBox: { flex: 1, borderWidth: 1, borderRadius: 8, paddingHorizontal: 9, paddingTop: 10, paddingBottom: 9 },

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { prefetchCarGallery } from '@/hooks/useVehicles';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -131,7 +132,8 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
             onPress={() => { Haptics.selectionAsync(); toggleFavorite(car.id); }}
             style={[styles.heart, { backgroundColor: p.summary }]}
           >
-            <Ionicons name={fav ? 'heart' : 'heart-outline'} size={16} color={fav ? p.red : p.muted} />
+            <FontAwesome name={fav ? 'heart' : 'heart-o'} size={16} color={fav ? 'red' : 'black'} />
+            {/* <Ionicons name={fav ? 'heart' : 'heart-outline'} size={16} color={fav ? p.red : p.muted} /> */}
           </Pressable>
           {images.length > 1 && (
             <View style={styles.dots} pointerEvents="none">
@@ -240,7 +242,7 @@ const styles = StyleSheet.create({
   // Figma: card padding 4/4/8, 8 between the photo and the details (351×212 photo, 8px radius, 8 inset for tag, heart and dots).
   card: { borderWidth: 1, borderRadius: 12, paddingTop: 4, paddingHorizontal: 4, paddingBottom: 8 },
   photo: { height: 212, borderRadius: 8, overflow: 'hidden' },
-  tag: { position: 'absolute', top: 8, left: 8, borderRadius: 20, paddingHorizontal: 8, height: 29, justifyContent: 'center', maxWidth: '70%' },
+  tag: { position: 'absolute', top: 8, left: 8, borderRadius: 20, paddingHorizontal: 10, height: 29, justifyContent: 'center', maxWidth: '70%' },
   tagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#FFFFFF' },
   heart: { position: 'absolute', top: 8, right: 8, width: 29, height: 29, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   // Dots: the current one is a 16×4 white pill, the others 4×4 Neutral/300, 5 apart.

@@ -383,8 +383,8 @@ const styles = StyleSheet.create({
   offChipText: { fontFamily: FONT.bold, fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
   upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#323E71', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
   upgradeText: { fontFamily: FONT.bold, fontSize: 11, lineHeight: 17, color: '#FFFFFF' },
-  memberTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
-  memberSub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20 },
+  memberTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
+  memberSub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 16.5 },
 
   wallet: { borderWidth: 1, borderRadius: 12, height: 60, paddingVertical: 16, paddingHorizontal: 12, gap: 12, marginTop: 16, flexDirection: 'row', alignItems: 'center' },
   walletLabel: { flex: 1, fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },

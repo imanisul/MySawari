@@ -90,7 +90,7 @@ export function VehicleHeader({ title, tripLabel, onEditTrip }: { title: string;
             <View style={styles.editBtn}>
               <Feather name="edit" size={10} color={p.navy} style={styles.editIcon} />
               <View style={styles.editBox}>
-                <Text style={[styles.editText, { color: p.navy }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Edit</Text>
+                <Text style={[styles.editText, { color: p.navy }]} numberOfLines={1}>Edit</Text>
               </View>
             </View>
           </View>
@@ -137,10 +137,10 @@ const styles = StyleSheet.create({
   // Medium/xs box: 11px on a 150% line = 16px, centred.
   tripBox: { height: 16, justifyContent: 'center', flexShrink: 1 },
   trip: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16, flexShrink: 1 },
-  editBtn: { width: 28, height: 12, flexDirection: 'row', alignItems: 'center', gap: 2 },
+  editBtn: { width: 28, height: 12, flexDirection: 'row', alignItems: 'center' },
   editIcon: { width: 10, height: 10, flexShrink: 0 },
-  editBox: { width: 16, height: 12, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  editText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8, lineHeight: 12, textDecorationLine: 'underline' },
+  editBox: { width: 26, height: 12, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
+  editText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 10, textDecorationLine: 'underline' },
   // Frame 24: two 32px circles, 8 apart, right aligned -- 32+8+32 = 72 wide, 32 tall.
   actions: { width: 72, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
 });

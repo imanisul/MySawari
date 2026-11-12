@@ -2,6 +2,7 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "strict": true,
     "paths": {
       "@/*": [
@@ -14,5 +15,9 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "mysawari_customer_backend"
   ]
 }

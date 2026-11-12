@@ -1,0 +1,440 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Feather } from '@expo/vector-icons';
+import { formatCurrency } from '@/services/backend/pricingEngine';
+import { BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch } from '@/services/backend/api';
+
+/** Deal / offer photos usually show a fleet vehicle, so they go through plate processing too. */
+import { Image as CachedImage } from 'expo-image';
+
+/** Downloads offer / banner pictures into the image cache as soon as the list arrives, so they draw instantly. */
+function prefetchOfferImages(list: any[]) {
+  const urls = list
+    .map((o) => (typeof o?.image === 'string' ? o.image : o?.image?.uri || o?.image?.url))
+    .filter((u): u is string => typeof u === 'string' && /^https?:/.test(u));
+  if (urls.length) CachedImage.prefetch(urls, 'memory-disk').catch(() => false);
+}
+
+function plateSafeOfferImage(image: any, updatedAt?: string | Date) {
+  const raw = typeof image === 'string' ? image : image?.url;
+  if (!raw) return undefined;
+  let url = plateSafeImageUrl(raw);
+  if (updatedAt) {
+    const v = new Date(updatedAt).getTime();
+    if (!Number.isNaN(v)) {
+      url += (url.includes('?') ? '&' : '?') + `v=${v}`;
+    }
+  }
+  return { ...(typeof image === 'object' ? image : {}), url, uri: url };
+}
+
+export interface Offer {
+  id: string;
+  _id?: string;
+  type: 'coupon' | 'special_deal' | 'banner';
+  title: string;
+  subtitle: string;
+  description?: string;
+  discount?: string;
+  code?: string;
+  expiry?: string;
+  gradientColors?: [string, string];
+  icon?: keyof typeof Feather.glyphMap;
+  image?: any;
+  displayFormat?: 'image' | 'text' | 'combination';
+  lines?: [string, string] | string[];
+  applicableType?: 'all' | 'specific_vehicles' | 'category' | 'campaign';
+  applicableVehicleIds?: string[];
+  applicableCategories?: string[];
+  startDate?: string;
+  startTime?: string;
+  minimumBooking?: number;
+  discountType?: 'FLAT' | 'PERCENTAGE';
+  discountValue?: number;
+  maximumDiscount?: number | null;
+  // Dynamic Banner fields
+  position?: 'hero' | 'middle' | 'bottom' | 'position3' | string;
+  destinationType?: 'none' | 'vehicle' | 'offers' | 'offer_details' | 'booking' | 'external' | 'screen';
+  destinationUrl?: string;
+  destinationScreen?: string;
+  buttonText?: string;
+  badgeText?: string;
+  sortOrder?: number;
+  updatedAt?: string;
+  // Special deal fields
+  isExclusive?: boolean;
+  promotionalPrice?: number;
+  vehicleId?: string;
+  originalPrice?: number;
+  dealPrice?: number;
+  discountPercent?: number;
+  expiryDate?: string;
+  endTime?: string;
+  active?: boolean;
+  approvalStatus?: 'approved' | 'pending_approval' | 'rejected' | string;
+}
+
+function formatExpiry(dateStr: string): string {
+  const date = new Date(dateStr);
+  return `Valid till ${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+}
+
+/**
+ * Fetches offers from the backend. Only live offers are shown: if the server can't be reached the
+ * request fails (React Query retries it) and the offer sections stay hidden, instead of showing
+ * built-in coupons that may not match what the server accepts.
+ */
+
+/**
+ * Still usable right now: switched on, approved by admin, and not past its expiry date.
+ */
+export function isOfferLive(offer: { active?: boolean; startDate?: string | Date | null; expiryDate?: string | Date; approvalStatus?: string }, now = Date.now(), serverDecidesStart = false): boolean {
+  if (offer.active === false) return false;
+  if (offer.approvalStatus && offer.approvalStatus !== 'approved') return false;
+  // Scheduled offers stay hidden until their start date and time.
+  const starts = offer.startDate ? new Date(offer.startDate).getTime() : NaN;
+  // Member early-access deals start later for everyone else; the exclusive endpoint already filters them, so it skips this check.
+  if (!serverDecidesStart && Number.isFinite(starts) && starts > now) return false;
+  const expires = offer.expiryDate ? new Date(offer.expiryDate).getTime() : NaN;
+  if (Number.isFinite(expires) && expires < now) return false;
+  return true;
+}
+
+/** One shared query, so the home screen and the app-start prefetch use the same cached offers. */
+const OFFERS_CACHE_KEY = '@offers_cache_v1';
+
+export const offersQueryOptions = {
+  queryKey: ['offers'] as const,
+  queryFn: async () => {
+    const offers = await fetchOffers();
+    AsyncStorage.setItem(OFFERS_CACHE_KEY, JSON.stringify(offers)).catch(() => { });
+    prefetchOfferImages(offers);
+    return offers;
+  },
+  staleTime: 20 * 1000,
+  refetchInterval: 20 * 1000,
+  refetchOnWindowFocus: true,
+};
+
+export async function fetchOffers(): Promise<Offer[]> {
+  try {
+    const res = await timedFetch(`${BACKEND_URL}/offers`, {}, 3500);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const mapped = json.data
+          .filter((offer: any) => {
+            if (!offer || !isOfferLive(offer)) return false;
+            // Special deals and exclusive offers belong strictly in the exclusive deals section, NEVER in banners
+            if (offer.isExclusive || offer.type === 'special_deal' || offer.position === 'exclusive') {
+              return false;
+            }
+            return true;
+          })
+          .map((offer: any) => {
+            if (offer.type === 'banner') {
+              const displayFormat = offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url && offer.title ? 'combination' : 'text');
+              return {
+                id: `banner-${offer._id}`,
+                _id: offer._id,
+                type: 'banner',
+                title: offer.title || '',
+                subtitle: offer.subtitle || '',
+                code: offer.code || '',
+                discount: offer.discount || '',
+                displayFormat,
+                lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
+                gradientColors: offer.gradientColors || ['#323E71', '#4B5A9E'],
+                icon: offer.icon || 'tag',
+                image: plateSafeOfferImage(offer.image, offer.updatedAt),
+                expiry: offer.expiryDate ? formatExpiry(offer.expiryDate) : '',
+                expiryDate: offer.expiryDate,
+                startDate: offer.startDate,
+                description: offer.description || '',
+                applicableType: offer.applicableType || 'all',
+                applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
+                applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
+                position: offer.position || 'position3',
+                destinationType: offer.destinationType || (offer.vehicleId ? 'vehicle' : 'none'),
+                destinationUrl: offer.destinationUrl || '',
+                destinationScreen: offer.destinationScreen || '',
+                buttonText: offer.buttonText || '',
+                badgeText: offer.badgeText || '',
+                sortOrder: offer.sortOrder || 0,
+                vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
+                active: offer.active,
+                approvalStatus: offer.approvalStatus,
+                updatedAt: offer.updatedAt,
+              };
+            } else if (offer.type === 'coupon') {
+              const isFlat = offer.discountType === 'FLAT';
+              const discount = isFlat ? `${formatCurrency(offer.discountValue)} OFF` : `${offer.discountValue}% OFF`;
+              const subtitle = offer.subtitle || (isFlat
+                ? `Flat ${formatCurrency(offer.discountValue)} off on bookings above ${formatCurrency(offer.minimumBooking)}`
+                : `${offer.discountValue}% off${offer.maximumDiscount ? ` (up to ${formatCurrency(offer.maximumDiscount)})` : ''} on bookings above ${formatCurrency(offer.minimumBooking)}`);
+
+              return {
+                id: `coupon-${offer.code}`,
+                _id: offer._id,
+                type: 'coupon',
+                title: offer.title,
+                subtitle,
+                discount,
+                code: offer.code,
+                displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
+                lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
+                expiry: formatExpiry(offer.expiryDate),
+                expiryDate: offer.expiryDate,
+                startDate: offer.startDate,
+                description: offer.description || '',
+                minimumBooking: offer.minimumBooking,
+                discountType: offer.discountType,
+                discountValue: offer.discountValue,
+                maximumDiscount: offer.maximumDiscount,
+                applicableType: offer.applicableType || 'all',
+                applicableVehicleIds: Array.isArray(offer.applicableVehicleIds) ? offer.applicableVehicleIds.map(String) : [],
+                applicableCategories: Array.isArray(offer.applicableCategories) ? offer.applicableCategories : [],
+                vehicleId: offer.vehicleId ? String(offer.vehicleId) : undefined,
+                gradientColors: offer.gradientColors || ['#6178D8', '#4B5A9E'],
+                icon: offer.icon || 'tag',
+                image: plateSafeOfferImage(offer.image, offer.updatedAt),
+                active: offer.active,
+                approvalStatus: offer.approvalStatus,
+                updatedAt: offer.updatedAt,
+              };
+            } else {
+              // special_deal — pass through as-is with minimal transforms
+              return {
+                id: `deal-${offer._id}`,
+                _id: offer._id,
+                type: 'special_deal',
+                title: offer.title,
+                subtitle: offer.subtitle,
+                description: offer.description || '',
+                discount: offer.discountPercent ? `${offer.discountPercent}% OFF` : '',
+                code: offer.code || '',
+                displayFormat: offer.displayFormat || (offer.image?.url && !offer.title ? 'image' : offer.image?.url ? 'combination' : 'text'),
+                lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
+                expiry: formatExpiry(offer.expiryDate),
+                expiryDate: offer.expiryDate,
+                startDate: offer.startDate,
+                applicableType: 'specific_vehicles',
+                applicableVehicleIds: [String(offer.vehicleId)],
+                vehicleId: String(offer.vehicleId),
+                gradientColors: offer.gradientColors || ['#FF416C', '#FF4B2B'],
+                icon: offer.icon || 'zap',
+                image: plateSafeOfferImage(offer.image, offer.updatedAt),
+                originalPrice: offer.originalPrice,
+                dealPrice: offer.dealPrice,
+                discountPercent: offer.discountPercent,
+                active: offer.active,
+                approvalStatus: offer.approvalStatus,
+                updatedAt: offer.updatedAt,
+              };
+            }
+            return undefined as any;
+          }).filter(Boolean);
+        return mapped;
+      }
+    }
+  } catch {
+    // Offline or network error: fall back to cached offers
+  }
+
+  try {
+    const saved = await AsyncStorage.getItem(OFFERS_CACHE_KEY);
+    if (saved) {
+      const list = JSON.parse(saved);
+      if (Array.isArray(list)) return list.filter((o) => o && isOfferLive(o));
+    }
+  } catch { }
+
+  return [];
+}
+
+/**
+ * Puts the offers from the last launch into the cache (marked stale, so they refresh straight away): Home shows its
+ * offer sections at once instead of after the network. Ones past their expiry date are dropped.
+ */
+export async function hydrateOffers(queryClient: { getQueryData: (k: readonly unknown[]) => unknown; setQueryData: (k: readonly unknown[], d: unknown, o?: { updatedAt: number }) => unknown }) {
+  try {
+    const saved = await AsyncStorage.getItem(OFFERS_CACHE_KEY);
+    if (!saved || queryClient.getQueryData(offersQueryOptions.queryKey)) return;
+    const list = (JSON.parse(saved) as any[]).filter((o) => o && (!o.expiryDate || isOfferLive(o)));
+    queryClient.setQueryData(offersQueryOptions.queryKey, list, { updatedAt: 0 });
+  } catch { }
+}
+
+export interface VehiclePriceItem {
+  vehicleId: string;
+  vehicleName?: string;
+  dealPrice: number;
+  originalPrice?: number;
+  stockLimit?: number;
+  soldCount?: number;
+}
+
+export interface ExclusiveOffer {
+  id: string;
+  _id: string;
+  title: string;
+  subtitle: string;
+  description?: string;
+  code?: string;
+  image?: { url: string; uri?: string };
+  pricingType: 'promotional_price' | 'fixed_discount' | 'percentage_discount' | 'custom_pricing';
+  pricingUnit: 'per_day' | 'per_trip';
+  promotionalPrice?: number;
+  originalPrice?: number;
+  dealPrice?: number;
+  discountPercent?: number;
+  vehiclePrices?: VehiclePriceItem[];
+  membershipEligibility: 'all' | 'members_only' | 'tier_specific' | 'non_members_only';
+  eligibleTiers?: string[];
+  allowMembershipStacking?: boolean;
+  claimLimit?: number;
+  claimsCount?: number;
+  activeClaim?: {
+    claimToken: string;
+    couponCode: string;
+    isExclusive?: boolean;
+    promotionalPrice?: number;
+    vehicleId?: string;
+    dealPrice: number;
+    expiresAt: string;
+  } | null;
+  startDate?: string;
+  startTime?: string;
+  expiryDate?: string;
+  endTime?: string;
+  earlyAccessHours?: number;
+  isMemberEarlyAccess?: boolean;
+  vehicleId?: any;
+  applicableVehicleIds?: string[];
+  allVehicles?: boolean;
+  applicableType?: 'all' | 'specific_vehicles' | 'category' | 'campaign';
+  pickupTime?: string;
+  returnTime?: string;
+  isOvernight?: boolean;
+  timeSlotLabel?: string;
+  rentalPeriodMode?: 'preset' | 'specific_dates' | 'duration_days' | 'flexible';
+  rentalStartDate?: string;
+  rentalStartTime?: string;
+  rentalEndDate?: string;
+  rentalEndTime?: string;
+  rentalDays?: number;
+  rentalHours?: number;
+  rentalPeriodLabel?: string;
+  analytics?: {
+    views?: number;
+    clicks?: number;
+    claims?: number;
+    redemptions?: number;
+  };
+}
+
+const EXCLUSIVE_OFFERS_CACHE_KEY = '@exclusive_offers_cache_v1';
+
+export const exclusiveOffersQueryOptions = {
+  queryKey: ['exclusive-offers'] as const,
+  queryFn: async () => {
+    return fetchExclusiveOffers();
+  },
+  staleTime: 20 * 1000,
+  refetchInterval: 20 * 1000,
+  refetchOnWindowFocus: true,
+};
+
+export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
+  try {
+    const res = await fetchWithAuth(`${BACKEND_URL}/offers/exclusive`);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && Array.isArray(json.data)) {
+        const live = json.data
+          .filter((o: any) => o && isOfferLive(o, Date.now(), true))
+          .map((o: any) => ({
+            ...o,
+            id: o._id,
+            image: plateSafeOfferImage(o.image, o.updatedAt),
+          }));
+        AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(live)).catch(() => {});
+        prefetchOfferImages(live);
+        return live;
+      }
+    }
+    // A definite answer from the server (e.g. 404/403) means no offers: drop the stale cache instead of showing deleted deals.
+    if (res.status < 500) {
+      AsyncStorage.removeItem(EXCLUSIVE_OFFERS_CACHE_KEY).catch(() => {});
+      return [];
+    }
+  } catch (e) {
+    console.warn('[Offers] Failed to fetch exclusive offers:', e);
+  }
+
+  try {
+    const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
+    if (saved) {
+      const list = JSON.parse(saved);
+      if (Array.isArray(list)) return list.filter((o: any) => o && isOfferLive(o, Date.now(), true));
+    }
+  } catch {}
+
+  return [];
+}
+
+export async function hydrateExclusiveOffers(queryClient: { getQueryData: (k: readonly unknown[]) => unknown; setQueryData: (k: readonly unknown[], d: unknown, o?: { updatedAt: number }) => unknown }) {
+  try {
+    const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
+    if (!saved || queryClient.getQueryData(exclusiveOffersQueryOptions.queryKey)) return;
+    const list = (JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o, Date.now(), true));
+    queryClient.setQueryData(exclusiveOffersQueryOptions.queryKey, list, { updatedAt: 0 });
+  } catch {}
+}
+
+/** The car a deal is for, when it targets one specific vehicle that is in the given list. */
+export function specificCarOf(offer: any, vehicles: any[]): any | undefined {
+  if (!offer || offer.allVehicles || offer.applicableType === 'all' || !vehicles?.length) return undefined;
+  const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
+  const ids = [
+    ...(offer.vehiclePrices || []).map((p: any) => asId(p.vehicleId)),
+    ...(offer.applicableVehicleIds || []).map(asId),
+    asId(offer.vehicleId),
+  ].filter(Boolean);
+  for (const id of ids) {
+    const car = vehicles.find((v: any) => String(v.id ?? v._id) === id);
+    if (car) return car;
+  }
+  return undefined;
+}
+
+export async function fetchContentVersion(): Promise<number> {
+  try {
+    const res = await timedFetch(`${BACKEND_URL}/offers/version`, {}, 2500);
+    if (res.ok) {
+      const json = await res.json();
+      if (json.success && json.version) return Number(json.version);
+    }
+  } catch { }
+  return 0;
+}
+
+export async function claimExclusiveOffer(offerId: string): Promise<{ success: boolean; alreadyClaimed?: boolean; claim?: any; message?: string }> {
+  try {
+    const res = await fetchWithAuth(`${BACKEND_URL}/offers/exclusive/${offerId}/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const json = await res.json();
+    return json;
+  } catch (e: any) {
+    return { success: false, message: e.message || 'Failed to claim offer' };
+  }
+}
+
+export async function recordOfferView(offerId: string): Promise<void> {
+  try {
+    await fetchWithAuth(`${BACKEND_URL}/offers/exclusive/${offerId}/view`, {
+      method: 'POST',
+    });
+  } catch { }
+}

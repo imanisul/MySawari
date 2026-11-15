@@ -35,6 +35,23 @@ import {
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 30;
+
+/**
+ * Last code sent to each number in this app session (outlives the sheet, which resets every time it opens).
+ * The server allows one send per number every 30 s, so tapping "Send OTP" again for the same number (after editing
+ * it, or closing and reopening the sheet) reuses that code and its timer instead of asking the server again — which
+ * only answered "Please wait 25 seconds".
+ */
+const lastSends = new Map<string, { at: number; cooldownSec: number; otpId: string | null; isExisting: boolean }>();
+const secondsLeft = (mobile: string, now = Date.now()) => {
+  const s = lastSends.get(mobile);
+  return s ? Math.max(0, Math.ceil((s.at + s.cooldownSec * 1000 - now) / 1000)) : 0;
+};
+/** The server's "Please wait 25 seconds before requesting another OTP" → 25, else 0. */
+const serverWaitSeconds = (msg: string) => {
+  const m = msg.match(/wait\s+(\d+)\s+sec/i);
+  return m ? parseInt(m[1], 10) || 0 : 0;
+};
 const HAS_LOGGED_IN_KEY = '@mysawari_has_logged_in_before';
 // Read once when the app starts, so the sheet knows on its very first frame whether to ask for the terms
 // (it used to show the tick for a moment on every open until the saved flag arrived, which jumped the layout).
@@ -351,10 +368,8 @@ export function LoginBottomSheet({
       const detected = extractOtpCode(text);
       if (detected && detected.length === OTP_LENGTH) {
         setDetectedClipOtp(detected);
-        // Only auto-submit if text explicitly contains verification context (e.g. from WhatsApp / SMS)
-        // and user hasn't already entered a code
-        const hasOtpContext = /(?:mysawari|sawari|verification|otp|code|whatsapp)/i.test(text);
-        if (hasOtpContext && detected !== lastDetectedOtp.current && !otp) {
+        // Automatically fill and verify if user has not yet entered a full code
+        if (detected !== lastDetectedOtp.current && (!otp || otp.trim().length === 0)) {
           lastDetectedOtp.current = detected;
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
           setOtp(detected);
@@ -369,15 +384,25 @@ export function LoginBottomSheet({
       setDetectedClipOtp(null);
       return;
     }
-    // Check clipboard once when entering OTP step, and on AppState active (when returning from WhatsApp/SMS)
-    const timer = setTimeout(checkClipboardForOtp, 400);
+    // Check clipboard immediately on entering OTP step
+    checkClipboardForOtp();
+    const timer = setTimeout(checkClipboardForOtp, 350);
+
+    // Continuous 1s interval while waiting on OTP screen so notification/WhatsApp copy is caught instantly
+    const interval = setInterval(() => {
+      checkClipboardForOtp();
+    }, 1000);
+
+    // AppState listener for switching from WhatsApp / SMS back to app
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
         checkClipboardForOtp();
       }
     });
+
     return () => {
       clearTimeout(timer);
+      clearInterval(interval);
       sub.remove();
     };
   }, [step, loading, otp]);
@@ -388,7 +413,24 @@ export function LoginBottomSheet({
   const sendOtp = async () => {
     if (mobile.length !== 10 || (isFirstTime && !termsAccepted) || loading || isVerifyingRef.current) return;
     Haptics.selectionAsync().catch(() => {});
-    setLoading(true); setError(null);
+    setError(null);
+
+    // A code already went to this number moments ago: go straight to entering it, with the time left to resend.
+    const left = secondsLeft(mobile);
+    const prev = lastSends.get(mobile);
+    if (left > 0 && prev) {
+      setIsExisting(prev.isExisting);
+      if (prev.isExisting) { setIsFirstTime(false); setTermsAccepted(true); }
+      setOtpId(prev.otpId);
+      setOtp('');
+      setResendIn(left);
+      setStep('otp');
+      return;
+    }
+
+    setLoading(true);
+    lastDetectedOtp.current = null;
+    setDetectedClipOtp(null);
     try {
       const res = await API.sendOtp(mobile);
       const existing = !!res.isExistingUser;
@@ -401,6 +443,7 @@ export function LoginBottomSheet({
       setOtpId(res.otpId || null);
       setOtp('');
       const cooldown = typeof res.cooldownSec === 'number' && res.cooldownSec > 0 ? res.cooldownSec : RESEND_SECONDS;
+      lastSends.set(mobile, { at: Date.now(), cooldownSec: cooldown, otpId: res.otpId || null, isExisting: existing });
       setResendIn(cooldown);
       setStep('otp');
 
@@ -416,12 +459,16 @@ export function LoginBottomSheet({
       }
     } catch (e: any) {
       const msg = String(e?.message || '');
-      const waitMatch = msg.match(/wait\s+(\d+)\s+sec/i);
-      if (waitMatch && waitMatch[1]) {
-        const waitSec = parseInt(waitMatch[1], 10);
-        if (waitSec > 0) setResendIn(waitSec);
+      const wait = serverWaitSeconds(msg);
+      if (wait > 0) {
+        // The server already sent a code to this number (another tap, another device): it is on its way, so
+        // carry on to entering it with the server's own timer — no error.
+        setOtp('');
+        setResendIn(wait);
+        setStep('otp');
+      } else {
+        setError(msg || 'Could not send the code. Please check your number and try again.');
       }
-      setError(msg || 'Could not send the code. Please check your number and try again.');
     } finally {
       setLoading(false);
     }
@@ -429,12 +476,18 @@ export function LoginBottomSheet({
 
   const resend = async () => {
     if (resendIn > 0 || loading || isVerifyingRef.current) return;
+    // The sheet's timer can be behind the last send (sheet reopened): never ask the server before 30 s are up.
+    const left = secondsLeft(mobile);
+    if (left > 0) { setResendIn(left); return; }
     setLoading(true); setError(null);
+    lastDetectedOtp.current = null;
+    setDetectedClipOtp(null);
     try {
       const res = await API.sendOtp(mobile);
       setOtpId(res.otpId || null);
       setOtp('');
       const cooldown = typeof res.cooldownSec === 'number' && res.cooldownSec > 0 ? res.cooldownSec : RESEND_SECONDS;
+      lastSends.set(mobile, { at: Date.now(), cooldownSec: cooldown, otpId: res.otpId || null, isExisting });
       setResendIn(cooldown);
       if (res.otp && String(res.otp).length === OTP_LENGTH) {
         const autoOtp = String(res.otp);
@@ -447,12 +500,13 @@ export function LoginBottomSheet({
       }
     } catch (e: any) {
       const msg = String(e?.message || '');
-      const waitMatch = msg.match(/wait\s+(\d+)\s+sec/i);
-      if (waitMatch && waitMatch[1]) {
-        const waitSec = parseInt(waitMatch[1], 10);
-        if (waitSec > 0) setResendIn(waitSec);
+      const wait = serverWaitSeconds(msg);
+      if (wait > 0) {
+        // Too soon by the server's clock: just run the timer again (it already says when Resend is ready).
+        setResendIn(wait);
+      } else {
+        setError(msg || 'Could not resend the code. Please try again.');
       }
-      setError(msg || 'Could not resend the code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -892,7 +946,11 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
   };
 
   const change = (text: string, i: number) => {
-    const digits = text.replace(/\D/g, '');
+    let digits = text.replace(/\D/g, '');
+    if (text.length > 1 && digits.length !== OTP_LENGTH) {
+      const extracted = extractOtpCode(text);
+      if (extracted) digits = extracted;
+    }
     const next = [...slots];
     if (!digits) { next[i] = ''; commit(next); return; }
     if (digits.length >= OTP_LENGTH) {
@@ -902,6 +960,13 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
       return;
     }
     if (digits.length > 1) {
+      if (digits.length === 2 && slots[i]) {
+        const newChar = digits[1] || digits[0];
+        next[i] = newChar;
+        commit(next);
+        if (i < OTP_LENGTH - 1) inputs.current[i + 1]?.focus();
+        return;
+      }
       for (let k = 0; k < digits.length && i + k < OTP_LENGTH; k++) next[i + k] = digits[k];
       commit(next);
       inputs.current[Math.min(i + digits.length, OTP_LENGTH - 1)]?.focus();
@@ -926,7 +991,7 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
           keyboardType="number-pad"
           textContentType="oneTimeCode"
           autoComplete={i === 0 ? 'sms-otp' : 'off'}
-          maxLength={OTP_LENGTH}
+          maxLength={i === 0 ? 64 : OTP_LENGTH}
           editable={editable}
           autoFocus={i === 0}
           selectTextOnFocus

@@ -451,11 +451,9 @@ export function DatesSheet() {
 
   // For one car or bike: whether it is free for the chosen dates and times, shown above the button as you pick.
   const availLine = (() => {
-    if (forSpecificCar !== 'true' || !liveSelectedCar || !start) return null;
+    // Not in the Today's Deals "Need more time?" calendar: the OFF tag and the greyed-out days already say it all.
+    if (forSpecificCar !== 'true' || !liveSelectedCar || !start || deal) return null;
     const noun = liveSelectedCar.type === 'Bike' ? 'Bike' : 'Car';
-    if (deal && isOffDay(start) && (!end || end.getTime() === start.getTime())) {
-      return { ok: true, text: `Today's Deal: ${noun} available until ${formatTime12(deal.endMs)}` };
-    }
     const ok = checkCarAvailability(liveSelectedCar, formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', tempReturnTime || '8:00 AM');
     return ok
       ? { ok: true, text: `${noun} is available for your dates` }
@@ -519,28 +517,13 @@ export function DatesSheet() {
       });
     });
 
-    if (thenLocation === 'true' && thenBook === 'true' && isAuthenticated) {
-      // Book Now: straight to payment, with or without a destination (the payment page has its own destination field).
+    if (thenBook === 'true' && isAuthenticated) {
+      // Book Now: straight to payment (payment page handles pickup & drop)
       router.replace('/booking');
-    } else if (thenLocation === 'true' && dropoff?.name) {
-      // A destination is already set (shown, and changeable, in this page's own field): no second location page.
+    } else if (forSpecificCar === 'true' || thenLocation === 'true' || fromDestination === 'true') {
       router.replace('/car-details');
-    } else if (thenLocation === 'true') {
-      // Check Availability from a car: after the dates, the location page; choosing there returns to the car.
-      router.replace({ pathname: '/dropoff', params: thenBook === 'true' ? { forSpecificCar: 'true', thenBook: 'true' } : { forSpecificCar: 'true' } });
     } else if (returnBack === 'true') {
       router.back();
-    } else if (fromDestination === 'true') {
-      // Flow from home Top Destination card: destination and car are already selected, proceed directly to car details
-      router.replace('/car-details');
-    } else if (forSpecificCar === 'true') {
-      if (dropoff?.name) {
-        // Destination already selected, return to car details directly
-        router.replace('/car-details');
-      } else {
-        // Needs destination: go to dropoff
-        router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
-      }
     } else {
       // Swap this page for the results. Back from the results returns to Home.
       router.replace('/search');

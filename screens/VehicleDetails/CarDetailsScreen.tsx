@@ -236,11 +236,11 @@ export default function CarDetailsScreen() {
       return;
     }
     Haptics.selectionAsync();
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true' } });
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
 
-  // Figma flow: Check Availability → date & time → back here with the price → Book Now.
-  // Book Now only asks for the trip destination if it is still missing, then opens the booking.
+  // Check Availability → date & time → back here with the price → Book Now.
+  // Straight to booking (payment option page) without asking for destination.
   const handleBookingProceed = () => {
     if (!isAuthenticated) {
       setPendingAction(() => handleBookingProceed);
@@ -249,9 +249,7 @@ export default function CarDetailsScreen() {
     }
     const isMissingEnd = !endStr || endStr.includes('Select');
     if ((!hasTrip || isMissingEnd) && !isDatesLocked) {
-      router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenLocation: 'true', thenBook: 'true' } });
-    } else if (!dropoff?.name) {
-      router.push({ pathname: '/dropoff', params: { forSpecificCar: 'true', thenBook: 'true' } });
+      router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenBook: 'true' } });
     } else {
       router.push({
         pathname: '/booking',

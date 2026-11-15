@@ -148,7 +148,6 @@ export default function BookingScreen() {
   const isMissingPickup = deliverPickup && !pickup?.name;
   const isMissingDrop = collectReturn && !returnAddress?.name;
   const isMissingDates = !dateRange || dateRange.includes('Select');
-  const isMissingDestination = !dropoff?.name;
 
   const [startStr, endStr] = (dateRange || '').split(' – ');
   // Checked against the live fleet, not the copy saved when the car was tapped.
@@ -232,9 +231,9 @@ export default function BookingScreen() {
   }, [waitingForPrice, isQuoteLoading, pricingQuote]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const payAndBook = () => {
-    if (isMissingDates || isMissingDestination || isMissingPickup || isMissingDrop) {
-      Alert.alert('Missing Details', isMissingDates || isMissingDestination
-        ? 'Please select your destination and travel dates before continuing.'
+    if (isMissingDates || isMissingPickup || isMissingDrop) {
+      Alert.alert('Missing Details', isMissingDates
+        ? 'Please select your travel dates before continuing.'
         : 'Please choose the address for delivery / collection, or pick up and return at the hub.');
       return;
     }
@@ -279,7 +278,6 @@ export default function BookingScreen() {
   const meta = [selectedCar.transmission, selectedCar.fuel, selectedCar.type === 'Bike' ? null : (/seat/i.test(String(selectedCar.seats)) ? selectedCar.seats : `${selectedCar.seats} seats`)].filter(Boolean) as string[];
   const pickupWhere = deliverPickup ? (pickup?.name || 'Choose delivery address') : MYSAWARI_HUB_NAME;
   const returnWhere = collectReturn ? (returnAddress?.name || 'Choose collection address') : MYSAWARI_HUB_NAME;
-  const destinationWhere = dropoff?.name || 'Select your destination';
   const payable = ready?.payableNow ?? pricingQuote?.onlinePayableNow ?? 500;
 
   return (
@@ -374,10 +372,10 @@ export default function BookingScreen() {
                 </View>
               )}
 
-              {/* Pickup & drop-off: Pickup -> Destination (in-between) -> Return, connected seamlessly */}
+              {/* Pickup & drop-off: Pickup -> Drop-off connected seamlessly */}
               <Text style={[styles.section, { color: p.fg }]}>Pickup & drop-off</Text>
               <View style={styles.journeyContainer}>
-                {/* Continuous vertical route line connecting Pickup, Destination and Return */}
+                {/* Continuous vertical route line connecting Pickup and Drop-off */}
                 <View style={[styles.journeyLine, { backgroundColor: p.deliveryBorder }]} pointerEvents="none" />
 
                 {/* 1. Pickup */}
@@ -399,34 +397,10 @@ export default function BookingScreen() {
                   <Text style={[styles.changeText, { color: p.navy }]}>Change</Text>
                 </Pressable>
 
-                {/* 2. Destination (In-between Pickup and Return) */}
+                {/* 2. Drop-off */}
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Destination ${destinationWhere}. Change`}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    router.push({ pathname: '/dropoff', params: { returnBack: 'true' } });
-                  }}
-                  style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
-                >
-                  <View style={[styles.ring, { borderColor: isMissingDestination ? p.red : p.navy, backgroundColor: p.page }]}>
-                    <View style={[styles.innerDot, { backgroundColor: isMissingDestination ? p.red : p.navy }]} />
-                  </View>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.stopTitle, { color: p.fg }]}>Destination</Text>
-                    <Text style={[styles.stopSub, { color: isMissingDestination ? p.red : p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-                      {destinationWhere}
-                    </Text>
-                  </View>
-                  <Text style={[styles.changeText, { color: isMissingDestination ? p.red : p.navy }]}>
-                    {isMissingDestination ? 'Choose' : 'Change'}
-                  </Text>
-                </Pressable>
-
-                {/* 3. Return */}
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Return ${returnWhere}. Change`}
+                  accessibilityLabel={`Drop-off ${returnWhere}. Change`}
                   onPress={chooseReturn}
                   style={({ pressed }) => [styles.stop, pressed && { opacity: 0.6 }]}
                 >
@@ -434,7 +408,7 @@ export default function BookingScreen() {
                     <View style={[styles.innerDot, { backgroundColor: p.red }]} />
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={[styles.stopTitle, { color: p.fg }]}>Return{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
+                    <Text style={[styles.stopTitle, { color: p.fg }]}>Drop-off{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
                     <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                       {collectReturn ? `Doorstep collection · ${returnWhere}${ready?.dropCharge ? ` · +${formatCurrency(ready.dropCharge)}` : ''}` : returnWhere}
                     </Text>
@@ -668,8 +642,8 @@ const styles = StyleSheet.create({
   noticeText: { fontFamily: FONT.regular, fontSize: 12, marginTop: 2 },
 
   section: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 22, marginTop: 20, marginBottom: 12 },
-  journeyContainer: { position: 'relative', gap: 12 },
-  journeyLine: { position: 'absolute', left: 5, top: 12, bottom: 12, width: 2, borderRadius: 1 },
+  journeyContainer: { position: 'relative', gap: 16 },
+  journeyLine: { position: 'absolute', left: 5, top: 14, bottom: 14, width: 2, borderRadius: 1 },
   stop: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   ring: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   innerDot: { width: 4, height: 4, borderRadius: 2 },

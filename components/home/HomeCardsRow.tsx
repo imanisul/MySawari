@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { formatCurrency } from '@/services/backend/pricingEngine';
-import { useDealCars, dealPricing } from '@/hooks/useDealCars';
+import { useDealCars, dealPricing, useOpenTopDeal } from '@/hooks/useDealCars';
 import HomeCardSunburst from '@/assets/images/home_card_sunburst.svg';
 import HomeDealsTitle from '@/assets/images/home_deals_title.svg';
 
@@ -59,6 +59,9 @@ function TimerBox({ value, label }: { value: number; label: string }) {
   );
 }
 
+// How long each deal car stays up before the next (WhatsApp-status style).
+const STORY_MS = 4000;
+
 function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
   const router = useRouter();
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -68,17 +71,26 @@ function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available:
     return () => clearInterval(t);
   }, []);
   const { dealCars, targetEndMs } = useDealCars(nowMs);
-  const shown = dealCars.slice(0, 4);
+  // Every car and bike in Today's Deals, one after another like WhatsApp status.
+  const shown = dealCars;
   useEffect(() => {
     onAvailabilityChange(shown.length > 0);
   }, [shown.length, onAvailabilityChange]);
+  // The shown car's bar fills over STORY_MS, then the next car comes up (back to the first after the last).
+  const progress = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    if (shown.length < 2) return;
-    const t = setInterval(() => setActive((a) => (a + 1) % shown.length), 4000);
-    return () => clearInterval(t);
-  }, [shown.length]);
+    if (active >= shown.length && shown.length) setActive(0);
+  }, [active, shown.length]);
+  useEffect(() => {
+    if (!shown.length) return;
+    progress.setValue(0);
+    const run = Animated.timing(progress, { toValue: 1, duration: STORY_MS, easing: Easing.linear, useNativeDriver: false });
+    run.start(({ finished }) => { if (finished && shown.length > 1) setActive((a) => (a + 1) % shown.length); });
+    return () => run.stop();
+  }, [active, shown.length, progress]);
 
   // Nothing free until 8 AM: no card (no placeholder car).
+  const openTopDeal = useOpenTopDeal(); // a hook: before the early return below
   if (!shown.length) return null;
   const car: any = shown[Math.min(active, shown.length - 1)];
 
@@ -91,6 +103,8 @@ function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available:
   const name = car.displayName || car.vehicleName || car.name || 'Vehicle';
   const photo = car.images?.[0] || car.image;
   const open = () => { Haptics.selectionAsync(); router.push('/top-deals'); };
+  // Tapping the car books that deal straight away: its dates, times and places are filled in, as on the deals page.
+  const openCar = () => openTopDeal(car, targetEndMs, nowMs);
 
   return (
     <LinearGradient colors={['#6152D8', '#ADA4F4']} style={[styles.card, styles.dealsCard]}>
@@ -109,11 +123,22 @@ function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available:
       </View>
 
       <View style={{ alignSelf: 'stretch', gap: 8 }}>
-        <View style={styles.bars}>
-          {shown.map((v: any, i) => <View key={String(v.id || v._id || i)} style={[styles.bar, i === Math.min(active, shown.length - 1) && { backgroundColor: '#FFFFFF' }]} />)}
+        {/* One bar per deal car: seen ones full, the shown one filling, the rest empty (Figma 3px bars, 10 apart) */}
+        <View style={[styles.bars, { gap: shown.length > 6 ? 4 : 10 }]}>
+          {shown.map((v: any, i) => {
+            const at = Math.min(active, shown.length - 1);
+            return (
+              <View key={String(v.id || v._id || i)} style={styles.bar}>
+                {i < at && <View style={styles.barFill} />}
+                {i === at && (
+                  <Animated.View style={[styles.barFill, { width: shown.length > 1 ? progress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) : '100%' }]} />
+                )}
+              </View>
+            );
+          })}
         </View>
         <View style={{ gap: 6 }}>
-          <Pressable onPress={open} accessibilityRole="button" accessibilityLabel={`${name}, ${formatCurrency(price)} for ${hours} hours`} style={styles.booking}>
+          <Pressable onPress={openCar} accessibilityRole="button" accessibilityLabel={`${name}, ${formatCurrency(price)} for ${hours} hours`} style={styles.booking}>
             <Image source={photo} style={styles.carPhoto} contentFit="cover" transition={150} />
             <View style={styles.bookingText}>
               <View>
@@ -214,7 +239,8 @@ const styles = StyleSheet.create({
   timerNum: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16, color: '#6152D8', textAlign: 'center', includeFontPadding: false },
   timerLabel: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8, lineHeight: 12, color: '#FFFFFF', textAlign: 'center', includeFontPadding: false },
   bars: { flexDirection: 'row', gap: 10, height: 3 },
-  bar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.49)' },
+  bar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.49)', overflow: 'hidden' },
+  barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', borderRadius: 2, backgroundColor: '#FFFFFF' },
   booking: { height: 110, flexDirection: 'row', alignItems: 'flex-start', padding: 8, gap: 12, backgroundColor: '#FBFAFE', borderWidth: 1, borderColor: '#DEDAFB', borderRadius: 8 },
   carPhoto: { width: 120, height: 92, borderRadius: 6, backgroundColor: '#EEEAFD' },
   bookingText: { flex: 1, height: 92, justifyContent: 'center', gap: 10, paddingTop: 2, paddingBottom: 4 },

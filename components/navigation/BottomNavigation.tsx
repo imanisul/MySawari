@@ -14,7 +14,7 @@ import { shadows } from '@/constants/shadows';
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 
 type IconProps = { color: string; fill: string; active: boolean };
-type Route = '/' | '/explore' | '/top-deals' | '/bookings' | '/profile';
+type Route = '/' | '/explore' | '/flash-sale' | '/bookings' | '/profile';
 
 function TopDealsIcon({ color, fill, active }: IconProps) {
   return (
@@ -235,7 +235,7 @@ const ALL_ITEMS: {
 }[] = [
   { id: 'home', label: 'Home', route: '/', Icon: HomeIcon },
   { id: 'explore', label: 'Explore', route: '/explore', Icon: ExploreIcon },
-  { id: 'top-deals', label: 'Top Deals', route: '/top-deals', Icon: TopDealsIcon },
+  { id: 'top-deals', label: 'Top Deals', route: '/flash-sale', Icon: TopDealsIcon },
   { id: 'bookings', label: 'My Trips', route: '/bookings', Icon: ActivityIcon },
   { id: 'profile', label: 'Profile', route: '/profile', Icon: ProfileIcon },
 ];

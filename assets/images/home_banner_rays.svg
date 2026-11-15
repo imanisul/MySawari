@@ -1,7 +1,7 @@
 <svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="560.675" height="560.675" viewBox="0 0 560.675 560.675" fill="none" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
 <g id="Repeat group 1">
 <g id="Repeat group 1_inner" data-figma-trr="r18u1-0f">
-<path id="Rectangle 7" d="M260.716 0.687536H299.959L285.057 280.338H275.619L260.716 0.687536Z" fill="url(#paint0_linear_0_84)"/>
+<path id="Rectangle 7" d="M260.716 0.687536H299.959L285.057 280.338H275.619L260.716 0.687536Z" fill="url(#paint0_linear_0_9)"/>
 </g>
 <use xlink:href="#Repeat%20group%201_inner" transform="translate(112.788 -78.9747) rotate(20)"/>
 <use xlink:href="#Repeat%20group%201_inner" transform="translate(245.784 -114.611) rotate(40)"/>
@@ -22,7 +22,7 @@
 <use xlink:href="#Repeat%20group%201_inner" transform="translate(-78.9748 112.788) rotate(-20)"/>
 </g>
 <defs>
-<linearGradient id="paint0_linear_0_84" x1="280.338" y1="0.687536" x2="280.338" y2="280.338" gradientUnits="userSpaceOnUse">
+<linearGradient id="paint0_linear_0_9" x1="280.338" y1="0.687536" x2="280.338" y2="280.338" gradientUnits="userSpaceOnUse">
 <stop stop-color="white" stop-opacity="0.7"/>
 <stop offset="1" stop-color="white" stop-opacity="0"/>
 </linearGradient>

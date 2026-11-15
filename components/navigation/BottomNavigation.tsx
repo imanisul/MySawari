@@ -16,14 +16,18 @@ import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 type IconProps = { color: string; fill: string; active: boolean };
 type Route = '/' | '/explore' | '/flash-sale' | '/bookings' | '/profile';
 
+// Figma exact rounded solid lightning bolt (24px frame, smooth curves and rounded tips)
+const BOLT_PATH =
+  'M13.2 2.5C14.1 2.5 14.8 3.1 14.7 4.0L12.0 11.5L17.5 11.5C18.5 11.5 19.0 12.4 18.5 13.2L11.5 21.2C10.8 22.0 9.8 21.8 9.5 21.0L12.0 14.5L6.5 14.5C5.5 14.5 4.8 13.6 5.3 12.8L12.5 2.8C12.7 2.5 13.0 2.5 13.2 2.5Z';
+
 function TopDealsIcon({ color, fill, active }: IconProps) {
   return (
     <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
       <Path
-        d="M13 2L3 14H12L11 22L21 10H12L13 2Z"
+        d={BOLT_PATH}
         fill={active ? color : 'none'}
         stroke={color}
-        strokeWidth={STROKE}
+        strokeWidth={active ? 0.5 : 1.3}
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -406,8 +410,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   navLabelActive: {},
-  // "Flash" tag on the Sale tab: pink pill overlapping the icon's foot.
-  // Measured from the design: a 32 × 13 pill over the bolt's lower part (purple when the tab isn't selected).
-  badge: { position: 'absolute', top: 21, alignSelf: 'center', height: 13, minWidth: 32, paddingHorizontal: 6, borderRadius: 7, backgroundColor: '#FF008B', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
-  badgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8.5, lineHeight: 11, color: '#FFFFFF', includeFontPadding: false },
+  // "Flash" tag on the Sale tab: exact Figma 17 × 8.5 pill centered over the bolt's lower foot.
+  badge: {
+    position: 'absolute',
+    bottom: -2.5,
+    alignSelf: 'center',
+    height: 9,
+    minWidth: 17,
+    paddingHorizontal: 3.5,
+    borderRadius: 5,
+    backgroundColor: '#FF008B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  badgeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 6.2,
+    lineHeight: 8.5,
+    color: '#FFFFFF',
+    includeFontPadding: false,
+  },
 });

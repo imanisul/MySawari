@@ -260,7 +260,7 @@ export function BikeCategoryTiles({ onPick, dark }: { onPick: (filter: { transmi
           style={[s.bikeTile, dark && { borderColor: 'rgba(107, 90, 237, 0.4)' }]}
         >
           <Image
-            source={require('../../assets/images/cat_bike.png')}
+            source={require('../../assets/images/category_bike.png')}
             style={s.bikeImg}
             resizeMode="contain"
           />
@@ -282,7 +282,7 @@ export function BikeCategoryTiles({ onPick, dark }: { onPick: (filter: { transmi
           style={[s.bikeTile, dark && { borderColor: 'rgba(107, 90, 237, 0.4)' }]}
         >
           <Image
-            source={require('../../assets/images/cat_scooter.png')}
+            source={require('../../assets/images/category_scooter.png')}
             style={s.bikeImg}
             resizeMode="contain"
           />

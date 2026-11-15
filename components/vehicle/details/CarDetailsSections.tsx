@@ -24,9 +24,8 @@ import { MembershipCelebration } from './MembershipSavedPopup';
 
 const MAPS_URL = 'https://www.google.com/maps/search/?api=1&query=MySawari+-+Self+Drive+Car+Rental+Guwahati,+Kahilipara,+Assam';
 
-// Flat rule, confirmed with operations: every 1-day booking includes 300 km and bills extras at ₹75/km;
-// 2+ day bookings are unlimited (see screens/Support/PolicyScreen.tsx). The Figma frame's "₹5/km" is a
-// design placeholder and must not be shown as if it were the charged rate.
+// Flat rule: every 1-day booking includes 300 km and bills extras at ₹5/km (owner's instruction, 2026-11-14);
+// 2+ day bookings are unlimited (see screens/Support/PolicyScreen.tsx).
 const INCLUDED_KM_ONE_DAY = 300;
 const EXTRA_KM_RATE = 5;
 
@@ -142,22 +141,68 @@ function MileageIcon({ source, size, p }: { source: ImageSourcePropType; size: n
 export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; tripDays?: number } = {}) {
   const p = useDetailsPalette();
   const topDeal = useIsTopDeal();
+  const hasTrip = typeof tripDays === 'number' && tripDays >= 1;
+  const oneDayOn = hasTrip && tripDays === 1;
+  const multiDayOn = hasTrip && (tripDays as number) >= 2;
   return (
     // Figma frame: padding 8/16/12, 12 between the title and the card.
     <View style={[styles.block, { paddingTop: 8, paddingBottom: 12 }]}>
       <SectionTitle>Mileage policy</SectionTitle>
       <View style={[styles.card, styles.mileCard, { backgroundColor: p.soft, borderColor: p.strongBorder }]}>
-        <View style={styles.mileRow}>
-          <MileageIcon source={require('@/assets/images/mileage_road.png')} size={22} p={p} />
-          <View style={{ flex: 1 }}>
-            <View style={styles.mileHead}>
-              <Text style={[styles.mileTitle, { color: p.fg }]}>{topDeal ? `${TOP_DEAL_KM} Kilometres` : 'Unlimited Kilometres'}</Text>
-              <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Included</Text></View>
+        {topDeal ? (
+          <View style={styles.mileRow}>
+            <MileageIcon source={require('@/assets/images/mileage_road.png')} size={20} p={p} />
+            <View style={{ flex: 1 }}>
+              <View style={styles.mileHead}>
+                <Text style={[styles.mileTitle, { color: p.fg }]}>{TOP_DEAL_KM} Kilometres</Text>
+                <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Included</Text></View>
+              </View>
+              <Text style={[styles.mileSub, { color: p.muted }]}>{`Top Deal includes up to ${TOP_DEAL_KM} km. Every extra km is ₹${TOP_DEAL_EXTRA_KM_RATE}.`}</Text>
             </View>
-            <Text style={[styles.mileSub, { color: p.muted }]}>{topDeal ? `Top Deal includes up to ${TOP_DEAL_KM} km. Every extra km is ₹${TOP_DEAL_EXTRA_KM_RATE}.` : 'Drive freely with no distance cap and zero extra kilometre charges.'}</Text>
           </View>
-        </View>
+        ) : (
+          <>
+            <View style={styles.mileRow}>
+              <MileageIcon source={require('@/assets/images/mileage_calendar.png')} size={18} p={p} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.mileHead}>
+                  <Text style={[styles.mileTitle, { color: p.fg }]}>1-Day Booking</Text>
+                  {oneDayOn && <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Your booking</Text></View>}
+                </View>
+                <Text style={[styles.mileSub, { color: p.muted }]}>Incl. {INCLUDED_KM_ONE_DAY} km  •  Extra km at ₹{EXTRA_KM_RATE}/km.</Text>
+              </View>
+            </View>
+            <View style={styles.mileRow}>
+              <MileageIcon source={require('@/assets/images/mileage_road.png')} size={20} p={p} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.mileHead}>
+                  <Text style={[styles.mileTitle, { color: p.fg }]}>2+ Day Booking</Text>
+                  {multiDayOn && <View style={[styles.mileTag, { backgroundColor: p.navy }]}><Text style={styles.mileTagText}>Your booking</Text></View>}
+                </View>
+                <Text style={[styles.mileSub, { color: p.muted }]}>Unlimited kilometres</Text>
+              </View>
+            </View>
+          </>
+        )}
       </View>
+      {/* Figma "Add 1 more day": 361×63, #F4F6FA, 1px #E7EAF4, radius 10, padding 12/10/12/12, gap 12; button 102×36 navy, radius 6. */}
+      {onAddDay && !topDeal && (
+        <View style={[styles.addDayCard, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.addDayTitle, { color: p.fg }]}>Need more time on the road?</Text>
+            <Text style={[styles.addDaySub, { color: p.muted }]}>Add 1 day to unlock unlimited kilometres.</Text>
+          </View>
+          <Pressable
+            onPress={() => { Haptics.selectionAsync(); onAddDay(); }}
+            accessibilityRole="button"
+            accessibilityLabel="Add 1 day"
+            style={({ pressed }) => [styles.addDayBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+          >
+            <Feather name="plus" size={16} color={p.onNavy} />
+            <Text style={[styles.addDayBtnText, { color: p.onNavy }]}>Add 1 day</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -622,7 +667,8 @@ export function WhyRent() {
   });
 
   return (
-    <View style={styles.block}>
+    // 8 above and below like the other sections, so Location below it sits 16 off the card.
+    <View style={[styles.block, { paddingTop: 8, paddingBottom: 8 }]}>
       {/* linear-gradient(236.34deg, #D5D9EA -14.94%, #EEF0F7 67.82%) on a 361×307 card: the line runs from
           (1.04, 0.08) to (-0.04, 0.92) of the card, and the colour at its start is #D5D9EA already 15% of the way
           to #EEF0F7 (#D5D9EA), reaching #EEF0F7 at 67.82%. */}
@@ -974,13 +1020,13 @@ const styles = StyleSheet.create({
   mileHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   mileTag: { borderRadius: 9, paddingHorizontal: 7, height: 17, justifyContent: 'center' },
   mileTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, color: '#FFFFFF', letterSpacing: 0.2 },
-  mileTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
-  mileSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, marginTop: 4 },
-  calCircle: { width: 36.5, height: 36.5, borderRadius: 18.25, alignItems: 'center', justifyContent: 'center' },
+  mileTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
+  mileSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  calCircle: { width: 37, height: 37, borderRadius: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   addDayCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingLeft: 12, paddingRight: 10, paddingVertical: 12, marginTop: 12, gap: 12 },
   addDayTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
-  addDaySub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 17 },
-  addDayBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 6, paddingHorizontal: 10, height: 36 },
+  addDaySub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  addDayBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 6, paddingHorizontal: 10, height: 36 },
   addDayBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
 
   // Figma "Car Details Navigation": 393×50, padding 4/16/10, 4 between the pills (so a 36px pill).
@@ -996,7 +1042,7 @@ const styles = StyleSheet.create({
   tableValue: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
 
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  benefitIcon: { width: 28, height: 28, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  benefitIcon: { width: 37, height: 37, borderRadius: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
 
   memberWrap: { borderWidth: 1, borderRadius: 16, padding: 8, paddingTop: 12 },
   planCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingVertical: 10.5, paddingLeft: 8, paddingRight: 9, gap: 9 },

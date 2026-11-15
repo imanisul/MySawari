@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
   thumb: {
     width: THUMB_W,
     height: Math.round(THUMB_W * (45 / 67.5)),
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
   },
 });

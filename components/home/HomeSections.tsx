@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useId, useRef, useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, Image, ImageSourcePropType, ScrollView, useWindowDimensions, Linking, Alert } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Defs, Text as SvgText, TextPath, G, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Path, Defs, Text as SvgText, TextPath, G, RadialGradient, Rect, Stop, Ellipse } from 'react-native-svg';
 import * as Haptics from '@/utils/haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useQuery } from '@tanstack/react-query';
@@ -11,6 +11,7 @@ import { Image as CachedImage } from 'expo-image';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import BenefitCards from './BenefitCards';
 import { formatCurrency, memberDayPrice, type QuoteParams } from '@/services/backend/pricingEngine';
 import { offersQueryOptions, isOfferLive } from '@/services/api/offers';
 import type { RecentSearch } from '@/utils/recentSearches';
@@ -39,6 +40,9 @@ function PicIcon({ source, size }: { source: any; size: number }) {
 }
 
 export const HOME_PURPLE = '#323E71';
+// Hero gradient (Figma Home frame): 180deg, #6152D8 to #CEC9F3.
+export const HERO_TOP = '#6152D8';
+const HERO_BOTTOM = '#CEC9F3';
 
 // ── Top banner ───────────────────────────────────────────────────────────────
 
@@ -73,12 +77,21 @@ interface ComboSlide extends HeroSlideBase {
   sub: string[];
 }
 
-type HeroSlide = TextSlide | ImageSlide | ComboSlide;
+/** "Your ride, from just ₹X" with the cars; X is the real lowest day rate (the `fromRate` prop). */
+interface PriceSlide extends HeroSlideBase {
+  kind: 'price';
+}
+
+/** The four benefit cards (security deposit, unlimited km, maintained, delivery) as one picture. */
+interface BenefitsSlide extends HeroSlideBase {
+  kind: 'benefits';
+}
+
+type HeroSlide = TextSlide | ImageSlide | ComboSlide | PriceSlide | BenefitsSlide;
 
 // Default brand slides if no backend offers or to complement active offers.
 const DEFAULT_SLIDES: HeroSlide[] = [
-  { id: 'default-lowest-price', kind: 'text', lines: ['LOWEST PRICE', 'GUARANTEED'], sub: ['Zero security Deposit', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'] },
-  { id: 'default-doorstep', kind: 'text', lines: ['DOORSTEP', 'DELIVERY'], sub: ['Anywhere in Guwahati', 'Pickup/ Drop-off Delivery', 'Self drive/ driver'] },
+  { id: 'default-benefits', kind: 'benefits' },
 ];
 
 function splitTitleIntoTwoLines(title?: string, lines?: [string, string] | string[]): [string, string] {
@@ -117,7 +130,7 @@ function parseSubtitleTags(subtitle?: string): string[] {
 // Sunburst (Figma): 36 thin wedges from the headline's centre, every other one lighter. The light
 // wedges fade out towards the centre so the rays melt into a soft glow behind the headline.
 function Sunburst({ width, height, cy }: { width: number; height: number; cy: number }) {
-  const cx = width / 2, r = Math.hypot(width, height) * 1.2, n = 36;
+  const cx = width / 2, r = Math.hypot(width, height) * 1.2, n = 32; // 16 light rays, as in the design
   const reach = Math.hypot(width / 2, Math.max(cy, height - cy));
   const wedges = Array.from({ length: n / 2 }, (_, i) => {
     // Offset half a wedge so a dark ray points straight up, as in the design.
@@ -196,7 +209,9 @@ function ArcHeadline({ lines, idPrefix = 'arc' }: { lines: [string, string]; idP
   );
 }
 
-export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, children }: {
+export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fromRate, children }: {
+  /** Lowest real day rate; the price slide is left out until it is known. */
+  fromRate?: number;
   children?: React.ReactNode;
   topInset: number;
   city: string;
@@ -218,7 +233,8 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
   const { data: offers } = useQuery(offersQueryOptions);
 
   const slides = useMemo<HeroSlide[]>(() => {
-    if (!offers || !Array.isArray(offers)) return DEFAULT_SLIDES;
+    const lead: HeroSlide[] = fromRate ? [{ id: 'default-from-price', kind: 'price' }] : [];
+    if (!offers || !Array.isArray(offers)) return [...lead, ...DEFAULT_SLIDES];
 
     const offerSlides: HeroSlide[] = [];
 
@@ -298,8 +314,8 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
       }
     });
 
-    return [...DEFAULT_SLIDES, ...offerSlides];
-  }, [offers]);
+    return [...lead, ...DEFAULT_SLIDES, ...offerSlides];
+  }, [offers, fromRate]);
 
   // Adaptive width across compact phones (360dp), modern phones (390-430dp), and tablets (460dp max)
   const cardWidth = Math.min(width - 32, 460);
@@ -383,6 +399,11 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
   // first without animation, so it never sweeps backwards across all the banners.
   const pos = useRef(0);
   const count = slides.length;
+  // Figma (measured below the 64px header): price slide area 11+137 with the slider overlapping its last 2px
+  // (slider at 210); benefits slide area 186 (slider at 250); anything else keeps 166.
+  const kind = slides[slide % count]?.kind;
+  const areaH = kind === 'price' ? 148 : kind === 'benefits' ? 186 : 166;
+  const pagerTop = kind === 'price' ? -2 : kind === 'benefits' ? 0 : 9;
   useEffect(() => {
     if (count <= 1) return;
     let reset: ReturnType<typeof setTimeout> | undefined;
@@ -402,9 +423,9 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
   }, [count, width]);
 
   return (
-    // linear-gradient(180deg, #323E71 0%, #C9CFE6 100%) — the design's two stops, no mid-tones.
+    // Two stops, no mid-tones.
     <LinearGradient
-      colors={[HOME_PURPLE, '#C9CFE6']}
+      colors={[HERO_TOP, HERO_BOTTOM]}
       style={{ paddingTop: topInset, paddingBottom: 16 }}
       onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
     >
@@ -436,8 +457,10 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
         </Pressable>
       </View>
 
+      {/* Slide area is 166 tall (Figma 137→303): the price slide sits at its top, the benefit cards at its bottom. */}
       <ScrollView
         ref={pager}
+        style={{ height: areaH }}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -451,8 +474,47 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
         }}
       >
         {(count > 1 ? [...slides, slides[0]] : slides).map((s, index) => (
-          <View key={`${s.id}-${index}`} style={{ width, alignItems: 'center', justifyContent: 'center' }}>
-            {s.kind === 'image' ? (
+          <View key={`${s.id}-${index}`} style={{ width, height: areaH, alignItems: 'center', justifyContent: s.kind === 'benefits' ? 'flex-end' : s.kind === 'price' ? 'flex-start' : 'center', paddingTop: s.kind === 'price' ? 11 : 0, paddingBottom: s.kind === 'benefits' ? 9 : 0 }}>
+            {s.kind === 'benefits' ? (
+              <>
+                <Text style={styles.findHeadline} numberOfLines={1} adjustsFontSizeToFit accessibilityRole="header" accessibilityLabel="Find the Perfect Ride">Find the <Text style={{ color: '#FAC64C' }}>Perfect Ride</Text></Text>
+                <BenefitCards width={Math.min(width, 492)} />
+              </>
+            ) : s.kind === 'price' ? (
+              <View style={styles.priceSlide} accessible accessibilityRole="header" accessibilityLabel={`Your ride, from just ${formatCurrency(fromRate || 0)}`}>
+                {/* Frame 2147226206: stacked "Your ride, / from just" beside "₹999" */}
+                <View style={styles.priceRow}>
+                  <View style={styles.priceLeadCol}>
+                    <Text style={[styles.priceLead, styles.priceLeadTop]} numberOfLines={1} allowFontScaling={false}>Your ride,</Text>
+                    <Text style={styles.priceLead} numberOfLines={1} allowFontScaling={false}>from just</Text>
+                  </View>
+                  <Text
+                    style={styles.priceAmount}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.72}
+                    allowFontScaling={false}
+                  >
+                    {formatCurrency(fromRate || 999)}
+                  </Text>
+                </View>
+
+                {/* Ellipse 13: blurred dark ellipse ground shadow beneath the 3 SUVs */}
+                <Svg width={242} height={30} style={styles.priceCarShadow} pointerEvents="none">
+                  <Defs>
+                    <RadialGradient id={`heroCarShadow_${index}`} cx="50%" cy="50%" rx="50%" ry="50%" fx="50%" fy="50%">
+                      <Stop offset="0" stopColor="#0E0E0E" stopOpacity={0.6} />
+                      <Stop offset="0.45" stopColor="#0E0E0E" stopOpacity={0.3} />
+                      <Stop offset="1" stopColor="#0E0E0E" stopOpacity={0} />
+                    </RadialGradient>
+                  </Defs>
+                  <Ellipse cx={121} cy={15} rx={121} ry={15} fill={`url(#heroCarShadow_${index})`} />
+                </Svg>
+
+                {/* Modern SUV Trio: Creta, Nexon, Seltos (522x174 @2x -> 261x87) */}
+                <CachedImage source={require('@/assets/images/home_hero_cars.png')} style={styles.priceCars} contentFit="contain" transition={0} />
+              </View>
+            ) : s.kind === 'image' ? (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Promotional banner"
@@ -548,8 +610,8 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, ch
 
       {/* Page indicator: a short white thumb sliding along a faint track */}
       {slides.length > 1 && (
-        <View style={styles.pager}>
-          <View style={[styles.thumb, { left: (slide * (36 - 12)) / Math.max(1, slides.length - 1) }]} />
+        <View style={[styles.pager, { marginTop: pagerTop }]}>
+          <View style={[styles.thumb, { left: (slide * (36 - 18)) / Math.max(1, slides.length - 1) }]} />
         </View>
       )}
       {children}
@@ -591,7 +653,7 @@ export function HomePromoBanner({ position = 'middle' }: { position?: 'middle' |
     Haptics.selectionAsync();
 
     if (b.destinationType === 'external' && b.destinationUrl) {
-      Linking.openURL(b.destinationUrl).catch(() => {});
+      Linking.openURL(b.destinationUrl).catch(() => { });
       return;
     }
     if ((b.destinationType === 'vehicle' || !b.destinationType) && b.vehicleId) {
@@ -676,8 +738,6 @@ export function HomePromoBanner({ position = 'middle' }: { position?: 'middle' |
 
 export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: () => void }) {
   const p = useDetailsPalette();
-  // Text scales with the screen width (390 = design width) so it fits one line on small and large phones alike.
-  const k = Math.min(Math.max(useWindowDimensions().width / 390, 0.85), 1.2);
   return (
     <Pressable
       accessibilityRole="button"
@@ -690,13 +750,13 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.referTop}>
-          <Text style={[styles.referTitle, { color: p.fg, fontSize: 11 * k, lineHeight: 19.5 * k }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Refer & Earn Up to {earnText}/Month!</Text>
+          <Text style={[styles.referTitle, { color: '#262626' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Refer & Earn up to {earnText}</Text>
           <View style={[styles.referBtn, { backgroundColor: p.navy }]}>
             <Text style={styles.referBtnText}>Refer</Text>
             <Feather name="arrow-right" size={8} color="#FFFFFF" />
           </View>
         </View>
-        <Text style={[styles.referSub, { color: p.muted, fontSize: 10 * k, lineHeight: 16.5 * k }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Earn 10% every time your friends complete a trip!</Text>
+        <Text style={[styles.referSub, { color: '#737373' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>Get 10% of your friend’s booking payment.</Text>
       </View>
     </Pressable>
   );
@@ -711,12 +771,10 @@ export function HomeSearchCard({ vehicleType, onType, onDates }: {
   onDates: () => void;
 }) {
   const p = useDetailsPalette();
-  // `slot` is the Figma image frame (45 wide, no gap before the label); `art` is where the exported
-  // picture sits inside it (read from the SVG's pattern matrix), clipped to the slot like the SVG is.
-  const tabs: { key: 'car' | 'bike'; label: string; image: ImageSourcePropType; art: { left: number; top: number; width: number; height: number }; slot: { width: number; height: number } }[] = [
-    { key: 'car', label: 'Cars', image: require('@/assets/images/home_tab_car.png'), art: { left: -0.78, top: -2.25, width: 46.5, height: 31 }, slot: { width: 45, height: 26 } },
-    { key: 'bike', label: 'Bikes', image: require('@/assets/images/home_tab_bike.png'), art: { left: 5.14, top: 3.18, width: 35.9, height: 23.94 }, slot: { width: 45, height: 30 } },
-  ];
+  const tabs = [{ key: 'car', label: 'Cars' }, { key: 'bike', label: 'Bikes & Scooters' }] as const;
+  const rows = [
+    { icon: 'calendar', label: 'Select dates & times', onPress: onDates, hint: 'Choose Your Rental Dates' },
+  ] as const;
   return (
     <View style={[styles.searchCard, { backgroundColor: p.page, borderColor: p.segBorder }]}>
       <View style={styles.tabs}>
@@ -728,29 +786,25 @@ export function HomeSearchCard({ vehicleType, onType, onDates }: {
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
               onPress={() => { Haptics.selectionAsync(); onType(t.key); }}
-              style={[styles.tab, on && { backgroundColor: p.segOn, borderColor: p.radioRing }]}
+              style={[styles.tab, on && styles.tabOn]}
             >
-              <View style={[t.slot, { overflow: 'hidden' }]}>
-                <Image source={t.image} style={[{ position: 'absolute' }, t.art]} resizeMode="stretch" />
-              </View>
-              <Text style={[styles.tabText, { color: on ? p.navy : p.muted }]}>{t.label}</Text>
+              <Text style={[styles.tabText, { color: on ? '#2B386A' : '#737373' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{t.label}</Text>
             </Pressable>
           );
         })}
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Choose Your Rental Dates"
-        onPress={() => { Haptics.selectionAsync(); onDates(); }}
-        style={({ pressed }) => [
-          styles.destBox,
-          { backgroundColor: p.page, borderColor: p.deliveryBorder },
-          pressed && { opacity: 0.85 },
-        ]}
-      >
-        <Feather name="calendar" size={20} color={p.muted} />
-        <Text style={[styles.destText, { color: p.muted }]} numberOfLines={1}>Choose Your Rental Dates</Text>
-      </Pressable>
+      {rows.map((r) => (
+        <Pressable
+          key={r.icon}
+          accessibilityRole="button"
+          accessibilityLabel={r.hint}
+          onPress={() => { Haptics.selectionAsync(); r.onPress(); }}
+          style={({ pressed }) => [styles.destBox, { backgroundColor: p.page, borderColor: p.deliveryBorder }, pressed && { opacity: 0.85 }]}
+        >
+          <Feather name={r.icon} size={20} color="#737373" />
+          <Text style={[styles.destText, { color: '#737373' }]} numberOfLines={1}>{r.label}</Text>
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -795,6 +849,64 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
   );
 }
 
+type CategoryFilter = { body?: string; transmission?: string };
+const BIKE_CATEGORIES = [
+  { filter: { transmission: 'Manual' }, label: 'Bikes', image: require('@/assets/images/category_bike.png'), w: 90, h: 60 },
+  { filter: { transmission: 'Automatic' }, label: 'Scooters', image: require('@/assets/images/category_scooter.png'), w: 90, h: 60 },
+];
+const CATEGORIES = [
+  { filter: { body: 'SUV' }, label: 'SUVs', image: require('@/assets/images/category_suv.png'), w: 66, h: 44 },
+  { filter: { body: 'Sedan' }, label: 'Sedans', image: require('@/assets/images/category_sedan.png'), w: 66, h: 44 },
+  { filter: { body: 'Hatchback' }, label: 'Hatchbacks', image: require('@/assets/images/category_hatchback.png'), w: 66, h: 44 },
+  { filter: { body: 'MUV' }, label: 'MUV / MPV', image: require('@/assets/images/category_muv.png'), w: 66, h: 44 },
+];
+
+/** "Explore Cars by Category" / "Explore Bikes & Scooters": crisp 2x cutouts inside soft radial-glow tiles. */
+export function HomeCategories({ bike, onPick }: { bike?: boolean; onPick: (filter: CategoryFilter) => void }) {
+  const p = useDetailsPalette();
+  const isDark = p.page !== '#FFFFFF';
+  const uid = useId().replace(/:/g, '');
+  const items = bike ? BIKE_CATEGORIES : CATEGORIES;
+  return (
+    <View style={styles.catWrap}>
+      <Text style={[styles.catTitle, { color: p.fg }]} accessibilityRole="header">{bike ? 'Explore Bikes & Scooters' : 'Explore Cars by Category'}</Text>
+      <View style={styles.catRow}>
+        {items.map((c, idx) => {
+          const gradId = `catGrad_${uid}_${idx}`;
+          return (
+            <Pressable
+              key={c.label}
+              accessibilityRole="button"
+              accessibilityLabel={c.label}
+              onPress={() => { Haptics.selectionAsync(); onPick(c.filter); }}
+              style={({ pressed }) => [styles.catItem, pressed && { opacity: 0.85 }]}
+            >
+              <View style={[styles.catTile, { borderColor: isDark ? p.deliveryBorder : '#BFC3D4', backgroundColor: isDark ? p.summary : '#E3E8F2' }]}>
+                <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+                  <Defs>
+                    <RadialGradient id={gradId} cx="50%" cy="50%" rx="50%" ry="50%" fx="50%" fy="50%">
+                      <Stop offset="0.48" stopColor={isDark ? p.iconBg : '#FFFFFF'} />
+                      <Stop offset="1" stopColor={isDark ? p.summary : '#E3E8F2'} />
+                    </RadialGradient>
+                  </Defs>
+                  <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradId})`} />
+                </Svg>
+                <CachedImage
+                  source={c.image}
+                  style={{ width: c.w, height: c.h }}
+                  contentFit="contain"
+                  transition={0}
+                />
+              </View>
+              <Text style={[styles.catLabel, { color: isDark ? p.fg : '#2B386A' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.78}>{c.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 export function HomeSectionTitle({ title }: { title: string }) {
   const p = useDetailsPalette();
   return <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">{title}</Text>;
@@ -808,7 +920,7 @@ const cardDate = (label: string) => label.replace(/^(\d{1,2}) ([A-Za-z]{3})[a-z]
 // Figma "Success" green for the availability line on the cards.
 const AVAILABLE_GREEN = '#339F79';
 
-export function TopPickCard({ car, membership, onPress }: { car: Car & { availability?: any; isAvailable?: boolean}; membership?: QuoteParams['membership']; onPress: () => void }) {
+export function TopPickCard({ car, membership, onPress }: { car: Car & { availability?: any; isAvailable?: boolean }; membership?: QuoteParams['membership']; onPress: () => void }) {
   const p = useDetailsPalette();
   const images: ImageSourcePropType[] = (car as any).images?.length ? (car as any).images : [car.image];
   // Top picks show the first photo only: no auto-slide (the design's card is static).
@@ -863,14 +975,13 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
             <Text style={[styles.pickPrice, { color: p.fg }]}>{formatCurrency(memberPrice ?? car.perDay)}</Text>
             <Text style={[styles.pickPerDay, { color: p.muted }]}>/day</Text>
           </View>
-          <Text style={[styles.pickAvail, { color: available || availability.availableFrom || availability.nextAvailableFrom ? AVAILABLE_GREEN : p.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-            {available
-              ? 'Available now'
-              : availability.availableFrom
-              ? `Available from ${availability.availableFrom}`
-              : availability.nextAvailableFrom
-              ? `Available on ${cardDate(availability.nextAvailableFrom)}`
-              : availability.headline}
+          {/* Availability line */}
+          <Text style={[styles.pickAvail, { color: (available || availability.availableToday || availability.nextAvailableFrom) && availability.reason !== 'service' ? AVAILABLE_GREEN : p.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {availability.availableWindowLabel || (available
+                ? (availability.headline || 'Available now')
+                : availability.nextAvailableFrom
+                  ? `Available on ${cardDate(availability.nextAvailableFrom)}`
+                  : availability.headline)}
           </Text>
         </View>
       </View>
@@ -911,8 +1022,8 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
       style={[styles.milestone, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }]}
     >
       <Image source={require('@/assets/images/MySawari_nobg.png')} style={styles.milestoneLogo} resizeMode="contain" />
-      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} Trips, Get up to {formatCurrency(reward)} Rewards</Text>
-      <Text style={[styles.milestoneSub, { color: p.muted }]}>Rewards are added to your wallet once you complete {target} trips.</Text>
+      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} Trips, Get up to {reward >= 1000 && reward % 1000 === 0 ? `₹${reward / 1000}K` : formatCurrency(reward)} Rewards</Text>
+      <Text style={[styles.milestoneSub, { color: p.muted }]}>Complete {target} trips to earn wallet rewards!</Text>
 
       <View style={styles.track}>
         <View style={styles.trackRail}>
@@ -1117,14 +1228,53 @@ export function ConnectCard() {
 
 const styles = StyleSheet.create({
   // Banner
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, paddingTop: 8 },  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, height: 64 }, cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   city: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
   brandLine: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
-  walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#EEF0F7', borderWidth: 1, borderColor: '#D5D9EA' },
+  walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
   walletCoin: { width: 12, height: 12 },
   walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#2F3E75' },
+  // Figma Frame 2147226207: 261×137 banner group with price header at top: 0, Ellipse 13 shadow at top: 106, cars at top: 50.
+  // Figma: 271 wide, 28/42, weight 680 (the app has 700), centred, white, shadow 0 4 6 at 25%.
+  findHeadline: { width: 300, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 28, lineHeight: 42, letterSpacing: -0.56, textAlign: 'center', color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 6, marginBottom: 9 },
+  priceSlide: { width: 261, height: 137, position: 'relative', alignItems: 'center' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 78, minWidth: 236, zIndex: 1 },
+  priceLeadCol: { minWidth: 107, height: 62, alignItems: 'center', justifyContent: 'center' },
+  priceLead: {
+    minWidth: 107,
+    height: 36,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 24,
+    lineHeight: 36,
+    textAlign: 'center',
+    letterSpacing: -0.48,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 6,
+    includeFontPadding: false,
+  },
+  priceLeadTop: { marginBottom: -10 },
+  // Figma: 52/78, weight 680 (700Bold), gold #FAC64C, soft shadow.
+  priceAmount: {
+    minWidth: 127,
+    maxWidth: 168,
+    height: 78,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 52,
+    lineHeight: 78,
+    textAlign: 'center',
+    letterSpacing: -1.04,
+    color: '#FAC64C',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 3.2 },
+    textShadowRadius: 3.2,
+    includeFontPadding: false,
+  },
+  priceCarShadow: { position: 'absolute', top: 106, left: (261 - 242) / 2 + 0.5, width: 242, height: 30, zIndex: 2 },
+  priceCars: { position: 'absolute', top: 50, left: 0, width: 261, height: 87, zIndex: 3 },
   headlineBlock: { alignItems: 'center', marginTop: 12 },
   // Figma: the promises start 117 below the headline block's top, i.e. 12 up into its 128.95 height.
   subRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: -12, paddingVertical: 4, paddingHorizontal: 8, minHeight: 25, alignSelf: 'stretch' },
@@ -1132,8 +1282,8 @@ const styles = StyleSheet.create({
   // The design's three promises: Semibold/xs in Neutral/50 (#F9F9FB), 6px apart.
   sub: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#F9F9FB', flexShrink: 1 },
   // Figma: 36×4 track rgba(234,236,241,0.4) with a 12×4 Primary/blue-50 thumb.
-  pager: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(234,236,241,0.4)', marginTop: 12, marginBottom: 10 },
-  thumb: { position: 'absolute', top: 0, width: 12, height: 4, borderRadius: 20, backgroundColor: '#EAECF1' },
+  pager: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: 'rgba(234,236,241,0.4)', marginTop: 9, marginBottom: 10 },
+  thumb: { position: 'absolute', top: 0, width: 18, height: 4, borderRadius: 20, backgroundColor: '#EAECF1' },
 
   // Hero dynamic offer slides
   imageSlideCard: {
@@ -1290,32 +1440,41 @@ const styles = StyleSheet.create({
   referIconWrap: { width: 40, height: 40, borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
   referIcon: { width: 24, height: 24 },
   referTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  referTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 19.5, flexShrink: 1 },
-  referSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 10, lineHeight: 16.5 },
+  referTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, flexShrink: 1 },
+  referSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
   referBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 20, paddingHorizontal: 8, borderRadius: 31 },
   referBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
 
   // Search
   // Figma: 361px card, 6 padding, 8 between the tabs and the destination box, shadow 0 2 15 4 rgba(47,62,117,.08).
   searchCard: { marginHorizontal: 16, padding: 6, borderWidth: 1, borderRadius: 16, shadowColor: '#2F3E75', shadowOpacity: 0.08, shadowRadius: 15, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
-  tabs: { flexDirection: 'row', gap: 12 },
-  tab: { flex: 1, height: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
+  // Figma: 56 high frame, 4 padding, 12 gap, 1px #E7EAF4 border, 12 radius, 20%-opaque fill; the tabs fill what is left inside.
+  tabs: { flexDirection: 'row', gap: 12, height: 56, padding: 4, borderWidth: 1, borderColor: '#E7EAF4', borderRadius: 12, backgroundColor: 'rgba(244,246,250,0.2)' },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderRadius: 10, borderWidth: 1, borderColor: 'transparent' },
+  // Selected tab (design): #F9F9FB fill, soft lavender-grey border.
+  tabOn: { backgroundColor: '#F9F9FB', borderColor: '#C4C6DC' },
   tabText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
-  // Figma search box: Flow Horizontal, Width Fill (347px), Height Hug (53px), Radius 12px, Border 3px, Padding 12px, Gap 9px
+  // Design: two rows (destination, dates), 49 high, 10 apart, 2px lavender border, radius 12, 12 padding, 9 gap.
   destBox: {
-    marginTop: 8,
+    marginTop: 10,
     width: '100%',
-    height: 53,
+    height: 49,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
     borderRadius: 12,
-    borderWidth: 3,
+    borderWidth: 2,
     paddingHorizontal: 12,
   },
   destIcon: { width: 20, height: 20 },
   destText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22.5 },
 
+  catWrap: { paddingHorizontal: 16, paddingVertical: 8, gap: 10 },
+  catTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
+  catRow: { flexDirection: 'row', gap: 9 },
+  catItem: { flex: 1, alignItems: 'center', gap: 5 },
+  catTile: { alignSelf: 'stretch', height: 68, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  catLabel: { alignSelf: 'stretch', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, lineHeight: 16, textAlign: 'center' },
   // Figma sections each pad 8 top and bottom, so blocks sit 16 apart; title to content is 12.
   sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: 16, marginBottom: 12, paddingHorizontal: 16 },
 
@@ -1329,7 +1488,7 @@ const styles = StyleSheet.create({
   // Figma: 240×144 photo, radius 8, 4px inset for the tag (top) and the dots (bottom).
   pickImageWrap: { height: 144, borderWidth: 1, borderRadius: 8, overflow: 'hidden' },
   pickTag: { position: 'absolute', top: 4, left: 4, height: 20, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 20 },
-  pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#FFFFFF' },
+  pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 14, color: '#FFFFFF' },
   // 4 below the photo, then 6 between the title row and the price row (Figma gaps).
   pickBody: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 6 },
   pickTitleRow: { flexDirection: 'row', alignItems: 'center', height: 37 },
@@ -1347,10 +1506,10 @@ const styles = StyleSheet.create({
   pickPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: -6.2, marginBottom: -5.1, includeFontPadding: false },
   pickStrike: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 14, marginTop: -3.3, marginBottom: -2.5, includeFontPadding: false },
   pickStrikeLine: { position: 'absolute', left: -1, right: -2, top: '50%', marginTop: -0.5, height: 1 },
-  pickAvail: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8, lineHeight: 12, letterSpacing: 0.16, flexShrink: 1 },
+  pickAvail: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 14, letterSpacing: 0.18, flexShrink: 1 },
 
   // Milestone
-  milestone: { marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8},
+  milestone: { marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   // The logo's artwork fills 360 × 316 of its 470 × 480 file; this shows that part at 32 × 27.
   milestoneLogo: { position: 'absolute', top: 11.5, right: 2, width: 42, height: 40, opacity: 0.32 },
   milestoneTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },

@@ -72,6 +72,12 @@ const PLANS: PlanDef[] = [
 
 const getPlanDef = (key?: string | null) => PLANS.find((p) => p.key === key);
 
+/** What a plan pays for `amount`: the plan's % of `base` (the day rent, as the booking applies it) off, capped per trip. */
+export const memberPriceFor = (plan: string | null | undefined, amount: number, base: number = amount) => {
+  const d = getPlanDef(plan) ?? PLANS[0];
+  return Math.max(0, amount - Math.min(Math.round((base * parseFloat(d.pctLabel)) / 100), d.perTripCap));
+};
+
 type ActiveMembership = { plan: PlanKey; activatedAt: string; expiresAt: string; totalSaved: number };
 
 /** The wallet's membership only when it is a known plan that hasn't expired; anything else means "not a member". */

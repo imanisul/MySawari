@@ -22,7 +22,8 @@ export function useTrackTripProgress(stage: SearchStage) {
     // Always update recently viewed so cars opened from Home can resume their checkout state
     if (withCar) {
       import('@/utils/recentlyViewed').then(({ addRecentlyViewed }) => {
-        addRecentlyViewed(isAuthenticated ? customer?.id : null, {
+        const storageKey = isAuthenticated ? customer?.id : null;
+        return addRecentlyViewed(storageKey, {
           vehicleId: String(selectedCar.id),
           dropoff: dropoff || undefined,
           dateRange,
@@ -31,6 +32,8 @@ export function useTrackTripProgress(stage: SearchStage) {
           duration,
           stage: stage as any,
           trip: { mode, isDeliveryRequested, deliveryMode, pickup, returnAddress }
+        }).then(() => {
+          queryClient.invalidateQueries({ queryKey: ['recentlyViewed', storageKey || 'guest'] });
         });
       }).catch(() => {});
     }

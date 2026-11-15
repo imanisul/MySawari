@@ -66,6 +66,8 @@ export type QuoteParams = {
   dailyRate: number;
   vehicleId?: string;
   vehicleCategory?: string;
+  /** Top Deal: the vehicle's hourly rate (with a "TOPDEAL-<hours>" coupon, the rent is rate × hours). */
+  hourlyRate?: number;
   pickupDateStr: string;
   returnDateStr: string;
   pickupTime?: string;
@@ -327,10 +329,18 @@ export function calculateCouponDiscount(
   rentalAmount: number,
   _driverCharge: number,
   couponCode?: string,
-  vehicleContext?: { vehicleId?: string; vehicleCategory?: string; days?: number }
+  vehicleContext?: { vehicleId?: string; vehicleCategory?: string; days?: number; hourlyRate?: number }
 ): number {
   if (!couponCode || !couponCode.trim()) return 0;
   const base = Math.max(0, rentalAmount);
+  // Top Deal: not a stored coupon — the server prices "TOPDEAL-<hours>" the same way (rent = hourly rate × hours).
+  const topDeal = /^TOPDEAL-(\d{1,2})$/i.exec(couponCode.trim());
+  if (topDeal) {
+    const hours = Number(topDeal[1]);
+    const rate = Number(vehicleContext?.hourlyRate) || 0;
+    if (hours < 1 || hours > 24 || (vehicleContext?.days || 1) !== 1 || rate <= 0) return 0;
+    return Math.round(Math.max(0, Math.min(base, base - rate * hours)));
+  }
   const coupon = couponCatalog.find(c => String(c.code).toUpperCase() === couponCode.trim().toUpperCase());
   if (!coupon || coupon.active === false) return 0;
   if (new Date(coupon.expiryDate) < new Date()) return 0;
@@ -470,6 +480,7 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
     vehicleId: params.vehicleId,
     vehicleCategory: params.vehicleCategory,
     days: rentalDays,
+    hourlyRate: params.hourlyRate,
   });
   const discountedRentalAmount = Math.max(0, rentalAmount + driverCharge - couponDiscount);
 

@@ -184,7 +184,7 @@ export default function RewardsScreen() {
           <Text style={[styles.section, { color: p.muted }]}>Rewards earned</Text>
           {received.length === 0 ? (
             <Text style={[styles.note, { color: p.muted, textAlign: 'left' }]}>
-              Nothing yet. Finish 4 trips to earn your first reward.
+              Nothing yet. Finish 4 trips booked via Customer App to earn your first reward.
             </Text>
           ) : (
             <View style={[styles.list, { borderColor: p.segBorder }]}>
@@ -199,7 +199,7 @@ export default function RewardsScreen() {
               ))}
             </View>
           )}
-          <Text style={[styles.foot, { color: p.muted }]}>Scratch a card and the reward is added to your wallet as SawariCash. Only completed trips count.</Text>
+          <Text style={[styles.foot, { color: p.muted }]}>Scratch a card and the reward is added to your wallet as SawariCash. Only completed trips booked via Customer App count.</Text>
         </ScrollView>
       )}
       <RewardScratchModal card={open} onClose={() => setOpen(null)} />

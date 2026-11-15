@@ -67,15 +67,29 @@ export function prefetchCarGallery(car: any) {
 export const vehiclesQueryOptions = {
   queryKey: VEHICLES_KEY,
   queryFn: async () => {
-    const raw = await API.getVehiclesRaw();
-    const mapped = API.mapVehicles(raw);
-    liveVehiclesAt = Date.now();
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(raw)).catch(() => {});
-    
-    // Aggressively cache all images in the background
-    prefetchVehicleImages(mapped);
-    
-    return mapped;
+    try {
+      const raw = await API.getVehiclesRaw();
+      const mapped = API.mapVehicles(raw);
+      liveVehiclesAt = Date.now();
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(raw)).catch(() => {});
+      
+      // Aggressively cache all images in the background
+      prefetchVehicleImages(mapped);
+      
+      return mapped;
+    } catch (err: any) {
+      if (__DEV__) console.warn('vehiclesQueryOptions queryFn error, attempting cache recovery:', err?.message);
+      try {
+        const cached = await AsyncStorage.getItem(STORAGE_KEY);
+        if (cached) {
+          const raw = JSON.parse(cached);
+          if (Array.isArray(raw) && raw.length > 0) {
+            return API.mapVehicles(raw);
+          }
+        }
+      } catch {}
+      throw err;
+    }
   },
   staleTime: 5 * 60 * 1000, // fresh for 5 min
   refetchInterval: 5 * 60 * 1000, // re-check every 5 min

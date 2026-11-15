@@ -212,7 +212,7 @@ async function withInstallId(headers: Record<string, string> = {}): Promise<Reco
  * fetch() with a time limit. Without one, a stalled server or a dead mobile connection left requests
  * (and their loading spinners) hanging forever. A caller's own AbortSignal still works as before.
  */
-export async function timedFetch(url: string, options: RequestInit = {}, timeoutMs: number = 20000): Promise<Response> {
+export async function timedFetch(url: string, options: RequestInit = {}, timeoutMs: number = 30000): Promise<Response> {
   const secureUrl = enforceHttpsUrl(url);
   const controller = new AbortController();
   const outer = options.signal;
@@ -622,6 +622,18 @@ let preloadedOrderCache: {
   timestamp: number;
 } | null = null;
 
+/** Infer a car's body category when the DB record omitted `vehicleType` or stored a generic `'car'`. */
+function inferCarBodyCategory(name: string, rawType?: string, seats?: number): Car['category'] {
+  const trimmed = typeof rawType === 'string' ? rawType.trim() : '';
+  if (trimmed && !/^(car|other)$/i.test(trimmed)) return trimmed as Car['category'];
+  const n = name.toLowerCase();
+  if (/\b(ertiga|rumion|innova|hycross|crysta|triber|carens|xl6|marazzo|lodgy|enjoy|mobilio|hexa)\b/.test(n) || (Number(seats) >= 6 && !/\b(scorpio|safari|fortuner|endeavour|xuv\s*700|alcazar)\b/.test(n))) return 'MUV';
+  if (/\b(creta|seltos|brezza|venue|nexon|punch|xuv|scorpio|thar|fronx|taisor|curvv|harrier|safari|bolero|jimny|elevate|vitara|kushaq|taigun|hector|sonet|magnite|kiger|exter)\b/.test(n)) return 'SUV';
+  if (/\b(dzire|amaze|city|ciaz|aura|tigor|verna|slavia|virtus|civic|mercedes|bmw|audi|camry|accord)\b/.test(n)) return 'Sedan';
+  if (/\b(swift|baleno|i20|i10|tiago|altroz|glanza|wagon|alto|ignis|santro|celerio|kwid|polo|spresso)\b/.test(n)) return 'Hatchback';
+  return 'Sedan';
+}
+
 export const API = {
   /**
    * GET /api/pickup-locations
@@ -647,7 +659,17 @@ export const API = {
     try {
       // The vehicle catalogue is public; use timedFetch with X-Install-Id directly to eliminate SecureStore/token latency
       const headers = await withInstallId();
-      const response = await timedFetch(`${BACKEND_URL}/vehicles`, { headers });
+      let response: Response;
+      try {
+        response = await timedFetch(`${BACKEND_URL}/vehicles`, { headers }, 30000);
+      } catch (fetchErr: any) {
+        // If Render was cold or connection was slow, retry once now that the server is woken up
+        if (fetchErr?.message?.includes('taking too long') || fetchErr?.message?.includes('Network request failed')) {
+          response = await timedFetch(`${BACKEND_URL}/vehicles`, { headers }, 30000);
+        } else {
+          throw fetchErr;
+        }
+      }
       const data = await response.json();
 
       if (!response.ok) throw new Error(data.message || 'Failed to fetch vehicles');
@@ -655,7 +677,17 @@ export const API = {
       // Extra safeguard: explicitly filter out any vehicles marked as deleted
       return (data.data || []).filter((v: any) => v.isDeleted !== true);
     } catch (e: any) {
-      if (__DEV__) console.warn('getVehiclesRaw error:', e?.message);
+      if (__DEV__) console.warn('getVehiclesRaw error, attempting cache fallback:', e?.message);
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const cached = await AsyncStorage.getItem('@vehicles_cache_v2');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            return parsed.filter((v: any) => v.isDeleted !== true);
+          }
+        }
+      } catch { }
       throw e;
     }
   },
@@ -856,7 +888,7 @@ export const API = {
         name: resolvedDisplayName,
         displayName: resolvedDisplayName,
         vehicleName: resolvedDisplayName,
-        category: isBike ? 'Bike' : (/^car$/i.test(v.vehicleType) ? 'Sedan' : (v.vehicleType || 'Car')),
+        category: isBike ? 'Bike' : inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''}`, v.vehicleType, v.seatingCapacity),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
         image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,
@@ -925,6 +957,8 @@ export const API = {
         bookedRanges: v.bookedRanges || [],
         maintenanceUntil: v.maintenanceUntil || null,
         recentBookings: Number(v.recentBookings) || 0,
+        availabilityDate: v.availabilityDate || v.availableFrom || undefined,
+        availableToDate: v.availableToDate || v.availableTo || v.availableTill || undefined,
       };
     });
   },

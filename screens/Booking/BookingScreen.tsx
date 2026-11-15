@@ -73,6 +73,9 @@ export default function BookingScreen() {
     isFixedDates?: string;
     isTopDeal?: string;
     offerId?: string;
+    dealPrice?: string;
+    hourlyPrice?: string;
+    rentalHours?: string;
   }>();
   const isDatesLocked = params.isFixedDates === 'true' || params.lockDates === 'true' || params.isTopDeal === 'true' || !!params.offerId;
   const insets = useSafeAreaInsets();

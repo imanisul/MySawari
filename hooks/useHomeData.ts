@@ -76,11 +76,20 @@ export async function loadHomeData(
   queryClient.fetchQuery(recentlyViewedQueryOptions(isAuthenticated ? userId : null)).catch(() => {});
 
   const tasks: Promise<unknown>[] = [
-    step('vehicles', queryClient.fetchQuery(vehiclesQueryOptions)),
-    step('offers', queryClient.fetchQuery(offersQueryOptions)),
+    step('vehicles', queryClient.fetchQuery(vehiclesQueryOptions).catch((err) => {
+      if (__DEV__) console.warn('Home vehicles fetch failed or timed out:', err?.message);
+      return null;
+    })),
+    step('offers', queryClient.fetchQuery(offersQueryOptions).catch((err) => {
+      if (__DEV__) console.warn('Home offers fetch failed or timed out:', err?.message);
+      return null;
+    })),
   ];
   if (isAuthenticated) {
-    tasks.push(step('wallet', fetchWallet()));
+    tasks.push(step('wallet', fetchWallet().catch((err) => {
+      if (__DEV__) console.warn('Home wallet fetch failed or timed out:', err?.message);
+      return null;
+    })));
 
     // Parallelize user persistence hydration with network calls instead of sequential awaiting
     const userHydration = (async () => {

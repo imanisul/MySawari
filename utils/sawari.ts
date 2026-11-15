@@ -100,6 +100,8 @@ export type Car = {
 
 export interface AvailabilityInfo {
   available: boolean;
+  /** Whether the vehicle is available at some time today (now or later today) */
+  availableToday?: boolean;
   /** The date the availability check starts from (either selected date or today). */
   startDate?: string;
   /** Short uppercase text for the card badge, e.g. "AVAILABLE NOW · FREE TILL 22 SEP". */
@@ -127,6 +129,12 @@ export interface AvailabilityInfo {
   freeUntil?: string;
   /** Today only: the car is free until a booking that starts later today, e.g. "8:10 AM". */
   freeTill?: string;
+  /** Exact end timestamp of the current free window */
+  freeUntilMs?: number;
+  /** Formatted time the vehicle is free until, e.g. "8:00 AM" */
+  freeUntilTime?: string;
+  /** The formatted human-readable availability window label, e.g. "Available Today, 10:00 PM – 8:00 AM" or "Available till 8:00 AM" */
+  availableWindowLabel?: string;
 }
 
 /**
@@ -465,20 +473,58 @@ export const premiumCollection: Car[] = [
 // to the same day number, so both sides compare like for like.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+export const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
 
-const toDayNum = (y: number, m: number, d: number) => Math.floor(Date.UTC(y, m, d) / DAY_MS);
+export const INDIA_TZ = 'Asia/Kolkata';
+
+/**
+ * Extracts year, month (0-based), date, hours, minutes, seconds strictly in Indian Standard Time (UTC+05:30).
+ * India does not observe daylight saving time, so IST is UTC + 330 minutes all year round.
+ */
+export function getIndiaDateParts(dateOrMsOrStr: Date | number | string = Date.now()): {
+  year: number;
+  month: number;
+  date: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+} {
+  const d =
+    typeof dateOrMsOrStr === 'string'
+      ? new Date(dateOrMsOrStr)
+      : typeof dateOrMsOrStr === 'number'
+      ? new Date(dateOrMsOrStr)
+      : dateOrMsOrStr;
+  const t = d.getTime();
+  if (isNaN(t)) {
+    return { year: 1970, month: 0, date: 1, hours: 0, minutes: 0, seconds: 0 };
+  }
+  const istMs = t + 330 * 60 * 1000;
+  const istD = new Date(istMs);
+  return {
+    year: istD.getUTCFullYear(),
+    month: istD.getUTCMonth(),
+    date: istD.getUTCDate(),
+    hours: istD.getUTCHours(),
+    minutes: istD.getUTCMinutes(),
+    seconds: istD.getUTCSeconds(),
+  };
+}
+
+export const toDayNum = (y: number, m: number, d: number) => Math.floor(Date.UTC(y, m, d) / DAY_MS);
 
 export const todayDayNum = () => {
-  const n = new Date();
-  return toDayNum(n.getFullYear(), n.getMonth(), n.getDate());
+  const p = getIndiaDateParts();
+  return toDayNum(p.year, p.month, p.date);
 };
 
 const isoToDayNum = (iso?: string | null): number => {
   if (!iso) return NaN;
   const d = new Date(iso);
   const t = d.getTime();
-  return isNaN(t) ? NaN : toDayNum(d.getFullYear(), d.getMonth(), d.getDate());
+  if (isNaN(t)) return NaN;
+  const p = getIndiaDateParts(d);
+  return toDayNum(p.year, p.month, p.date);
 };
 
 export const TURNOVER_BUFFER_MS = 0; // Turnaround buffer between trips (0 ms enables immediate booking at return time)
@@ -505,11 +551,11 @@ export function parseTimeToMinutes(timeStr?: string | null): number | null {
   return null;
 }
 
-/** Formats a Date object or timestamp into 12-hour format e.g. "8:10 AM" or "12:00 PM". */
-export function formatTime12(dateOrMs: Date | number): string {
-  const d = typeof dateOrMs === 'number' ? new Date(dateOrMs) : dateOrMs;
-  let hours = d.getHours();
-  const minutes = d.getMinutes();
+/** Formats a Date object, timestamp, or date string into 12-hour format strictly in Indian Standard Time e.g. "8:10 AM" or "12:00 PM". */
+export function formatTime12(dateOrMsOrStr: Date | number | string): string {
+  const p = getIndiaDateParts(dateOrMsOrStr);
+  let hours = p.hours;
+  const minutes = p.minutes;
   const ampm = hours >= 12 ? 'PM' : 'AM';
   hours = hours % 12;
   if (hours === 0) hours = 12;
@@ -517,16 +563,12 @@ export function formatTime12(dateOrMs: Date | number): string {
   return `${hours}:${mm} ${ampm}`;
 }
 
-/** Combines calendar day number and time string into exact local millisecond timestamp. */
+/** Combines calendar day number and time string into exact UTC millisecond timestamp for Indian Standard Time. */
 export function dayNumAndTimeToMs(dayNum: number, timeStr?: string | null, defaultMinutes = 480): number {
-  const d = new Date(dayNum * DAY_MS);
-  const year = d.getUTCFullYear();
-  const month = d.getUTCMonth();
-  const date = d.getUTCDate();
   const mins = parseTimeToMinutes(timeStr) ?? defaultMinutes;
-  const hours = Math.floor(mins / 60);
-  const minutes = mins % 60;
-  return new Date(year, month, date, hours, minutes, 0, 0).getTime();
+  // In Indian Standard Time (UTC+05:30), 00:00 UTC = 05:30 AM IST.
+  // Midnight IST is UTC - 330 minutes. So wall-clock time in India is (mins - 330) minutes from UTC midnight.
+  return dayNum * DAY_MS + (mins - 330) * 60000;
 }
 
 export const dayNumToLabel = (n: number) => {
@@ -564,6 +606,33 @@ export function parseDayLabel(label: string | undefined | null, notBefore?: numb
   return n;
 }
 
+/** Parses date/datetime strings (ISO, "14 Nov, 10:00 PM", "14 Nov", etc.) into millisecond timestamp. */
+export function parseDateAndTimeToMs(str?: string | null, defaultTime = '08:00 AM'): number | null {
+  if (!str) return null;
+  const s = str.trim();
+  if (s.toLowerCase() === 'available now') return null;
+
+  const parsed = Date.parse(s);
+  if (!isNaN(parsed)) {
+    return parsed;
+  }
+
+  const m = s.match(/^(\d{1,2}\s+[A-Za-z]{3,}(?:\s+\d{4})?)(?:,\s*|\s+)(.*)$/);
+  if (m) {
+    const dayN = parseDayLabel(m[1]);
+    if (dayN !== null) {
+      return dayNumAndTimeToMs(dayN, m[2]);
+    }
+  }
+
+  const dayN = parseDayLabel(s);
+  if (dayN !== null) {
+    return dayNumAndTimeToMs(dayN, defaultTime);
+  }
+
+  return null;
+}
+
 /** Splits "15 Sep – 18 Sep" (or a single "15 Sep") into its start / end labels. */
 export function splitDateRange(range?: string | null): [string | undefined, string | undefined] {
   if (!range) return [undefined, undefined];
@@ -596,7 +665,7 @@ export function isHighDemand(car: Car | undefined | null, tripStart: number | nu
   return around.length >= 2;
 }
 
-type Block = {
+export type Block = {
   start: number;
   end: number;
   kind: 'booked' | 'service' | 'rented';
@@ -604,14 +673,14 @@ type Block = {
   endMs: number;
 };
 
-function buildBlocks(car: Car, today: number): Block[] {
+export function buildBlocks(car: Car, today: number): Block[] {
   const blocks: Block[] = [];
 
   for (const r of car.bookedRanges || []) {
-    const d1 = new Date(r.start);
-    const d2 = new Date(r.end);
-    const start = toDayNum(d1.getFullYear(), d1.getMonth(), d1.getDate());
-    const end = toDayNum(d2.getFullYear(), d2.getMonth(), d2.getDate());
+    const p1 = getIndiaDateParts(r.start);
+    const p2 = getIndiaDateParts(r.end);
+    const start = toDayNum(p1.year, p1.month, p1.date);
+    const end = toDayNum(p2.year, p2.month, p2.date);
     if (isNaN(start) || isNaN(end) || end < today) continue; // past bookings don't matter
 
     // If the backend includes the status, ignore cancelled/completed bookings
@@ -622,31 +691,27 @@ function buildBlocks(car: Car, today: number): Block[] {
       }
     }
 
-    let startMs = d1.getTime();
-    let endMs = d2.getTime();
-
     const pickStr = (r as any).pickupTime;
-    if (pickStr) {
-      const pMins = parseTimeToMinutes(pickStr);
-      if (pMins !== null) {
-        startMs = dayNumAndTimeToMs(start, pickStr, pMins);
-      }
-    }
+    const pMins = parseTimeToMinutes(pickStr);
+    // If pickupTime is specified, use it; otherwise default to business start time 08:00 AM (480 mins).
+    // Never fall back to raw UTC midnight d1.getTime() which renders as 5:30 AM in Indian Standard Time (UTC+5:30).
+    const startMs = pMins !== null
+      ? dayNumAndTimeToMs(start, pickStr, pMins)
+      : dayNumAndTimeToMs(start, '08:00 AM', 480);
 
     const dropStr = (r as any).dropTime || (r as any).returnTime;
-    if (dropStr) {
-      const dMins = parseTimeToMinutes(dropStr);
-      if (dMins !== null) {
-        endMs = dayNumAndTimeToMs(end, dropStr, dMins);
-      }
-    }
+    const dMins = parseTimeToMinutes(dropStr);
+    // If dropTime is specified, use it; otherwise default to 08:00 PM (1200 mins).
+    const endMs = dMins !== null
+      ? dayNumAndTimeToMs(end, dropStr, dMins)
+      : dayNumAndTimeToMs(end, '08:00 PM', 1200);
 
     blocks.push({
       start,
       end,
       kind: 'booked',
-      startMs: isNaN(startMs) ? dayNumAndTimeToMs(start, '00:00 AM', 0) : startMs,
-      endMs: isNaN(endMs) ? dayNumAndTimeToMs(end, '11:59 PM', 1439) : endMs,
+      startMs,
+      endMs,
     });
   }
 
@@ -683,28 +748,32 @@ function buildBlocks(car: Car, today: number): Block[] {
     });
   }
 
-  // --- Mock Database Compatibility ---
-  if (car.availabilityDate && car.availabilityDate !== 'Available Now') {
-    const availStart = parseDayLabel(car.availabilityDate);
-    if (availStart !== null && availStart > today) {
+  // --- Mock Database / String Availability Compatibility ---
+  if (car.availabilityDate && car.availabilityDate.toLowerCase() !== 'available now') {
+    const availStartMs = parseDateAndTimeToMs(car.availabilityDate, '08:00 AM');
+    if (availStartMs !== null && availStartMs > Date.now()) {
+      const d = new Date(availStartMs);
+      const availStartDay = toDayNum(d.getFullYear(), d.getMonth(), d.getDate());
       blocks.push({
         start: today,
-        end: availStart - 1,
+        end: availStartDay,
         kind: 'booked',
         startMs: dayNumAndTimeToMs(today, '00:00 AM', 0),
-        endMs: dayNumAndTimeToMs(availStart - 1, '11:59 PM', 1439),
+        endMs: availStartMs,
       });
     }
   }
 
   if (car.availableToDate) {
-    const availEnd = parseDayLabel(car.availableToDate);
-    if (availEnd !== null && availEnd >= today) {
+    const availEndMs = parseDateAndTimeToMs(car.availableToDate, '08:00 PM');
+    if (availEndMs !== null && isFinite(availEndMs)) {
+      const d = new Date(availEndMs);
+      const availEndDay = toDayNum(d.getFullYear(), d.getMonth(), d.getDate());
       blocks.push({
-        start: availEnd + 1,
+        start: availEndDay,
         end: Infinity,
         kind: 'booked',
-        startMs: dayNumAndTimeToMs(availEnd + 1, '00:00 AM', 0),
+        startMs: availEndMs,
         endMs: Infinity,
       });
     }
@@ -728,10 +797,10 @@ export function carTitle(car: Pick<Car, 'displayName' | 'name' | 'manufacturer' 
 /**
  * Is this vehicle free for the chosen dates and times, and if so for how long / if not,
  * when is it next free?
- * - Accurate time-wise & day-wise availability with 10-minute turnover buffer.
- * - If a car is booked from 8:00 AM, searching from 8:00 AM will never show it as available.
- * - When a trip ends at 8:00 AM, turnover buffer makes the vehicle available from 8:10 AM.
- * - Searching from 8:00 AM shows availability till the customer's next booking date and time.
+ * - Accurate time-wise & day-wise availability.
+ * - If a car is booked till 10:00 PM today, searching from 10:00 PM will show it as available.
+ * - Supports overnight time boundary rollover (e.g. 10:00 PM to 8:00 AM next morning).
+ * - Detailed availability windows: "Available Today, 10:00 PM – 8:00 AM", "Available till 8:00 AM".
  */
 export function getAvailability(
   car: Car | undefined | null,
@@ -740,8 +809,8 @@ export function getAvailability(
   pickupTime?: string,
   returnTime?: string
 ): AvailabilityInfo {
-  if (!car) return { available: false, label: 'ON A TRIP', headline: 'On a trip', detail: '' };
-  if (car.isPublic === false) return { available: false, label: 'INTERNAL', headline: 'Not available', detail: 'Internal vehicle only' };
+  if (!car) return { available: false, label: 'ON A TRIP', headline: 'On a trip', detail: '', availableWindowLabel: 'On a trip' };
+  if (car.isPublic === false) return { available: false, label: 'INTERNAL', headline: 'Not available', detail: 'Internal vehicle only', availableWindowLabel: 'Not available' };
 
   const today = todayDayNum();
   const now = Date.now();
@@ -750,7 +819,7 @@ export function getAvailability(
   const rawStart = hasDates ? start! : today;
   const windowStart = Math.max(rawStart, today);
   const parsedEnd = hasDates ? parseDayLabel(endLabel, windowStart) : null;
-  const windowEnd = parsedEnd !== null ? parsedEnd : windowStart;
+  let windowEnd = parsedEnd !== null ? parsedEnd : windowStart;
 
   const defaultPickupMins = 8 * 60; // 08:00 AM
   const defaultReturnMins = 20 * 60; // 08:00 PM
@@ -758,15 +827,21 @@ export function getAvailability(
   let requestEndMs: number;
 
   if (hasDates) {
+    const pMins = parseTimeToMinutes(pickupTime) ?? defaultPickupMins;
+    const rMins = parseTimeToMinutes(returnTime) ?? defaultReturnMins;
+    // Overnight booking on single chosen date: e.g. 10:00 PM to 8:00 AM returns tomorrow
+    if (windowEnd === windowStart && rMins <= pMins) {
+      windowEnd = windowStart + 1;
+    }
     requestStartMs = dayNumAndTimeToMs(windowStart, pickupTime, defaultPickupMins);
     requestEndMs = dayNumAndTimeToMs(windowEnd, returnTime, defaultReturnMins);
     if (requestEndMs <= requestStartMs) {
       requestEndMs = requestStartMs + 2 * 60 * 60 * 1000;
     }
   } else {
-    // Browsing without specific dates (e.g. Explore initial view) -> check from current moment
+    // Browsing without specific dates (e.g. Explore initial view, cards on Home) -> check from current moment
     requestStartMs = now;
-    requestEndMs = now + 4 * 60 * 60 * 1000;
+    requestEndMs = now + 60 * 60 * 1000; // 1-hour active check from now
   }
 
   const blocks = buildBlocks(car, today);
@@ -780,7 +855,7 @@ export function getAvailability(
   if (conflicts.length > 0) {
     const reason = conflicts[0].kind;
     const base = reason === 'service' ? 'IN SERVICE' : 'ON A TRIP';
-    const stayMs = Math.max(2 * 60 * 60 * 1000, requestEndMs - requestStartMs);
+    const stayMs = Math.max(60 * 60 * 1000, requestEndMs - requestStartMs);
 
     // Candidates for next availability: start of search range, or exactly when each block ends
     const candidateTimes = [
@@ -797,45 +872,92 @@ export function getAvailability(
     );
 
     if (nextFreeMs !== undefined) {
-      const nextDate = new Date(nextFreeMs);
-      const nextDayNum = toDayNum(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
+      const nextParts = getIndiaDateParts(nextFreeMs);
+      const nextDayNum = toDayNum(nextParts.year, nextParts.month, nextParts.date);
+      const isAvailToday = nextDayNum === today;
+      const isAvailTomorrow = nextDayNum === today + 1;
       const nextAvailableFrom = dayNumToLabel(nextDayNum);
-      const formattedTime = formatTime12(nextDate);
-      const availableFrom = nextDayNum === windowStart ? formattedTime : `${nextAvailableFrom}, ${formattedTime}`;
+      const fromTimeStr = formatTime12(nextFreeMs);
+      const availableFrom = isAvailToday ? fromTimeStr : `${nextAvailableFrom}, ${fromTimeStr}`;
+
+      // Check when that next free window ends (next booking/service starting after nextFreeMs)
+      const nextBlockAfterFree = blocks.find((b) => b.startMs > nextFreeMs && isFinite(b.startMs));
+      let untilTimeStr: string | undefined;
+      let untilDayNum: number | undefined;
+      let freeUntilMs: number | undefined;
+
+      if (nextBlockAfterFree) {
+        freeUntilMs = nextBlockAfterFree.startMs;
+        const untilParts = getIndiaDateParts(nextBlockAfterFree.startMs);
+        untilDayNum = toDayNum(untilParts.year, untilParts.month, untilParts.date);
+        untilTimeStr = formatTime12(nextBlockAfterFree.startMs);
+      }
+
+      let availableWindowLabel = '';
+      if (reason === 'service' && (!nextBlockAfterFree || !isFinite(conflicts[0].endMs))) {
+        availableWindowLabel = 'In maintenance';
+      } else if (isAvailToday) {
+        if (untilTimeStr) {
+          availableWindowLabel = `Available Today, ${fromTimeStr} – ${untilTimeStr}`;
+        } else {
+          availableWindowLabel = `Available Today from ${fromTimeStr}`;
+        }
+      } else if (isAvailTomorrow) {
+        if (untilTimeStr) {
+          availableWindowLabel = `Available Tomorrow, ${fromTimeStr} – ${untilTimeStr}`;
+        } else {
+          availableWindowLabel = `Available Tomorrow from ${fromTimeStr}`;
+        }
+      } else {
+        if (untilTimeStr) {
+          availableWindowLabel = `Available ${nextAvailableFrom}, ${fromTimeStr} – ${untilTimeStr}`;
+        } else {
+          availableWindowLabel = `Available ${nextAvailableFrom} from ${fromTimeStr}`;
+        }
+      }
 
       return {
         available: false,
+        availableToday: isAvailToday,
         reason,
         headline: base === 'IN SERVICE' ? 'In service' : 'On a trip',
         detail: `Next available from ${availableFrom}`,
         label: `${base} · FROM ${availableFrom}`.toUpperCase(),
         nextAvailableFrom,
         availableFrom,
+        freeUntilMs,
+        freeUntilTime: untilTimeStr,
+        availableWindowLabel,
       };
     }
 
     return {
       available: false,
+      availableToday: false,
       reason,
       headline: base === 'IN SERVICE' ? 'In service' : 'On a trip',
       detail: '',
       label: base,
+      availableWindowLabel: base === 'IN SERVICE' ? 'In maintenance' : 'On a trip',
     };
   }
 
   // Vehicle is AVAILABLE for requested range!
   // Look for the next upcoming booking/service that starts after or during the requested range
-  const nextUpcoming = blocks.find((b) => b.startMs >= requestStartMs);
+  const nextUpcoming = blocks.find((b) => b.startMs >= requestStartMs && isFinite(b.startMs));
   let freeUntil: string | undefined;
   let freeUntilDayNum: number | undefined;
   let freeTill: string | undefined;
+  let freeUntilTime: string | undefined;
+  let freeUntilMs: number | undefined;
 
-  if (nextUpcoming && isFinite(nextUpcoming.startMs)) {
-    const nextDate = new Date(nextUpcoming.startMs);
-    freeUntilDayNum = toDayNum(nextDate.getFullYear(), nextDate.getMonth(), nextDate.getDate());
+  if (nextUpcoming) {
+    freeUntilMs = nextUpcoming.startMs;
+    const nextParts = getIndiaDateParts(nextUpcoming.startMs);
+    freeUntilDayNum = toDayNum(nextParts.year, nextParts.month, nextParts.date);
     freeUntil = dayNumToLabel(freeUntilDayNum);
-    const timeStr = formatTime12(nextDate);
-    freeTill = freeUntilDayNum === windowStart ? timeStr : `${freeUntil}, ${timeStr}`;
+    freeUntilTime = formatTime12(nextUpcoming.startMs);
+    freeTill = freeUntilDayNum === windowStart ? freeUntilTime : `${freeUntil}, ${freeUntilTime}`;
   }
 
   const untilText = freeUntil !== undefined ? ` · FREE TILL ${freeUntil.toUpperCase()}` : '';
@@ -852,8 +974,24 @@ export function getAvailability(
         ? (hasDates ? `Available ${fromText} only` : 'Available today only')
         : `Available ${fromText} – ${freeUntil}`;
 
+  let availableWindowLabel: string;
+  if (hasDates) {
+    availableWindowLabel = `Available for ${dayNumToLabel(windowStart)}${windowEnd > windowStart ? ` – ${dayNumToLabel(windowEnd)}` : ''}`;
+  } else {
+    if (freeUntilDayNum !== undefined && freeUntilTime) {
+      if (freeUntilDayNum === today || freeUntilDayNum === today + 1) {
+        availableWindowLabel = `Available till ${freeUntilTime}`;
+      } else {
+        availableWindowLabel = `Available till ${freeUntil}, ${freeUntilTime}`;
+      }
+    } else {
+      availableWindowLabel = 'Available now';
+    }
+  }
+
   return {
     available: true,
+    availableToday: true,
     startDate: hasDates ? dayNumToLabel(windowStart) : 'Today',
     headline,
     rangeHeadline,
@@ -861,6 +999,9 @@ export function getAvailability(
     label: `${headline}${untilText}`.toUpperCase(),
     freeUntil,
     freeTill,
+    freeUntilMs,
+    freeUntilTime,
+    availableWindowLabel,
   };
 }
 
@@ -871,6 +1012,79 @@ export const checkCarAvailability = (
   pickupTime?: string,
   returnTime?: string
 ): boolean => getAvailability(car, selectedStartDate, selectedEndDate, pickupTime, returnTime).available;
+
+export interface CarNextBookingWindow {
+  availableUntilMs: number;
+  availableHours: number;
+  availableTillLabel: string;
+  nextBookingStartMs: number | null;
+  hasUpcomingBooking: boolean;
+  freeUntilDateLabel: string;
+  freeUntilTimeLabel: string;
+}
+
+/**
+ * Calculates the exact availability window and remaining hours for a vehicle until its
+ * next future booking, rental, or service block begins.
+ * Used for hourly flash sale calculations and countdown timers.
+ */
+export function getCarNextBookingWindow(car: Car | undefined | null, nowMs: number = Date.now()): CarNextBookingWindow {
+  const defaultUntil = nowMs + 24 * 3600 * 1000;
+  if (!car) {
+    const p = getIndiaDateParts(defaultUntil);
+    const dayN = toDayNum(p.year, p.month, p.date);
+    return {
+      availableUntilMs: defaultUntil,
+      availableHours: 24,
+      availableTillLabel: 'Tomorrow',
+      nextBookingStartMs: null,
+      hasUpcomingBooking: false,
+      freeUntilDateLabel: dayNumToLabel(dayN),
+      freeUntilTimeLabel: formatTime12(defaultUntil),
+    };
+  }
+
+  const today = todayDayNum();
+  const blocks = buildBlocks(car, today);
+
+  // Find future bookings or service events that start after nowMs
+  const futureBlocks = blocks
+    .filter((b) => b.startMs > nowMs && Number.isFinite(b.startMs))
+    .sort((a, b) => a.startMs - b.startMs);
+
+  const nextBooking = futureBlocks[0];
+  let availableUntilMs: number;
+  let hasUpcomingBooking = false;
+  let nextBookingStartMs: number | null = null;
+
+  if (nextBooking && Number.isFinite(nextBooking.startMs)) {
+    availableUntilMs = nextBooking.startMs;
+    hasUpcomingBooking = true;
+    nextBookingStartMs = nextBooking.startMs;
+  } else {
+    // No upcoming booking on record: available for the full 24-hour cycle
+    availableUntilMs = defaultUntil;
+  }
+
+  const diffMs = Math.max(0, availableUntilMs - nowMs);
+  const availableHours = Math.max(1, Math.floor(diffMs / (3600 * 1000)));
+
+  const untilParts = getIndiaDateParts(availableUntilMs);
+  const untilDayNum = toDayNum(untilParts.year, untilParts.month, untilParts.date);
+  const freeUntilTimeLabel = formatTime12(availableUntilMs);
+  const freeUntilDateLabel = dayNumToLabel(untilDayNum);
+  const availableTillLabel = untilDayNum === today ? freeUntilTimeLabel : `${freeUntilDateLabel}, ${freeUntilTimeLabel}`;
+
+  return {
+    availableUntilMs,
+    availableHours,
+    availableTillLabel,
+    nextBookingStartMs,
+    hasUpcomingBooking,
+    freeUntilDateLabel,
+    freeUntilTimeLabel,
+  };
+}
 
 /** Attaches `availability` / `isAvailable` for the dates being viewed. */
 export function withAvailability(

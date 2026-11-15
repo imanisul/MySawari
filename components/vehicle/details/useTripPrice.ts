@@ -1,5 +1,5 @@
 import { useSawari, useQuote } from '@/context/SawariContext';
-import { useIsTopDeal, TOP_DEAL_KM, TOP_DEAL_EXTRA_KM_RATE } from './topDealKm';
+import { useIsTopDeal, TOP_DEAL_KM, ONE_DAY_KM, TOP_DEAL_EXTRA_KM_RATE } from './topDealKm';
 import { BOOKING_ADVANCE_AMOUNT } from '@/services/backend/pricingEngine';
 
 const PLAN_NAMES: Record<string, string> = { starter: 'Starter', plus: 'Plus', pro: 'Pro' };
@@ -54,8 +54,9 @@ export type TripPrice =
  * car and these dates isn't in yet, the state says so.
  */
 export function useTripPrice(hasTrip: boolean): TripPrice {
-  const { selectedCar, membership } = useSawari();
+  const { selectedCar, membership, duration } = useSawari();
   const topDeal = useIsTopDeal();
+  const oneDay = (parseInt(duration, 10) || 1) < 2; // 300 km on a 1-day trip, unlimited from 2 days
   const { pricingQuote: q, isQuoteLoading, quoteError, refreshQuote } = useQuote();
   const perDay = selectedCar?.perDay || 0;
 
@@ -117,6 +118,6 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
     payableNow: q.onlinePayableNow ?? Math.min(BOOKING_ADVANCE_AMOUNT, final),
     sawariCashUsed: q.sawariCashUsed || 0,
     balance: q.remainingRentalAmount,
-    kmText: topDeal ? `${TOP_DEAL_KM} km, then ₹${TOP_DEAL_EXTRA_KM_RATE}/km` : 'Unlimited km',
+    kmText: topDeal || oneDay ? `${topDeal ? TOP_DEAL_KM : ONE_DAY_KM} km, then ₹${TOP_DEAL_EXTRA_KM_RATE}/km` : 'Unlimited km',
   };
 }

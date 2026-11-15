@@ -157,13 +157,14 @@ export function registerDeviceForPushNotifications(): Promise<void> {
 export async function unregisterDeviceForPushNotifications(authToken: string | null) {
   if (!authToken || !lastExpoPushToken) return;
   try {
+    const unregisterReq = fetchWithAuth(`${BACKEND_URL}/notifications/unregister-device`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expoPushToken: lastExpoPushToken }),
+    }).catch(() => null);
+
     await Promise.race([
-      // fetchWithAuth: the saved access token is often expired by the time someone logs out.
-      fetchWithAuth(`${BACKEND_URL}/notifications/unregister-device`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expoPushToken: lastExpoPushToken }),
-      }),
+      unregisterReq,
       new Promise((resolve) => setTimeout(resolve, 3000)),
     ]);
   } catch (error) {

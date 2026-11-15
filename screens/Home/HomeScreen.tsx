@@ -9,9 +9,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import {  StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAvailability, splitDateRange, parseDayLabel, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
+import { getAvailability, splitDateRange, parseDayLabel, todayDayNum, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
-import { Page, LoginBottomSheet } from '@/components';
+import { Page, LoginBottomSheet, onSplashGone } from '@/components';
+import { WelcomeSheet } from '@/components/home/WelcomeSheet';
 import { API } from '@/services/backend/api';
 import { isPastSearch, removeRecentSearch, RecentSearch } from '@/utils/recentSearches';
 import { useVehicles, prefetchCarGallery } from '@/hooks/useVehicles';
@@ -21,8 +22,8 @@ import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
 import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
-  HomeHero, ReferStrip, HomeSearchCard, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
-  DestinationTile, BenefitsGrid, MemberBenefitsCard, RateUsCard, ConnectCard, HomePromoBanner, HOME_PURPLE,
+  HomeHero, ReferStrip, HomeSearchCard, HomeCategories, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
+  DestinationTile, BenefitsGrid, MemberBenefitsCard, RateUsCard, ConnectCard, HomePromoBanner, HERO_TOP,
 } from '@/components/home/HomeSections';
 import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
@@ -114,6 +115,9 @@ const TOP_CARS: { model: string; color?: string }[] = [
  * Home (Figma "Home"): banner, refer strip, Cars / Bikes + destination, top picks (recently viewed first),
  * trip milestone, top destinations, benefits, membership and social links.
  */
+// The welcome popup shows once per app launch, after the splash, for a signed-in customer.
+let welcomeShown = false;
+
 export default function HomeScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
@@ -126,6 +130,15 @@ export default function HomeScreen() {
     pickupTime, returnTime,
   } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+  useEffect(() => {
+    if (!isAuthenticated || welcomeShown) return;
+    return onSplashGone(() => {
+      if (welcomeShown) return;
+      welcomeShown = true;
+      setShowWelcome(true);
+    });
+  }, [isAuthenticated]);
   // The city shown at the top; tapping it opens the picker (one city for now, more later).
   const [city, setCityState] = useState(CITIES[0].name);
   const [showCity, setShowCity] = useState(false);
@@ -193,6 +206,11 @@ export default function HomeScreen() {
   // ("Select your Destination") when they want to.
 
   const { data: fetchedVehicles = [], refetch: refetchVehicles, isLoading: vehiclesLoading } = useVehicles();
+  // Real lowest car day rate for the hero's "from just ₹X" slide.
+  const fromRate = useMemo(() => {
+    const rates = fetchedVehicles.filter((v: any) => v.type !== 'Bike').map((v: any) => v.perDay).filter((n: number) => n > 0);
+    return rates.length ? Math.min(...rates) : undefined;
+  }, [fetchedVehicles]);
 
   // ── Top picks: vehicles the customer viewed (resume where they left), then curated favourites ──
   const recentKey = isAuthenticated ? customer?.id : null;
@@ -205,15 +223,16 @@ export default function HomeScreen() {
   const [startStr, endStr] = dateRange === 'Select Dates' ? [undefined, undefined] : splitDateRange(dateRange);
   const withAvail = useCallback((v: any) => { const availability = getAvailability(v, startStr, endStr, pickupTime, returnTime); return { ...v, availability, isAvailable: availability.available }; }, [startStr, endStr, pickupTime, returnTime]);
 
-  // Recent Searches: only what this customer looked at (newest first, with the trip it was viewed for), never filler.
+  // Recently Viewed: only cars/bikes this customer actually looked at (newest first, with the trip context it was viewed for), never filler.
   const recent = useMemo(() => viewedIds
     .map((item: any) => {
-      const v = fetchedVehicles.find((x) => String(x.id) === item.vehicleId);
+      const targetId = String(item.vehicleId);
+      const v = fetchedVehicles.find((x) => String(x.id) === targetId || (Boolean((x as any)._id) && String((x as any)._id) === targetId));
       // Everything the customer looked at shows together, cars and bikes, whichever tab is selected.
       return v && !isInService(v) ? { ...withAvail(v), viewedContext: item } : null;
     })
     .filter(Boolean)
-    .slice(0, 4) as any[], [viewedIds, fetchedVehicles, withAvail]);
+    .slice(0, 6) as any[], [viewedIds, fetchedVehicles, withAvail]);
 
   // Top Picks: the most booked vehicles of the selected type (last 90 days, from the bookings), free ones first;
   // the curated favourites only break ties.
@@ -275,6 +294,33 @@ export default function HomeScreen() {
     router.push('/car-details');
   }, [selectCar, setBookingSource, router, setDropoff, setDates, setTimes]);
 
+  const openRecent = useCallback((item: any) => {
+    const ctx = item?.viewedContext;
+    const [startLabel] = ctx?.dateRange ? splitDateRange(ctx.dateRange) : [''];
+    const startDay = startLabel ? parseDayLabel(startLabel) : null;
+    const hasValidContext = Boolean(
+      ctx?.dropoff?.name &&
+      ctx?.dateRange &&
+      ctx.dateRange !== 'Select Dates' &&
+      ctx.dateRange !== 'Upcoming Trip' &&
+      startDay !== null &&
+      startDay >= todayDayNum()
+    );
+    selectCar(item);
+    prefetchCarGallery(item);
+    setBookingSource('home');
+    if (hasValidContext) {
+      setDropoff(ctx.dropoff);
+      setDates(ctx.dateRange, ctx.duration || '1 day');
+      setTimes(ctx.pickupTime || '08:00 AM', ctx.returnTime || '08:00 AM');
+    } else {
+      setDropoff(null);
+      setDates('Select Dates', '5 days');
+      setTimes('08:00 AM', '08:00 AM');
+    }
+    router.push('/car-details');
+  }, [selectCar, setBookingSource, router, setDropoff, setDates, setTimes]);
+
   // ── Trip milestone (ride journey from the server) ──
   const { data: journey, refetch: refetchJourney, cards } = useRideJourney();
   const claimable = journey?.milestones.find((m) => m.unlocked && !m.claimed) ?? null;
@@ -289,11 +335,7 @@ export default function HomeScreen() {
   }, [cards]);
 
   // Refer & Earn: 10% of a friend's first booking — at least 10% of the lowest day rate in the fleet.
-  const referEarn = useMemo(() => {
-    const rates = fetchedVehicles.map((v) => v.perDay).filter((n) => n > 0);
-    if (!rates.length) return '10%';
-    return `₹50000`;   //previously it was calculating from lowest vehicle daily rate, calculates 10%,
-  }, [fetchedVehicles]);
+  const referEarn = '₹50K'; // fixed headline reward on the strip
 
   const isMember = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
 
@@ -337,14 +379,17 @@ export default function HomeScreen() {
     });
   }, [setBookingSource, setDropoff, selectedCar, typeName, picks, fetchedVehicles, selectCar, router]);
 
+  // One cars row under the categories: Top Picks for a first-time visitor, which becomes Recently Viewed
+  // as soon as the customer has opened a vehicle.
+  const showRecent = recent.length > 0;
   const sections = useMemo(() => [
     'top_hero',
     'search_card',
-    'position3_promo',
+    'categories',
     'searches',
-    'recent',
-    'exclusive_offers',
     'picks',
+    'position3_promo',
+    'exclusive_offers',
     'milestone',
     'middle_banner',
     'destinations',
@@ -363,13 +408,14 @@ export default function HomeScreen() {
         return (
           <View onLayout={(event) => { heroSectionHeight.current = event.nativeEvent.layout.height; }}>
             {/* Pulling the page down (iOS bounce) shows more of the hero's purple instead of a white gap above it. */}
-            <View pointerEvents="none" style={{ position: 'absolute', top: -1200, left: 0, right: 0, height: 1200, backgroundColor: HOME_PURPLE }} />
+            <View pointerEvents="none" style={{ position: 'absolute', top: -1200, left: 0, right: 0, height: 1200, backgroundColor: HERO_TOP }} />
             <HomeHero
               topInset={insets.top}
               city={city}
               onCityPress={() => setShowCity(true)}
               sawariCash={isAuthenticated ? sawariCash : 0}
               onWallet={() => {}}
+              fromRate={fromRate}
             >
               <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
             </HomeHero>
@@ -381,6 +427,10 @@ export default function HomeScreen() {
             <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDates={openDates} />
           </View>
         );
+      case 'categories':
+        // A tile opens Explore with that body type (cars) or gear type (bikes) already applied.
+        content = <HomeCategories bike={vehicleType === 'bike'} onPick={(filter) => router.push({ pathname: '/explore', params: { ...filter, type: vehicleType, t: String(Date.now()) } })} />;
+        break;
       case 'position3_promo': 
         content = (
           <View style={{ marginTop: 8, marginBottom: 4 }}>
@@ -391,31 +441,12 @@ export default function HomeScreen() {
       case 'exclusive_offers':
         content = <ExclusiveOffersSection />;
         break;
-      case 'recent':
-        if (!recent.length) break;
-        content = (
-          <>
-            <HomeSectionTitle title="Recently Viewed" />
-            <FlatList
-              data={recent}
-              horizontal
-              keyExtractor={(v) => `recent-${v.id}`}
-              renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.row, { gap: 8 }]}
-              snapToInterval={254}
-              decelerationRate="fast"
-              removeClippedSubviews={false}
-            />
-          </>
-        );
-        break;
       case 'picks':
-        if (!picks.length && vehiclesLoading) {
+        if (!showRecent && !picks.length && vehiclesLoading) {
           // The My Trips placeholder, returned without the fade-in so it is on screen from the first frame.
           return (
             <>
-              <HomeSectionTitle title="Top Picks" />
+              <HomeSectionTitle title="Recommended Cars" />
               <View style={{ paddingHorizontal: 16 }}>
                 <BookingSkeleton index={0} />
                 <BookingSkeleton index={1} />
@@ -423,14 +454,14 @@ export default function HomeScreen() {
             </>
           );
         }
-        if (!picks.length) break;
+        if (!showRecent && !picks.length) break;
         content = (
           <>
-            <HomeSectionTitle title="Top Picks" />
+            <HomeSectionTitle title={showRecent ? 'Recently Viewed' : 'Recommended Cars'} />
             <FlatList
-              data={picks}
+              data={showRecent ? recent : picks}
               horizontal
-              keyExtractor={(v) => `pick-${v.id}`}
+              keyExtractor={(v) => `${showRecent ? 'recent' : 'pick'}-${v.id}`}
               // The real day rate (vehicle pricePerDay), not a member price: no membership passed to the card.
               renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
               showsHorizontalScrollIndicator={false}
@@ -481,7 +512,7 @@ export default function HomeScreen() {
       case 'destinations':
         content = (
           <>
-            <HomeSectionTitle title="Top Destinations" />
+            <HomeSectionTitle title="Top Destination" />
             <FlatList
               data={DESTINATIONS}
               horizontal
@@ -501,7 +532,7 @@ export default function HomeScreen() {
       case 'benefits':
         content = (
           <>
-            <HomeSectionTitle title="More benefits with every journey" />
+            <HomeSectionTitle title="Benefits" />
             <BenefitsGrid />
           </>
         );
@@ -524,7 +555,7 @@ export default function HomeScreen() {
     }
     if (!content) return null;
     return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, vehiclesLoading, milestone, journey, claimable, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, vehiclesLoading, showRecent, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>
@@ -564,6 +595,7 @@ export default function HomeScreen() {
       {isPastHero && <View pointerEvents="none" style={[styles.statusBarSpacer, { height: insets.top, backgroundColor: p.page }]} />}
 
       <RewardScratchModal card={scratch} onClose={() => setScratch(null)} />
+      <WelcomeSheet visible={showWelcome} onClose={() => setShowWelcome(false)} />
       <CitySheet visible={showCity} value={city} onSelect={setCity} onClose={() => setShowCity(false)} />
 
       <LoginBottomSheet
@@ -603,6 +635,6 @@ const styles = StyleSheet.create({
   footerSmall: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, letterSpacing: 0.5 },
   footerBig: { fontFamily: 'Anton_400Regular', fontSize: 56, lineHeight: 66, letterSpacing: 2, marginTop: 2 },
   // The refer strip sits inside the banner (rays behind it); the white sheet's rounded top covers its foot.
-  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, paddingTop: 12 },
+  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, paddingTop: 10, paddingBottom: 8 },
   row: { gap: 10, paddingHorizontal: 16 },
 });

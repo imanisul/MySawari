@@ -617,6 +617,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       dailyRate: selectedCar.perDay,
       vehicleId: selectedCar.id || (selectedCar as any)._id,
       vehicleCategory: selectedCar.category || (selectedCar as any).segment,
+      hourlyRate: (selectedCar as any).hourlyRate as number | undefined,
       pickupDateStr,
       returnDateStr,
       pickupTime,
@@ -636,7 +637,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         expiresAt: membership.expiresAt,
       } : null,
     };
-  }, [selectedCar.id, selectedCar.perDay, dateRange, pickupTime, returnTime, pickup?.id, dropoff?.id, dropoff?.name, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode, planToBuy, membership]);
+  }, [selectedCar.id, selectedCar.perDay, (selectedCar as any).hourlyRate, dateRange, pickupTime, returnTime, pickup?.id, dropoff?.id, dropoff?.name, returnAddress?.id, appliedCouponCode, sawariCashToApply, mode, isDeliveryRequested, deliveryMode, planToBuy, membership]);
 
   // Only the newest quote may update the screen: when details change quickly, an older, slower quote
   // used to finish last and overwrite the correct price.

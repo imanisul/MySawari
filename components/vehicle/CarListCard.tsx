@@ -2,7 +2,6 @@ import React, { useRef, useState } from 'react';
 import { prefetchCarGallery } from '@/hooks/useVehicles';
 import { NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -13,7 +12,9 @@ import { formatCurrency } from '@/services/backend/pricingEngine';
 import { API } from '@/services/backend/api';
 import { useSawari, useFavorites } from '@/context/SawariContext';
 import { ActivityAPI } from '@/services/api/activity';
+import { HeartIcon } from '@/components/vehicle/HeartIcon';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { memberPriceFor } from '@/screens/Membership/MembershipScreen';
 import { clearMembershipPopupShown } from '@/components/vehicle/details/MembershipSavedPopup';
 
 /**
@@ -28,6 +29,9 @@ type CarListCardProps = {
   effectiveDateRange?: string;
   onIntercept?: () => void;
   onPressOverride?: () => void;
+  /** Top Deals: the amount to pay for the deal's window (and the real price struck through) instead of "₹X/day". */
+  dealPrice?: number;
+  dealOriginal?: number;
   style?: any;
 };
 
@@ -44,9 +48,10 @@ export const longAvail = (label?: string) => {
 
 
 
-const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress }: CarListCardProps & { onCarPress: () => void }) {
+const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress, dealPrice, dealOriginal }: CarListCardProps & { onCarPress: () => void }) {
   const p = useDetailsPalette();
   const { favorites, toggleFavorite } = useFavorites();
+  const { membership } = useSawari();
   const { width: windowWidth } = useWindowDimensions();
   // Photo width known synchronously: screen − 16 margin − 1 border − 4 card padding, each side (= 42). The photo
   // list snaps to its own width, so a page even 1–2 px wider than that left a growing gap at the start of each image.
@@ -78,6 +83,13 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
   const seats = car.type === 'Bike' ? null : (seatsNum ? `${seatsNum} Seater` : (car.seats ? String(car.seats) : null));
   const meta = [car.transmission, car.fuel, seats].filter(Boolean) as string[];
 
+  // "Member Price": what the member's plan would take off this day rate (members see their own plan, others the
+  // entry plan). Shown only on the plain day-rate card and only when it really saves something.
+  const activePlan = membership?.plan && String(membership.plan).toLowerCase() !== 'none' && (!membership.expiresAt || new Date(membership.expiresAt) > new Date())
+    ? String(membership.plan).toLowerCase().trim() : null;
+  const memberPrice = dealPrice === undefined && car.perDay > 0 ? memberPriceFor(activePlan, car.perDay, car.perDay) : null;
+  const showMember = memberPrice !== null && memberPrice < car.perDay;
+
   const onSwipe = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (!width) return;
     setSlide(Math.round(e.nativeEvent.contentOffset.x / width));
@@ -87,7 +99,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
     <View style={[styles.wrap, style]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${car.name}, ${formatCurrency(car.perDay)} per day${unavailable && (availability.availableFrom || availability.nextAvailableFrom) ? `, available from ${availability.availableFrom || availability.nextAvailableFrom}` : ''}`}
+        accessibilityLabel={`${car.name}, ${formatCurrency(car.perDay)} per day${unavailable && availability.nextAvailableFrom ? `, available on ${availability.nextAvailableFrom}` : ''}`}
         testID={`list-car-${car.id}`}
         onPress={onCarPress}
         style={({ pressed }) => [styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder, opacity: pressed ? 0.92 : 1 }]}
@@ -132,8 +144,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
             onPress={() => { Haptics.selectionAsync(); toggleFavorite(car.id); }}
             style={[styles.heart, { backgroundColor: p.summary }]}
           >
-            <FontAwesome name={fav ? 'heart' : 'heart-o'} size={16} color={fav ? 'red' : 'black'} />
-            {/* <Ionicons name={fav ? 'heart' : 'heart-outline'} size={16} color={fav ? p.red : p.muted} /> */}
+            <HeartIcon width={20} height={20} color={fav ? p.red : p.muted} filled={fav} />
           </Pressable>
           {images.length > 1 && (
             <View style={styles.dots} pointerEvents="none">
@@ -169,20 +180,33 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
             )}
           </View>
           <View style={styles.priceBar}>
-            <View style={styles.priceRow}>
-              <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(car.perDay)}</Text>
-              <Text style={[styles.perDay, { color: p.muted }]}>/day</Text>
+            <View style={styles.priceWrap}>
+              <View style={styles.priceRow}>
+                <Text style={[styles.price, { color: p.fg }]}>{formatCurrency(dealPrice ?? car.perDay)}</Text>
+                {dealPrice === undefined ? (
+                  showMember ? null : <Text style={[styles.perDay, { color: p.muted }]}>/day</Text>
+                ) : dealOriginal !== undefined && Math.round(dealOriginal) > Math.round(dealPrice) ? (
+                  <Text style={[styles.perDay, { color: p.muted, textDecorationLine: 'line-through' }]}>{formatCurrency(dealOriginal)}</Text>
+                ) : null}
+              </View>
+              {showMember && (
+                <View style={styles.memberPill}>
+                  <Ionicons name="lock-open" size={10} color="#FBBF0F" />
+                  <Text style={styles.memberText} numberOfLines={1}>Member Price {formatCurrency(memberPrice as number)}</Text>
+                </View>
+              )}
             </View>
             {unavailable ? (
               <View style={styles.linkRow}>
-                <Text style={[styles.availText, { color: availability.availableFrom || availability.nextAvailableFrom ? p.green : p.red }]}>
-                  {availability.availableFrom
-                    ? `Available from ${availability.availableFrom}`
-                    : (availability.nextAvailableFrom
-                        ? `Available on ${shortAvail(availability.nextAvailableFrom)}`
-                        : availability.headline)}
+                <Text
+                  style={[styles.availText, { color: (availability.availableToday || availability.nextAvailableFrom) && availability.reason !== 'service' ? p.green : p.red }]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                >
+                  {(availability.nextAvailableFrom ? `Available on ${shortAvail(availability.nextAvailableFrom)}` : availability.headline)}
                 </Text>
-                <Feather name="chevron-right" size={13} color={availability.availableFrom || availability.nextAvailableFrom ? p.green : p.red} />
+                <Feather name="chevron-right" size={13} color={(availability.availableToday || availability.nextAvailableFrom) && availability.reason !== 'service' ? p.green : p.red} />
               </View>
             ) : (
               <View style={styles.linkRow}>
@@ -243,14 +267,14 @@ export const CarListCard = React.memo(function CarListCard(props: CarListCardPro
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 12, marginHorizontal: 16 },
-  // Figma: card padding 4/4/8, 8 between the photo and the details (351×212 photo, 8px radius, 8 inset for tag, heart and dots).
+  // Figma: card padding 4/4/8, 8 between the photo and the details (351×212 photo, 8px radius, 6 inset for tag, heart and dots; tag 28 high, heart 32 with a 20 icon).
   card: { borderWidth: 1, borderRadius: 12, paddingTop: 4, paddingHorizontal: 4, paddingBottom: 8 },
   photo: { height: 212, borderRadius: 8, overflow: 'hidden' },
-  tag: { position: 'absolute', top: 8, left: 8, borderRadius: 20, paddingHorizontal: 10, height: 29, justifyContent: 'center', maxWidth: '70%' },
+  tag: { position: 'absolute', top: 6, left: 6, borderRadius: 20, paddingHorizontal: 10, height: 28, justifyContent: 'center', maxWidth: '70%' },
   tagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#FFFFFF' },
-  heart: { position: 'absolute', top: 8, right: 8, width: 29, height: 29, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  heart: { position: 'absolute', top: 6, right: 6, width: 32, height: 32, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
   // Dots: the current one is a 16×4 white pill, the others 4×4 Neutral/300, 5 apart.
-  dots: { position: 'absolute', bottom: 8, alignSelf: 'center', flexDirection: 'row', gap: 5, alignItems: 'center' },
+  dots: { position: 'absolute', bottom: 6, alignSelf: 'center', flexDirection: 'row', gap: 5, alignItems: 'center' },
   dot: { width: 4, height: 4, borderRadius: 20, backgroundColor: '#D4D4D4' },
   dotOn: { width: 16, backgroundColor: '#FFFFFF' },
   body: { marginTop: 8, gap: 6 },
@@ -263,8 +287,12 @@ const styles = StyleSheet.create({
   ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, height: 28, paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 10 },
   ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   reviews: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
-  // Price row: 4 padding around a 17px line; the price and the struck rate are trimmed to cap height (Figma leading-trim: cap).
-  priceBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: 4 },
+  // Price row: 25 high, 4 side padding; the price and the struck rate are trimmed to cap height (Figma leading-trim: cap).
+  priceBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, height: 25, paddingHorizontal: 4 },
+  priceWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
+  // Member pill: 22 high, 6/10 padding, 4 between the lock and the text, #6B5AED.
+  memberPill: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 22, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 20, backgroundColor: '#6B5AED' },
+  memberText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 10, letterSpacing: 0.18, color: '#FFFFFF', includeFontPadding: false },
   priceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   price: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28.5, marginTop: -7.85, marginBottom: -6.5, includeFontPadding: false },
   strike: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 16, textDecorationLine: 'line-through', marginTop: -3.6, marginBottom: -2.7, includeFontPadding: false },

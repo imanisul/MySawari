@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated from 'react-native-reanimated';
 import { Car, dayNumToLabel, getAvailability, parseDayLabel, splitDateRange, todayDayNum } from '@/utils/sawari';
 import { useVehicles } from '@/hooks/useVehicles';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSawari } from '@/context/SawariContext';
 import { saveRecentSearch } from '@/utils/recentSearches';
 import { CarListCard } from '@/components';
@@ -46,7 +47,8 @@ export default function SearchResultsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollHandlers = useHideSupportWhileScrolling();
-  const { dateRange, vehicleType, pickupTime, returnTime, setDates, dropoff, duration, customer } = useSawari();
+  const queryClient = useQueryClient();
+  const { dateRange, vehicleType, pickupTime, returnTime, setDates, dropoff, duration, customer, isAuthenticated } = useSawari();
   const vehicleWord = vehicleType === 'bike' ? 'bike' : 'car';
 
   const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
@@ -74,10 +76,15 @@ export default function SearchResultsScreen() {
   // Remember this trip search so Home can offer it again with one tap.
   useEffect(() => {
     if (!dropoff?.name || startDay === null || endDay === null) return;
-    saveRecentSearch(customer?.id, { dropoff, dateRange, duration, pickupTime, returnTime, vehicleType }).catch(() => {});
+    const storageKey = isAuthenticated ? customer?.id : null;
+    saveRecentSearch(storageKey, { dropoff, dateRange, duration, pickupTime, returnTime, vehicleType })
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['recentSearches', storageKey || 'guest'] });
+      })
+      .catch(() => {});
     ActivityAPI.logActivity('trip_search', 'SearchScreen', { destination: dropoff.name, dateRange, vehicleType });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dropoff?.name, dateRange, vehicleType]);
+  }, [dropoff?.name, dateRange, vehicleType, isAuthenticated, customer?.id]);
 
   // New dates → fresh vehicle data (bookings may have changed).
   const lastDates = useRef<string | undefined>(undefined);
@@ -95,8 +102,8 @@ export default function SearchResultsScreen() {
   const freeCars = useMemo(() => (fetchedCars || [])
     .filter((c) => (vehicleType === 'bike' ? c.type === 'Bike' : c.type === 'Car' || !c.type))
     .map((c) => ({ ...c, availability: getAvailability(c, startLabel, hasRange ? endLabel : undefined, pickupTime, returnTime) }))
-    .filter((c) => c.availability.available)
-    .map((c) => ({ ...c, isAvailable: true })),
+    .filter((c) => c.availability.available || (!hasRange && c.availability.availableToday))
+    .map((c) => ({ ...c, isAvailable: c.availability.available })),
   [fetchedCars, vehicleType, startLabel, endLabel, hasRange, pickupTime, returnTime]);
 
   const activeFilterCount = countActive(filters);

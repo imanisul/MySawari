@@ -117,7 +117,7 @@ export const offersQueryOptions = {
 
 export async function fetchOffers(): Promise<Offer[]> {
   try {
-    const res = await timedFetch(`${BACKEND_URL}/offers`, {}, 3500);
+    const res = await timedFetch(`${BACKEND_URL}/offers`, {}, 20000);
     if (res.ok) {
       const json = await res.json();
       if (json.success && Array.isArray(json.data)) {
@@ -308,6 +308,14 @@ export interface ExclusiveOffer {
   endTime?: string;
   earlyAccessHours?: number;
   isMemberEarlyAccess?: boolean;
+  isEligible?: boolean;
+  isMemberOnly?: boolean;
+  isEarlyAccessLocked?: boolean;
+  isEarlyAccessUnlocked?: boolean;
+  earlyAccessEndsAt?: string;
+  lockedReason?: string;
+  isTopDeal?: boolean;
+  type?: string;
   vehicleId?: any;
   applicableVehicleIds?: string[];
   allVehicles?: boolean;
@@ -409,7 +417,7 @@ export function specificCarOf(offer: any, vehicles: any[]): any | undefined {
 
 export async function fetchContentVersion(): Promise<number> {
   try {
-    const res = await timedFetch(`${BACKEND_URL}/offers/version`, {}, 2500);
+    const res = await timedFetch(`${BACKEND_URL}/offers/version`, {}, 10000);
     if (res.ok) {
       const json = await res.json();
       if (json.success && json.version) return Number(json.version);

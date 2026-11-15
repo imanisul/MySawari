@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, RefreshControl } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, RefreshControl, Animated, Easing, PanResponder } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -85,6 +85,71 @@ export default function BookingsScreen() {
   const tabs = hasCancelled ? TABS : TABS.filter((t) => t !== 'Cancelled');
   useEffect(() => { if (!hasCancelled && tab === 'Cancelled') setTab('All'); }, [hasCancelled, tab]);
 
+  // Slide the tab strip so the chosen tab (tapped, swiped, or switched to automatically) is always fully on screen.
+  const tabsRef = useRef<ScrollView>(null);
+  const tabBounds = useRef<Record<string, { x: number; w: number }>>({});
+  const tabsViewW = useRef(0);
+  const revealTab = (key: string) => {
+    const b = tabBounds.current[key];
+    if (!b || !tabsViewW.current) return;
+    tabsRef.current?.scrollTo({ x: Math.max(0, b.x + b.w / 2 - tabsViewW.current / 2), animated: true });
+  };
+  // One rounded-top slider bar anchored flush at the bottom of the tabs row, sliding smoothly between All / Upcoming / Active / Completed.
+  const barX = useRef(new Animated.Value(0)).current;
+  const barW = useRef(new Animated.Value(0)).current;
+  const barPlaced = useRef(false);
+  const lastBarTarget = useRef<{ x: number; w: number } | null>(null);
+  const moveBar = (key: string, animate: boolean) => {
+    const b = tabBounds.current[key];
+    if (!b) return;
+    if (!animate || !barPlaced.current) {
+      barX.stopAnimation();
+      barW.stopAnimation();
+      barX.setValue(b.x);
+      barW.setValue(b.w);
+      barPlaced.current = true;
+      lastBarTarget.current = { x: b.x, w: b.w };
+      return;
+    }
+    if (lastBarTarget.current?.x === b.x && lastBarTarget.current?.w === b.w) return;
+    lastBarTarget.current = { x: b.x, w: b.w };
+    Animated.parallel([
+      Animated.timing(barX, { toValue: b.x, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+      Animated.timing(barW, { toValue: b.w, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: false }),
+    ]).start();
+  };
+  useEffect(() => {
+    if (!isAuthenticated) {
+      barPlaced.current = false;
+      lastBarTarget.current = null;
+      tabBounds.current = {};
+      return;
+    }
+    revealTab(tab);
+    moveBar(tab, true);
+  }, [tab, isAuthenticated, tabs.length]);
+
+  // Allow swiping left/right across the trips area to slide between All / Upcoming / Active / Completed.
+  const swipeStateRef = useRef({ tabs, tab });
+  swipeStateRef.current = { tabs, tab };
+  const tabSwipeResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        g.x0 > 24 && Math.abs(g.dx) > 30 && Math.abs(g.dx) > 2 * Math.abs(g.dy),
+      onPanResponderRelease: (_, g) => {
+        if (Math.abs(g.dx) < 45 || Math.abs(g.dx) < 1.5 * Math.abs(g.dy)) return;
+        const { tabs: curTabs, tab: curTab } = swipeStateRef.current;
+        const idx = curTabs.indexOf(curTab);
+        if (idx < 0) return;
+        const nextIdx = g.dx < 0 ? idx + 1 : idx - 1;
+        if (nextIdx >= 0 && nextIdx < curTabs.length) {
+          Haptics.selectionAsync();
+          setTab(curTabs[nextIdx]);
+        }
+      },
+    })
+  ).current;
+
   const vehicleMap = useMemo(() => new Map(vehicles.map((v) => [v.id, v])), [vehicles]);
 
   // Active only once the operations app has handed the vehicle over (status mapped to ONGOING).
@@ -159,68 +224,82 @@ export default function BookingsScreen() {
      <BlurTarget style={{ flex: 1 }}>
       <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>My Trips</Text>
 
-      {/* Underlined tabs */}
-      <View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
-          {tabs.map((item) => {
-            const on = tab === item;
-            return (
-              <Pressable
-                key={item}
-                onPress={() => { Haptics.selectionAsync(); setTab(item); }}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: on }}
-                style={styles.tab}
-              >
-                <Text style={[styles.tabText, { color: on ? p.navy : p.muted, fontFamily: on ? FONT.semibold : FONT.regular }]}>{item}</Text>
-                <View style={[styles.underline, { backgroundColor: on ? p.navy : 'transparent' }]} />
-              </Pressable>
-            );
-          })}
+      {/* Underlined tabs with sliding navy bar */}
+      <View style={[styles.tabBarWrap, { borderBottomColor: p.divider }]}>
+        <ScrollView
+          ref={tabsRef}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabs}
+          onLayout={(e) => { tabsViewW.current = e.nativeEvent.layout.width; revealTab(tab); }}
+        >
+          <View style={styles.tabsTrack}>
+            {tabs.map((item) => {
+              const on = tab === item;
+              return (
+                <Pressable
+                  key={item}
+                  onLayout={(e) => {
+                    tabBounds.current[item] = { x: e.nativeEvent.layout.x, w: e.nativeEvent.layout.width };
+                    if (item === tab) moveBar(item, barPlaced.current);
+                  }}
+                  onPress={() => { Haptics.selectionAsync(); setTab(item); }}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}
+                  style={styles.tab}
+                >
+                  <Text style={[styles.tabText, { color: on ? p.navy : p.muted, fontFamily: on ? FONT.semibold : FONT.medium }]}>{item}</Text>
+                </Pressable>
+              );
+            })}
+            <Animated.View pointerEvents="none" style={[styles.underline, { backgroundColor: p.navy, left: barX, width: barW }]} />
+          </View>
         </ScrollView>
       </View>
 
-      {loading ? (
-        <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-          <BookingSkeleton index={0} />
-          <BookingSkeleton index={1} />
-          <BookingSkeleton index={2} />
-        </Reanimated.View>
-      ) : fetchError && bookings.length === 0 ? (
-        <Empty p={p} icon="wifi-off" title="Couldn't load your trips" copy="Check your internet connection and try again." action="Retry" onAction={() => refetch()} />
-      ) : filtered.length === 0 ? (
-        <Empty
-          p={p}
-          icon="map"
-          title={tab === 'All' ? 'No trips yet' : `No ${tab.toLowerCase()} trips`}
-          copy={tab === 'All' ? 'Your bookings will appear here.' : `Your ${tab.toLowerCase()} rentals will appear here.`}
-          action={tab === 'All' ? 'Explore vehicles' : undefined}
-          onAction={() => router.push('/explore')}
-        />
-      ) : (
-        <ScrollView
-          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 110 }]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl refreshing={pulling} onRefresh={async () => { setPulling(true); try { await Promise.all([refetch(), refetchReviews()]); } finally { setPulling(false); } }} />
-          }
-        >
-          {filtered.map((b) => (
-            <Reanimated.View key={b.id} entering={rise()}>
-              <TripCard
-                p={p}
-                booking={b}
-                image={vehicleMap.get(b.vehicleId)?.image}
-                canRate={b.status === 'COMPLETED' && !reviewed(b)}
-                onOpen={() => router.push(`/booking-detail?id=${b.id}` as any)}
-                onRate={() => setReviewTrip({ bookingId: b.id, carId: String(b.vehicleId), vehicleName: b.vehicleName })}
-                onExtend={() => setExtendFor(b)}
-                onBookAgain={() => bookAgain(b)}
-              />
-            </Reanimated.View>
-          ))}
-        </ScrollView>
-      )}
+      <View style={{ flex: 1 }} {...tabSwipeResponder.panHandlers}>
+        {loading ? (
+          <Reanimated.View entering={FadeIn.duration(200)} style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+            <BookingSkeleton index={0} />
+            <BookingSkeleton index={1} />
+            <BookingSkeleton index={2} />
+          </Reanimated.View>
+        ) : fetchError && bookings.length === 0 ? (
+          <Empty p={p} icon="wifi-off" title="Couldn't load your trips" copy="Check your internet connection and try again." action="Retry" onAction={() => refetch()} />
+        ) : filtered.length === 0 ? (
+          <Empty
+            p={p}
+            icon="map"
+            title={tab === 'All' ? 'No trips yet' : `No ${tab.toLowerCase()} trips`}
+            copy={tab === 'All' ? 'Your bookings will appear here.' : `Your ${tab.toLowerCase()} rentals will appear here.`}
+            action={tab === 'All' ? 'Explore vehicles' : undefined}
+            onAction={() => router.push('/explore')}
+          />
+        ) : (
+          <ScrollView
+            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 110 }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={pulling} onRefresh={async () => { setPulling(true); try { await Promise.all([refetch(), refetchReviews()]); } finally { setPulling(false); } }} />
+            }
+          >
+            {filtered.map((b) => (
+              <Reanimated.View key={b.id} entering={rise()}>
+                <TripCard
+                  p={p}
+                  booking={b}
+                  image={vehicleMap.get(b.vehicleId)?.image}
+                  canRate={b.status === 'COMPLETED' && !reviewed(b)}
+                  onOpen={() => router.push(`/booking-detail?id=${b.id}` as any)}
+                  onRate={() => setReviewTrip({ bookingId: b.id, carId: String(b.vehicleId), vehicleName: b.vehicleName })}
+                  onExtend={() => setExtendFor(b)}
+                  onBookAgain={() => bookAgain(b)}
+                />
+              </Reanimated.View>
+            ))}
+          </ScrollView>
+        )}
+      </View>
      </BlurTarget>
 
       {/* Same sheets (and server calls) as Trip Details */}
@@ -372,11 +451,22 @@ function Empty({ p, icon, title, copy, action, onAction }: { p: DetailsPalette; 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   title: { fontFamily: FONT.semibold, fontSize: 24, lineHeight: 36, paddingHorizontal: 16 },
-  // Figma frame: 393×48 — 4 above, 8 below, a 36px strip of tabs between (text centred, underline on the bottom edge).
-  tabs: { paddingHorizontal: 16, gap: 22, paddingTop: 4, paddingBottom: 8 },
-  tab: { alignItems: 'center', justifyContent: 'flex-end', height: 40 },
-  tabText: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, paddingHorizontal: 2 },
-  underline: { height: 2, borderRadius: 1, alignSelf: 'stretch', marginTop: 6 },
+  tabBarWrap: { borderBottomWidth: StyleSheet.hairlineWidth },
+  tabs: { flexGrow: 1 },
+  // Figma 393×38: padding 8/16/10 -> 38px total height with clean separation above the 4px bottom-anchored slider.
+  tabsTrack: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 2, position: 'relative' },
+  tab: { alignItems: 'center', justifyContent: 'center', paddingTop: 8, paddingBottom: 10 },
+  tabText: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, paddingHorizontal: 12 },
+  // Matches the 69×4 navy indicator: rounded top corners, flat bottom edge flush with the tab strip bottom.
+  underline: {
+    position: 'absolute',
+    bottom: 0,
+    height: 4,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
   list: { paddingHorizontal: 16, paddingTop: 16, gap: 12 },
 
   card: { borderWidth: 1, borderRadius: 12, padding: 8, gap: 6 },

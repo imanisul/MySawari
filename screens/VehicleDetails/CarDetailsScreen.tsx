@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles, useLiveCar } from '@/hooks/useVehicles';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { offersQueryOptions, Offer } from '@/services/api/offers';
 import { Feather } from '@expo/vector-icons';
 import { LoginBottomSheet } from '@/components';
@@ -54,6 +54,7 @@ export default function CarDetailsScreen() {
   const p = useDetailsPalette();
   const blurTarget = useRef<View | null>(null);
   const router = useRouter();
+  const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     id?: string;
@@ -66,6 +67,9 @@ export default function CarDetailsScreen() {
     isFixedDates?: string;
     lockDates?: string;
     isTopDeal?: string;
+    dealPrice?: string;
+    hourlyPrice?: string;
+    rentalHours?: string;
   }>();
   const { id: paramCarId, vehicleId: paramVehicleId, offerId: paramOfferId, promoCode: paramPromoCode } = params;
   const targetCarId = paramCarId || paramVehicleId;
@@ -92,6 +96,12 @@ export default function CarDetailsScreen() {
     (paramOfferId || paramPromoCode) &&
       (!targetOffer || (targetOffer.expiryDate && new Date(targetOffer.expiryDate) < new Date()))
   );
+
+  // The Top Deal's hourly price belongs only to a booking opened from Top Deals: a normal booking of the same car
+  // (Explore, Search) must not keep it.
+  useEffect(() => {
+    if (params.isTopDeal !== 'true' && /^TOPDEAL-/i.test(appliedCouponCode || '')) applyCoupon(null);
+  }, [params.isTopDeal, appliedCouponCode, applyCoupon]);
 
   // Auto-apply promo code if valid and not yet applied
   useEffect(() => {
@@ -142,6 +152,13 @@ export default function CarDetailsScreen() {
   // options promise is what the quote then applies. Before the quote arrives, the day rate × days.
   const tripPrice = useTripPrice(hasTrip);
   const tripDays = hasTrip ? Math.max(1, parseInt(duration, 10) || requestedEnd! - requestedStart!) : 1;
+  // "Add 1 day" (Figma card): only on a 1-day trip with free dates; 2+ days are already unlimited km.
+  const canAddDay = hasTrip && tripDays === 1 && !isDatesLocked;
+  const addOneDay = () => {
+    if (requestedStart === null || requestedEnd === null) return;
+    const end = requestedEnd + 1;
+    setDates(`${dayNumToLabel(requestedStart)} – ${dayNumToLabel(end)}`, `${tripDays + 1} Days`);
+  };
   const freeCancelUntil = requestedStart !== null ? `${dayNumToLabel(requestedStart - 1)}, ${pickupTime}` : null;
 
   const year = selectedCar?.modelYear || selectedCar?.registrationYear;
@@ -209,6 +226,9 @@ export default function CarDetailsScreen() {
           isFixedDates: isDatesLocked ? 'true' : undefined,
           isTopDeal: params.isTopDeal || undefined,
           offerId: paramOfferId || '',
+          dealPrice: params.dealPrice || undefined,
+          hourlyPrice: params.hourlyPrice || undefined,
+          rentalHours: params.rentalHours || undefined,
         },
       });
     }
@@ -221,18 +241,23 @@ export default function CarDetailsScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (selectedCar && selectedCar !== cars[0]) {
+        const storageKey = isAuthenticated ? customer?.id : null;
         ActivityAPI.logActivity('view_car', 'CarDetailsScreen', { carId: selectedCar.id, carName: selectedCar.name });
-        // Shown again on Home under "Recently viewed".
-        addRecentlyViewed(isAuthenticated ? customer?.id : null, {
+        // Shown again on Home under "Recently Viewed".
+        addRecentlyViewed(storageKey, {
           vehicleId: String(selectedCar.id),
           dropoff: dropoff || undefined,
-          dateRange, 
+          dateRange,
           pickupTime,
           returnTime,
           duration,
-        }).catch(() => {});
+        })
+          .then(() => {
+            queryClient.invalidateQueries({ queryKey: ['recentlyViewed', storageKey || 'guest'] });
+          })
+          .catch(() => {});
       }
-    }, [selectedCar, isAuthenticated, customer?.id])
+    }, [selectedCar, isAuthenticated, customer?.id, dropoff, dateRange, pickupTime, returnTime, duration, queryClient])
   );
 
   const mainScrollRef = useRef<ScrollView>(null);
@@ -363,7 +388,7 @@ export default function CarDetailsScreen() {
           <DriverCard />
           <View style={{ height: 8 }} />
 
-          <MileageLimits />
+          <MileageLimits onAddDay={canAddDay ? addOneDay : undefined} />
           <View style={{ height: 8 }} />
         </View>
 

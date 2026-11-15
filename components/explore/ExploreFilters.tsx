@@ -57,14 +57,22 @@ const BIKE_BUDGETS: { key: string; label: string; min: number; max: number }[] =
 ];
 const ALL_BUDGETS = [...BUDGETS, ...BIKE_BUDGETS];
 
+const MUV_NAME_RE = /\b(ertiga|rumion|innova|hycross|crysta|triber|carens|xl6|marazzo|lodgy|enjoy|mobilio|hexa)\b/i;
+
 // Body types in the design's order; any other type the fleet has (Luxury, Bike …) is listed after them.
-const BODY_ORDER: { key: string; label: string; test: (c: string) => boolean }[] = [
+const BODY_ORDER: { key: string; label: string; test: (c: string, name?: string) => boolean }[] = [
   { key: 'SUV', label: 'SUV', test: (c) => /suv/i.test(c || '') },
   { key: 'Compact SUV', label: 'Compact SUV', test: (c) => /compact\s*suv/i.test(c || '') },
   { key: 'Sedan', label: 'SEDAN', test: (c) => /sedan/i.test(c || '') },
   { key: 'Hatchback', label: 'HATCH BACK', test: (c) => /hatch/i.test(c || '') },
-  { key: 'MUV', label: 'MUV / MPV', test: (c) => /muv|mpv/i.test(c || '') },
+  { key: 'MUV', label: 'MUV / MPV', test: (c, name) => /muv|mpv/i.test(c || '') || MUV_NAME_RE.test(name || '') },
 ];
+
+function matchesBodyCategory(car: Car, bodyKey: string): boolean {
+  const cat = String(car.category || car.type || '');
+  const known = BODY_ORDER.find((x) => x.key === bodyKey);
+  return known ? known.test(cat, car.name) : cat.toLowerCase() === bodyKey.toLowerCase();
+}
 
 const TRANSMISSIONS: { key: string; label: string; test: (t: string) => boolean }[] = [
   { key: 'Automatic', label: 'Automatic', test: (t) => /auto/i.test(t) && !/semi|amt/i.test(t) },
@@ -118,10 +126,8 @@ export function matchesFilters(car: Car, f: ExploreFilters, ratingOf: (c: Car) =
     const b = ALL_BUDGETS.find((x) => x.key === f.budget);
     if (b && !(car.perDay >= b.min && car.perDay <= b.max)) return false;
   }
-  if (f.body) {
-    const known = BODY_ORDER.find((x) => x.key === f.body);
-    const cat = String(car.category || car.type || '');
-    if (known ? !known.test(cat) : cat.toLowerCase() !== f.body.toLowerCase()) return false;
+  if (f.body && !matchesBodyCategory(car, f.body)) {
+    return false;
   }
   if (f.transmission) {
     const t = TRANSMISSIONS.find((x) => x.key === f.transmission);
@@ -394,7 +400,7 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, bik
     const budget: Option[] = (isBike ? BIKE_BUDGETS : BUDGETS).map((b) => ({ key: b.key, label: b.label, count: count((c) => c.perDay >= b.min && c.perDay <= b.max) }));
     const extraBodies = Array.from(new Set(cars.map((c) => c.category).filter((cat) => cat && !BODY_ORDER.some((b) => b.test(cat)))));
     const body: Option[] = [
-      ...BODY_ORDER.map((b) => ({ key: b.key, label: b.label, count: count((c) => b.test(c.category)) })),
+      ...BODY_ORDER.map((b) => ({ key: b.key, label: b.label, count: count((c) => matchesBodyCategory(c, b.key)) })),
       ...extraBodies.map((cat) => ({ key: cat, label: cat.toUpperCase(), count: count((c) => c.category === cat) })),
     ];
     const transmission: Option[] = TRANSMISSIONS.map((t) => ({ key: t.key, label: t.label, count: count((c) => t.test(c.transmission || '')) }));

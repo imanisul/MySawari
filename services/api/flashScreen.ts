@@ -181,7 +181,7 @@ export async function getCachedFlashScreenConfig(): Promise<FlashScreenConfig> {
 export async function fetchRemoteFlashScreenConfig(): Promise<FlashScreenConfig | null> {
   // Strategy 1: Customer Backend
   try {
-    const res = await timedFetch(`${BACKEND_URL}/flash-screen`, { method: 'GET' }, 3000);
+    const res = await timedFetch(`${BACKEND_URL}/flash-screen`, { method: 'GET' }, 8000);
     if (res.ok) {
       const json = await res.json();
       if (json?.success && json?.data) {
@@ -194,7 +194,7 @@ export async function fetchRemoteFlashScreenConfig(): Promise<FlashScreenConfig 
 
   // Strategy 2: Operation Backend direct fallback
   try {
-    const res = await timedFetch(OPERATION_BACKEND_URL, { method: 'GET' }, 3000);
+    const res = await timedFetch(OPERATION_BACKEND_URL, { method: 'GET' }, 8000);
     if (res.ok) {
       const json = await res.json();
       if (json?.success && json?.data) {

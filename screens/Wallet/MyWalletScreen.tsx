@@ -349,9 +349,10 @@ const styles = StyleSheet.create({
   hint: { fontFamily: PF.regular, fontSize: 11.5, lineHeight: 17, marginTop: 6 },
   // Design: the empty message sits in the middle of the space under the balance card.
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, paddingTop: 48, minHeight: 360 },
-  emptyTitle: { fontFamily: PF.medium, fontSize: 19.5, lineHeight: 28, marginTop: 14, textAlign: 'center' },
+  // Figma: 333×29, semibold 19 on a 29px line, centred.
+  emptyTitle: { fontFamily: PF.semibold, fontSize: 19, lineHeight: 29, marginTop: 14, textAlign: 'center', alignSelf: 'stretch' },
   emptySub: { fontFamily: PF.regular, fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 8 },
-  emptyLink: { fontFamily: PF.medium, fontSize: 12.5, marginTop: 14 },
+  emptyLink: { fontFamily: PF.semibold, fontSize: 11, lineHeight: 16.5, textAlign: 'center', marginTop: 14 },
   card: { borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
   cardTop: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, minHeight: 64 },
   when: { fontFamily: PF.semibold, fontSize: 15, lineHeight: 23 },

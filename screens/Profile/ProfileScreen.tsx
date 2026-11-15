@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, Animated, Pressable, Modal, Image, Platform, Re
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, Ionicons } from '@expo/vector-icons';
+import Svg, { Path } from 'react-native-svg';
+import { HeartIcon } from '@/components/vehicle/HeartIcon';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -205,7 +207,10 @@ export default function ProfileScreen() {
               {(!plan || plan.next) && (
                 <View style={styles.upgrade}>
                   <Text style={styles.upgradeText}>{plan ? 'Upgrade' : 'Get membership'}</Text>
-                  <Feather name="arrow-up-right" size={10} color="#FFFFFF" />
+                  {/* Horizontal right arrow (→) matching the 20×20 icon spec */}
+                  <Svg width={11} height={11} viewBox="0 0 10 10" fill="none" stroke="#FFFFFF" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round">
+                    <Path d="M1.75 5H8.25M5 1.75L8.25 5L5 8.25" />
+                  </Svg>
                 </View>
               )}
             </View>
@@ -236,7 +241,9 @@ export default function ProfileScreen() {
                   style={({ pressed }) => [styles.row, pressed && !r.cash && { backgroundColor: p.soft }]}
                 >
                   <View style={[styles.rowIcon, { backgroundColor: p.segOn }]}>
-                    <Feather name={r.icon} size={16} color={p.fg} />
+                    {r.icon === 'heart'
+                      ? <HeartIcon width={16} height={16} color={p.fg} strokeWidth={1.5} />
+                      : <Feather name={r.icon} size={16} color={p.fg} />}
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.rowTitle, { color: p.fg }]}>{r.title}</Text>
@@ -267,7 +274,9 @@ export default function ProfileScreen() {
                 {i > 0 && <Dashes color={p.segBorder} />}
                 <Pressable accessibilityRole="button" onPress={r.onPress} style={({ pressed }) => [styles.row, styles.rowPlain, pressed && { backgroundColor: p.soft }]}>
                   <View style={[styles.rowIcon, { backgroundColor: p.segOn }]}>
-                    <Feather name={r.icon} size={16} color={p.fg} />
+                    {r.icon === 'heart'
+                      ? <HeartIcon width={16} height={16} color={p.fg} strokeWidth={1.5} />
+                      : <Feather name={r.icon} size={16} color={p.fg} />}
                   </View>
                   <Text style={[styles.rowTitle, { color: p.fg, flex: 1 }]}>{r.title}</Text>
                   <Feather name="chevron-right" size={16} color={p.muted} />
@@ -381,7 +390,7 @@ const styles = StyleSheet.create({
   planName: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
   offChip: { height: 20, paddingHorizontal: 8, borderRadius: 24, justifyContent: 'center' },
   offChipText: { fontFamily: FONT.bold, fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
-  upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#323E71', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 },
+  upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#323E71', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   upgradeText: { fontFamily: FONT.bold, fontSize: 11, lineHeight: 17, color: '#FFFFFF' },
   memberTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
   memberSub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 16.5 },

@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Car, getAvailability, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
@@ -35,7 +35,7 @@ export default function ExploreScreen() {
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
   // Cars or bikes, as chosen on Home.
-  const { setBookingSource, vehicleType: homeType, setDropoff, setDates, duration, pickupTime, returnTime } = useSawari();
+  const { setBookingSource, vehicleType: homeType, setVehicleType, setDropoff, setDates, duration, pickupTime, returnTime } = useSawari();
   const isBike = homeType === 'bike';
   const CHIPS = chipsFor(isBike);
 
@@ -64,10 +64,46 @@ export default function ExploreScreen() {
     return () => clearTimeout(t);
   }, [searchQuery]);
 
-  // Switching between cars and bikes starts that list fresh.
+  // Switching between cars and bikes starts that list fresh unless triggered by an incoming category deep-link.
+  const skipNextTypeReset = useRef(false);
+  const prevHomeType = useRef(homeType);
   useEffect(() => {
+    if (prevHomeType.current === homeType) return;
+    prevHomeType.current = homeType;
+    if (skipNextTypeReset.current) {
+      skipNextTypeReset.current = false;
+      return;
+    }
     setFilters(EMPTY_FILTERS);
   }, [homeType]);
+
+  // Home's category tiles open Explore with a body or gear type (`t` makes a repeat of the same tile count as new).
+  const { body: bodyParam, transmission: gearParam, type: typeParam, t: bodyStamp } = useLocalSearchParams<{ body?: string; transmission?: string; type?: string; t?: string }>();
+  const chipScroll = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (!bodyParam && !gearParam && !typeParam) return;
+    const nextType: 'car' | 'bike' =
+      typeParam === 'bike' ? 'bike'
+      : typeParam === 'car' ? 'car'
+      : bodyParam ? 'car'
+      : homeType;
+
+    if (nextType !== homeType) {
+      skipNextTypeReset.current = true;
+      setVehicleType(nextType);
+    }
+
+    if (bodyParam || gearParam) {
+      setFilters({ ...EMPTY_FILTERS, body: bodyParam || null, transmission: gearParam || null });
+      setSearchQuery('');
+      setDebouncedQuery('');
+      requestAnimationFrame(toFirstCar);
+      const targetChips = chipsFor(nextType === 'bike');
+      // Bring the matching quick chip into view (chips are ~84 wide, the Filter chip comes first).
+      const i = targetChips.findIndex((c) => (bodyParam && c.apply?.body === bodyParam) || (gearParam && c.apply?.transmission === gearParam));
+      if (i >= 0) setTimeout(() => chipScroll.current?.scrollTo({ x: Math.max(0, (i + 1) * 84 - 120), animated: true }), 80);
+    }
+  }, [bodyParam, gearParam, typeParam, bodyStamp]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: fetchedCars = [], isLoading: isFetchingCars, isError: fetchError, refetch: fetchVehicles } = useVehicles();
 
@@ -150,15 +186,32 @@ export default function ExploreScreen() {
         </Pressable>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+      <View style={[styles.toggle, { borderColor: p.segBorder, backgroundColor: p.page }]}>
+        {(['car', 'bike'] as const).map((t) => {
+          const on = (t === 'bike') === isBike;
+          return (
+            <Pressable
+              key={t}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              onPress={() => { if (!on) { Haptics.selectionAsync(); setVehicleType(t); } }}
+              style={[styles.toggleItem, on && { backgroundColor: p.segOn, borderColor: p.segBorder }]}
+            >
+              <Text style={[styles.toggleText, { color: on ? p.navy : p.muted }]}>{t === 'car' ? 'Cars' : 'Bike & Scooter'}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <ScrollView ref={chipScroll} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Filter${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
           onPress={() => { Haptics.selectionAsync(); setShowFilterSheet(true); }}
-          style={[styles.chip, styles.filterChip, styles.filterChipFixed, { borderColor: p.segBorder, backgroundColor: p.segOn }]}
+          style={[styles.chip, styles.filterChip, styles.filterChipFixed, { borderColor: activeFilterCount ? p.navy : p.segBorder, backgroundColor: p.segOn }]}
         >
-          <FunnelIcon color={p.muted} size={16} />
-          <Text style={[styles.chipText, { color: p.muted }]}>Filter</Text>
+          <FunnelIcon color={activeFilterCount ? p.navy : p.muted} size={16} />
+          <Text style={[styles.chipText, { color: activeFilterCount ? p.navy : p.muted }]}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
         </Pressable>
         {CHIPS.map((c) => {
           const on = chipOn(filters, c);
@@ -260,6 +313,10 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Figma: 48 high, 4 padding, 10 radius; items 38 high, 6 radius, semibold 13/20.
+  toggle: { flexDirection: 'row', gap: 8, height: 48, padding: 4, marginHorizontal: 16, marginTop: 12, borderWidth: 1, borderRadius: 10 },
+  toggleItem: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 6, borderWidth: 1, borderColor: 'transparent' },
+  toggleText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, lineHeight: 32 },
   seg: { flexDirection: 'row', borderWidth: 1, borderRadius: 8, padding: 2 },
@@ -272,10 +329,10 @@ const styles = StyleSheet.create({
   sortBtn: { width: 58, height: 49, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   // Figma: chips 36 high, 8 apart, padding 6/8, 1px Primary/blue-50 border, 8px radius, 13/20 weight-500 text.
   // The chips frame pads 8 below, and the card list under it pads 8 above: the first card starts 16 below the chips.
-  chips: { gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
-  chip: { height: 36, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chips: { gap: 8, alignItems: 'flex-start', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
+  chip: { height: 38, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4 },
-  filterChipFixed: { width: 70, height:38 },
+  filterChipFixed: { height: 38 },
   chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   empty: { borderWidth: 1, borderRadius: 12, marginHorizontal: 16, marginTop: 8, padding: 20, alignItems: 'center', gap: 6 },
   emptyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 16, marginTop: 6 },

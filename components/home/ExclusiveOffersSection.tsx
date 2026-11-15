@@ -83,6 +83,11 @@ export function ExclusiveOffersSection() {
   const handleCardPress = (offer: ExclusiveOffer) => {
     recordOfferView(offer._id || offer.id);
 
+    if (offer.isEarlyAccessLocked || (offer.isEligible === false && !isMember)) {
+      router.push('/top-deals');
+      return;
+    }
+
     // 1. Resolve target vehicle
     let targetCar: any = null;
     if (offer.vehicleId) {

@@ -5,16 +5,15 @@ import {
   StyleSheet,
   ScrollView,
   Pressable,
-  Image,
   Dimensions,
   Share,
   Platform,
-  Alert,
-  FlatList,
-  Animated,
-  PanResponder,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
+import { Image as CachedImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path, Defs, RadialGradient, Stop, Ellipse, Circle } from 'react-native-svg';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,119 +21,378 @@ import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
-import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
-import { formatCurrency, memberDayPrice, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
-import { dayNumToLabel, todayDayNum, getAvailability, isInService, Car } from '@/utils/sawari';
-import { LoginBottomSheet } from '@/components';
-
-import { VehicleSummary, DriverCard } from '@/components/vehicle/details/VehicleSummary';
-import { VehicleHeroGallery } from '@/components/vehicle/details/VehicleHeroGallery';
+import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
-  MileageLimits,
-  SectionPills,
-  MainSpecification,
-  Benefits,
-  ReviewsStrip,
-  RealTrips,
-  FeatureList,
-  WhyRent,
-  LocationCard,
-  CancellationPolicy,
-  Inclusions,
-  PaymentSchedule,
-  Faqs,
-  HelpCard,
-} from '@/components/vehicle/details/CarDetailsSections';
+  dayNumToLabel,
+  todayDayNum,
+  isInService,
+  buildBlocks,
+  parseTimeToMinutes,
+  toDayNum,
+  dayNumAndTimeToMs,
+  parseDayLabel,
+  formatTime12,
+  getIndiaDateParts,
+  bestFor,
+  MONTH_NAMES,
+} from '@/utils/sawari';
+import { useQuery } from '@tanstack/react-query';
+import { API } from '@/services/backend/api';
+import { HeartIcon } from '@/components/vehicle/HeartIcon';
+import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
+import { memberPriceFor } from '@/screens/Membership/MembershipScreen';
+import { exclusiveOffersQueryOptions } from '@/services/api/offers';
+import { LoadingImage } from '@/components/common/LoadingImage';
+import { getVehicleImage } from '@/utils/vehicleImages';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-// Side padding that lets the first and last 60px round reach the middle of the strip (round + 14 gap = 74 apart).
-const THUMB_PAD = (SCREEN_WIDTH - 60) / 2;
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-type SectionKey =
-  | 'specification'
-  | 'benefits'
-  | 'reviews'
-  | 'features'
-  | 'why'
-  | 'location'
-  | 'policy'
-  | 'inclusions'
-  | 'schedule'
-  | 'faqs'
-  | 'support';
+const pad2 = (n: number) => String(Math.max(0, Math.floor(n))).padStart(2, '0');
 
-const SECTIONS: { key: SectionKey; label: string }[] = [
-  { key: 'specification', label: 'Specification' },
-  { key: 'benefits', label: 'Benefits' },
-  { key: 'reviews', label: 'Reviews' },
-  { key: 'features', label: 'Features' },
-  { key: 'why', label: 'Why Rent?' },
-  { key: 'location', label: 'Location' },
-  { key: 'policy', label: 'Policies' },
-  { key: 'inclusions', label: 'Inclusions' },
-  { key: 'schedule', label: 'Payment Schedule' },
-  { key: 'faqs', label: 'FAQs' },
-  { key: 'support', label: 'Support' },
-];
+/** Formats "Available till 8:00 AM" or "Available till Tomorrow, 8:00 AM" in Indian Standard Time */
+function formatAvailableTill(endMs: number, nowMs: number): string {
+  const endParts = getIndiaDateParts(endMs);
+  const nowParts = getIndiaDateParts(nowMs);
+  const timeStr = formatTime12(endMs);
 
-interface DealSlot {
-  id: string;
-  title: string;
-  badge: string;
-  discountPct: number;
-  durationHours: number;
-  pickupTime: string;
-  returnTime: string;
-  daysSpan: number; // 0 = same day, 1 = overnight/next day
-  isOvernight?: boolean;
-  basePrice: number;
-  dealPrice: number;
-  memberPrice: number;
-  hourlyRate: number;
-  startLabel: string;
-  endLabel: string;
+  const isSameDay =
+    endParts.year === nowParts.year &&
+    endParts.month === nowParts.month &&
+    endParts.date === nowParts.date;
+
+  const endDayNum = toDayNum(endParts.year, endParts.month, endParts.date);
+  const nowDayNum = toDayNum(nowParts.year, nowParts.month, nowParts.date);
+  const isTomorrow = endDayNum === nowDayNum + 1;
+
+  if (isSameDay || isTomorrow) {
+    return `Available till ${timeStr}`;
+  } else {
+    const month = MONTH_NAMES[endParts.month] || '';
+    const monthCap = month ? month[0].toUpperCase() + month.slice(1) : '';
+    return `Available till ${endParts.date} ${monthCap}, ${timeStr}`;
+  }
 }
 
-const HOUR = 3600000;
-// A Top Deal is a short gap: free for at most this many hours, ending at a booking that is already on the calendar.
-const MAX_DEAL_HOURS = 18;
-const dayWord = (offset: number) => (offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : dayNumToLabel(todayDayNum() + offset));
-const INACTIVE = ['cancelled', 'canceled', 'failed', 'rejected', 'completed', 'complete', 'returned', 'closed'];
-const clock = (ms: number) => {
-  const d = new Date(ms);
-  const h = d.getHours();
-  return `${String(h % 12 || 12).padStart(2, '0')}:00 ${h < 12 ? 'AM' : 'PM'}`;
-};
-const dayOffset = (ms: number) => {
-  const a = new Date(); a.setHours(0, 0, 0, 0);
-  const b = new Date(ms); b.setHours(0, 0, 0, 0);
-  return Math.round((b.getTime() - a.getTime()) / 86400000);
-};
+/** Helper to parse ISO date strings or day labels like '15 Nov' to Indian timestamp ms */
+function parseCustomDateToMs(val: any, defaultTime = '08:00 AM'): number | null {
+  if (!val) return null;
+  if (val instanceof Date) return val.getTime();
+  if (typeof val === 'number') return val;
+  if (typeof val !== 'string') return null;
+  const s = val.trim();
+  if (!s || s.toLowerCase() === 'available now') return null;
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const parts = s.split('-').map(Number);
+    const dayNum = toDayNum(parts[0], parts[1] - 1, parts[2]);
+    return dayNumAndTimeToMs(dayNum, defaultTime);
+  }
+
+  const parsed = Date.parse(s);
+  if (!isNaN(parsed)) {
+    return parsed;
+  }
+
+  const dayNum = parseDayLabel(s);
+  if (dayNum !== null) {
+    return dayNumAndTimeToMs(dayNum, defaultTime);
+  }
+  return null;
+}
 
 /**
- * The free window of a vehicle: from the next whole hour until the next booking starts (at most 24 h).
- * null when it is on a trip right now, in the workshop, or the gap is shorter than an hour.
+ * A Top Deal charges the car's hourly rate for the hours left (never more than its day rate): the offer's hourly
+ * rate, else day rate / 24 (at least ₹50). The server prices the booking with the same rule ("TOPDEAL-<hours>").
  */
-function freeWindow(car: any, now: number): { startMs: number; endMs: number; hours: number; bounded: boolean } | null {
-  const st = String(car?.dbStatus || car?.status || '').toLowerCase();
-  if (st === 'service' || st === 'maintenance') return null;
-  const ranges = (car?.bookedRanges || [])
-    .filter((r: any) => !r.status || !INACTIVE.includes(String(r.status).toLowerCase()))
-    .map((r: any) => ({ a: new Date(r.start).getTime(), b: new Date(r.end).getTime() }))
-    .filter((r: any) => !isNaN(r.a) && !isNaN(r.b));
-  if (ranges.some((r: any) => r.a <= now && r.b > now)) return null;
-  const startMs = Math.ceil(now / HOUR) * HOUR;
-  const next = Math.min(Infinity, ...ranges.filter((r: any) => r.a > now).map((r: any) => r.a));
-  const endMs = Math.min(startMs + 24 * HOUR, isFinite(next) ? Math.floor(next / HOUR) * HOUR : Infinity);
-  const hours = (endMs - startMs) / HOUR;
-  return hours >= 1 ? { startMs, endMs, hours, bounded: isFinite(next) && next - startMs <= 24 * HOUR } : null;
+function dealPricing(car: any, hours: number) {
+  const perDay = Number(car.perDay || car.pricePerDay || 0);
+  const offerRate = Number(car.offer?.hourlyRate) || 0;
+  const rate = offerRate > 0 ? offerRate : Math.max(50, Math.round(perDay / 24));
+  return { perDay, rate, price: Math.min(perDay || Infinity, rate * hours) };
+}
+
+/** 4-pointed sparkle star matching Figma spec */
+function FourPointStar({ size = 12, color = '#FBC422' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 0C12 6.627 6.627 12 0 12C6.627 12 12 17.373 12 24C12 17.373 17.373 12 24 12C17.373 12 12 6.627 12 0Z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
+/** Crisp golden crown icon tilted on top-left of Today's Deal badge */
+function CrownDealIcon({ size = 14, color = '#FBC422' }: { size?: number; color?: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M2.5 19h19c.8 0 1.5-.7 1.5-1.5 0-.4-.2-.8-.5-1.1L19 7l-5 6.5L12 3l-2 10.5L5 7 1.5 16.4c-.3.3-.5.7-.5 1.1 0 .8.7 1.5 1.5 1.5z"
+        fill={color}
+      />
+      <Circle cx="12" cy="2.5" r="1.5" fill={color} />
+      <Circle cx="5" cy="6.5" r="1.5" fill={color} />
+      <Circle cx="19" cy="6.5" r="1.5" fill={color} />
+    </Svg>
+  );
+}
+
+interface VehicleCardProps {
+  car: any;
+  nowMs: number;
+  targetEndMs: number;
+  isMember: boolean;
+  memberPlan: string | null;
+  isFav: boolean;
+  onToggleFav: () => void;
+  onPress: () => void;
+  onPressExtend?: () => void;
+}
+
+/** Vehicle Card matching Figma Frame 2147226289 design */
+function VehicleCard({
+  car,
+  nowMs,
+  targetEndMs,
+  isMember,
+  memberPlan,
+  isFav,
+  onToggleFav,
+  onPress,
+  onPressExtend,
+}: VehicleCardProps) {
+  const [photoIndex, setPhotoIndex] = useState(0);
+
+  // Fast, multi-source image resolution handling Cloudinary URLs, plate proxy strings, and local require numbers
+  const imageSources = useMemo(() => {
+    const list: any[] = [];
+    const seenUris = new Set<string>();
+
+    const add = (im: any) => {
+      if (!im) return;
+      if (typeof im === 'number') {
+        list.push(im);
+        return;
+      }
+      let uri = '';
+      if (typeof im === 'string') {
+        uri = im.trim();
+      } else if (typeof im === 'object') {
+        uri = (im.url || im.uri || '').trim();
+      }
+      if (uri && !seenUris.has(uri)) {
+        seenUris.add(uri);
+        list.push({ uri });
+      }
+    };
+
+    if (Array.isArray(car.images)) car.images.forEach(add);
+    add(car.image);
+    add(car.vehicleImage);
+    add(car.imageUrl);
+    add(car.coverImage);
+
+    // If no valid image found, fall back to high-res local asset
+    if (list.length === 0) {
+      const isBike =
+        car.type === 'Bike' ||
+        car.category === 'Bike' ||
+        (car.seatingCapacity && car.seatingCapacity <= 2);
+      const fallback = getVehicleImage(
+        car.displayName || car.vehicleName || car.name || '',
+        isBike
+      );
+      if (fallback) list.push(fallback);
+    }
+    return list;
+  }, [car]);
+
+  // Hourly pricing & live decreasing price
+  const startMs = (car.dealStartMs || 0) > nowMs ? car.dealStartMs : Math.floor(nowMs / 60000) * 60000;
+  const endMs = car.dealEndMs || targetEndMs;
+  const hoursRemaining = Math.max(1, Math.ceil(Math.max(0, endMs - startMs) / (3600 * 1000)));
+
+  const { perDay, price: dealPrice } = dealPricing(car, hoursRemaining);
+
+  const carName = car.displayName || car.vehicleName || car.name || 'Vehicle';
+  const seatsNum = parseInt(String(car.seats || ''), 10);
+  const specs = [
+    car.transmission,
+    car.fuel || car.fuelType,
+    car.type === 'Bike' || !seatsNum ? null : `${seatsNum} Seater`,
+  ].filter(Boolean) as string[];
+
+  // Only real reviews from server or car
+  const needsReviews = car.rating === undefined && car.reviewCount === undefined;
+  const { data: dbReviews = [] } = useQuery({
+    queryKey: ['carReviews', car.id],
+    queryFn: () => API.reviews.fetchByCarId(car.id),
+    staleTime: 10 * 60 * 1000,
+    enabled: needsReviews,
+  });
+  const reviews = [...(car.reviews || []), ...dbReviews].filter((r: any) => r.rating >= MIN_PUBLIC_REVIEW_RATING);
+  const ratingNum = car.rating ?? (reviews.length ? reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length : null);
+  const reviewCount = car.reviewCount ? car.reviewCount + dbReviews.length : reviews.length;
+
+  const currentSource = imageSources[photoIndex] || imageSources[0];
+
+  const handleNextPhoto = () => {
+    if (imageSources.length > 1) {
+      Haptics.selectionAsync();
+      setPhotoIndex((prev) => (prev + 1) % imageSources.length);
+    }
+  };
+
+  return (
+    <View style={styles.outerCard}>
+      {/* Vehicle Card (Frame 2147226289 -> Vehicle Card) */}
+      <Pressable onPress={onPress} style={styles.vehicleCard}>
+        {/* Frame 20: Photo Container */}
+        <View style={styles.photoBox}>
+          {currentSource ? (
+            <LoadingImage
+              source={currentSource}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              recyclingKey={`${car.id}-${photoIndex}`}
+              transition={150}
+            />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, styles.placeholderPhoto]}>
+              <Ionicons name="car-outline" size={54} color="#94A3B8" />
+            </View>
+          )}
+
+          {/* Frame 2147225882: Top Header Row in Photo (Today’s Deal + Heart) */}
+          <View style={styles.photoTopRow}>
+            {/* Pill Badge (Frame 2147225777) */}
+            <View style={styles.comfortPill}>
+              {/* Crown Deal Icon (Figma image 588256529) */}
+              <View style={styles.crownWrap} pointerEvents="none">
+                <CrownDealIcon size={14} color="#FBC422" />
+              </View>
+              <Text style={styles.comfortText} numberOfLines={1}>Today’s Deal</Text>
+            </View>
+
+            {/* Heart button (Frame 22) */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Toggle Favorite"
+              hitSlop={8}
+              onPress={(e) => {
+                e.stopPropagation();
+                onToggleFav();
+              }}
+              style={styles.heartBtn}
+            >
+              <HeartIcon width={20} height={20} color={isFav ? '#EF4444' : '#737373'} filled={isFav} strokeWidth={1.5} />
+            </Pressable>
+          </View>
+
+          {/* Photo tap area to cycle photos */}
+          {imageSources.length > 1 && (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                handleNextPhoto();
+              }}
+              style={styles.photoTapOverlay}
+            />
+          )}
+
+          {/* Bottom Pagination Dots (Frame 25) */}
+          {imageSources.length > 1 && (
+            <View style={styles.dotsRow}>
+              {imageSources.slice(0, 5).map((_: unknown, idx: number) => (
+                <Pressable
+                  key={idx}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    setPhotoIndex(idx);
+                  }}
+                  style={[
+                    styles.dot,
+                    idx === photoIndex ? styles.dotActive : styles.dotInactive,
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Frame 2147225778: Details Section */}
+        <View style={styles.detailsBox}>
+          {/* Row 1: Frame 2147225757 */}
+          <View style={styles.titleRatingRow}>
+            {/* Left: Frame 2147225756 */}
+            <View style={styles.titleCol}>
+              <Text style={styles.carNameText} numberOfLines={1}>
+                {carName}
+              </Text>
+              {/* Frame 132: Specs */}
+              <View style={styles.specsRow}>
+                {specs.map((m, i) => (
+                  <React.Fragment key={m}>
+                    {i > 0 && <View style={styles.bulletDot} />}
+                    <Text style={styles.specText} numberOfLines={1}>{m}</Text>
+                  </React.Fragment>
+                ))}
+              </View>
+            </View>
+
+            {/* Right: Frame 88 Rating */}
+            {ratingNum !== null && reviewCount > 0 && (
+            <View style={styles.ratingCol}>
+              <View style={styles.ratingPill}>
+                <Text style={styles.ratingVal}>{Number(ratingNum).toFixed(1)}</Text>
+                <Ionicons name="star" size={14} color="#FBBC04" />
+              </View>
+              <Text style={styles.reviewsText}>({reviewCount} Reviews)</Text>
+            </View>
+            )}
+          </View>
+
+          {/* Row 2: Frame 2147225762 */}
+          <View style={styles.priceActionRow}>
+            {/* Left: Frame 2147225771 (Price + for X hours) */}
+            <View style={styles.priceGroup}>
+              <Text style={styles.dealPriceText}>{formatCurrency(dealPrice)}</Text>
+              <Text style={styles.hoursText}>for {hoursRemaining} {hoursRemaining === 1 ? 'hour' : 'hours'}</Text>
+            </View>
+
+            {/* Right: Frame 51 View Details */}
+            <Pressable onPress={onPress} hitSlop={6} style={styles.viewDetailsBtn}>
+              <Text style={styles.viewDetailsText}>View Details</Text>
+              <Feather name="chevron-right" size={13} color="#737373" />
+            </Pressable>
+          </View>
+        </View>
+      </Pressable>
+
+      {/* Frame 2147226290: Bottom Extension Bar */}
+      <Pressable
+        onPress={onPressExtend || onPress}
+        style={styles.extensionBar}
+        hitSlop={4}
+      >
+        <Text style={styles.extendText} numberOfLines={1}>
+          Need more time? Extend your booking
+        </Text>
+        <View style={styles.extendRateRow}>
+          <Text style={styles.extendRateText}>{formatCurrency(perDay)}/day</Text>
+          <Feather name="chevron-right" size={13} color="#737373" />
+        </View>
+      </Pressable>
+    </View>
+  );
 }
 
 export default function TopDealsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const p = useDetailsPalette();
   const { data: vehicles = [], isLoading } = useVehicles();
+  const { data: offers = [] } = useQuery(exclusiveOffersQueryOptions);
   const {
     selectCar,
     setDates,
@@ -146,111 +404,180 @@ export default function TopDealsScreen() {
     membership,
     favorites,
     toggleFavorite,
-    isDeliveryRequested,
     setIsDeliveryRequested,
-    isAuthenticated,
+    applyCoupon,
   } = useSawari();
 
-  const [activeCarIndex, setActiveCarIndex] = useState(0);
-  const [activePhotoIndex, setActivePhotoIndex] = useState(0);
-  const [selectedSlotId, setSelectedSlotId] = useState<string>('overnight');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-  // The free window moves on with the clock, so the price is refreshed every minute.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 60000); return () => clearInterval(t); }, []);
-  const [activeSection, setActiveSection] = useState<SectionKey>('specification');
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
-  const expandAnim = useRef(new Animated.Value(0)).current;
-  const thumbsRef = useRef<FlatList<any>>(null);
-  const mainScrollRef = useRef<ScrollView>(null);
-  const sectionPositions = useRef<Record<string, number>>({});
+  // Second-by-second live countdown & price decrease
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  // Slide open / close animations
-  const openFullDetails = () => openCarPageRef.current();
+  const memberPlan = (membership?.plan || '').toLowerCase().trim() || null;
+  const isMember = Boolean(
+    membership?.plan &&
+      membership.plan.toLowerCase() !== 'none' &&
+      (!membership.expiresAt || new Date(membership.expiresAt) > new Date())
+  );
 
-  const closeFullDetails = () => {
-    Haptics.selectionAsync();
-    Animated.spring(expandAnim, {
-      toValue: 0,
-      friction: 8,
-      tension: 50,
-      useNativeDriver: false,
-    }).start(() => {
-      setIsExpanded(false);
-    });
-  };
+  // Target end time: Today's gap slot runs until 8:00 AM tomorrow (or 8:00 AM today if past midnight) in Indian Standard Time
+  const targetEndMs = useMemo(() => {
+    const p = getIndiaDateParts(nowMs);
+    const today = toDayNum(p.year, p.month, p.date);
+    if (p.hours < 8) {
+      return dayNumAndTimeToMs(today, '08:00 AM', 480);
+    } else {
+      return dayNumAndTimeToMs(today + 1, '08:00 AM', 480);
+    }
+  }, [Math.floor(nowMs / 60000)]);
 
-  // Drag up anywhere on the sheet (fast or slow) opens the full car details; drag down on the header closes them.
-  // Created once, so the current state is read through refs (a captured isExpanded would stay false).
-  const openCarPageRef = useRef<() => void>(() => {});
-  const expandedRef = useRef(false);
-  expandedRef.current = isExpanded;
-  const actionsRef = useRef({ open: openFullDetails, close: closeFullDetails });
-  actionsRef.current = { open: () => openCarPageRef.current(), close: closeFullDetails };
-  const vertical = (g: { dx: number; dy: number }) => Math.abs(g.dy) > 12 && Math.abs(g.dy) > 1.5 * Math.abs(g.dx);
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => vertical(g) && expandedRef.current && g.dy > 0,
-      // Captured in preview mode so the body's own scrolling doesn't swallow the upward drag.
-      onMoveShouldSetPanResponderCapture: (_, g) => vertical(g) && !expandedRef.current && g.dy < 0,
-      onPanResponderRelease: (_, g) => {
-        if (!expandedRef.current && g.dy < -30) actionsRef.current.open();
-        else if (expandedRef.current && g.dy > 45) actionsRef.current.close();
-      },
-    })
-  ).current;
+  // Live countdown timer calculations for Frame 2147226222
+  const msRemaining = Math.max(0, targetEndMs - nowMs);
+  const timerHrs = Math.floor(msRemaining / 3600000);
+  const timerMins = Math.floor((msRemaining % 3600000) / 60000);
+  const timerSecs = Math.floor((msRemaining % 60000) / 1000);
+  const hoursRemaining = Math.max(1, Math.ceil(msRemaining / (3600 * 1000)));
 
-  // Horizontal swipe on the photo: left -> next car/bike, right -> previous. The responder is created once, so it
-  // reads the current list size from a ref (a captured value would stay at the first render's empty list).
-  const carCount = useRef(0);
-  const slideX = useRef(new Animated.Value(0)).current;
-  const sliding = useRef(false);
-  // The current car slides out the way it was swiped, the next one slides in from the other side.
-  const swipeCar = (step: number) => {
-    if (carCount.current < 2 || sliding.current) return;
-    sliding.current = true;
-    Haptics.selectionAsync();
-    Animated.timing(slideX, { toValue: -step * SCREEN_WIDTH, duration: 140, useNativeDriver: true }).start(() => {
-      setActiveCarIndex((prev) => (prev + step + carCount.current) % carCount.current);
-      setActivePhotoIndex(0);
-      slideX.setValue(step * SCREEN_WIDTH);
-      Animated.timing(slideX, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => { sliding.current = false; });
-    });
-  };
-  const swipeRef = useRef(swipeCar);
-  swipeRef.current = swipeCar;
-  const horizontalSwipeResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dx) > 2 * Math.abs(g.dy),
-      onMoveShouldSetPanResponderCapture: (_, g) => Math.abs(g.dx) > 20 && Math.abs(g.dx) > 2 * Math.abs(g.dy),
-      onPanResponderRelease: (_, g) => {
-        if (g.dx < -40) swipeRef.current(1);
-        else if (g.dx > 40) swipeRef.current(-1);
-      },
-    })
-  ).current;
-
-  // Available cars with gap slots: show available cars and cars returning today
+  // Cars free for the whole deal window (now → 8 AM tomorrow)
   const dealCars = useMemo(() => {
     if (!vehicles || vehicles.length === 0) return [];
-    const filtered = vehicles.filter((v: any) => {
-      if (isInService(v)) return false;
-      const st = String(v.dbStatus || v.status || '').toLowerCase();
-      if (st === 'service' || st === 'maintenance') return false;
 
-      const avail = getAvailability(v);
-      if (avail.available) return true;
-      if (avail.availableFrom && !avail.availableFrom.toLowerCase().includes('service')) return true;
-      if (avail.nextAvailableFrom) return true;
-      return false;
+    // Map offers configured from Operation App
+    // The lowest positive hourly rate a live top-deal offer sets for a car — the server picks the same one.
+    const offerMap = new Map<string, any>();
+    const setOffer = (vid: string, o: any) => {
+      const cur = offerMap.get(vid);
+      const rate = Number(o.hourlyRate) || 0;
+      if (!cur || (rate > 0 && (!(Number(cur.hourlyRate) > 0) || rate < Number(cur.hourlyRate)))) offerMap.set(vid, o);
+    };
+    offers.forEach((o: any) => {
+      if (o.isTopDeal || o.type === 'top_deal' || o.isExclusive || o.position === 'exclusive') {
+        if (o.vehicleId) {
+          setOffer(String(typeof o.vehicleId === 'object' ? o.vehicleId._id || o.vehicleId.id : o.vehicleId), o);
+        }
+        if (Array.isArray(o.applicableVehicleIds)) {
+          o.applicableVehicleIds.forEach((vid: any) => setOffer(String(vid), o));
+        }
+      }
     });
 
-    return filtered.length > 0 ? filtered : vehicles.filter((v: any) => !isInService(v));
-  }, [vehicles]);
+    const gapOf = (v: any) => {
+      // The car's free gap inside the deal window: from now until its next booking.
+      // A booking saved without a pickup time starts at the default 8:00 AM (its bare date would read as 5:30 AM in IST).
+      const withPickup = { ...v, bookedRanges: (v.bookedRanges || []).map((r: any) => (r.pickupTime ? r : { ...r, pickupTime: '8:00 AM' })) };
+      const blocks = buildBlocks(withPickup, todayDayNum()).filter((b) => Number.isFinite(b.startMs)).sort((a, b) => a.startMs - b.startMs);
+
+      // Busy now? The deal starts when the current booking(s) end, rounded up to the next whole hour.
+      let start = Math.floor(nowMs / 60000) * 60000;
+      for (const b of blocks) if (b.startMs <= start && b.endMs > start) start = b.endMs;
+      if (start > nowMs) start = Math.ceil(start / 3600000) * 3600000;
+
+      const vid = String(v.id || v._id);
+      const offer = offerMap.get(vid);
+
+      // Check membership 10-minute early access on offers from Operation App
+      if (offer) {
+        const earlyHours = Number(offer.notificationCampaign?.memberEarlyAccessHours || offer.memberEarlyAccessHours) || 0;
+        if (earlyHours > 0) {
+          const earlyMs = earlyHours * 3600 * 1000;
+          const createdMs = offer.createdAt ? new Date(offer.createdAt).getTime() : 0;
+          if (!isMember && createdMs > 0 && (nowMs - createdMs) < earlyMs) {
+            // Non-members don't get access during 10-minute early access period
+            return null;
+          }
+        }
+      }
+
+      // Next booking that starts after the free gap begins
+      const next = blocks.find((b) => b.startMs >= start);
+      let dealEndMs = next ? next.startMs : Infinity;
+
+      // Also check vehicle's availableToDate limit
+      const availToMs = parseCustomDateToMs(v.availableToDate, '08:00 AM');
+      if (availToMs && availToMs > start && availToMs < dealEndMs) {
+        dealEndMs = availToMs;
+      }
+
+      // Also check offer-specific return time/date if configured in Operation App
+      if (offer) {
+        if (offer.rentalEndDate && (offer.rentalEndTime || offer.returnTime)) {
+          const oMs = parseCustomDateToMs(offer.rentalEndDate, offer.rentalEndTime || offer.returnTime);
+          if (oMs && oMs > start && oMs < dealEndMs) {
+            dealEndMs = oMs;
+          }
+        }
+      }
+
+      // Today's Deal slot ends at 8:00 AM tomorrow (or at the car's next booking if at/before 8:00 AM)
+      if (!Number.isFinite(dealEndMs) || dealEndMs > targetEndMs) {
+        dealEndMs = targetEndMs;
+      }
+
+      const end = Math.floor(dealEndMs / 60000) * 60000;
+      // If the next booking starts at 8:00 AM tomorrow, this car is available today till 8:00 AM!
+      const hasBookingAt8AM = Boolean(next && Math.abs(next.startMs - targetEndMs) <= 60 * 60 * 1000);
+      const freeUntil = Math.min(next ? next.startMs : Infinity, availToMs && availToMs > start ? availToMs : Infinity);
+      const canExtend = !hasBookingAt8AM && freeUntil >= targetEndMs + 24 * 3600 * 1000;
+
+      // Cars must be available from now until 8:00 AM tomorrow (minimum 1 hour gap)
+      const isAvailableTill8AM = end >= Math.floor((targetEndMs - 5 * 60 * 1000) / 60000) * 60000;
+      if (!isAvailableTill8AM) return null;
+      if (end - start < 3600 * 1000) return null;
+
+      return { start, end, canExtend, hasBookingAt8AM };
+    };
+
+    const filtered = vehicles.map((v: any) => ({ v, gap: gapOf(v) })).filter(({ v, gap }: any) => {
+      if (!gap) return false;
+      if (isInService(v)) return false;
+      const st = String(v.dbStatus || v.status || '').toLowerCase().trim();
+      // Only workshop / maintenance blocks a vehicle entirely.
+      // If a vehicle is booked starting tomorrow at 8:00 AM, it is available today till 8:00 AM and must be shown!
+      if (
+        st === 'service' ||
+        st === 'maintenance' ||
+        st === 'under_maintenance'
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return filtered.sort((x: any, y: any) => x.gap.start - y.gap.start).map(({ v, gap }: any) => {
+      const vid = String(v.id || v._id);
+      const offer = offerMap.get(vid);
+      return {
+        ...v,
+        hourlyRate: offer?.hourlyRate,
+        dealPrice: offer?.dealPrice,
+        dealStartMs: gap.start,
+        dealEndMs: gap.end,
+        canExtend: gap.canExtend,
+        hasBookingAt8AM: gap.hasBookingAt8AM,
+        offer,
+      };
+    });
+  }, [vehicles, offers, targetEndMs, isMember, Math.floor(nowMs / 60000)]);
+
+  // Prefetch card photos for all deal cars so image loading is instant
+  useEffect(() => {
+    if (dealCars && dealCars.length > 0) {
+      const uris = dealCars
+        .flatMap((c: any) => [c.image, ...(Array.isArray(c.images) ? c.images : [])])
+        .map((im: any) => (typeof im === 'string' ? im : im?.url || im?.uri))
+        .filter((u: any): u is string => typeof u === 'string' && u.startsWith('http'));
+      if (uris.length > 0) {
+        CachedImage.prefetch(Array.from(new Set(uris)), 'memory-disk').catch(() => {});
+      }
+    }
+  }, [dealCars]);
 
   const filteredCars = useMemo(() => {
     if (!searchQuery.trim()) return dealCars;
@@ -263,155 +590,25 @@ export default function TopDealsScreen() {
     );
   }, [dealCars, searchQuery]);
 
-  useEffect(() => {
-    setActiveCarIndex(0);
-    setActivePhotoIndex(0);
-  }, [searchQuery]);
-
-  carCount.current = filteredCars.length;
-  // The highlighted round always slides to the middle of the strip.
-  useEffect(() => {
-    if (filteredCars.length) thumbsRef.current?.scrollToIndex({ index: Math.min(activeCarIndex, filteredCars.length - 1), viewPosition: 0.5, animated: true });
-  }, [activeCarIndex, filteredCars.length, isExpanded]);
-  const rawActiveCar = filteredCars[activeCarIndex] || dealCars[0] || null;
-
-  // Build a fully compliant Car object identical to what CarDetailsScreen expects
-  const activeCar: Car | null = useMemo(() => {
-    if (!rawActiveCar) return null;
-    return {
-      ...rawActiveCar,
-      id: String(rawActiveCar.id || (rawActiveCar as any)._id || 'deal_car'),
-      name: rawActiveCar.displayName || rawActiveCar.name || rawActiveCar.vehicleName || 'Vehicle',
-      displayName: rawActiveCar.displayName || rawActiveCar.name || rawActiveCar.vehicleName || 'Vehicle',
-      vehicleName: rawActiveCar.vehicleName || rawActiveCar.displayName || rawActiveCar.name || 'Vehicle',
-      category: rawActiveCar.category || 'SUV',
-      fuel: rawActiveCar.fuel || (rawActiveCar as any).fuelType || 'Diesel',
-      transmission: rawActiveCar.transmission || 'Automatic',
-      seats: rawActiveCar.seats || (rawActiveCar as any).seatingCapacity || '5 Seater',
-      perDay: rawActiveCar.perDay || (rawActiveCar as any).pricePerDay || 2200,
-      pricePerDay: (rawActiveCar as any).pricePerDay || rawActiveCar.perDay || 2200,
-      price: rawActiveCar.price || `₹${rawActiveCar.perDay || 2200}`,
-      type: rawActiveCar.type || 'Car',
-      image: rawActiveCar.image,
-      images: rawActiveCar.images || [rawActiveCar.image],
-    };
-  }, [rawActiveCar]);
-
-  // Realistic gap slots computed from car's availability and day rate
-  const slots: DealSlot[] = useMemo(() => {
-    if (!rawActiveCar) return [];
-    const perDay = Number(rawActiveCar.perDay || (rawActiveCar as any).pricePerDay || 2000);
-    const hourlyBase = Math.max(45, Math.round(perDay / 24));
-
-    const todayNum = todayDayNum();
-    const todayStr = dayNumToLabel(todayNum);
-    const tmrwStr = dayNumToLabel(todayNum + 1);
-
-    const avail = getAvailability(rawActiveCar);
-    const returnTimeStr = avail.availableFrom ? avail.availableFrom.split(',')[0].trim() : '03:00 PM';
-    const gapPickup = avail.availableFrom && !avail.available ? returnTimeStr : '03:00 PM';
-
-    // Slot 1: Overnight Slot (8:00 PM - 8:00 AM next day, 12h)
-    const s1Hours = 12;
-    const s1Base = s1Hours * hourlyBase;
-    const s1Deal = Math.round(s1Base * 0.75); // 25% off
-    const s1Member = memberDayPrice(s1Deal, membership) ?? Math.round(s1Deal * 0.88);
-
-    // Slot 2: Full Gap Slot (from return time or 3 PM - 8:00 AM next day, 17h)
-    const s2Hours = 17;
-    const s2Base = s2Hours * hourlyBase;
-    const s2Deal = Math.round(s2Base * 0.70); // 30% off
-    const s2Member = memberDayPrice(s2Deal, membership) ?? Math.round(s2Deal * 0.85);
-
-    // Slot 3: Evening Drive (from return time or 3 PM - 10:00 PM, 7h)
-    const s3Hours = 7;
-    const s3Base = s3Hours * hourlyBase;
-    const s3Deal = Math.round(s3Base * 0.82); // 18% off
-    const s3Member = memberDayPrice(s3Deal, membership) ?? Math.round(s3Deal * 0.90);
-
-    return [
-      {
-        id: 'overnight',
-        title: 'Overnight Slot',
-        badge: '8 PM – 8 AM (12 hrs)',
-        discountPct: 25,
-        durationHours: s1Hours,
-        pickupTime: '08:00 PM',
-        returnTime: '08:00 AM',
-        daysSpan: 1,
-        isOvernight: true,
-        basePrice: s1Base,
-        dealPrice: s1Deal,
-        memberPrice: s1Member,
-        hourlyRate: Number((s1Deal / s1Hours).toFixed(1)),
-        startLabel: todayStr,
-        endLabel: tmrwStr,
-      },
-      {
-        id: 'full_gap',
-        title: 'Full Gap Slot',
-        badge: `${gapPickup} – 8 AM (17 hrs)`,
-        discountPct: 30,
-        durationHours: s2Hours,
-        pickupTime: gapPickup.includes(':') ? gapPickup : '03:00 PM',
-        returnTime: '08:00 AM',
-        daysSpan: 1,
-        isOvernight: true,
-        basePrice: s2Base,
-        dealPrice: s2Deal,
-        memberPrice: s2Member,
-        hourlyRate: Number((s2Deal / s2Hours).toFixed(1)),
-        startLabel: todayStr,
-        endLabel: tmrwStr,
-      },
-      {
-        id: 'evening',
-        title: 'Evening Drive',
-        badge: `${gapPickup} – 10 PM (7 hrs)`,
-        discountPct: 18,
-        durationHours: s3Hours,
-        pickupTime: gapPickup.includes(':') ? gapPickup : '03:00 PM',
-        returnTime: '10:00 PM',
-        daysSpan: 0,
-        isOvernight: false,
-        basePrice: s3Base,
-        dealPrice: s3Deal,
-        memberPrice: s3Member,
-        hourlyRate: Number((s3Deal / s3Hours).toFixed(1)),
-        startLabel: todayStr,
-        endLabel: todayStr,
-      },
-    ];
-  }, [rawActiveCar, membership]);
-
-  const activeSlot = slots.find((s) => s.id === selectedSlotId) || slots[0];
-
-  const isMember = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
-  const isFav = activeCar ? favorites.includes(String(activeCar.id)) : false;
-
-  const handleShare = async () => {
+  const handleSelectDeal = (car: any) => {
     Haptics.selectionAsync();
-    if (!activeCar) return;
-    try {
-      const carName = activeCar.displayName || activeCar.name || 'Special Car';
-      await Share.share({
-        title: `Top Deal: ${carName}`,
-        message: `Check out the Top Deal on ${carName} on MySawari! Rent from ₹${activeSlot?.hourlyRate || 69}/hr. Book now on the MySawari App!`,
-      });
-    } catch {
-      // share dismissed
-    }
-  };
+    // The booking prices this trip by the hour: hourly rate × hours left, applied like a coupon.
+    const startMs = (car.dealStartMs || 0) > nowMs ? car.dealStartMs : Math.floor(nowMs / 60000) * 60000; // whole minutes, as booked
+    const endMs = car.dealEndMs || targetEndMs;
+    const hours = Math.max(1, Math.ceil(Math.max(0, endMs - startMs) / (3600 * 1000)));
+    selectCar({ ...car, hourlyRate: dealPricing(car, hours).rate });
+    applyCoupon(`TOPDEAL-${hours}`);
 
-  // Locks the car, the free window and the pickup/drop defaults, ready for the booking or the car page.
-  const applyDeal = () => {
-    if (!activeCar || !activeSlot) return;
-    selectCar(activeCar);
-    setDates(
-      `${activeSlot.startLabel} – ${activeSlot.endLabel}`,
-      activeSlot.daysSpan === 0 ? 'Same Day' : '1 Day'
-    );
-    setTimes(activeSlot.pickupTime, activeSlot.returnTime);
+    const { rate: dealHourlyRate, price: dealPrice } = dealPricing(car, hours);
+
+    const dayLabel = (ms: number) => {
+      const p = getIndiaDateParts(ms);
+      return dayNumToLabel(toDayNum(p.year, p.month, p.date));
+    };
+    const pickupLabel = formatTime12(startMs);
+    const returnLabel = formatTime12(endMs);
+    setDates(`${dayLabel(startMs)} – ${dayLabel(endMs)}`, '1 Day');
+    setTimes(pickupLabel, returnLabel);
     setIsDeliveryRequested(false);
 
     if (!pickup?.name) {
@@ -435,1099 +632,727 @@ export default function TopDealsScreen() {
         source: 'database',
       });
     }
-  };
 
-  // Sliding up opens the car's regular details page for the free window.
-  const openCarPage = () => {
-    if (!activeCar || !activeSlot) return;
-    Haptics.selectionAsync();
-    applyDeal();
     router.push({
       pathname: '/car-details',
       params: {
-        id: String(activeCar.id), vehicleId: String(activeCar.id),
-        lockDates: 'true', isFixedDates: 'true', isTopDeal: 'true',
-        pickupTime: activeSlot.pickupTime, returnTime: activeSlot.returnTime,
-        isOvernight: activeSlot.isOvernight ? 'true' : 'false',
+        id: String(car.id || car._id),
+        vehicleId: String(car.id || car._id),
+        lockDates: 'true',
+        isFixedDates: 'true',
+        isTopDeal: 'true',
+        pickupTime: pickupLabel,
+        returnTime: returnLabel,
+        dealPrice: String(dealPrice), // the quote applies the member discount itself
+        hourlyPrice: String(dealHourlyRate),
+        rentalHours: String(hours),
       },
     });
   };
-  openCarPageRef.current = openCarPage;
 
-  const handleBookDeal = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (!activeCar || !activeSlot) return;
-    applyDeal();
-
-    const proceed = () => {
-      router.push({
-        pathname: '/booking',
-        params: {
-          lockDates: 'true',
-          isFixedDates: 'true',
-          isTopDeal: 'true',
-          isOvernight: activeSlot.isOvernight ? 'true' : 'false',
-          dealPrice: String(isMember ? activeSlot.memberPrice : activeSlot.dealPrice),
-          hourlyRate: String(activeSlot.hourlyRate),
-          slotTitle: activeSlot.title,
-        },
-      });
+  const handleExtendBooking = (car: any) => {
+    Haptics.selectionAsync();
+    // Extending is a normal booking at the full day rate: from when the deal starts to 8 AM the day after the deal ends.
+    selectCar(car);
+    const dayLabel = (ms: number) => {
+      const p = getIndiaDateParts(ms);
+      return dayNumToLabel(toDayNum(p.year, p.month, p.date));
     };
+    // The calendar's pickup times are whole hours/half hours: start at the next whole hour the car is free.
+    const startMs = Math.ceil(((car.dealStartMs || 0) > nowMs ? car.dealStartMs : nowMs) / 3600000) * 3600000;
+    const endMs = targetEndMs + 24 * 3600 * 1000;
 
-    if (!isAuthenticated) {
-      setPendingAction(() => proceed);
-      setShowLogin(true);
-      return;
+    setDates(`${dayLabel(startMs)} – ${dayLabel(endMs)}`, '2 Days');
+    setTimes(formatTime12(startMs), formatTime12(endMs));
+    setIsDeliveryRequested(false);
+    if (!pickup?.name) {
+      setPickup({ id: 'hub_pickup', name: MYSAWARI_HUB_NAME, address: 'MySawari Hub, Kahilipara', latitude: 26.1412, longitude: 91.7645, source: 'database' });
+    }
+    if (!dropoff?.name) {
+      setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
     }
 
-    proceed();
+    // The date & time calendar opens for this car: days it cannot be booked are off, and Apply goes on to car details.
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true' } });
   };
 
-  const scrollToSection = (key: SectionKey) => {
-    setActiveSection(key);
-    const y = sectionPositions.current[key];
-    if (typeof y === 'number') {
-      mainScrollRef.current?.scrollTo({ y: Math.max(0, y - 60), animated: true });
+  const handleShare = async () => {
+    Haptics.selectionAsync();
+    try {
+      await Share.share({
+        title: `MySawari Today's Deals`,
+        message: `Book top self-drive cars in Today's Deals on MySawari starting at discounted hourly rates! Check it out in the app now!`,
+      });
+    } catch {
+      // dismissed
     }
   };
-
-  // Car images
-  const carImages: any[] = useMemo(() => {
-    if (!activeCar) return [];
-    const anyCar = activeCar as any;
-    if (Array.isArray(anyCar.images) && anyCar.images.length > 0) {
-      return anyCar.images.map((im: any) =>
-        typeof im === 'string' ? { uri: im } : (im?.url ? { uri: im.url } : im)
-      );
-    }
-    if (typeof activeCar.image === 'string') return [{ uri: activeCar.image }];
-    if ((activeCar.image as any)?.url) return [{ uri: (activeCar.image as any).url }];
-    if (activeCar.image) return [activeCar.image];
-    return [];
-  }, [activeCar]);
-
-  // Auto-slide vehicle photos every 3 seconds
-  useEffect(() => {
-    if (carImages.length <= 1) return;
-    const timer = setInterval(() => {
-      setActivePhotoIndex((prev) => (prev + 1) % carImages.length);
-    }, 3000);
-    return () => clearInterval(timer);
-  }, [carImages.length, activeCarIndex]);
-
-  const carName = activeCar?.displayName || activeCar?.name || 'Premium Vehicle';
-  const category = activeCar?.category || 'SUV';
-  const fuel = activeCar?.fuel || 'Diesel';
-  const transmission = activeCar?.transmission || 'Automatic';
-  const seats = activeCar?.seats
-    ? activeCar.seats.includes('Seater')
-      ? activeCar.seats
-      : `${activeCar.seats} Seater`
-    : '5 Seater';
-
-  // Animation values
-  const sheetTopMargin = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, insets.top],
-  });
-
-  const sheetBorderRadius = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [26, 0],
-  });
-
-  const sheetMarginHorizontal = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [18, 0],
-  });
-
-  const bottomCarouselHeight = expandAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [80, 0],
-  });
-
-  const bottomCarouselOpacity = expandAnim.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [1, 0, 0],
-  });
-
-  const topBarOpacity = expandAnim.interpolate({
-    inputRange: [0, 0.4, 1],
-    outputRange: [1, 0, 0],
-  });
-
-  if (!isLoading && dealCars.length === 0) {
-    return (
-      <View style={[styles.container, { backgroundColor: '#323E71', alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
-        <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 18, color: '#FFFFFF', textAlign: 'center' }}>No Top Deals right now</Text>
-        <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: '#D5D9EA', textAlign: 'center', marginTop: 8 }}>
-          Cars that are free for the next few hours show up here. Check back soon.
-        </Text>
-        <Pressable onPress={() => safeBack(router)} style={{ marginTop: 20, paddingHorizontal: 24, height: 44, borderRadius: 22, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14, color: '#323E71' }}>Go back</Text>
-        </Pressable>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
-      {/* Dimmed Background Backdrop (Modal overlay effect matching screenshot) */}
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: '#323E71' }]} />
-
-      {/* Top Header Bar (Visible when in preview mode) */}
-      {!isExpanded && (
-        <Animated.View style={[styles.topHeader, { paddingTop: insets.top + 8, opacity: topBarOpacity }]}>
+      {/* Top Header Bar */}
+      <View style={[styles.headerBar, { height: 64 + insets.top, paddingTop: insets.top }]}>
+        <View style={styles.headerLeft}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Back"
             onPress={() => safeBack(router)}
             style={styles.headerIconBtn}
           >
-            <Feather name="arrow-left" size={22} color="#FFFFFF" />
+            <Feather name="chevron-left" size={24} color="#737373" />
           </Pressable>
-
-          <Text style={styles.headerTitle}>Top Deals</Text>
-
-          <View style={styles.headerRightActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Search deals"
-              onPress={() => {
-                Haptics.selectionAsync();
-                setIsSearching((prev) => {
-                  if (prev) setSearchQuery('');
-                  return !prev;
-                });
-              }}
-              style={styles.headerIconBtn}
-            >
-              <Feather name={isSearching ? 'x' : 'search'} size={20} color="#FFFFFF" />
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Share deal"
-              onPress={handleShare}
-              style={styles.headerIconBtn}
-            >
-              <Feather name="external-link" size={20} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </Animated.View>
-      )}
-
-      {!isExpanded && isSearching && (
-        <View style={styles.searchBarWrap}>
-          <Feather name="search" size={16} color="#94A3B8" />
-          <TextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search car model, SUV, Sedan..."
-            placeholderTextColor="#94A3B8"
-            style={styles.searchBarInput}
-            autoFocus
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <Feather name="x-circle" size={16} color="#94A3B8" />
-            </Pressable>
-          )}
-        </View>
-      )}
-
-      {/* Main Sliding Sheet Card (Preview mode matches image, slides open to reveal full car details) */}
-      <Animated.View
-        style={[
-          styles.sheetCard,
-          {
-            backgroundColor: p.page,
-            marginTop: sheetTopMargin,
-            borderRadius: sheetBorderRadius,
-            marginHorizontal: sheetMarginHorizontal,
-          },
-        ]}
-        {...panResponder.panHandlers}
-      >
-        {/* Card Header: Down chevron, Heart, Share (external-link) */}
-        <View style={styles.cardHeader}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={isExpanded ? 'Slide down to preview' : 'Close'}
-            onPress={isExpanded ? closeFullDetails : () => safeBack(router)}
-            style={[styles.circleActionBtn, { backgroundColor: p.iconBg }]}
-          >
-            <Feather name="chevron-down" size={22} color={p.muted} />
-          </Pressable>
-
-          {isExpanded ? (
-            <View style={{ flex: 1, paddingHorizontal: 12 }}>
-              <Text style={{ fontFamily: 'PlusJakartaSans_700Bold', fontSize: 16, color: p.fg }} numberOfLines={1}>
-                {carName}
-              </Text>
-              <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, color: '#323E71' }}>
-                ⚡ TOP DEAL • LOCKED DATES
-              </Text>
-            </View>
-          ) : (
-            <Pressable onPress={openFullDetails} style={styles.swipeHintPill}>
-              <Feather name="chevrons-up" size={14} color="#323E71" />
-              <Text style={styles.swipeHintText}>Slide up for full details</Text>
-            </Pressable>
-          )}
-
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={isFav ? 'Remove from favourites' : 'Add to favourites'}
-              onPress={() => {
-                if (activeCar) {
-                  Haptics.selectionAsync();
-                  toggleFavorite(String(activeCar.id));
-                }
-              }}
-              style={[styles.circleActionBtn, { backgroundColor: p.iconBg }]}
-            >
-              {isFav
-                ? <Ionicons name="heart" size={20} color={p.red} />
-                : <Feather name="heart" size={20} color={p.muted} />}
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Share"
-              onPress={handleShare}
-              style={[styles.circleActionBtn, { backgroundColor: p.iconBg }]}
-            >
-              <Feather name="external-link" size={19} color={p.muted} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Scrollable Body: In preview mode it shows the card from image; on slide up it reveals full car details page */}
-        <ScrollView
-          ref={mainScrollRef}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.cardScroll}
-          scrollEventThrottle={32}
-        >
-          {/* ==================== PREVIEW HERO SECTION (Matching image) ==================== */}
-          <Animated.View style={{ transform: [{ translateX: slideX }] }} {...horizontalSwipeResponder.panHandlers}>
-            {/* Large Vehicle Photo Gallery */}
-            <View style={styles.photoContainer}>
-              {carImages.length > 0 ? (
-                <Image
-                  source={carImages[activePhotoIndex] || carImages[0]}
-                  style={styles.photo}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View style={[styles.photo, styles.photoPlaceholder]}>
-                  <Ionicons name="car-outline" size={64} color="#9CA3AF" />
-                </View>
-              )}
-
-              {/* Photo Bottom Controls: Pagination dots + Time badge + Rating */}
-              <View style={styles.photoMetaRow}>
-                {/* Pagination dots */}
-                <View style={styles.dotsRow}>
-                  {(carImages.length > 1 ? carImages : [1, 2, 3]).map((_, idx) => (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.dot,
-                        idx === activePhotoIndex ? styles.dotActive : styles.dotInactive,
-                      ]}
-                    />
-                  ))}
-                </View>
-
-                <View style={styles.photoBadges}>
-                  <View style={styles.timeBadge}>
-                    <Text style={styles.timeBadgeText}>⚡ {activeSlot ? `${activeSlot.pickupTime.replace(':00', '')} – ${activeSlot.returnTime.replace(':00', '')}` : ''}</Text>
-                  </View>
-
-                  <View style={styles.ratingBadge}>
-                    <Ionicons name="star" size={11} color="#059669" />
-                    <Text style={styles.ratingText}>4.8 (120)</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Expand / View photo button on bottom right */}
-              <Pressable
-                style={styles.expandBtn}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  if (carImages.length > 1) {
-                    setActivePhotoIndex((prev) => (prev + 1) % carImages.length);
-                  }
-                }}
-              >
-                <Ionicons name="copy-outline" size={15} color="#374151" />
-              </Pressable>
-            </View>
-
-            {/* Category Breadcrumb (Tapping slides open the full car details page) */}
-            <Pressable accessibilityRole="link" onPress={openFullDetails} style={styles.categoryLink}>
-              <Text style={styles.categoryLinkText}>Explore all {category}s & full details</Text>
-              <Feather name="chevron-right" size={14} color="#323E71" />
-            </Pressable>
-
-            {/* Car Title */}
-            <Pressable onPress={openFullDetails}>
-              <Text style={[styles.carTitle, { color: p.fg }]} numberOfLines={2}>
-                {carName}
-              </Text>
-            </Pressable>
-
-            {/* Vehicle Specs / Subtitle */}
-            <Text style={[styles.carSpecsSubtitle, { color: p.muted }]}>
-              Free for {activeSlot?.durationHours ?? 0} hrs • {seats} • {transmission} • {fuel}
+          <View style={styles.headerTextCol}>
+            <Text style={styles.headerTitle}>Today’s Deals</Text>
+            <Text style={styles.headerSub}>
+              Showing {filteredCars.length} {filteredCars.length === 1 ? 'Car' : 'Cars'} available
             </Text>
-          </Animated.View>
+          </View>
+        </View>
 
-          {/* Package Selector Cards (Overnight, Full Gap, Evening Drive) matching design */}
-          {slots.length > 0 && (
-            <View style={{ marginTop: 4, marginBottom: 6 }}>
-              <Text style={[styles.slotSectionHeader, { color: p.fg }]}>
-                Duration: {activeSlot?.durationHours || 12} hrs ({activeSlot?.badge})
-              </Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.slotsRow}
-              >
-                {slots.map((s) => {
-                  const isSelected = s.id === (activeSlot?.id || 'overnight');
-                  return (
-                    <Pressable
-                      key={s.id}
-                      accessibilityRole="button"
-                      accessibilityLabel={s.title}
-                      onPress={() => {
-                        Haptics.selectionAsync();
-                        setSelectedSlotId(s.id);
-                      }}
-                      style={[
-                        styles.slotCard,
-                        { borderColor: '#E5E7EB', borderWidth: 1 },
-                        isSelected && {
-                          borderColor: '#323E71',
-                          borderWidth: 2,
-                          backgroundColor: '#FFFFFF',
-                        },
-                      ]}
-                    >
-                      <Text style={styles.slotTitle} numberOfLines={1}>
-                        {s.title}
-                      </Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Share deal"
+          onPress={handleShare}
+          style={styles.headerIconBtn}
+        >
+          <Feather name="external-link" size={17} color="#737373" />
+        </Pressable>
+      </View>
 
-                      <View style={styles.discountRow}>
-                        <Text style={styles.discountBadgeText}>{s.discountPct}% OFF</Text>
-                        <View style={styles.discountDivider} />
-                      </View>
+      {/* Main Content Feed */}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Frame 2147226218: Today's Deals Banner */}
+        <LinearGradient
+          colors={['#6152D8', '#ADA4F4']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={styles.bannerContainer}
+        >
+          {/* Frame 2147226221 */}
+          <View style={styles.bannerRow}>
+            {/* Left: Frame 2147226220 (Today's Deals + Stars) */}
+            <View style={styles.bannerLeft}>
+              {/* Ellipse 13: Glow */}
+              <Svg style={styles.bannerGlow} width={160} height={110} pointerEvents="none">
+                <Defs>
+                  <RadialGradient id="tdGlow" cx="50%" cy="50%" rx="50%" ry="50%">
+                    <Stop offset="0" stopColor="#FCDF8A" stopOpacity={0.45} />
+                    <Stop offset="1" stopColor="#FCDF8A" stopOpacity={0} />
+                  </RadialGradient>
+                </Defs>
+                <Ellipse cx={80} cy={55} rx={80} ry={55} fill="url(#tdGlow)" />
+              </Svg>
 
-                      <View style={styles.slotPriceRow}>
-                        <Text style={styles.slotDealPrice}>{formatCurrency(s.dealPrice)}</Text>
-                        <View style={styles.memberLockBadge}>
-                          <Ionicons name="lock-closed" size={9} color="#065F46" />
-                          <Text style={styles.memberLockText}>₹{s.memberPrice}</Text>
-                        </View>
-                      </View>
+              {/* Sparkle Stars matching exact positions */}
+              <View style={styles.sparkleTopLeft} pointerEvents="none">
+                <FourPointStar size={11} color="#FBC422" />
+              </View>
+              <View style={styles.sparkleTopRight} pointerEvents="none">
+                <FourPointStar size={11} color="#FBC422" />
+              </View>
+              <View style={styles.sparkleBottomLeft} pointerEvents="none">
+                <FourPointStar size={14} color="#FFFFFF" />
+              </View>
+              <View style={styles.sparkleBottomRight} pointerEvents="none">
+                <FourPointStar size={12} color="#FFFFFF" />
+              </View>
 
-                      <View style={styles.slotStrikeRow}>
-                        <Text style={styles.slotStrikePrice}>{formatCurrency(s.basePrice)}</Text>
-                        <Text style={styles.memberSubText}>MEMBER SAVINGS</Text>
-                      </View>
-
-                      <Text style={styles.slotHourlyText}>
-                        ₹{s.hourlyRate}/hr
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
+              <Text style={styles.todaysText}>Today’s</Text>
+              <Text style={styles.dealsText}>Deals</Text>
             </View>
-          )}
 
-          {/* Slide Up Button Pill in Preview Mode */}
-          {!isExpanded && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="View full car details"
-              onPress={openFullDetails}
-              style={styles.expandCarDetailsBtn}
-            >
-              <Text style={styles.expandCarDetailsBtnText}>
-                View Full Specifications & Policies
-              </Text>
-              <Feather name="chevron-up" size={16} color="#323E71" />
-            </Pressable>
-          )}
-
-          {/* ==================== FULL CAR DETAILS SECTIONS (Exact design as app car details page) ==================== */}
-          {isExpanded && activeCar && (
-            <View style={styles.fullCarDetailsContainer}>
-              <View style={styles.dividerLine} />
-
-              {/* 1. Vehicle Summary Card */}
-              <VehicleSummary
-                car={activeCar}
-                isAvailable={true}
-                availableOn="Today 3:00 PM – Tomorrow 8:00 AM (Top Deal)"
-              />
-              <View style={{ height: 16 }} />
-              <VehicleHeroGallery car={activeCar} />
-              <View style={{ height: 16 }} />
-
-              {/* 2. Driver option */}
-              <DriverCard />
-              <View style={{ height: 10 }} />
-
-              {/* 3. Mileage Limits (Clean unlimited policy) */}
-              <MileageLimits />
-              <View style={{ height: 10 }} />
-
-              {/* 4. Sticky Section Pills */}
-              <View style={{ backgroundColor: p.page, marginVertical: 6 }}>
-                <SectionPills
-                  sections={SECTIONS}
-                  active={activeSection}
-                  onPress={scrollToSection}
-                />
-              </View>
-
-              {/* 5. Main Specifications */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['specification'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <MainSpecification car={activeCar} />
-              </View>
-
-              {/* 6. Benefits */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['benefits'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <Benefits />
-              </View>
-
-              {/* 7. Reviews Strip & Real Trips */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['reviews'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <ReviewsStrip car={activeCar} />
-                <RealTrips car={activeCar} />
-              </View>
-
-              {/* 8. Feature List */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['features'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <FeatureList car={activeCar} />
-              </View>
-
-              {/* 9. Why Rent From MySawari */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['why'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <WhyRent />
-              </View>
-
-              {/* 10. Location Card */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['location'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <LocationCard deliveryAddress={isDeliveryRequested ? pickup?.name : null} />
-              </View>
-
-              {/* 11. Policies & Cancellation */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['policy'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <CancellationPolicy freeCancelUntil="Till 24h before trip" />
-              </View>
-
-              {/* 12. Inclusions */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['inclusions'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <Inclusions />
-              </View>
-
-              {/* 13. Payment Schedule */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['schedule'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <PaymentSchedule />
-              </View>
-
-              {/* 14. FAQs & Support */}
-              <View
-                onLayout={(e) => {
-                  sectionPositions.current['faqs'] = e.nativeEvent.layout.y;
-                }}
-              >
-                <Faqs />
-                <HelpCard />
-              </View>
-            </View>
-          )}
-        </ScrollView>
-
-        {/* Fixed Sticky Bottom Action Bar inside Sheet */}
-        <View style={[styles.fixedBottomBar, { borderTopColor: '#E5E7EB', backgroundColor: p.page }]}>
-          <View style={styles.bottomPriceInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.bottomSlotLabel}>{activeSlot ? `${activeSlot.durationHours} hrs` : 'Top Deal'}</Text>
-              {activeSlot && <Text style={{ color: '#CBD5E1' }}>|</Text>}
-              {activeSlot && <Text style={styles.bottomDiscountBadge}>{activeSlot.discountPct}% OFF</Text>}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 }}>
-              <Text style={styles.bottomPrice}>{formatCurrency((isMember ? activeSlot?.memberPrice : activeSlot?.dealPrice) || 0)}</Text>
-              {!!activeSlot && (
-                <View style={styles.bottomMemberBadge}>
-                  <Ionicons name="lock-closed" size={10} color="#065F46" />
-                  <Text style={styles.bottomMemberText}>₹{activeSlot.memberPrice}</Text>
+            {/* Right: Frame 2147226222 (ENDS IN + Timer) */}
+            <View style={styles.bannerRight}>
+              <Text style={styles.endsInText}>ENDS IN</Text>
+              {/* Frame 2147226219: Timer row */}
+              <View style={styles.timerRow}>
+                {/* Frame 2147226216: Hrs */}
+                <View style={styles.timerCol}>
+                  <View style={styles.timerBox}>
+                    <Text style={styles.timerNum}>{pad2(timerHrs)}</Text>
+                  </View>
+                  <Text style={styles.timerLbl}>Hrs</Text>
                 </View>
-              )}
-              {!!activeSlot && (
-                <Text style={styles.bottomStrikePrice}>{formatCurrency(activeSlot.basePrice)}</Text>
-              )}
+
+                {/* Frame 2147226217: Min */}
+                <View style={styles.timerCol}>
+                  <View style={styles.timerBox}>
+                    <Text style={styles.timerNum}>{pad2(timerMins)}</Text>
+                  </View>
+                  <Text style={styles.timerLbl}>Min</Text>
+                </View>
+
+                {/* Frame 2147226218: Sec */}
+                <View style={styles.timerCol}>
+                  <View style={styles.timerBox}>
+                    <Text style={styles.timerNum}>{pad2(timerSecs)}</Text>
+                  </View>
+                  <Text style={styles.timerLbl}>Sec</Text>
+                </View>
+              </View>
             </View>
           </View>
+        </LinearGradient>
 
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Book Deal"
-            onPress={handleBookDeal}
-            style={({ pressed }) => [styles.bookDealBtn, pressed && { opacity: 0.88 }]}
-          >
-            <Text style={styles.bookDealBtnText}>BOOK DEAL</Text>
-          </Pressable>
-        </View>
-      </Animated.View>
+        {/* Vehicles Feed */}
+        {isLoading ? (
+          <View style={styles.emptyBox}>
+            <ActivityIndicator size="large" color="#6152D8" />
+            <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
+              Loading available cars...
+            </Text>
+          </View>
+        ) : filteredCars.length === 0 ? (
+          <View style={styles.emptyBox}>
+            <Feather name="clock" size={38} color="#6152D8" />
+            <Text style={styles.emptyTitle}>No Cars Available Right Now</Text>
+            <Text style={styles.emptySubtitle}>
+              Cars and bikes that are free until 8:00 AM will appear here
+              automatically. Check back soon!
+            </Text>
+            <Pressable
+              onPress={() => safeBack(router)}
+              style={styles.exploreBtn}
+            >
+              <Text style={styles.exploreBtnText}>Explore All Fleet</Text>
+            </Pressable>
+          </View>
+        ) : (
+          filteredCars.map((car) => {
+            const carId = String(car.id || car._id);
+            const isFav = favorites.includes(carId);
 
-      {/* Bottom Circular Vehicle Thumbnails Carousel (Visible in preview mode, smoothly hides when slid open) */}
-      {!isExpanded && (
-        <Animated.View
-          style={[
-            styles.bottomCarouselContainer,
-            {
-              paddingBottom: Math.max(insets.bottom, 12),
-              height: bottomCarouselHeight,
-              opacity: bottomCarouselOpacity,
-            },
-          ]}
-        >
-          <FlatList
-            ref={thumbsRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            data={filteredCars}
-            keyExtractor={(item: any, idx: number) => String(item.id || idx)}
-            getItemLayout={(_, i) => ({ length: 60, offset: THUMB_PAD + i * 74, index: i })}
-            onScrollToIndexFailed={() => {}}
-            contentContainerStyle={[styles.bottomCarouselContent, { paddingHorizontal: THUMB_PAD }]}
-            renderItem={({ item, index }) => {
-              const isSelected = index === activeCarIndex;
-              const anyItem = item as any;
-              const rawImg =
-                (Array.isArray(anyItem.images) && anyItem.images[0]) || anyItem.image;
-              const imgSrc =
-                typeof rawImg === 'string'
-                  ? { uri: rawImg }
-                  : (rawImg?.url ? { uri: rawImg.url } : rawImg);
-
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={item.displayName || item.name || item.vehicleName}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setActiveCarIndex(index);
-                    setActivePhotoIndex(0);
-                  }}
-                  style={[
-                    styles.circleThumbWrap,
-                    isSelected && styles.circleThumbWrapActive,
-                  ]}
-                >
-                  {imgSrc ? (
-                    <Image source={imgSrc} style={styles.circleThumb} resizeMode="cover" />
-                  ) : (
-                    <View style={[styles.circleThumb, styles.circleThumbPlaceholder]}>
-                      <Ionicons name="car" size={24} color="#6B7280" />
-                    </View>
-                  )}
-                </Pressable>
-              );
-            }}
-          />
-        </Animated.View>
-      )}
-
-      <LoginBottomSheet
-        visible={showLogin}
-        onClose={() => {
-          setShowLogin(false);
-          setPendingAction(null);
-        }}
-        onLoginSuccess={() => {
-          setShowLogin(false);
-          if (pendingAction) {
-            pendingAction();
-            setPendingAction(null);
-          }
-        }}
-      />
+            return (
+              <VehicleCard
+                key={carId}
+                car={car}
+                nowMs={nowMs}
+                targetEndMs={targetEndMs}
+                isMember={isMember}
+                memberPlan={memberPlan}
+                isFav={isFav}
+                onToggleFav={() => {
+                  Haptics.selectionAsync();
+                  toggleFavorite(carId);
+                }}
+                onPress={() => handleSelectDeal(car)}
+                onPressExtend={() => handleExtendBooking(car)}
+              />
+            );
+          })
+        )}
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  dealBox: { marginHorizontal: 16, marginTop: 4, marginBottom: 6, padding: 14, borderRadius: 14, backgroundColor: '#EEF0F7', borderWidth: 1, borderColor: '#D5D9EA', gap: 2 },
-  dealWindow: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, lineHeight: 18, color: '#323E71' },
-  dealPriceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
-  dealPriceText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 30, lineHeight: 38, color: '#323E71' },
-  dealStrike: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22, color: '#737373', textDecorationLine: 'line-through' },
-  dealNote: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12, lineHeight: 18, color: '#525252' },
   container: {
     flex: 1,
-    backgroundColor: '#374151',
+    backgroundColor: '#FFFFFF',
   },
-  topHeader: {
+  headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 16,
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingBottom: 4,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#D4D4D4',
+  },
+  headerLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   headerIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 32,
+    height: 32,
+    borderRadius: 30,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
   },
-  headerTitle: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 18,
-    lineHeight: 24,
-    color: '#FFFFFF',
-  },
-  headerRightActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  sheetCard: {
+  headerTextCol: {
     flex: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.22,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 6,
-  },
-  circleActionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  swipeHintPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#EEF0F7',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  swipeHintText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 11,
-    color: '#323E71',
-  },
-  cardScroll: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-  },
-  photoContainer: {
-    position: 'relative',
-    height: 180,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 6,
-    backgroundColor: '#F3F4F6',
-  },
-  photo: {
-    width: '100%',
-    height: '100%',
-  },
-  photoPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoMetaRow: {
-    position: 'absolute',
-    bottom: 8,
-    left: 10,
-    right: 48,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  dotsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  dot: {
-    height: 6,
-    borderRadius: 3,
-  },
-  dotActive: {
-    width: 14,
-    backgroundColor: '#323E71',
-  },
-  dotInactive: {
-    width: 6,
-    backgroundColor: '#CBD5E1',
-  },
-  photoBadges: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  timeBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  timeBadgeText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 10,
-    color: '#1E293B',
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-  },
-  ratingText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 10,
-    color: '#059669',
-  },
-  expandBtn: {
-    position: 'absolute',
-    bottom: 8,
-    right: 10,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  categoryLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 14,
     gap: 2,
   },
-  categoryLinkText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13,
-    color: '#323E71',
-  },
-  carTitle: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 19,
-    lineHeight: 25,
-    marginTop: 6,
-  },
-  carSpecsSubtitle: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 4,
-    marginBottom: 8,
-  },
-  slotSectionHeader: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  slotsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingVertical: 4,
-  },
-  slotCard: {
-    width: 146,
-    padding: 10,
-    borderRadius: 14,
-    backgroundColor: '#FAFAFA',
-  },
-  slotTitle: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13,
-    color: '#1E293B',
-  },
-  discountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    marginBottom: 6,
-  },
-  discountBadgeText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 11,
-    color: '#059669',
-  },
-  discountDivider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-    marginLeft: 6,
-  },
-  slotPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  slotDealPrice: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 16,
-    color: '#0F172A',
-  },
-  memberLockBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#A7F3D0',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  memberLockText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 10,
-    color: '#065F46',
-  },
-  slotStrikeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 2,
-  },
-  slotStrikePrice: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 11,
-    color: '#94A3B8',
-    textDecorationLine: 'line-through',
-  },
-  memberSubText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 8,
-    color: '#059669',
-  },
-  slotHourlyText: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  expandCarDetailsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#EEF0F7',
-    borderWidth: 1,
-    borderColor: '#D5D9EA',
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 14,
-  },
-  expandCarDetailsBtnText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13,
-    color: '#323E71',
-  },
-  fullCarDetailsContainer: {
-    marginTop: 16,
-  },
-  dividerLine: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginVertical: 12,
-  },
-  fixedBottomBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-  },
-  bottomPriceInfo: {
-    flex: 1,
-  },
-  bottomSlotLabel: {
+  headerTitle: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 12,
-    color: '#475569',
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#262626',
   },
-  bottomDiscountBadge: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 11,
-    color: '#059669',
-  },
-  bottomPrice: {
-    fontFamily: 'PlusJakartaSans_800ExtraBold',
-    fontSize: 18,
-    color: '#0F172A',
-  },
-  bottomStrikePrice: {
+  headerSub: {
     fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 12,
-    color: '#94A3B8',
-    textDecorationLine: 'line-through',
-  },
-  bottomMemberBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#A7F3D0',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  bottomMemberText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 10,
-    color: '#065F46',
-  },
-  bookDealBtn: {
-    backgroundColor: '#323E71',
-    paddingHorizontal: 28,
-    paddingVertical: 13,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#323E71',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  bookDealBtnText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 14,
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  bottomCarouselContainer: {
-    paddingTop: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bottomCarouselContent: {
-    paddingHorizontal: 20,
-    gap: 14,
-    alignItems: 'center',
-  },
-  circleThumbWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    overflow: 'hidden',
-    backgroundColor: '#323E71',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  circleThumbWrapActive: {
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    transform: [{ scale: 1.08 }],
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  circleThumb: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-  },
-  circleThumbPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#374151',
+    fontSize: 11,
+    lineHeight: 17,
+    color: '#525252',
   },
   searchBarWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 18,
+    marginHorizontal: 16,
     marginBottom: 10,
     paddingHorizontal: 12,
-    height: 40,
+    height: 42,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   searchBarInput: {
     flex: 1,
-    color: '#FFFFFF',
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 13,
+    color: '#1E293B',
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 40,
+    alignItems: 'center',
+  },
+
+  // ── Today's Deals Banner (Frame 2147226218) ──
+  bannerContainer: {
+    width: '100%',
+    maxWidth: 361,
+    height: 103,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 20,
+    justifyContent: 'center',
+    marginBottom: 16,
+    overflow: 'hidden',
+    shadowColor: '#6152D8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  bannerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    width: '100%',
+  },
+  bannerLeft: {
+    position: 'relative',
+    width: 131.41,
+    height: 59.46,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bannerGlow: {
+    position: 'absolute',
+    left: -9.3,
+    top: -28.8,
+  },
+  sparkleTopLeft: {
+    position: 'absolute',
+    left: 14.31,
+    top: 3.88,
+  },
+  sparkleTopRight: {
+    position: 'absolute',
+    left: 108.87,
+    top: 5,
+  },
+  sparkleBottomLeft: {
+    position: 'absolute',
+    left: 10.98,
+    top: 28.36,
+  },
+  sparkleBottomRight: {
+    position: 'absolute',
+    left: 111.1,
+    top: 30.58,
+  },
+  todaysText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 24,
+    lineHeight: 29,
+    color: '#FBC422',
+    letterSpacing: -0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 3.28 },
+    textShadowRadius: 3.28,
+  },
+  dealsText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 34,
+    lineHeight: 34,
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    marginTop: -4,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 4.45 },
+    textShadowRadius: 4.45,
+  },
+
+  // ── Timer Box (Frame 2147226222) ──
+  bannerRight: {
+    width: 114,
+    height: 63,
+    gap: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  endsInText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#FFFFFF',
+    alignSelf: 'stretch',
+    textAlign: 'center',
+  },
+  timerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  timerCol: {
+    alignItems: 'center',
+    width: 34,
+  },
+  timerBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 7,
+    backgroundColor: '#FFFBF0',
+    borderWidth: 1.5,
+    borderColor: '#FBC422',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  timerNum: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 14,
+    lineHeight: 18,
+    color: '#6152D8',
+    textAlign: 'center',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  timerLbl: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 10,
+    lineHeight: 14,
+    color: '#FFFFFF',
+    alignSelf: 'stretch',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+
+  // ── Vehicle Card (Figma Frame 2147226289) ──
+  outerCard: {
+    width: '100%',
+    maxWidth: 361,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E7EAF4',
+    borderRadius: 16,
+    paddingBottom: 8,
+    gap: 4,
+    marginBottom: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  vehicleCard: {
+    width: '100%',
+    backgroundColor: '#F4F6FA',
+    borderWidth: 1,
+    borderColor: '#E7EAF4',
+    borderRadius: 12,
+    padding: 4,
+    paddingBottom: 6,
+    gap: 8,
+  },
+  photoBox: {
+    width: '100%',
+    height: 212,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#E2E8F0',
+  },
+  placeholderPhoto: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E2E8F0',
+  },
+  photoTopRow: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    right: 6,
+    height: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 2,
+  },
+  comfortPill: {
+    height: 28,
+    paddingHorizontal: 12,
+    backgroundColor: '#6B5AED',
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  comfortText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#FFFFFF',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  crownWrap: {
+    position: 'absolute',
+    left: -4,
+    top: -6,
+    width: 14,
+    height: 14,
+    transform: [{ rotate: '-30deg' }],
+  },
+  heartBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F4F6FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  photoTapOverlay: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    right: 0,
+    bottom: 24,
+  },
+  dotsRow: {
+    position: 'absolute',
+    bottom: 6,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    zIndex: 2,
+  },
+  dot: {
+    height: 4,
+    borderRadius: 2,
+  },
+  dotActive: {
+    width: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  dotInactive: {
+    width: 4,
+    backgroundColor: '#D4D4D4',
+  },
+
+  // ── Details Section (Frame 2147225778) ──
+  detailsBox: {
+    gap: 6,
+  },
+  titleRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    height: 50,
+  },
+  titleCol: {
+    flex: 1,
+    gap: 4,
+    justifyContent: 'center',
+  },
+  carNameText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 17,
+    color: '#262626',
+    lineHeight: 26,
+  },
+  specsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 20,
+  },
+  specText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#737373',
+    flexShrink: 1,
+    includeFontPadding: false,
+  },
+  bulletDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#737373',
+  },
+  ratingCol: {
+    alignItems: 'center',
+    gap: 4,
+    width: 67,
+  },
+  ratingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    width: 56,
+    height: 28,
+    paddingLeft: 10,
+    paddingRight: 9,
+    backgroundColor: '#2F3E75',
+    borderRadius: 20,
+  },
+  ratingVal: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#FFFFFF',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  reviewsText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    lineHeight: 17,
+    color: '#525252',
+    textAlign: 'center',
+  },
+
+  // ── Price & Action Row (Frame 2147225762) ──
+  priceActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    height: 28,
+    paddingHorizontal: 4,
+    alignSelf: 'stretch',
+  },
+  priceGroup: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 4,
+  },
+  dealPriceText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 19,
+    lineHeight: 24,
+    includeFontPadding: false,
+    color: '#262626',
+  },
+  hoursText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13,
+    lineHeight: 18,
+    includeFontPadding: false,
+    color: '#737373',
+  },
+  viewDetailsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 25,
+  },
+  viewDetailsText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 11,
+    lineHeight: 16.5,
+    includeFontPadding: false,
+    color: '#737373',
+    textDecorationLine: 'underline',
+  },
+
+  // ── Bottom Extension Bar (Frame 2147226290) ──
+  extensionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    gap: 12,
+    height: 17,
+    alignSelf: 'stretch',
+  },
+  extendText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    lineHeight: 16.5,
+    includeFontPadding: false,
+    color: '#737373',
+    flexShrink: 1,
+  },
+  extendRateRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  extendRateText: {
+    flex: 1,
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11,
+    lineHeight: 16.5,
+    includeFontPadding: false,
+    textAlign: 'right',
+    color: '#737373',
+  },
+
+  // Empty state
+  emptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+    width: '100%',
+    maxWidth: 361,
+  },
+  emptyTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 17,
+    color: '#1E293B',
+    marginTop: 12,
+  },
+  emptySubtitle: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  exploreBtn: {
+    marginTop: 18,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#2F3E75',
+  },
+  exploreBtnText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    color: '#FFFFFF',
   },
 });

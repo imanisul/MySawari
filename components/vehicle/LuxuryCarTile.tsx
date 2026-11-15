@@ -36,22 +36,24 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
   
   const isDateSelected = dateRange && !dateRange.includes('Select') && dateRange !== 'All Dates';
   const availability = car.availability ?? getAvailability(car);
-  let availableText = availability.headline.toUpperCase();
+  let availableText = availability.availableWindowLabel ? availability.availableWindowLabel.toUpperCase() : availability.headline.toUpperCase();
   
-  if (availability.available) {
-    if (availability.freeUntil) {
-      if (availability.startDate === availability.freeUntil || (availability.startDate === 'Today' && availability.freeUntil === dayNumToLabel(todayDayNum()))) {
-        availableText = availability.startDate === 'Today' ? 'AVAIL ONLY FOR TODAY' : `AVAIL ONLY FOR ${availability.startDate}`.toUpperCase();
+  if (!availability.availableWindowLabel) {
+    if (availability.available) {
+      if (availability.freeUntil) {
+        if (availability.startDate === availability.freeUntil || (availability.startDate === 'Today' && availability.freeUntil === dayNumToLabel(todayDayNum()))) {
+          availableText = availability.startDate === 'Today' ? 'AVAIL ONLY FOR TODAY' : `AVAIL ONLY FOR ${availability.startDate}`.toUpperCase();
+        } else {
+          availableText = `AVAIL · ${availability.startDate} – ${availability.freeUntil}`.toUpperCase();
+        }
       } else {
-        availableText = `AVAIL · ${availability.startDate} – ${availability.freeUntil}`.toUpperCase();
+        availableText = `AVAIL · ${availability.startDate} – ONWARDS`.toUpperCase();
       }
-    } else {
-      availableText = `AVAIL · ${availability.startDate} – ONWARDS`.toUpperCase();
+    } else if (availability.availableFrom) {
+      availableText = `${availability.headline} · AVAIL FROM ${availability.availableFrom}`.toUpperCase();
+    } else if (availability.nextAvailableFrom) {
+      availableText = `${availability.headline} · NEXT AVAIL ${availability.nextAvailableFrom}`.toUpperCase();
     }
-  } else if (availability.availableFrom) {
-    availableText = `${availability.headline} · AVAIL FROM ${availability.availableFrom}`.toUpperCase();
-  } else if (availability.nextAvailableFrom) {
-    availableText = `${availability.headline} · NEXT AVAIL ${availability.nextAvailableFrom}`.toUpperCase();
   }
 
   return (

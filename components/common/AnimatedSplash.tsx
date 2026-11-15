@@ -328,17 +328,10 @@ export function AnimatedSplash({
   // - OR occasionTheme is diwali_animated / diwali_gold
   // - OR animationStyle is diwali_animated
   // - OR no custom static image was uploaded
-  const isFestiveMode = Boolean(
-    config?.isOccasionActive ||
-    config?.occasionTheme === 'diwali_animated' ||
-    config?.occasionTheme === 'diwali_gold' ||
-    config?.animationStyle === 'diwali_animated' ||
-    (!config?.imageUrl && !config?.bgImageUrl && config?.isOccasionActive !== false)
-  );
-
-  const hasCustomActiveImage = Boolean(
-    !isFestiveMode && config?.isActive && (config?.imageUrl || config?.bgImageUrl) && !customImageError
-  );
+  // Always the classic MySawari splash (logo + "Your ride, your way."): the Diwali splash and any admin-uploaded
+  // splash image are switched off. Flip these back to re-enable them.
+  const isFestiveMode = false;
+  const hasCustomActiveImage = false;
 
   const activeBg = isFestiveMode ? FESTIVE_BG : (config?.backgroundColor || '#FFFFFF');
   const showProblem = !isDataReady && (loadFailed || isSlow);

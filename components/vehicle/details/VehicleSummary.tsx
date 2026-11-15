@@ -295,7 +295,8 @@ function Toggle({ label, value, onChange, onColor }: { label: string; value: boo
 const TRACK_OFF = '#D4D4D4';
 
 const styles = StyleSheet.create({
-  container: { paddingHorizontal: 16, gap: 8 },
+  // Figma top block: padding 4/16/8, 8 between the urgency strip, name card and delivery card.
+  container: { paddingHorizontal: 16, paddingTop: 4, gap: 8 },
   // Figma "Urgency Message": 361×39, border-box (the 1pt stroke sits inside that height) and flex-grow 0.
   // RN has no box-sizing, so this is the 359 content width -- 361 minus both strokes -- pinned rather than
   // stretched, which keeps the strip exactly as designed on every device instead of tracking the gutters.
@@ -307,24 +308,26 @@ const styles = StyleSheet.create({
   bannerText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, textAlign: 'center', flexShrink: 1 },
   // Figma "Car Detail + Rating": 361×82 border-box, padding 10/12/12, 8 between the details and the rating.
   summaryCard: { flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 82, borderWidth: 1, borderRadius: 10, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12 },
-  brand: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11 },
+  // Figma "Frame 20": 260×58 column, no padding or gap: 16.5 brand + 25 name + 16.5 meta.
+  brand: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5 },
   // Semibold/lg in the design: weight 600 at 17px, on a 25px (150%) line like every role here, and
   // centred inside its box. numberOfLines={2} means one line sits at y=4 of this 25px row; a wrap fills
   // both rows. No tracking tweak -- the role specifies none.
-  name: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 25, letterSpacing: 0, marginTop: 2 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 4 },
-  meta: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
-  metaDot: { width: 2.5, height: 2.5, borderRadius: 1.25, marginHorizontal: 7 },
+  name: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 25, letterSpacing: 0 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  meta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
+  metaDot: { width: 3, height: 3, borderRadius: 1.5, marginHorizontal: 6 },
   // Rating: 28px navy pill (padding 4/9/4/10, 2 between the number and the 14px star), review count 4 below.
   ratingCol: { alignItems: 'center', gap: 4 },
   ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, height: 28, paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 10 },
   ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   reviewCount: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
   // Figma "Delivery & Pickup": 361×63 border-box, padding 12, 12 between the text and the switch.
-  deliveryCard: { borderWidth: 1, borderRadius: 10, padding: 12 },
-  deliveryHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  // Figma "Need a driver?": 361×84 border-box, padding 12/10/12/12, 12 between the text and the switch.
-  driverCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, minHeight: 84, borderWidth: 1, borderRadius: 10, paddingTop: 12, paddingRight: 10, paddingBottom: 12, paddingLeft: 12 },
+  deliveryCard: { borderWidth: 1, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12 },
+  // Row is 335×39; with 11 + 1 border above and below the card is the 63 Figma shows.
+  deliveryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, height: 39 },
+  // Figma "Need a driver?": 361×84, padding 12 (inner row 335×58), 12 between the text and the switch.
+  driverCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, minHeight: 84, borderWidth: 1, borderRadius: 10, padding: 12 },
   segBox: { flexDirection: 'row', gap: 16, borderWidth: 1, borderRadius: 8, padding: 4, marginTop: 16 },
   seg: { flex: 1, height: 34, borderRadius: 6, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   segText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13.5 },

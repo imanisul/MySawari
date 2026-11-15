@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -18,6 +18,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { safeBack } from '@/utils/navigation';
 import {
+  ExclusiveOffer,
   exclusiveOffersQueryOptions,
   nextFlashSaleQueryOptions,
   recordOfferView,
@@ -38,12 +39,12 @@ const GOLD = '#FBC422';
 const GOLD_AMBER = '#F5BD47';
 const PINK_SHADOW = { dx: -3.44, dy: 3.44, color: '#FF008B' };
 const BLACK_SHADOW = { dx: -1.15, dy: 1.15, color: '#000000' };
-const FROST_OVERLAY = 'rgba(28, 28, 30, 0.4)';
+const FROST_OVERLAY = 'rgba(28, 28, 30, 0.45)';
 const STAR_PATH = 'M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C8 11 11 8 12 0Z';
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** Default fallback vehicles so the ticket card and 5-circle arc always render in crisp high quality */
+/** High-resolution fallback vehicle fleet to ensure 5 gorgeous cars are always present */
 const FALLBACK_VEHICLES = [
   {
     id: 'thar_2025',
@@ -52,8 +53,8 @@ const FALLBACK_VEHICLES = [
     transmission: 'Manual',
     fuelType: 'Petrol',
     seatingCapacity: 5,
-    dealPrice: 5073,
-    originalPrice: 5073,
+    dealPrice: 399,
+    originalPrice: 1000,
     ratings: { averageRating: 4.2, reviewCount: 48 },
     images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1779773847/my-sawari/vehicles/vehicle-1779773846844-5b6cp5.jpg' }],
   },
@@ -94,20 +95,20 @@ const FALLBACK_VEHICLES = [
     images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1791177935/my-sawari/vehicles/vehicle-1791177934459-v5r5vh.jpg' }],
   },
   {
-    id: 'seltos_gt',
-    displayName: 'Kia Seltos',
-    vehicleName: 'Kia Seltos',
+    id: 'fronx_alpha',
+    displayName: 'Fronx White',
+    vehicleName: 'Fronx White',
     transmission: 'Automatic',
-    fuelType: 'Diesel',
+    fuelType: 'Petrol',
     seatingCapacity: 5,
-    dealPrice: 3800,
-    originalPrice: 4500,
+    dealPrice: 1800,
+    originalPrice: 2400,
     ratings: { averageRating: 4.6, reviewCount: 54 },
-    images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1779773847/my-sawari/vehicles/vehicle-1779773846844-5b6cp5.jpg' }],
+    images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1794706851/my-sawari/vehicles/vehicle-1794706850058-xl0ewu.png' }],
   },
 ];
 
-/** Light rays from center: white 8% at the outer edge fading inward */
+/** Light rays radiating from slightly below center */
 function Rays({ width, height }: { width: number; height: number }) {
   const cx = width / 2;
   const cy = height / 2 + 5;
@@ -254,89 +255,118 @@ export default function FlashSaleScreen() {
   }, []);
 
   const isEarlyAccessActive = isLive && (
-    Boolean(liveOffer?.isEarlyAccessLocked) ||
-    Boolean(liveOffer?.isEarlyAccessUnlocked) ||
+    Boolean(offers.some((o: any) => o.isEarlyAccessLocked)) ||
+    Boolean(offers.some((o: any) => o.isEarlyAccessUnlocked)) ||
     (earlyAccessEndsMs > nowMs)
   );
 
-  // Can the customer book now?
-  const canBook = isLive && (
-    !liveOffer?.isEarlyAccessLocked &&
-    (liveOffer?.isEligible !== false || isMember)
-  );
-
-  // View state for scheduled sale: allow toggle or previewing
+  // View state for scheduled sale: locked teaser vs unblurred preview
   const [previewLocked, setPreviewLocked] = useState(!isMember);
   useEffect(() => {
-    if (isMember) setPreviewLocked(false);
-  }, [isMember]);
+    if (isLive) {
+      setPreviewLocked(false);
+    } else if (isMember) {
+      setPreviewLocked(false);
+    }
+  }, [isLive, isMember]);
 
-  // Cars list construction
-  const currentOffer = liveOffer || nextSale?.offer || null;
+  // Construct cars list: ensures exactly 5 attractive cars for the bottom arc
   const displayCars = useMemo(() => {
     const list: any[] = [];
-    const pushCar = (c: any, dPrice?: number, origPrice?: number) => {
-      if (!c) return;
-      const id = String(c.id || c._id);
-      if (list.some((item) => String(item.id || item._id) === id)) return;
+    const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
+
+    const add = (offer: any, ref: any, dealPrice?: number, originalPrice?: number) => {
+      const id = asId(ref);
+      if (!id || list.some((c) => String(c.id || c._id) === id)) return;
+      const fleet: any = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === id);
+      const car: any = fleet || (typeof ref === 'object' ? { ...ref, id } : null);
+      if (!car) return;
       list.push({
-        ...c,
-        dealPrice: dPrice || currentOffer?.promotionalPrice || (c.pricePerDay ? Math.round(c.pricePerDay * 0.7) : 399),
-        originalPrice: origPrice || (c.pricePerDay ? c.pricePerDay * (currentOffer?.rentalDays || 1) : 1000),
+        ...car,
+        id,
+        offer,
+        dealPrice: dealPrice ?? offer?.promotionalPrice ?? offer?.dealPrice ?? (car.pricePerDay ? Math.round(car.pricePerDay * 0.7) : 399),
+        originalPrice: originalPrice ?? offer?.originalPrice ?? (car.pricePerDay || 1000),
       });
     };
 
-    // 1. Vehicle prices array
-    if (Array.isArray(currentOffer?.vehiclePrices) && currentOffer.vehiclePrices.length > 0) {
-      currentOffer.vehiclePrices.forEach((vp: any) => {
-        const v = typeof vp.vehicleId === 'object' && vp.vehicleId ? vp.vehicleId : fleetVehicles.find((fv: any) => String(fv.id || fv._id) === String(vp.vehicleId));
-        if (v) pushCar(v, vp.dealPrice, vp.originalPrice);
+    if (isLive) {
+      for (const offer of offers as any[]) {
+        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice));
+        (offer.applicableVehicleIds || []).forEach((v: any) => add(offer, v));
+        if (offer.vehicleId) add(offer, offer.vehicleId);
+      }
+      // Complement from fleet vehicles to have 5 cars
+      for (const fv of fleetVehicles as any[]) {
+        if (list.length >= 5) break;
+        add(liveOffer, fv);
+      }
+      // If still fewer than 5, complement from FALLBACK_VEHICLES
+      for (const fb of FALLBACK_VEHICLES) {
+        if (list.length >= 5) break;
+        if (!list.some((c) => String(c.id || c._id) === fb.id)) {
+          list.push({ ...fb, offer: liveOffer, dealPrice: liveOffer?.promotionalPrice || fb.dealPrice });
+        }
+      }
+    } else if (isScheduled) {
+      const schOffer = nextSale?.offer;
+      if (schOffer) {
+        (schOffer.vehiclePrices || []).forEach((vp: any) => add(schOffer, vp.vehicleId, vp.dealPrice, vp.originalPrice));
+        (schOffer.applicableVehicleIds || []).forEach((v: any) => add(schOffer, v));
+        if (schOffer.vehicleId) add(schOffer, schOffer.vehicleId);
+      }
+      (nextSale?.images || []).forEach((url, i) => {
+        if (list.length < 5) list.push({ id: `hidden-${i}`, images: [{ url }], displayName: 'Upcoming Deal Car' });
       });
+      for (const fb of FALLBACK_VEHICLES) {
+        if (list.length >= 5) break;
+        if (!list.some((c) => String(c.id || c._id) === fb.id)) {
+          list.push({ ...fb, offer: schOffer, dealPrice: schOffer?.promotionalPrice || fb.dealPrice });
+        }
+      }
+    } else {
+      // Coming soon fallbacks
+      FALLBACK_VEHICLES.forEach((fb) => list.push(fb));
     }
-
-    // 2. Applicable vehicle IDs
-    if (Array.isArray(currentOffer?.applicableVehicleIds) && currentOffer.applicableVehicleIds.length > 0) {
-      currentOffer.applicableVehicleIds.forEach((av: any) => {
-        const id = typeof av === 'object' && av ? String(av._id || av.id) : String(av);
-        const v = typeof av === 'object' && av ? av : fleetVehicles.find((fv: any) => String(fv.id || fv._id) === id);
-        if (v) pushCar(v);
-      });
-    }
-
-    // 3. Single vehicleId
-    if (currentOffer?.vehicleId) {
-      const v = typeof currentOffer.vehicleId === 'object' && currentOffer.vehicleId
-        ? currentOffer.vehicleId
-        : fleetVehicles.find((fv: any) => String(fv.id || fv._id) === String(currentOffer.vehicleId));
-      if (v) pushCar(v);
-    }
-
-    // 4. Fill from fleet vehicles
-    fleetVehicles.forEach((fv) => {
-      if (list.length < 5) pushCar(fv);
-    });
-
-    // 5. Fill from fallback vehicles if fleet is empty
-    FALLBACK_VEHICLES.forEach((fb) => {
-      if (list.length < 5) pushCar(fb);
-    });
 
     return list.slice(0, 5);
-  }, [currentOffer, fleetVehicles]);
+  }, [offers, isLive, isScheduled, nextSale, fleetVehicles, liveOffer]);
 
   const [selectedCarIndex, setSelectedCarIndex] = useState(0);
-  const activeCar = displayCars[selectedCarIndex] || displayCars[0] || FALLBACK_VEHICLES[0];
+  const activeCar: any = displayCars[selectedCarIndex] || displayCars[0] || FALLBACK_VEHICLES[0];
+  const activeOffer: any = activeCar.offer || liveOffer || null;
 
-  // Helper to extract safe photo URL
+  // Can the customer book this car now?
+  const canBook = isLive && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
+
+  // Helper to extract safe photo URL - NEVER returns empty string
   const getCarImage = useCallback((car: any, fallbackIdx = 0): string => {
     const raw = car?.images?.[0];
     const url = typeof raw === 'string' ? raw : raw?.url;
     if (url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('/uploads'))) {
       return url;
     }
+    if (car?.image && typeof car.image === 'string' && (car.image.startsWith('http') || car.image.startsWith('/uploads'))) {
+      return car.image;
+    }
     const fb = FALLBACK_VEHICLES[fallbackIdx % FALLBACK_VEHICLES.length];
-    return (fb.images[0] as any).url;
+    return fb.images[0].url;
   }, []);
+
+  // Safe car name
+  const carDisplayName = useMemo(() => {
+    if (activeCar.displayName && activeCar.displayName.trim() && activeCar.displayName !== 'Test vehicle') {
+      return activeCar.displayName;
+    }
+    if (activeCar.vehicleName && activeCar.vehicleName.trim() && activeCar.vehicleName !== 'Test vehicle') {
+      return activeCar.vehicleName;
+    }
+    return activeOffer?.title || FALLBACK_VEHICLES[selectedCarIndex % FALLBACK_VEHICLES.length].displayName;
+  }, [activeCar, activeOffer, selectedCarIndex]);
+
+  // Pricing
+  const dealPrice = activeCar.dealPrice || activeOffer?.promotionalPrice || 399;
+  const originalPrice = activeCar.originalPrice || activeOffer?.originalPrice || (dealPrice ? Math.round(dealPrice * 1.4) : 1000);
 
   // Swiping card gesture
   const panResponder = useMemo(
@@ -346,11 +376,9 @@ export default function FlashSaleScreen() {
         onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 15 && Math.abs(gesture.dy) < 30,
         onPanResponderRelease: (_, gesture) => {
           if (gesture.dx < -40) {
-            // Swipe left -> next car
             Haptics.selectionAsync();
             setSelectedCarIndex((prev) => (prev + 1) % displayCars.length);
           } else if (gesture.dx > 40) {
-            // Swipe right -> prev car
             Haptics.selectionAsync();
             setSelectedCarIndex((prev) => (prev - 1 + displayCars.length) % displayCars.length);
           }
@@ -362,34 +390,36 @@ export default function FlashSaleScreen() {
   // Booking action
   const handleBookNow = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (liveOffer) {
-      recordOfferView(liveOffer._id || liveOffer.id);
+    const targetOffer = activeOffer || liveOffer;
+    if (targetOffer) {
+      recordOfferView(targetOffer._id || targetOffer.id);
     }
 
     // 1. Select vehicle
-    if (activeCar) {
-      selectCar(activeCar);
+    const bookingCar = fleetVehicles.find((fv: any) => String(fv.id || fv._id) === String(activeCar.id || activeCar._id)) || activeCar;
+    if (bookingCar) {
+      selectCar(bookingCar);
     }
 
     // 2. Pre-fill dates and duration
     const today = new Date();
-    const daysCount = currentOffer?.rentalDays || 1;
+    const daysCount = targetOffer?.rentalDays || 1;
     const endD = new Date(today.getTime() + daysCount * 24 * 3600 * 1000);
     const travelRange = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${endD.getDate()} ${MONTHS_SHORT[endD.getMonth()]}`;
 
-    const isOvernight = Boolean(currentOffer?.isOvernight);
-    const pickupT = currentOffer?.pickupTime || (isOvernight ? '08:00 PM' : '08:00 AM');
-    const returnT = currentOffer?.returnTime || (isOvernight ? '08:00 AM' : '08:00 AM');
+    const isOvernight = Boolean(targetOffer?.isOvernight);
+    const pickupT = targetOffer?.pickupTime || (isOvernight ? '08:00 PM' : '08:00 AM');
+    const returnT = targetOffer?.returnTime || (isOvernight ? '08:00 AM' : '08:00 AM');
 
     setDates(travelRange, `${daysCount} ${daysCount === 1 ? 'Day' : 'Days'}`);
-    setTimes(currentOffer?.rentalStartTime || pickupT, currentOffer?.rentalEndTime || returnT);
+    setTimes(targetOffer?.rentalStartTime || pickupT, targetOffer?.rentalEndTime || returnT);
 
     // 3. Set pickup/dropoff default to hub
     setPickup({ id: 'hub', name: 'MySawari Hub', address: 'Silchar Main Hub', latitude: 24.8333, longitude: 92.7789, source: 'database' });
     setDropoff({ id: 'hub', name: 'MySawari Hub', address: 'Silchar Main Hub', latitude: 24.8333, longitude: 92.7789, source: 'database' });
 
     // 4. Apply coupon
-    const code = (liveOffer as any)?.userClaim?.couponCode || liveOffer?.code || currentOffer?.code;
+    const code = (targetOffer as any)?.userClaim?.couponCode || targetOffer?.code;
     if (code) {
       applyCoupon(code);
     }
@@ -398,27 +428,28 @@ export default function FlashSaleScreen() {
     router.push({
       pathname: '/booking',
       params: {
-        exclusiveOfferId: String(liveOffer?._id || liveOffer?.id || ''),
-        dealPrice: String(activeCar?.dealPrice || currentOffer?.promotionalPrice || ''),
+        exclusiveOfferId: String(targetOffer?._id || targetOffer?.id || ''),
+        dealPrice: String(dealPrice),
       },
     });
-  }, [activeCar, currentOffer, liveOffer, router, selectCar, setDates, setTimes, setPickup, setDropoff, applyCoupon]);
+  }, [activeCar, activeOffer, liveOffer, fleetVehicles, router, selectCar, setDates, setTimes, setPickup, setDropoff, applyCoupon, dealPrice]);
 
   // View details action
   const handleViewDetails = useCallback(() => {
     Haptics.selectionAsync();
-    if (activeCar) {
-      selectCar(activeCar);
+    const car = fleetVehicles.find((fv: any) => String(fv.id || fv._id) === String(activeCar.id || activeCar._id)) || activeCar;
+    if (car) {
+      selectCar(car);
       router.push({
         pathname: '/car-details',
-        params: { id: String(activeCar.id || activeCar._id) },
+        params: { id: String(car.id || car._id) },
       });
     }
-  }, [activeCar, router, selectCar]);
+  }, [activeCar, fleetVehicles, router, selectCar]);
 
   // Schedule text calculations
   const scheduleInfo = useMemo(() => {
-    if (!scheduledStartsMs) return { weekday: 'SATURDAY', timeStr: '8 AM', fullLabel: 'STARTS SATURDAY 8AM' };
+    if (!scheduledStartsMs) return { weekday: 'SUNDAY', timeStr: '8 AM', fullLabel: 'STARTS SUNDAY 8AM' };
     const p = getIndiaDateParts(scheduledStartsMs);
     const day = WEEKDAYS[new Date(Date.UTC(p.year, p.month, p.date)).getUTCDay()];
     const hour12 = p.hours % 12 === 0 ? 12 : p.hours % 12;
@@ -436,7 +467,6 @@ export default function FlashSaleScreen() {
     if (liveOffer?.expiryDate) {
       return new Date(liveOffer.expiryDate).getTime();
     }
-    // Default to midnight tonight
     const end = new Date();
     end.setHours(23, 59, 59, 999);
     return end.getTime();
@@ -510,7 +540,7 @@ export default function FlashSaleScreen() {
             <Sparkle size={7} left={358} top={-16} />
 
             <View style={styles.ticketCard} {...panResponder.panHandlers}>
-              {/* Notches */}
+              {/* Side bite notches */}
               <View style={[styles.notch, { left: -14 }]} />
               <View style={[styles.notch, { right: -14 }]} />
               <View style={styles.dashedDivider} />
@@ -550,7 +580,7 @@ export default function FlashSaleScreen() {
                     {/* Top-left Amber Duration Badge */}
                     <View style={styles.durationBadge}>
                       <Text style={styles.durationBadgeText}>
-                        {currentOffer?.rentalDays ? `${currentOffer.rentalDays} ${currentOffer.rentalDays === 1 ? 'Day' : 'Days'}` : '3 Days'}
+                        {activeOffer?.rentalDays ? `${activeOffer.rentalDays} ${activeOffer.rentalDays === 1 ? 'Day' : 'Days'}` : '3 Days'}
                       </Text>
                     </View>
 
@@ -588,7 +618,7 @@ export default function FlashSaleScreen() {
 
               {/* Bottom Details Section */}
               {isScheduled && previewLocked ? (
-                // Locked times cards (Images 3 & 4)
+                // Locked times row (Images 3 & 4)
                 <View style={styles.lockedTimesRow}>
                   <View style={[styles.timeBox, styles.timeBoxGold]}>
                     <Text style={styles.timeBoxMain} numberOfLines={1}>
@@ -613,7 +643,7 @@ export default function FlashSaleScreen() {
                   {/* Row 1: Car Name & Rating */}
                   <View style={styles.detailsRow1}>
                     <Text style={styles.carTitle} numberOfLines={1}>
-                      {activeCar.displayName || activeCar.vehicleName || 'Thar 2025 RWD'}
+                      {carDisplayName}
                     </Text>
 
                     <View style={styles.ratingCol}>
@@ -642,10 +672,10 @@ export default function FlashSaleScreen() {
                   <View style={styles.detailsRow3}>
                     <View style={styles.priceRow}>
                       <Text style={styles.dealPriceText}>
-                        {formatCurrency(activeCar.dealPrice || currentOffer?.promotionalPrice || 5073)}
+                        {formatCurrency(dealPrice)}
                       </Text>
                       <Text style={styles.struckPriceText}>
-                        {formatCurrency(activeCar.originalPrice || 5073)}
+                        {formatCurrency(originalPrice)}
                       </Text>
                     </View>
 
@@ -742,7 +772,6 @@ export default function FlashSaleScreen() {
                 const isSelected = idx === selectedCarIndex;
                 const uri = getCarImage(car, idx);
 
-                // Slot geometry: center is at idx === selectedCarIndex
                 const size = isSelected ? 56 : idx === 1 || idx === 3 ? 46 : 40;
                 const ring = size + (isSelected ? 4 : 2);
 
@@ -752,7 +781,7 @@ export default function FlashSaleScreen() {
                     onPress={() => {
                       Haptics.selectionAsync();
                       setSelectedCarIndex(idx);
-                      if (previewLocked) setPreviewLocked(false);
+                      if (previewLocked && !isScheduled) setPreviewLocked(false);
                     }}
                     style={[
                       styles.arcThumbBtn,

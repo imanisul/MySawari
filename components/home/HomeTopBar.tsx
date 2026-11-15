@@ -78,14 +78,21 @@ export function HomeTopBar({
 
       {/* Select dates & times */}
       <View style={s.searchWrap}>
-        <Pressable style={s.search} onPress={onDates} accessibilityRole="button">
-          <HomeHeaderCalendar />
-          <Text style={[s.searchText, dateLabel && { color: '#262626' }]} numberOfLines={1}>
-            {dateLabel || 'Select dates & times'}
-          </Text>
-        </Pressable>
+        <DateSearchBox dateLabel={dateLabel} onDates={onDates} />
       </View>
     </LinearGradient>
+  );
+}
+
+/** "Select dates & times" field (361 × 51, 2px #D1CCF9, radius 12): in the header, and pinned at the top on scroll. */
+export function DateSearchBox({ dateLabel, onDates }: { dateLabel?: string; onDates: () => void }) {
+  return (
+    <Pressable style={s.search} onPress={onDates} accessibilityRole="button" accessibilityLabel={dateLabel ? `Trip dates ${dateLabel}` : 'Select dates and times'}>
+      <HomeHeaderCalendar />
+      <Text style={[s.searchText, dateLabel && { color: '#262626' }]} numberOfLines={1}>
+        {dateLabel || 'Select dates & times'}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -352,7 +359,7 @@ const s = StyleSheet.create({
   bikeBadge: {
     width: 76, height: 27, backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 6, borderBottomLeftRadius: 6,
-    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4,
+    alignItems: 'center', justifyContent: 'center', padding: 4,
   },
   bikeBadgeText: { fontFamily: F.bold, fontSize: 11, lineHeight: 16, textAlign: 'center', color: '#262626' },
   // Frame 2147225720: 331 × 57, flat top-rounded strip sitting directly on the milestone card

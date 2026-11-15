@@ -1,9 +1,8 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
-import FlashSaleRays from '@/assets/images/home_banner_rays.svg';
 import FlashSaleTitle from '@/assets/images/home_flash_sale_title.svg';
 import FlashSaleUnderline from '@/assets/images/home_flash_sale_underline.svg';
 
@@ -50,20 +49,57 @@ export function Bolt({ style, width = 13, line = 1.2, near = 1, far = 3 }: { sty
   );
 }
 
+/**
+ * Figma "Repeat group 1": 18 rays (one every 20°) of white 70% → 0, laid over the banner with mix-blend overlay.
+ * Drawn in code: the exported SVG repeats the ray through `<use href="#Repeat%20group…">`, an id react-native-svg
+ * can't resolve, and it has no blend modes, so the overlay's lightening is matched with a lower opacity instead.
+ */
+const RAY = 'M260.716 0.687536H299.959L285.057 280.338H275.619L260.716 0.687536Z';
+function BannerRays({ style }: { style?: object }) {
+  return (
+    <Svg width={560.68} height={560.68} viewBox="0 0 560.675 560.675" style={style} pointerEvents="none">
+      <Defs>
+        <LinearGradient id="bannerRay" x1="280.338" y1="0.6875" x2="280.338" y2="280.338" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.7} />
+          <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+        </LinearGradient>
+      </Defs>
+      <G opacity={0.33}>
+        {Array.from({ length: 18 }, (_, i) => (
+          <Path key={i} d={RAY} fill="url(#bannerRay)" transform={`rotate(${i * 20} 280.3375 280.3375)`} />
+        ))}
+      </G>
+    </Svg>
+  );
+}
+
+import { useQuery } from '@tanstack/react-query';
+import { exclusiveOffersQueryOptions } from '@/services/api/offers';
+
 export function FlashSaleBanner() {
   const router = useRouter();
+  const { data: offers = [] } = useQuery(exclusiveOffersQueryOptions);
+  const isLive = offers.length > 0;
+  const subText = isLive ? 'LIVE NOW · BOOK DEALS' : 'EVERY SUNDAY 8AM';
+
   return (
     <View style={styles.row}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Flash Sale, every Sunday 8 AM"
+        accessibilityLabel="Flash Sale"
         onPress={() => { Haptics.selectionAsync(); router.push('/flash-sale'); }}
         style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]}
       >
-        <FlashSaleRays style={styles.rays} pointerEvents="none" />
+        <BannerRays style={styles.rays} />
         <View style={styles.text}>
-          <FlashSaleTitle />
-          <Lettering text="EVERY SUNDAY 8AM" width={223.93} size={30} shadow={{ dx: -0.8, dy: 0.8, color: '#000000' }} />
+          <View style={{ width: 183.21, height: 32.58, marginVertical: -3.1, alignItems: 'center', justifyContent: 'center' }}>
+            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 2.32, top: 6.27 }} />
+            <Lettering text="FLASH SALE" width={156.73} size={28} shadow={{ dx: -2.3, dy: 2.3, color: '#FF008B' }} font="PlusJakartaSans_700Bold" />
+            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 166.47, top: 6.27 }} />
+          </View>
+          <View style={{ marginTop: -4 }}>
+            <Lettering text={subText} width={260} size={23} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
+          </View>
         </View>
         <FlashSaleUnderline style={styles.underline} pointerEvents="none" />
       </Pressable>

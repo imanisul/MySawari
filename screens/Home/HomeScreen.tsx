@@ -27,7 +27,7 @@ import {
   HomeCategories, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
   DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HomePromoBanner,
 } from '@/components/home/HomeSections';
-import { HomeTopBar, CategoryTiles, CAR_CATEGORIES, BikeCategoryTiles, ReferCard, Panel, HERO_TOP } from '@/components/home/HomeTopBar';
+import { HomeTopBar, DateSearchBox, CategoryTiles, CAR_CATEGORIES, BikeCategoryTiles, ReferCard, Panel, HERO_TOP } from '@/components/home/HomeTopBar';
 import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
 import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
@@ -565,7 +565,9 @@ export default function HomeScreen() {
           renderItem={renderSection}
           onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
             if (!heroSectionHeight.current) return;
-            const threshold = Math.max(0, heroSectionHeight.current - insets.top - 140);
+            // The moment the header's date field (51 high, 14 above the header's bottom) reaches the pinned spot
+            // (12 under the status bar), the pinned copy takes over, so it never jumps.
+            const threshold = Math.max(0, heroSectionHeight.current - 14 - 51 - 12 - insets.top);
             const pastHero = event.nativeEvent.contentOffset.y >= threshold;
             setIsPastHero((current) => current === pastHero ? current : pastHero);
           }}
@@ -591,7 +593,12 @@ export default function HomeScreen() {
           }
         />
 
-        {isPastHero && <View pointerEvents="none" style={[styles.statusBarSpacer, { height: insets.top, backgroundColor: p.page }]} />}
+        {/* Scrolled past the header: the date field stays pinned at the top on the page colour (12 above, 14 below). */}
+        {isPastHero && (
+          <View style={[styles.statusBarSpacer, { paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: p.page }]}>
+            <DateSearchBox dateLabel={dateRange && dateRange !== 'Select Dates' ? dateRange : undefined} onDates={openDates} />
+          </View>
+        )}
 
         <RewardScratchModal card={scratch} onClose={() => setScratch(null)} />
         <WelcomeSheet visible={showWelcome} onClose={() => setShowWelcome(false)} />

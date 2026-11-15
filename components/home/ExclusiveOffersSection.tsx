@@ -271,7 +271,7 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
       }
     }
 
-    // Resolve car image with priority: item.image -> specific vehicle photo -> first fleet vehicle photo
+    // Resolve car image with priority: dealCar -> item.image -> specific vehicle photo -> first fleet vehicle photo -> high quality fallback
     const vehicleImage =
       (typeof item.vehicleId === 'object' ? item.vehicleId?.images?.[0] : null) ||
       (typeof item.vehicleId === 'string'
@@ -285,9 +285,10 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
     // A deal on specific cars shows that car's own photo; others use the deal's banner.
     const dealCar = specificCarOf(item, vehicles);
     const dealCarImage = dealCar?.image || dealCar?.images?.[0];
-    const imageUrl = dealCarImage || item.image?.url || item.image?.uri || vehicleImage;
+    const fleetFallback = vehicles.find((v: any) => v?.image || (Array.isArray(v?.images) && v.images.length > 0))?.image || 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1779773847/my-sawari/vehicles/vehicle-1779773846844-5b6cp5.jpg';
+    const imageUrl = dealCarImage || item.image?.url || item.image?.uri || vehicleImage || fleetFallback;
 
-    const resolvedVehicleName =
+    const rawVehicleName =
       (typeof item.vehicleId === 'object'
         ? (item.vehicleId?.displayName || item.vehicleId?.vehicleName || item.vehicleId?.name)
         : null) ||
@@ -297,8 +298,12 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
       (Array.isArray(item.vehiclePrices) && item.vehiclePrices.length > 0
         ? (item.vehiclePrices[0].vehicleName ||
             vehicles.find((v: any) => String(v.id || v._id) === String(item.vehiclePrices![0].vehicleId))?.name)
-        : null) ||
-      (isAllCars ? 'All Fleet Cars' : vehicles[0]?.name || 'Available Fleet');
+        : null);
+
+    const resolvedVehicleName =
+      (rawVehicleName && rawVehicleName !== 'Test vehicle' && rawVehicleName !== 'Test Vehicle')
+        ? rawVehicleName
+        : item.title || (isAllCars ? 'All Fleet Cars' : vehicles[0]?.name || 'Thar 2025 RWD');
 
     return (
       <TouchableOpacity

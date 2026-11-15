@@ -519,28 +519,13 @@ export function DatesSheet() {
       });
     });
 
-    if (thenLocation === 'true' && thenBook === 'true' && isAuthenticated) {
-      // Book Now: straight to payment, with or without a destination (the payment page has its own destination field).
+    if (thenBook === 'true' && isAuthenticated) {
+      // Book Now: straight to payment (payment page handles pickup & drop)
       router.replace('/booking');
-    } else if (thenLocation === 'true' && dropoff?.name) {
-      // A destination is already set (shown, and changeable, in this page's own field): no second location page.
+    } else if (forSpecificCar === 'true' || thenLocation === 'true' || fromDestination === 'true') {
       router.replace('/car-details');
-    } else if (thenLocation === 'true') {
-      // Check Availability from a car: after the dates, the location page; choosing there returns to the car.
-      router.replace({ pathname: '/dropoff', params: thenBook === 'true' ? { forSpecificCar: 'true', thenBook: 'true' } : { forSpecificCar: 'true' } });
     } else if (returnBack === 'true') {
       router.back();
-    } else if (fromDestination === 'true') {
-      // Flow from home Top Destination card: destination and car are already selected, proceed directly to car details
-      router.replace('/car-details');
-    } else if (forSpecificCar === 'true') {
-      if (dropoff?.name) {
-        // Destination already selected, return to car details directly
-        router.replace('/car-details');
-      } else {
-        // Needs destination: go to dropoff
-        router.replace({ pathname: '/dropoff', params: { forSpecificCar: 'true' } });
-      }
     } else {
       // Swap this page for the results. Back from the results returns to Home.
       router.replace('/search');

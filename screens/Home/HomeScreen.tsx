@@ -420,7 +420,6 @@ export default function HomeScreen() {
               sawariCash={isAuthenticated ? sawariCash : 0}
               vehicleType={vehicleType}
               onType={setVehicleType}
-              dateLabel={dateRange && dateRange !== 'Select Dates' ? dateRange : undefined}
               onDates={openDates}
             />
           </View>
@@ -612,7 +611,8 @@ export default function HomeScreen() {
         {/* Scrolled past the header: the date field stays pinned at the top on the page colour (12 above, 14 below). */}
         {isPastHero && (
           <View style={[styles.statusBarSpacer, { paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: p.page }]}>
-            <DateSearchBox dateLabel={dateRange && dateRange !== 'Select Dates' ? dateRange : undefined} onDates={openDates} />
+            {/* Always the empty "Select dates & times": dates left over from a deal or a car page are not shown as chosen here */}
+            <DateSearchBox onDates={openDates} />
           </View>
         )}
 

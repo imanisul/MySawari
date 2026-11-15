@@ -1,9 +1,12 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useRouter } from 'expo-router';
+import * as Haptics from '@/utils/haptics';
+import { MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { useQuery } from '@tanstack/react-query';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { exclusiveOffersQueryOptions } from '@/services/api/offers';
-import { todayDayNum, isInService, buildBlocks, toDayNum, dayNumAndTimeToMs, parseDayLabel, getIndiaDateParts } from '@/utils/sawari';
+import { todayDayNum, isInService, buildBlocks, toDayNum, dayNumAndTimeToMs, parseDayLabel, getIndiaDateParts, dayNumToLabel, formatTime12 } from '@/utils/sawari';
 
 /** Helper to parse ISO date strings or day labels like '15 Nov' to Indian timestamp ms */
 function parseCustomDateToMs(val: any, defaultTime = '08:00 AM'): number | null {
@@ -187,4 +190,55 @@ export function useDealCars(nowMs: number) {
   }, [vehicles, offers, targetEndMs, isMember, Math.floor(nowMs / 60000)]);
 
   return { dealCars, targetEndMs, isLoading, isMember };
+}
+
+/**
+ * Opening a Today's Deal (from the deals page or the Home card): the trip is filled in for the customer — the car,
+ * its hours from when it is free (or now) to the deal's end, dates, times, hub pickup / city trip if none chosen, and
+ * the hourly price as a TOPDEAL-<hours> coupon the server prices itself — then the car's page with the dates locked.
+ */
+export function useOpenTopDeal() {
+  const router = useRouter();
+  const { selectCar, applyCoupon, setDates, setTimes, setIsDeliveryRequested, pickup, dropoff, setPickup, setDropoff } = useSawari();
+  return useCallback((car: any, targetEndMs: number, nowMs = Date.now()) => {
+    Haptics.selectionAsync();
+    const startMs = (car.dealStartMs || 0) > nowMs ? car.dealStartMs : Math.floor(nowMs / 60000) * 60000; // whole minutes, as booked
+    const endMs = car.dealEndMs || targetEndMs;
+    const hours = Math.max(1, Math.ceil(Math.max(0, endMs - startMs) / (3600 * 1000)));
+    const { rate, price } = dealPricing(car, hours);
+    selectCar({ ...car, hourlyRate: rate });
+    applyCoupon(`TOPDEAL-${hours}`);
+
+    const dayLabel = (ms: number) => {
+      const p = getIndiaDateParts(ms);
+      return dayNumToLabel(toDayNum(p.year, p.month, p.date));
+    };
+    const pickupLabel = formatTime12(startMs);
+    const returnLabel = formatTime12(endMs);
+    setDates(`${dayLabel(startMs)} – ${dayLabel(endMs)}`, '1 Day');
+    setTimes(pickupLabel, returnLabel);
+    setIsDeliveryRequested(false);
+    if (!pickup?.name) {
+      setPickup({ id: 'hub_pickup', name: MYSAWARI_HUB_NAME, address: 'MySawari Hub, Kahilipara', latitude: 26.1412, longitude: 91.7645, source: 'database' });
+    }
+    if (!dropoff?.name) {
+      setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
+    }
+
+    router.push({
+      pathname: '/car-details',
+      params: {
+        id: String(car.id || car._id),
+        vehicleId: String(car.id || car._id),
+        lockDates: 'true',
+        isFixedDates: 'true',
+        isTopDeal: 'true',
+        pickupTime: pickupLabel,
+        returnTime: returnLabel,
+        dealPrice: String(price), // the quote applies the member discount itself
+        hourlyPrice: String(rate),
+        rentalHours: String(hours),
+      },
+    });
+  }, [router, selectCar, applyCoupon, setDates, setTimes, setIsDeliveryRequested, pickup, dropoff, setPickup, setDropoff]);
 }

@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
-import { useDealCars, dealPricing } from '@/hooks/useDealCars';
+import { useDealCars, dealPricing, useOpenTopDeal } from '@/hooks/useDealCars';
 import { VEHICLES_KEY } from '@/hooks/useVehicles';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
@@ -129,6 +129,8 @@ interface VehicleCardProps {
   isFav: boolean;
   onToggleFav: () => void;
   onPress: () => void;
+  /** "Need more time? Extend your booking": the car's calendar with the deal day marked OFF. */
+  onPressExtend?: () => void;
 }
 
 /** Vehicle Card matching Figma Frame 2147226289 design */
@@ -139,6 +141,7 @@ function VehicleCard({
   isFav,
   onToggleFav,
   onPress,
+  onPressExtend,
 }: VehicleCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
 
@@ -191,7 +194,7 @@ function VehicleCard({
   const endMs = car.dealEndMs || targetEndMs;
   const hoursRemaining = Math.max(1, Math.ceil(Math.max(0, endMs - startMs) / (3600 * 1000)));
 
-  const { price: dealPrice } = dealPricing(car, hoursRemaining);
+  const { price: dealPrice, perDay } = dealPricing(car, hoursRemaining);
 
   const carName = car.displayName || car.vehicleName || car.name || 'Vehicle';
   const seatsNum = parseInt(String(car.seats || ''), 10);
@@ -347,6 +350,22 @@ function VehicleCard({
         </View>
       </Pressable>
 
+      {/* Frame 2147226290: "Need more time? Extend your booking" · the day rate (an extension is a normal full-day booking) */}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Need more time? Extend your booking at ${formatCurrency(perDay)} per day`}
+        onPress={onPressExtend || onPress}
+        hitSlop={{ top: 8, bottom: 8 }}
+        style={({ pressed }) => [styles.extensionBar, pressed && { opacity: 0.7 }]}
+      >
+        <Text style={styles.extendText} numberOfLines={1}>Need more time? Extend your booking</Text>
+        {perDay > 0 && (
+          <View style={styles.extendRateRow}>
+            <Text style={styles.extendRateText} numberOfLines={1}>{formatCurrency(perDay)}/day</Text>
+            <TopDealsChevron />
+          </View>
+        )}
+      </Pressable>
     </View>
   );
 }
@@ -442,65 +461,9 @@ export default function TopDealsScreen() {
     setFilters(EMPTY_FILTERS);
   };
 
-  const handleSelectDeal = (car: any) => {
-    Haptics.selectionAsync();
-    // The booking prices this trip by the hour: hourly rate × hours left, applied like a coupon.
-    const startMs = (car.dealStartMs || 0) > nowMs ? car.dealStartMs : Math.floor(nowMs / 60000) * 60000; // whole minutes, as booked
-    const endMs = car.dealEndMs || targetEndMs;
-    const hours = Math.max(1, Math.ceil(Math.max(0, endMs - startMs) / (3600 * 1000)));
-    selectCar({ ...car, hourlyRate: dealPricing(car, hours).rate });
-    applyCoupon(`TOPDEAL-${hours}`);
-
-    const { rate: dealHourlyRate, price: dealPrice } = dealPricing(car, hours);
-
-    const dayLabel = (ms: number) => {
-      const p = getIndiaDateParts(ms);
-      return dayNumToLabel(toDayNum(p.year, p.month, p.date));
-    };
-    const pickupLabel = formatTime12(startMs);
-    const returnLabel = formatTime12(endMs);
-    setDates(`${dayLabel(startMs)} – ${dayLabel(endMs)}`, '1 Day');
-    setTimes(pickupLabel, returnLabel);
-    setIsDeliveryRequested(false);
-
-    if (!pickup?.name) {
-      setPickup({
-        id: 'hub_pickup',
-        name: MYSAWARI_HUB_NAME,
-        address: 'MySawari Hub, Kahilipara',
-        latitude: 26.1412,
-        longitude: 91.7645,
-        source: 'database',
-      });
-    }
-
-    if (!dropoff?.name) {
-      setDropoff({
-        id: 'city_trip',
-        name: 'Local City Trip',
-        address: 'City limits / Self-drive destination',
-        latitude: 26.1412,
-        longitude: 91.7645,
-        source: 'database',
-      });
-    }
-
-    router.push({
-      pathname: '/car-details',
-      params: {
-        id: String(car.id || car._id),
-        vehicleId: String(car.id || car._id),
-        lockDates: 'true',
-        isFixedDates: 'true',
-        isTopDeal: 'true',
-        pickupTime: pickupLabel,
-        returnTime: returnLabel,
-        dealPrice: String(dealPrice), // the quote applies the member discount itself
-        hourlyPrice: String(dealHourlyRate),
-        rentalHours: String(hours),
-      },
-    });
-  };
+  // Fills the deal's trip (dates, times, places, hourly price) and opens the car — shared with the Home deals card.
+  const openTopDeal = useOpenTopDeal();
+  const handleSelectDeal = (car: any) => openTopDeal(car, targetEndMs, nowMs);
 
   const handleExtendBooking = (car: any) => {
     Haptics.selectionAsync();
@@ -760,6 +723,7 @@ export default function TopDealsScreen() {
                     toggleFavorite(carId);
                   }}
                   onPress={() => handleSelectDeal(car)}
+                  onPressExtend={() => handleExtendBooking(car)}
                 />
               );
             })

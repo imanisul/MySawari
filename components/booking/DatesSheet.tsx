@@ -131,6 +131,24 @@ function TimeWheel({ title, times, value, onPick, p, titleColor }: {
     if (!onPick(times[i])) ref.current?.scrollTo({ y: index * ROW, animated: true });
   };
 
+  // Only the customer's own drag picks a time. The wheel also scrolls by itself (to the chosen time, or when the list
+  // of times changes) and Android reports those as ordinary scroll ends — they used to pick an early hour and pop
+  // the Early Pickup / Late Return notice before anything was touched.
+  const dragging = useRef(false);
+  const coasting = useRef(false);
+  const onDragEnd = (y: number) => {
+    // A slow release does not coast (no momentum events on iOS): settle where it was let go.
+    setTimeout(() => {
+      if (dragging.current && !coasting.current) { dragging.current = false; settle(y); }
+    }, 80);
+  };
+  const onCoastEnd = (y: number) => {
+    coasting.current = false;
+    if (!dragging.current) return; // the wheel moved by itself
+    dragging.current = false;
+    settle(y);
+  };
+
   return (
     <View style={[styles.wheelCard, { backgroundColor: p.card }]}>
       <Text style={[styles.wheelTitle, { color: titleColor }]}>{title}</Text>
@@ -145,9 +163,10 @@ function TimeWheel({ title, times, value, onPick, p, titleColor }: {
          decelerationRate="fast"
          scrollEventThrottle={16}
          contentContainerStyle={{ paddingVertical: EDGE_PAD }}
-         onMomentumScrollEnd={(e) =>
-           settle(e.nativeEvent.contentOffset.y)
-         }
+         onScrollBeginDrag={() => { dragging.current = true; coasting.current = false; }}
+         onScrollEndDrag={(e) => onDragEnd(e.nativeEvent.contentOffset.y)}
+         onMomentumScrollBegin={() => { coasting.current = true; }}
+         onMomentumScrollEnd={(e) => onCoastEnd(e.nativeEvent.contentOffset.y)}
         >
           {times.map((time, i) => (
             <Pressable
@@ -449,16 +468,6 @@ export function DatesSheet() {
     return 'No free dates in the next 90 days.';
   };
 
-  // For one car or bike: whether it is free for the chosen dates and times, shown above the button as you pick.
-  const availLine = (() => {
-    // Not in the Today's Deals "Need more time?" calendar: the OFF tag and the greyed-out days already say it all.
-    if (forSpecificCar !== 'true' || !liveSelectedCar || !start || deal) return null;
-    const noun = liveSelectedCar.type === 'Bike' ? 'Bike' : 'Car';
-    const ok = checkCarAvailability(liveSelectedCar, formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', tempReturnTime || '8:00 AM');
-    return ok
-      ? { ok: true, text: `${noun} is available for your dates` }
-      : { ok: false, text: `${noun} is not available for these dates. ${freeWindowNote(liveSelectedCar, start)}` };
-  })();
 
   const handleApply = () => {
     if (!start) return;
@@ -752,12 +761,6 @@ export function DatesSheet() {
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16, backgroundColor: ui.page }]}>
-        {availLine && (
-          <View style={styles.availRow} accessibilityLiveRegion="polite">
-            <Ionicons name={availLine.ok ? 'checkmark-circle' : 'close-circle'} size={14} color={availLine.ok ? '#339F79' : '#D04646'} />
-            <Text style={[styles.availText, { color: availLine.ok ? '#339F79' : '#D04646' }]} numberOfLines={2}>{availLine.text}</Text>
-          </View>
-        )}
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ disabled: !canApply }}
@@ -969,8 +972,6 @@ const styles = StyleSheet.create({
   dayCircle: { width: 36, height: 36, borderRadius: 18, paddingBottom: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent'},
   dayText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
   struck: { textDecorationLine: 'line-through' },
-  availRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 8, paddingHorizontal: 4 },
-  availText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, flexShrink: 1, textAlign: 'center' },
   offTag: { position: 'absolute', top: -6, left: 18 - 11.5 - 10.36, width: 23, height: 14, borderRadius: 10, borderWidth: 1, borderColor: '#6B5AED', paddingHorizontal: 2, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-29.06deg' }], zIndex: 1 },
   offText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, includeFontPadding: false },
   wheels: {

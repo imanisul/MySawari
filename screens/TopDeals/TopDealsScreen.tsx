@@ -9,6 +9,7 @@ import {
   Share,
   Platform,
   TextInput,
+  RefreshControl,
   ActivityIndicator,
 } from 'react-native';
 import { Image as CachedImage } from 'expo-image';
@@ -44,6 +45,7 @@ import { HeartIcon } from '@/components/vehicle/HeartIcon';
 import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { exclusiveOffersQueryOptions } from '@/services/api/offers';
 import { LoadingImage } from '@/components/common/LoadingImage';
+import { CarCardSkeleton } from '@/components/loading/CarCardSkeleton';
 import { getVehicleImage } from '@/utils/vehicleImages';
 import {
   ExploreFilterSheet,
@@ -415,7 +417,12 @@ export default function TopDealsScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const { dealCars, targetEndMs, isLoading } = useDealCars(nowMs);
+  const { dealCars, targetEndMs, isLoading, refetch } = useDealCars(nowMs);
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try { await refetch(); } finally { setRefreshing(false); }
+  };
   // Live countdown timer calculations for Frame 2147226222
   const msRemaining = Math.max(0, targetEndMs - nowMs);
   const timerHrs = Math.floor(msRemaining / 3600000);
@@ -547,6 +554,9 @@ export default function TopDealsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#6152D8" colors={['#6152D8']} />}
       >
         <View style={styles.searchSection}>
           <View style={styles.searchRow}>
@@ -680,12 +690,10 @@ export default function TopDealsScreen() {
         </View>
 
         <View style={styles.vehicleFeed}>
-          {isLoading ? (
-            <View style={styles.emptyBox}>
-              <ActivityIndicator size="large" color="#6152D8" />
-              <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
-                Loading available {isBike ? 'bikes' : 'cars'}...
-              </Text>
+          {isLoading && !dealCars.length ? (
+            // First load: card-shaped placeholders where the deals will appear
+            <View style={{ width: '100%', maxWidth: 361, gap: 12 }}>
+              {[0, 1, 2].map((i) => <CarCardSkeleton key={i} index={i} />)}
             </View>
           ) : filteredCars.length === 0 ? (
             <View style={styles.emptyBox}>

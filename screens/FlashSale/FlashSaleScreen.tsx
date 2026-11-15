@@ -184,7 +184,7 @@ function TripleUnderline({ width = 160 }: { width?: number }) {
 }
 
 /** Live ticking countdown timer box in top header (Images 6 & 7) */
-function LiveCountdownHeader({ expiryMs }: { expiryMs: number }) {
+function LiveCountdownHeader({ expiryMs, scale = 1 }: { expiryMs: number; scale?: number }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -199,7 +199,7 @@ function LiveCountdownHeader({ expiryMs }: { expiryMs: number }) {
   const pad = (n: number) => String(n).padStart(2, '0');
 
   return (
-    <View style={styles.liveHeaderWrap}>
+    <View style={[styles.liveHeaderWrap, scale < 1 && { transform: [{ scale }], marginBottom: -92.42 * (1 - scale) }]}>
       {/* Ellipse 13 glow (154 × 70 at 18, 10; exported with its blur, so it spills 118.7 each way) behind the title */}
       <FsTitleGlow width={391.449} height={307.449} style={{ position: 'absolute', left: 18 - 118.72, top: 10 - 118.72 }} pointerEvents="none" />
       {/* Frame 2147226232: the bolt + FLASH / SALE lettering, exported from Figma (172.87 × 92.42) */}
@@ -238,6 +238,15 @@ export default function FlashSaleScreen() {
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const { membership, selectCar, isAuthenticated, applyCoupon, setDates, setTimes, pickup, dropoff, setPickup, setDropoff } = useSawari();
+
+  // Every phone: the layout is Figma's 393 × 852 frame. On narrower or shorter phones the fixed-size blocks shrink to
+  // fit (never grow): the header and Coming Soon block to the width, the ticket to the width and to the room left
+  // between the header and the photo row, centred in that room (on a 393 × 852 phone that is the Figma spot).
+  const fitW = Math.min(1, (windowWidth - 24) / 361);
+  const headerBottom = insets.top + 44 - 17 + 92.42 * fitW;
+  const arcTop = windowHeight - 16 - Math.max(0, 75 - insets.bottom) - 86;
+  const ticketScale = Math.max(0.6, Math.min(fitW, (arcTop - headerBottom - 16) / 417));
+  const ticketTop = (headerBottom + arcTop) / 2 - 208.5 - (insets.top + 44);
   const { data: fleetVehicles = [] } = useVehicles();
 
   // Queries
@@ -519,7 +528,7 @@ export default function FlashSaleScreen() {
       ) : isComingSoon ? (
         // State 1 & 2: COMING SOON / NO ACTIVE SALE
         <View style={styles.centerComingSoon} accessible accessibilityRole="header" accessibilityLabel="Flash Sale Coming Soon">
-          <View style={styles.comingSoonGroup}>
+          <View style={[styles.comingSoonGroup, { transform: [{ scale: Math.min(1, (windowWidth - 12) / 378) }] }]}>
             <View style={[styles.csLine, { top: 4 }]}>
               <Lettering text="FLASH" width={160} size={42} shadow={PINK_SHADOW} near={1.42} outline={1.7} skew="0deg" scaleY={1.15} font={FONT} />
             </View>
@@ -541,7 +550,7 @@ export default function FlashSaleScreen() {
         <View style={styles.mainContainer}>
           {/* Header: Live countdown (Images 6 & 7) vs Scheduled (Images 3, 4, 5) */}
           {isLive ? (
-            <LiveCountdownHeader expiryMs={expiryMs} />
+            <LiveCountdownHeader expiryMs={expiryMs} scale={fitW} />
           ) : isScheduled ? (
             <View style={styles.scheduledHeaderWrap}>
               <View style={styles.scheduledTitleRow}>
@@ -558,7 +567,7 @@ export default function FlashSaleScreen() {
           ) : null}
 
           {/* Ticket Card + Sparkles */}
-          <View style={[styles.ticketSection, { position: 'absolute', left: (windowWidth - 353) / 2, top: windowHeight / 2 - 208 - insets.top - 44 }]}>
+          <View style={[styles.ticketSection, { position: 'absolute', left: (windowWidth - 353) / 2, top: ticketTop, transform: [{ scale: ticketScale }] }]}>
             <Sparkle size={13.867} left={-8.87} top={-9} />
             <Sparkle size={6.934} left={-12} top={-14} />
             <Sparkle size={13.867} left={348} top={-9} />
@@ -865,7 +874,6 @@ const styles = StyleSheet.create({
   // status bar; the 44-high back row sits above it here, so it moves up 17 to keep that 86.
   liveHeaderWrap: {
     width: 361,
-    maxWidth: '100%',
     height: 92.42,
     alignSelf: 'center',
     flexDirection: 'row',
@@ -895,7 +903,6 @@ const styles = StyleSheet.create({
   },
   comingSoonGroup: {
     width: 378,
-    maxWidth: '100%',
     height: 224,
   },
   csLine: {

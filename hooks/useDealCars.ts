@@ -48,8 +48,11 @@ export function dealPricing(car: any, hours: number) {
 
 /** Cars and bikes free from now (or when their current booking ends) until 8 AM: the Today's Deals list. */
 export function useDealCars(nowMs: number) {
-  const { data: vehicles = [], isLoading } = useVehicles();
-  const { data: offers = [] } = useQuery(exclusiveOffersQueryOptions);
+  const { data: vehicles = [], isLoading: vehiclesLoading, refetch: refetchVehicles } = useVehicles();
+  const { data: offers = [], isLoading: offersLoading, refetch: refetchOffers } = useQuery(exclusiveOffersQueryOptions);
+  // Wait for both: a car's deal price comes from its offer, so showing cars before the offers made prices jump.
+  const isLoading = vehiclesLoading || offersLoading;
+  const refetch = useCallback(() => Promise.all([refetchVehicles(), refetchOffers()]), [refetchVehicles, refetchOffers]);
   const { membership } = useSawari();
   const isMember = Boolean(
     membership?.plan &&
@@ -189,7 +192,7 @@ export function useDealCars(nowMs: number) {
     });
   }, [vehicles, offers, targetEndMs, isMember, Math.floor(nowMs / 60000)]);
 
-  return { dealCars, targetEndMs, isLoading, isMember };
+  return { dealCars, targetEndMs, isLoading, isMember, refetch };
 }
 
 /**

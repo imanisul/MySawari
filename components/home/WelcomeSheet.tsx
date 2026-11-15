@@ -1,6 +1,6 @@
 import React from 'react';
 import { SheetModal } from '@/components/common/SheetModal';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,6 +39,9 @@ const ROWS: { left: number; top: number; w: number; h: number; chips: Chip[] }[]
 
 export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
+  // The chips are placed for a 361-wide area (393 phone − 16 each side); narrower phones shrink them to fit.
+  const { width } = useWindowDimensions();
+  const chipScale = Math.min(1, (width - 32) / 361);
   return (
     <SheetModal visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
@@ -67,7 +70,8 @@ export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: 
 
             <View style={styles.content}>
               {/* Frame 2147226270: the tilted chips */}
-              <View style={styles.chipArea}>
+              <View style={[styles.chipArea, { height: 244 * chipScale }]}>
+                <View style={{ width: 361, height: 244, alignSelf: 'center', transform: [{ scale: chipScale }], marginTop: -(244 * (1 - chipScale)) / 2 }}>
                 {ROWS.map((row, ri) => (
                   <View key={ri} style={{ position: 'absolute', left: row.left, top: row.top, width: row.w, height: row.h }}>
                     {row.chips.map((c) => (
@@ -83,6 +87,7 @@ export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: 
                     ))}
                   </View>
                 ))}
+                </View>
               </View>
 
               {/* Frame 2147226278 */}

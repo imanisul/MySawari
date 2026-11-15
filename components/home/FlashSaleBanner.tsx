@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
@@ -81,14 +81,17 @@ export function FlashSaleBanner() {
   const { data: offers = [] } = useQuery(exclusiveOffersQueryOptions);
   const isLive = offers.length > 0;
   const subText = isLive ? 'LIVE NOW · BOOK DEALS' : 'EVERY SUNDAY 8AM';
+  // Its lettering sits at fixed spots on a 361-wide card: on narrower phones the whole banner shrinks to fit.
+  const { width } = useWindowDimensions();
+  const k = Math.min(1, (width - 32) / 361);
 
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, { height: 106 * k }]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Flash Sale"
         onPress={() => { Haptics.selectionAsync(); router.push('/flash-sale'); }}
-        style={({ pressed }) => [styles.card, pressed && { opacity: 0.92 }]}
+        style={({ pressed }) => [styles.card, k < 1 && { transform: [{ scale: k }], marginHorizontal: -(361 * (1 - k)) / 2 }, pressed && { opacity: 0.92 }]}
       >
         <BannerRays style={styles.rays} />
         <View style={styles.text}>
@@ -107,8 +110,8 @@ export function FlashSaleBanner() {
 }
 
 const styles = StyleSheet.create({
-  row: { height: 106, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
-  card: { width: 361, maxWidth: '100%', height: 106, borderRadius: 16, backgroundColor: '#3E2DC8', overflow: 'hidden' },
+  row: { height: 106, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  card: { width: 361, height: 106, borderRadius: 16, backgroundColor: '#3E2DC8', overflow: 'hidden' },
   rays: { position: 'absolute', left: -100, top: -228.5, mixBlendMode: 'overlay' },
   text: { position: 'absolute', top: 23, left: (361 - 223.93) / 2 + 0.47, width: 223.93, height: 54.307, alignItems: 'center', overflow: 'visible' },
   underlineFrame: {

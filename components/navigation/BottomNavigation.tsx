@@ -246,8 +246,8 @@ const ALL_ITEMS: {
   badge?: string;
 }[] = [
   { id: 'home', label: 'Home', route: '/', Icon: HomeIcon },
+  { id: 'flash-sale', label: 'Sale', route: '/flash-sale', Icon: TopDealsIcon, badge: 'Flash' },
   { id: 'explore', label: 'Search', route: '/explore', Icon: SearchIcon },
-  { id: 'flash-sale', label: 'Sale', route: '/flash-sale', Icon: TopDealsIcon, badge: 'Flash' }, // the exclusive deals (Flash Sale page)
   { id: 'bookings', label: 'My Trips', route: '/bookings', Icon: ActivityIcon },
   { id: 'profile', label: 'Profile', route: '/profile', Icon: ProfileIcon },
 ];
@@ -294,12 +294,14 @@ export function BottomNavigation() {
                 hitSlop={{ top: 6, bottom: 6 }}
                 style={({ pressed }) => [styles.navItem, pressed && !active && { opacity: 0.7 }]}
               >
-                <Icon color={color} fill={isDarkMode ? colors.card : '#FFFFFF'} active={active} />
-                {!!badge && (
-                  <View pointerEvents="none" style={[styles.badge, { backgroundColor: active ? '#FF008B' : '#6B5AED' }]}>
-                    <Text style={styles.badgeText} allowFontScaling={false}>{badge}</Text>
-                  </View>
-                )}
+                <View style={styles.iconWrapper}>
+                  <Icon color={color} fill={isDarkMode ? colors.card : '#FFFFFF'} active={active} />
+                  {!!badge && (
+                    <View pointerEvents="none" style={styles.badge}>
+                      <Text style={styles.badgeText} allowFontScaling={false}>{badge}</Text>
+                    </View>
+                  )}
+                </View>
                 <Text
                   style={[styles.navLabel, active && styles.navLabelActive, { color }]}
                   numberOfLines={1}
@@ -334,28 +336,33 @@ const styles = StyleSheet.create({
   fade: { bottom: 0, left: 0, position: 'absolute', right: 0 },
   // flex-end: opening the Help menu grows the Help column upward without lifting the tab pill.
   row: { alignItems: 'flex-end', flexDirection: 'row', gap: BOTTOM_NAV_GAP },
-  // Design: 285×64 pill (fluid width here, so it fills wider phones), 1px #E7EAF4 border, 8px padding and 4 between tabs, soft upward glow.
+  // Figma Frame 2147225836: 293×56 pill (fluid width flex: 1), 1px #F0EFFD border, padding 6px 8px, gap 4px, soft upward glow.
   pill: {
     flex: 1,
     minWidth: 0,
     alignItems: 'center',
-    borderColor: '#E7EAF4',
+    borderColor: '#F0EFFD',
     borderRadius: BOTTOM_NAV_RADIUS,
     borderWidth: 1,
     flexDirection: 'row',
     height: BOTTOM_NAV_CONTENT_HEIGHT,
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
     paddingVertical: 6,
-    gap: 2,
+    gap: 4,
     boxShadow: NAV_SHADOW,
+    shadowColor: '#2F3E75',
+    shadowOffset: { width: 0, height: -34 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 8,
   },
   helpCol: { alignItems: 'center' },
-  // Design: 64×64 circle, Green/green-50 fill, #DCEFE8 border, 8px padding, 2 between icon and label.
+  // Design: 56×56 circle, Green/green-50 fill, #DCEFE8 border, 8px padding, 2 between icon and label.
   help: {
     alignItems: 'center',
     backgroundColor: '#E6F3EE',
     borderColor: '#DCEFE8',
-    borderRadius: BOTTOM_NAV_RADIUS,
+    borderRadius: 28,
     borderWidth: 1,
     gap: 2,
     padding: 8,
@@ -363,10 +370,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: BOTTOM_NAV_CONTENT_HEIGHT,
     boxShadow: NAV_SHADOW,
+    shadowColor: '#2F3E75',
+    shadowOffset: { width: 0, height: -34 },
+    shadowOpacity: 0.05,
+    shadowRadius: 20,
+    elevation: 8,
   },
   helpMenu: { alignItems: 'center', gap: 12, marginBottom: 12 },
   helpOption: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  // Figma tab (Frame 2147225810): 42 high, padding 2/0, gap 2, equal widths (51.8 on a 393 screen): 2 + icon 24 + 2 + label 12 + 2.
+  // Figma tab (Frame 2147225810 / 2147225814 / 2147226154 / 2147226157 / 2147225815):
+  // 42 high, padding 2/0, gap 2, equal widths (51.8 on a 393 screen): 2 + icon 24 + 2 + label 12 + 2.
   navItem: {
     alignItems: 'center',
     flexBasis: 0,
@@ -375,17 +388,42 @@ const styles = StyleSheet.create({
     gap: 2,
     height: 42,
     paddingVertical: 2,
+    paddingHorizontal: 0,
     justifyContent: 'center',
   },
-  // Design: Plus Jakarta Sans 600, 8px / 12px, in every state.
+  iconWrapper: {
+    width: ICON,
+    height: ICON,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  // Design: Plus Jakarta Sans 600, 8.5px / 12px, in every state.
   navLabel: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 8.1,
+    fontSize: 8.5,
     lineHeight: 12,
     textAlign: 'center',
   },
   navLabelActive: {},
   // "Flash" tag on the Sale tab: pink pill overlapping the icon's foot.
-  badge: { position: 'absolute', top: 22, alignSelf: 'center', height: 10, paddingHorizontal: 4, borderRadius: 8, backgroundColor: '#FF008B', alignItems: 'center', justifyContent: 'center' },
-  badgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 6.5, lineHeight: 9, color: '#FFFFFF', includeFontPadding: false },
+  badge: {
+    position: 'absolute',
+    bottom: 0,
+    alignSelf: 'center',
+    height: 10,
+    paddingHorizontal: 4,
+    borderRadius: 5,
+    backgroundColor: '#FF008B',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2,
+  },
+  badgeText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 6.5,
+    lineHeight: 9,
+    color: '#FFFFFF',
+    includeFontPadding: false,
+  },
 });

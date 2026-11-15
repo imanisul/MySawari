@@ -40,8 +40,9 @@ function PriceCard({ fromRate }: { fromRate: number }) {
         <Image source={require('@/assets/images/home_hero_cars.png')} style={styles.priceCars} contentFit="contain" transition={0} />
         <View style={styles.priceRow}>
           <View style={styles.priceLeadCol}>
-            <Text style={[styles.priceLead, { marginVertical: -11.97 }]} numberOfLines={1} allowFontScaling={false}>Your ride,</Text>
-            <Text style={[styles.priceLead, { marginVertical: -11.97 }]} numberOfLines={1} allowFontScaling={false}>from just</Text>
+            {/* Frame 2147226205: two 43-tall lines overlapping by 11.97 (Figma's negative gap) → 74.03 tall */}
+            <Text style={styles.priceLead} numberOfLines={1} allowFontScaling={false}>Your ride,</Text>
+            <Text style={[styles.priceLead, { marginTop: -11.97 }]} numberOfLines={1} allowFontScaling={false}>from just</Text>
           </View>
           <Text style={styles.priceAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} allowFontScaling={false}>{formatCurrency(fromRate)}</Text>
         </View>
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
   priceShadow: { position: 'absolute', left: (312.44 - 289.69) / 2 + 0.6, top: 146 },
   priceCars: { position: 'absolute', width: 371, height: 123.7, left: -17.3 - 13.78, top: 95.2 - 42.5 },
   priceRow: { position: 'absolute', top: 0, left: (312.44 - 282.48) / 2 - 0.6, width: 282.48, height: 93, flexDirection: 'row', alignItems: 'center', gap: 2.39 },
-  priceLeadCol: { width: 128.09, alignItems: 'center' },
+  priceLeadCol: { width: 128.09, height: 74.03, alignItems: 'center' },
   priceLead: { fontFamily: F700, fontSize: 28.73, lineHeight: 43, letterSpacing: -0.57, color: '#FFFFFF', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 4.79 }, textShadowRadius: 7.18, includeFontPadding: false },
   priceAmount: { width: 152, fontFamily: F700, fontSize: 62.25, lineHeight: 93, letterSpacing: -1.25, color: '#FAC64C', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 3.83 }, textShadowRadius: 3.83, includeFontPadding: false },
   // deals card
@@ -247,7 +248,8 @@ const styles = StyleSheet.create({
   bars: { flexDirection: 'row', gap: 10, height: 3 },
   bar: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.49)', overflow: 'hidden' },
   barFill: { position: 'absolute', left: 0, top: 0, bottom: 0, width: '100%', borderRadius: 2, backgroundColor: '#FFFFFF' },
-  booking: { height: 110, flexDirection: 'row', alignItems: 'flex-start', padding: 8, gap: 12, backgroundColor: '#FBFAFE', borderWidth: 1, borderColor: '#DEDAFB', borderRadius: 8 },
+  // Booking Card (110 high, padding 8) holding Frame 2147225883: photo + text, 12 apart, centred both ways in 306 × 92.
+  booking: { height: 110, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 8, gap: 12, backgroundColor: '#FBFAFE', borderWidth: 1, borderColor: '#DEDAFB', borderRadius: 8 },
   carPhoto: { width: 120, height: 92, borderRadius: 6, backgroundColor: '#EEEAFD' },
   bookingText: { flex: 1, height: 92, justifyContent: 'center', gap: 10, paddingTop: 2, paddingBottom: 4 },
   brand: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, color: '#737373', includeFontPadding: false },

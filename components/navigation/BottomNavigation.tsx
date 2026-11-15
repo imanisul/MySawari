@@ -407,23 +407,7 @@ const styles = StyleSheet.create({
   },
   navLabelActive: {},
   // "Flash" tag on the Sale tab: pink pill overlapping the icon's foot.
-  badge: {
-    position: 'absolute',
-    bottom: 0,
-    alignSelf: 'center',
-    height: 10,
-    paddingHorizontal: 4,
-    borderRadius: 5,
-    backgroundColor: '#FF008B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  badgeText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 6.5,
-    lineHeight: 9,
-    color: '#FFFFFF',
-    includeFontPadding: false,
-  },
+  // Measured from the design: a 32 × 13 pill over the bolt's lower part (purple when the tab isn't selected).
+  badge: { position: 'absolute', top: 21, alignSelf: 'center', height: 13, minWidth: 32, paddingHorizontal: 6, borderRadius: 7, backgroundColor: '#FF008B', alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  badgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8.5, lineHeight: 11, color: '#FFFFFF', includeFontPadding: false },
 });

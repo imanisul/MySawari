@@ -27,7 +27,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 246; // same width as the Top Picks cards
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function ExclusiveOffersSection() {
+/** layout 'row': the Home row (title, LIVE tag, sideways cards). 'list': full-width cards stacked, for the Flash Sale page. */
+export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'list' } = {}) {
   const router = useRouter();
   const p = useDetailsPalette();
   const {
@@ -84,7 +85,8 @@ export function ExclusiveOffersSection() {
     recordOfferView(offer._id || offer.id);
 
     if (offer.isEarlyAccessLocked || (offer.isEligible === false && !isMember)) {
-      router.push('/top-deals');
+      // Members-only for now (early access or a members deal): the way in is a membership.
+      router.push('/membership');
       return;
     }
 
@@ -301,7 +303,7 @@ export function ExclusiveOffersSection() {
     return (
       <TouchableOpacity
         onPress={() => handleCardPress(item)}
-        style={[styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}
+        style={[styles.card, layout === 'list' && { width: '100%' }, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}
         activeOpacity={0.9}
       >
         {/* Banner Thumbnail */}
@@ -421,7 +423,7 @@ export function ExclusiveOffersSection() {
   return (
     <View style={styles.container}>
       {/* Section Header */}
-      <View style={styles.sectionHeader}>
+      {layout === 'row' && <View style={styles.sectionHeader}>
         <View style={styles.titleWithZap}>
           <Feather name="zap" size={17} color="#E11D48" />
           <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">Flash Sale</Text>
@@ -430,17 +432,18 @@ export function ExclusiveOffersSection() {
           <View style={styles.liveDot} />
           <Text style={styles.liveTagText}>LIVE</Text>
         </View>
-      </View>
+      </View>}
 
       {/* Cards List */}
       <FlatList
         data={offers}
         renderItem={renderOfferCard}
         keyExtractor={(item) => item._id || item.id}
-        horizontal
+        horizontal={layout === 'row'}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
-        snapToInterval={CARD_WIDTH + 8}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={layout === 'row' ? styles.listContainer : { padding: 16, gap: 12 }}
+        snapToInterval={layout === 'row' ? CARD_WIDTH + 8 : undefined}
         decelerationRate="fast"
       />
 

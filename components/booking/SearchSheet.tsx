@@ -7,6 +7,7 @@ import { SearchCard } from './SearchCard';
 import { PrimaryButton } from '../common/PrimaryButton';
 import { useSawari } from '@/context/SawariContext';
 import { getAvailability } from '@/utils/sawari';
+import { useVehicles } from '@/hooks/useVehicles';
 
 export function SearchSheet({
   visible,
@@ -31,8 +32,11 @@ export function SearchSheet({
     if ((deliveryMode === 'return' || deliveryMode === 'both') && !returnAddress?.name) isSearchDisabled = true;
   }
 
+  const { data: fetchedVehicles = [] } = useVehicles();
+  const activeCar = selectedCar ? (fetchedVehicles.find((v) => String(v.id) === String(selectedCar.id)) || selectedCar) : selectedCar;
+
   // Check if selected car is available on these dates
-  const availability = getAvailability(selectedCar, startStr, endStr, pickupTime, returnTime);
+  const availability = getAvailability(activeCar, startStr, endStr, pickupTime, returnTime);
   const isAvailable = availability.available;
   
   return (

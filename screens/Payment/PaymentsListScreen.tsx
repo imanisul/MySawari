@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, TextInput, ActivityIndicator, RefreshControl } from 'react-native';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -378,10 +379,9 @@ export default function PaymentsScreen() {
       </SafeAreaView>
 
       {/* Add Payment Modal */}
-      <Modal visible={showAddModal} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent>
+      <SheetModal visible={showAddModal}>
         <View ref={kb.ref} collapsable={false} style={styles.modalOverlay}>
           <View style={styles.modalOverlayBg}>
-            <ModalBlur />
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowAddModal(false)} />
           </View>
           
@@ -488,7 +488,7 @@ export default function PaymentsScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </SheetModal>
 
     </View>
   );

@@ -1,4 +1,5 @@
 import React from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,9 +28,8 @@ export function ManageBookingSheet({
   const code = booking.bookingCode || booking.id.slice(-6).toUpperCase();
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <SheetModal visible={visible} onRequestClose={onClose}>
       <View style={[styles.overlay, { backgroundColor: 'transparent' }]}>
-        <ModalBlur />
         <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.dim]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={styles.wrap}>
@@ -69,7 +69,7 @@ export function ManageBookingSheet({
           </View>
         </View>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

@@ -1,4 +1,5 @@
 import React, { useCallback, useRef, useState } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { View, Text, StyleSheet, FlatList, Pressable, Modal, Share, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { BlurTargetView } from 'expo-blur';
 import { Feather, Ionicons } from '@expo/vector-icons';
@@ -130,9 +131,8 @@ export default function SavedAddressesScreen() {
       </SafeAreaView>
 
       {/* ── Select option ── */}
-      <Modal visible={!!menuFor} transparent animationType="slide" onRequestClose={() => setMenuFor(null)} statusBarTranslucent navigationBarTranslucent>
+      <SheetModal visible={!!menuFor} onRequestClose={() => setMenuFor(null)}>
         <View style={styles.sheetWrap}>
-          <ModalBlur />
           <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuFor(null)} accessibilityLabel="Close" />
           <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => setMenuFor(null)} style={[styles.closeBubble, { backgroundColor: p.page }]}>
@@ -162,7 +162,7 @@ export default function SavedAddressesScreen() {
             </View>
           </View>
         </View>
-      </Modal>
+      </SheetModal>
 
       {/* ── Delete this address? ── */}
       <Modal visible={!!deleteFor} transparent animationType="fade" onRequestClose={() => setDeleteFor(null)} statusBarTranslucent navigationBarTranslucent>
@@ -223,9 +223,8 @@ function PhoneSheet({ address, onClose, onSave }: { address: SavedAddress | null
   };
 
   return (
-    <Modal visible={!!address} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <SheetModal visible={!!address} onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetWrap}>
-        <ModalBlur />
         <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} style={[styles.closeBubble, { backgroundColor: p.page }]}>
@@ -262,7 +261,7 @@ function PhoneSheet({ address, onClose, onSave }: { address: SavedAddress | null
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </SheetModal>
   );
 }
 

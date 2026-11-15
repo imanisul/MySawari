@@ -17,7 +17,7 @@ import { HomeCardsRow } from '@/components/home/HomeCardsRow';
 import { WelcomeSheet } from '@/components/home/WelcomeSheet';
 import { API } from '@/services/backend/api';
 import { isPastSearch, removeRecentSearch, RecentSearch } from '@/utils/recentSearches';
-import { useVehicles, prefetchCarGallery } from '@/hooks/useVehicles';
+import { useVehicles, prefetchCarGallery, VEHICLES_KEY } from '@/hooks/useVehicles';
 import { recentlyViewedQueryOptions, recentSearchesQueryOptions } from '@/hooks/useHomeData';
 import { Reveal } from '@/components/common/Reveal';
 import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
@@ -178,8 +178,9 @@ export default function HomeScreen() {
     }
   }, [isAuthLoading, isAuthenticated, setBookingSource, fetchWallet, syncNotifications]));
 
-  // Live content synchronisation: refresh offers on focus and background version check
+  // Live content synchronisation: refresh vehicles and offers on focus and background version check
   useFocusEffect(useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: VEHICLES_KEY });
     queryClient.invalidateQueries({ queryKey: ['offers'] });
     queryClient.invalidateQueries({ queryKey: ['exclusive-offers'] });
   }, [queryClient]));

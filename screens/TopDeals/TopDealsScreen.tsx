@@ -15,12 +15,13 @@ import { Image as CachedImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, RadialGradient, Stop, Ellipse, Circle } from 'react-native-svg';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
 import { useDealCars, dealPricing } from '@/hooks/useDealCars';
+import { VEHICLES_KEY } from '@/hooks/useVehicles';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
   dayNumToLabel,
@@ -36,7 +37,7 @@ import {
   bestFor,
   MONTH_NAMES,
 } from '@/utils/sawari';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { HeartIcon } from '@/components/vehicle/HeartIcon';
 import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
@@ -44,6 +45,8 @@ import { memberPriceFor } from '@/screens/Membership/MembershipScreen';
 import { exclusiveOffersQueryOptions } from '@/services/api/offers';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { getVehicleImage } from '@/utils/vehicleImages';
+import { SortSheet, type SortKey } from '@/components/booking/SortSheet';
+import { SortLinesIcon } from '@/components/common/FilterIcons';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -368,8 +371,20 @@ export default function TopDealsScreen() {
     applyCoupon,
   } = useSawari();
 
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
+  // Cars / Bikes & Scooters switch under the search box.
+  const [kind, setKind] = useState<'car' | 'bike'>('car');
+  // Sort button beside the search (same sheet as Explore). Recommended = the order deals start in.
+  const [sort, setSort] = useState<SortKey>('recommended');
+  const [showSort, setShowSort] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useFocusEffect(
+    React.useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: VEHICLES_KEY });
+    }, [queryClient])
+  );
 
   // Second-by-second live countdown & price decrease
   useEffect(() => {
@@ -408,15 +423,25 @@ export default function TopDealsScreen() {
   }, [dealCars]);
 
   const filteredCars = useMemo(() => {
-    if (!searchQuery.trim()) return dealCars;
-    const q = searchQuery.toLowerCase();
-    return dealCars.filter(
+    const ofKind = dealCars.filter((c: any) => (c.type === 'Bike') === (kind === 'bike'));
+    const q = searchQuery.trim().toLowerCase();
+    const found = !q ? ofKind : ofKind.filter(
       (c: any) =>
-        (c.displayName || c.name || c.vehicleName || '').toLowerCase().includes(q) ||
-        (c.category || '').toLowerCase().includes(q) ||
-        (c.fuelType || c.fuel || '').toLowerCase().includes(q)
+        [c.displayName, c.name, c.vehicleName, c.brand, c.category, c.fuelType, c.fuel, c.transmission]
+          .some((f) => String(f || '').toLowerCase().includes(q))
     );
-  }, [dealCars, searchQuery]);
+    if (sort === 'recommended') return found;
+    // The deal price shown on each card: hourly rate × the hours from its start (or now) to its end.
+    const now = Date.now();
+    const priceOf = (c: any) => {
+      const start = (c.dealStartMs || 0) > now ? c.dealStartMs : now;
+      return dealPricing(c, Math.max(1, Math.ceil(Math.max(0, (c.dealEndMs || targetEndMs) - start) / 3600000))).price;
+    };
+    const rated = (c: any) => Number(c.reviewCount) > 0 ? Number(c.rating) || 0 : 0;
+    return [...found].sort((a: any, b: any) =>
+      sort === 'price_asc' ? priceOf(a) - priceOf(b) : sort === 'price_desc' ? priceOf(b) - priceOf(a) : rated(b) - rated(a));
+  }, [dealCars, searchQuery, kind, sort, targetEndMs]);
+  const noun = kind === 'bike' ? (filteredCars.length === 1 ? 'Bike' : 'Bikes') : (filteredCars.length === 1 ? 'Car' : 'Cars');
 
   const handleSelectDeal = (car: any) => {
     Haptics.selectionAsync();
@@ -500,8 +525,19 @@ export default function TopDealsScreen() {
       setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
     }
 
+    // The deal itself, so the calendar can mark its day "OFF" and still book it at the hourly deal price when that
+    // day alone is chosen (any longer trip is a normal full-day-rate booking).
+    const dealStartMs = (car.dealStartMs || 0) > nowMs ? car.dealStartMs : Math.floor(nowMs / 60000) * 60000;
+    const dp = getIndiaDateParts(dealStartMs);
+    const deal = {
+      day: toDayNum(dp.year, dp.month, dp.date),
+      startMs: dealStartMs,
+      endMs: car.dealEndMs || targetEndMs,
+      rate: dealPricing(car, 1).rate,
+    };
+
     // The date & time calendar opens for this car: days it cannot be booked are off, and Apply goes on to car details.
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true' } });
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', deal: JSON.stringify(deal) } });
   };
 
   const handleShare = async () => {
@@ -532,7 +568,7 @@ export default function TopDealsScreen() {
           <View style={styles.headerTextCol}>
             <Text style={styles.headerTitle}>Today’s Deals</Text>
             <Text style={styles.headerSub}>
-              Showing {filteredCars.length} {filteredCars.length === 1 ? 'Car' : 'Cars'} available
+              Showing {filteredCars.length} {noun} available
             </Text>
           </View>
         </View>
@@ -551,7 +587,53 @@ export default function TopDealsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
+        {/* Frame 2147225639: search (padding 12/16/4), then the Cars / Bikes & Scooters switch */}
+        <View style={styles.searchWrap}>
+          {/* Frame 2147225947: search field + sort button, 8 apart */}
+          <View style={styles.searchRow}>
+            <View style={styles.searchBox}>
+              <Feather name="search" size={20} color="#737373" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search cars and bike"
+                placeholderTextColor="#737373"
+                style={styles.searchInput}
+                returnKeyType="search"
+                autoCorrect={false}
+                accessibilityLabel="Search deals"
+              />
+              {!!searchQuery && (
+                <Pressable onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
+                  <Feather name="x" size={16} color="#737373" />
+                </Pressable>
+              )}
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="Sort deals" onPress={() => { Haptics.selectionAsync(); setShowSort(true); }} style={styles.sortBtn}>
+              <SortLinesIcon color={sort === 'recommended' ? '#737373' : '#6B5AED'} width={16} />
+            </Pressable>
+          </View>
+          <View style={styles.kindRow} accessibilityRole="tablist">
+            {([['car', 'Cars'], ['bike', 'Bikes & Scooters']] as const).map(([k, label]) => {
+              const on = kind === k;
+              return (
+                <Pressable
+                  key={k}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: on }}
+                  onPress={() => { Haptics.selectionAsync(); setKind(k); }}
+                  style={[styles.kindPill, on && styles.kindPillOn]}
+                >
+                  <Text style={[styles.kindText, on && styles.kindTextOn]}>{label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         {/* Frame 2147226218: Today's Deals Banner */}
         <LinearGradient
           colors={['#6152D8', '#ADA4F4']}
@@ -630,13 +712,13 @@ export default function TopDealsScreen() {
           <View style={styles.emptyBox}>
             <ActivityIndicator size="large" color="#6152D8" />
             <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
-              Loading available cars...
+              Loading available {kind === 'bike' ? 'bikes' : 'cars'}...
             </Text>
           </View>
         ) : filteredCars.length === 0 ? (
           <View style={styles.emptyBox}>
             <Feather name="clock" size={38} color="#6152D8" />
-            <Text style={styles.emptyTitle}>No Cars Available Right Now</Text>
+            <Text style={styles.emptyTitle}>{searchQuery.trim() ? `No ${kind === 'bike' ? 'bikes' : 'cars'} match “${searchQuery.trim()}”` : `No ${kind === 'bike' ? 'Bikes' : 'Cars'} Available Right Now`}</Text>
             <Text style={styles.emptySubtitle}>
               Cars and bikes that are free until 8:00 AM will appear here
               automatically. Check back soon!
@@ -673,6 +755,7 @@ export default function TopDealsScreen() {
           })
         )}
       </ScrollView>
+      <SortSheet visible={showSort} onClose={() => setShowSort(false)} value={sort} onApply={(k) => { setSort(k); setShowSort(false); }} />
     </View>
   );
 }
@@ -741,9 +824,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#1E293B',
   },
+  searchWrap: { width: '100%', maxWidth: 393, paddingTop: 12 },
+  searchRow: { flexDirection: 'row', gap: 8, height: 45 },
+  searchBox: { flex: 1, height: 45, flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#EAECF1', backgroundColor: '#FFFFFF' },
+  searchInput: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22.5, color: '#262626', paddingVertical: 0, includeFontPadding: false },
+  sortBtn: { width: 54, height: 45, alignItems: 'center', justifyContent: 'center', paddingVertical: 5, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: '#EAECF1', backgroundColor: '#F9F9FB' },
+  // Frame 2147225816: the Cars / Bikes & Scooters filter, 50 high (4 above + the search block's 4 below, 8 under).
+  kindRow: { flexDirection: 'row', gap: 8, height: 50, paddingTop: 8, paddingBottom: 8, alignItems: 'center' },
+  kindPill: { height: 34, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E7EAF4', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  kindPillOn: { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
+  kindText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5, color: '#737373' },
+  kindTextOn: { color: '#FFFFFF' },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 0, // the search block on top brings its own 12
     paddingBottom: 40,
     alignItems: 'center',
   },

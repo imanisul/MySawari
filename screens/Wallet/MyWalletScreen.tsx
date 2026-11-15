@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl, Modal, TextInput, KeyboardAvoidingView, Platform, ActivityIndicator, Alert, LayoutAnimation } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -285,10 +286,9 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
   );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <SheetModal visible={visible} onRequestClose={onClose}>
       {/* 'padding' on Android too: a translucent Modal ignores the system resize, so the sheet sat behind the keyboard. */}
       <KeyboardAvoidingView behavior="padding" style={styles.sheetWrap}>
-        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={[styles.sheet, { backgroundColor: p.page, paddingBottom: Math.max(insets.bottom, 16) }]}>
           <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
@@ -330,7 +330,7 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </SheetModal>
   );
 }
 

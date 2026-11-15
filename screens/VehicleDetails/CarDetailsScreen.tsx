@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { Animated, Dimensions, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager, Alert } from 'react-native';
 import * as Haptics from '@/utils/haptics';
+import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSawari } from '@/context/SawariContext';
@@ -135,6 +136,13 @@ export default function CarDetailsScreen() {
   // Enrich the car with the computed availability so child components can access nextAvailableFrom etc.
   const enrichedCar = liveCar ? { ...liveCar, availability, isAvailable } : liveCar;
 
+  // Keep selectedCar in context synchronized with live availability facts
+  useEffect(() => {
+    if (liveCar && selectedCar && liveCar !== selectedCar && liveCar.bookedRanges !== selectedCar.bookedRanges) {
+      selectCar(liveCar);
+    }
+  }, [liveCar, selectedCar, selectCar]);
+
   const requestedStart = parseDayLabel(startStr);
   const requestedEnd = requestedStart !== null ? parseDayLabel(endStr, requestedStart) : null;
   // A same-day trip (e.g. 8 AM → 8 PM) is a real trip: requiring end > start sent Book Now back to the dates.
@@ -176,6 +184,13 @@ export default function CarDetailsScreen() {
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [agreed, setAgreed] = useState(true); // pre-ticked; the customer can untick it
   const [barHeight, setBarHeight] = useState(165 + Math.max(insets.bottom, 12));
+  // "Want to keep it longer?" floats above the bar (fading in) once the Policy Agreement scrolls into view.
+  const [floatAddDay, setFloatAddDay] = useState(false);
+  const policyTop = useRef(0);
+  const floatFade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(floatFade, { toValue: floatAddDay ? 1 : 0, duration: 220, useNativeDriver: true }).start();
+  }, [floatAddDay, floatFade]);
 
   const openDates = () => {
     if (isDatesLocked) {
@@ -292,6 +307,8 @@ export default function CarDetailsScreen() {
   };
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const seen = policyTop.current > 0 && e.nativeEvent.contentOffset.y + e.nativeEvent.layoutMeasurement.height >= policyTop.current + 24;
+    if (seen !== floatAddDay) setFloatAddDay(seen);
     if (Date.now() < jumpingUntil.current) return;
     const line = e.nativeEvent.contentOffset.y + pillsHeight.current + 24;
     let next: SectionKey = 'overview';
@@ -425,11 +442,33 @@ export default function CarDetailsScreen() {
         <PaymentSchedule />
         <Faqs />
         <HelpCard />
-        <PolicyAgreement agreed={agreed} onToggle={() => setAgreed((v) => !v)} />
+        <View onLayout={(e) => { policyTop.current = e.nativeEvent.layout.y; }}>
+          <PolicyAgreement agreed={agreed} onToggle={() => setAgreed((v) => !v)} />
+        </View>
           </>
         )}
       </ScrollView>
       </BlurTargetView>
+
+      {/* Figma "Add 1 more day": 297 × 45 floating card above the bottom bar */}
+      {canAddDay && (
+        <Animated.View pointerEvents={floatAddDay ? 'box-none' : 'none'} style={[styles.floatWrap, { bottom: barHeight + 8, opacity: floatFade }]}>
+          <View style={[styles.floatCard, { borderColor: p.deliveryBorder }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.floatTitle, { color: p.fg }]} numberOfLines={1}>Want to keep it longer?</Text>
+              <Text style={[styles.floatSub, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Extend your booking at {formatCurrency(selectedCar.perDay)}/day.</Text>
+            </View>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); addOneDay(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Add more days"
+              style={({ pressed }) => [styles.floatBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={[styles.floatBtnText, { color: p.onNavy }]}>Add more days</Text>
+            </Pressable>
+          </View>
+        </Animated.View>
+      )}
 
       <StickyBookingBar
         isAvailable={isAvailable}
@@ -464,5 +503,11 @@ export default function CarDetailsScreen() {
 }
 
 const styles = StyleSheet.create({
+  floatWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 16 },
+  floatCard: { width: 297, maxWidth: '100%', height: 45, flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 6, paddingBottom: 6, paddingRight: 8, paddingLeft: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 10, shadowColor: '#2F3E75', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  floatTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, includeFontPadding: false },
+  floatSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 9, lineHeight: 14, includeFontPadding: false },
+  floatBtn: { width: 96, height: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },
+  floatBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, includeFontPadding: false },
   screen: { flex: 1 },
 });

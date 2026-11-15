@@ -5,9 +5,10 @@ import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
 import { useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { Car, getAvailability, isInService } from '@/utils/sawari';
+import { useQueryClient } from '@tanstack/react-query';
+import { Car, getAvailability, isInService, splitDateRange } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
-import { useVehicles } from '@/hooks/useVehicles';
+import { useVehicles, VEHICLES_KEY } from '@/hooks/useVehicles';
 import { CarListCard, Page } from '@/components';
 import {
   ExploreFilterSheet, SortSheet, ExploreFilters, EMPTY_FILTERS, SortKey, countActive, matchesFilters, sortCars,
@@ -34,8 +35,9 @@ export default function ExploreScreen() {
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
+  const queryClient = useQueryClient();
   // Cars or bikes, as chosen on Home.
-  const { setBookingSource, vehicleType: homeType, setVehicleType, setDropoff, setDates, duration, pickupTime, returnTime } = useSawari();
+  const { setBookingSource, vehicleType: homeType, setVehicleType, setDropoff, setDates, dateRange, duration, pickupTime, returnTime } = useSawari();
   const isBike = homeType === 'bike';
   const CHIPS = chipsFor(isBike);
 
@@ -45,7 +47,8 @@ export default function ExploreScreen() {
     setBookingSource('explore');
     setDropoff(null);
     setDates('Select Dates', duration);
-  }, [setBookingSource, setDropoff, setDates])); // eslint-disable-line react-hooks/exhaustive-deps
+    queryClient.invalidateQueries({ queryKey: VEHICLES_KEY });
+  }, [setBookingSource, setDropoff, setDates, duration, queryClient]));
 
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [showSortSheet, setShowSortSheet] = useState(false);
@@ -126,10 +129,11 @@ export default function ExploreScreen() {
 
   // Availability is worked out once per vehicle list, so filtering and sorting reuse the same card objects
   // (new objects on every change made every card redraw).
+  const [startStr, endStr] = dateRange && dateRange !== 'Select Dates' ? splitDateRange(dateRange) : [undefined, undefined];
   const withAvailability = useMemo(() => baseCars.map((car: Car) => {
-    const availability = getAvailability(car, undefined, undefined, pickupTime, returnTime);
+    const availability = getAvailability(car, startStr, endStr, pickupTime, returnTime);
     return { ...car, isAvailable: availability.available, availability };
-  }), [baseCars, pickupTime, returnTime]);
+  }), [baseCars, startStr, endStr, pickupTime, returnTime]);
 
   const filteredCars = useMemo(() => {
     const query = debouncedQuery.trim().toLowerCase();

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { useQueries } from '@tanstack/react-query';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -269,9 +270,8 @@ function SheetFrame({ visible, onClose, title, onClear, children, footer }: {
   const p = useDetailsPalette();
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <SheetModal visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <ModalBlur />
         <View  style={[StyleSheet.absoluteFill, styles.dim]}/>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <View style={styles.closeRow}>
@@ -290,7 +290,7 @@ function SheetFrame({ visible, onClose, title, onClear, children, footer }: {
           <View style={styles.footer}>{footer}</View>
         </View>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

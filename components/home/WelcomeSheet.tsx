@@ -1,4 +1,5 @@
 import React from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Feather } from '@expo/vector-icons';
@@ -39,9 +40,8 @@ const ROWS: { left: number; top: number; w: number; h: number; chips: Chip[] }[]
 export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} transparent animationType="slide" statusBarTranslucent navigationBarTranslucent onRequestClose={onClose}>
+    <SheetModal visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
 
         <View style={styles.wrap}>
@@ -98,7 +98,7 @@ export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: 
           </View>
         </View>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

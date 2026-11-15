@@ -1132,8 +1132,8 @@ const styles = StyleSheet.create({
   helpSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16, marginTop: 2 },
   helpBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
-  agreeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  agreeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 56 },
   // 16 × 16 box centred on the first 20px text line.
-  checkbox: { width: 16, height: 16, borderRadius: 3, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  checkbox: { width: 16, height: 16, borderRadius: 3, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   agreeText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
 });

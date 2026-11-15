@@ -136,7 +136,7 @@ export default function ReferEarnScreen() {
         <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }} showsVerticalScrollIndicator={false}>
           {/* ── Hero ── */}
           <View style={{ height: cardTop + 123 }}>
-            <LinearGradient colors={['#323E71', '#4B5A9E']} style={[styles.heroBg, { height: heroH }]}>
+            <LinearGradient colors={['#332B72', '#6B5AED']} style={[styles.heroBg, { height: heroH }]}>
               <Rays width={width} height={heroH} cy={cardTop - 14} />
             </LinearGradient>
             <Pressable

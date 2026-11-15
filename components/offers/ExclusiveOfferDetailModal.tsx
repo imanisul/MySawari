@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import {
   Modal,
   View,
@@ -417,7 +418,7 @@ export function ExclusiveOfferDetailModal({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent onRequestClose={onClose}>
+    <SheetModal visible={visible} onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close offer" />
 
@@ -753,14 +754,14 @@ export function ExclusiveOfferDetailModal({
         onClose={() => setShowLogin(false)}
         onLoginSuccess={() => { setShowLogin(false); handleProceedToBooking(true); }}
       />
-    </Modal>
+    </SheetModal>
   );
 }
 
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(8, 6, 24, 0.65)',
+    backgroundColor: 'transparent', // the shared popup blur + dim sits behind (SheetModal)
     justifyContent: 'flex-end',
   },
   sheet: {

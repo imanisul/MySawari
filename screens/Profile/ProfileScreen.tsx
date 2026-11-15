@@ -22,8 +22,8 @@ import { ModalBlur } from '@/components/common/ModalBlur';
 // list of account rows with dashed dividers.
 
 const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
-// Page background: brand navy (the logo's #323E71) fading to a lighter navy by y=170, flat from there down.
-const HEADER = ['#323E71', '#4B5A9E', '#4B5A9E'] as const;
+// Page background: the Home header's purple (#332B72 → #6B5AED by y=170), flat from there down.
+const HEADER = ['#332B72', '#6B5AED', '#6B5AED'] as const; // same purple as the Home header
 const PURPLE = '#323E71';
 
 type PlanKey = 'starter' | 'plus' | 'pro';

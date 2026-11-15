@@ -10,27 +10,39 @@ import * as Haptics from '@/utils/haptics';
 // and the hard offset shadow is one more copy behind them.
 const NUDGE = [[-1, 0], [1, 0], [0, -1], [0, 1], [-0.7, -0.7], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7]];
 
-function Lettering({ text, width, size, shadow }: { text: string; width: number; size: number; shadow: { dx: number; dy: number; color: string } }) {
-  const base = { fontFamily: 'Anton_400Regular', fontSize: size, lineHeight: size * 1.15, width, textAlign: 'center' as const, includeFontPadding: false };
+/**
+ * Outlined lettering with a hard offset shadow. `near`: offset of the thin black shadow (default 0.4 × the main one);
+ * `outline`: outline thickness; `skew` / `scaleY`: slant and vertical stretch (the Figma font is taller than ours).
+ */
+export function Lettering({ text, width, size, shadow, font = 'Anton_400Regular', near, outline = 1, skew = '-6deg', scaleY = 1 }: {
+  text: string; width?: number; size: number; shadow: { dx: number; dy: number; color: string }; font?: string;
+  near?: number; outline?: number; skew?: string; scaleY?: number;
+}) {
+  const base = { fontFamily: font, fontSize: size, lineHeight: size * 1.15, width, textAlign: 'center' as const, includeFontPadding: false };
   const copy = (color: string, dx: number, dy: number, key: string) => (
     <Text key={key} allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit style={[base, { position: 'absolute', left: dx, top: dy, color }]}>{text}</Text>
   );
+  const nx = near !== undefined ? Math.sign(shadow.dx) * near : shadow.dx * 0.4;
+  const ny = near !== undefined ? Math.sign(shadow.dy) * near : shadow.dy * 0.4;
   return (
-    <View style={{ width, height: size * 1.15, transform: [{ skewX: '-6deg' }] }}>
+    <View style={{ width, height: size * 1.15, transform: [{ skewX: skew }, { scaleY }] }}>
       {copy(shadow.color, shadow.dx, shadow.dy, 's')}
-      {copy('#000000', shadow.dx * 0.4, shadow.dy * 0.4, 'sb')}
-      {NUDGE.map(([dx, dy], i) => copy('#000000', dx, dy, `o${i}`))}
+      {copy('#000000', nx, ny, 'sb')}
+      {NUDGE.map(([dx, dy], i) => copy('#000000', dx * outline, dy * outline, `o${i}`))}
       <Text allowFontScaling={false} numberOfLines={1} adjustsFontSizeToFit style={[base, { color: '#FFFFFF' }]}>{text}</Text>
     </View>
   );
 }
 
-function Bolt({ style }: { style?: object }) {
+/** Gold bolt (Figma Vector): 1.2px black outline, then a 1px black and a 3px #E58900 hard shadow down-right. */
+export function Bolt({ style, width = 13, line = 1.2, near = 1, far = 3 }: { style?: object; width?: number; line?: number; near?: number; far?: number }) {
   const d = 'M7.5 0.5 L0.8 13 H5.6 L3.6 22.6 L11.3 9.6 H6.4 Z';
+  const u = 12.08 / width; // screen px → drawing units
   return (
-    <Svg width={13} height={24} viewBox="0 0 12.08 23.15" style={[{ position: 'absolute' }, style]} pointerEvents="none">
-      <Path d={d} fill="#E58900" transform="translate(1,1)" />
-      <Path d={d} fill="#FBC422" stroke="#000000" strokeWidth={0.5} />
+    <Svg width={width + far} height={(width * 23.15) / 12.08 + far} viewBox={`0 0 ${12.08 + far * u} ${23.15 + far * u}`} style={[{ position: 'absolute' }, style]} pointerEvents="none">
+      <Path d={d} fill="#E58900" transform={`translate(${far * u},${far * u})`} />
+      <Path d={d} fill="#000000" transform={`translate(${near * u},${near * u})`} />
+      <Path d={d} fill="#FBC422" stroke="#000000" strokeWidth={line * u} />
     </Svg>
   );
 }
@@ -47,9 +59,9 @@ export function FlashSaleBanner() {
       >
         <View style={styles.text}>
           <View style={{ width: 183.21, height: 32.58, marginVertical: -3.1, alignItems: 'center', justifyContent: 'center' }}>
-            <Bolt style={{ left: 2.32, top: 6.27 }} />
+            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 2.32, top: 6.27 }} />
             <Lettering text="FLASH SALE" width={156.73} size={28} shadow={{ dx: -2.3, dy: 2.3, color: '#FF008B' }} />
-            <Bolt style={{ left: 166.47, top: 6.27 }} />
+            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 166.47, top: 6.27 }} />
           </View>
           <Lettering text="EVERY SUNDAY 8AM" width={223.93} size={30} shadow={{ dx: -0.8, dy: 0.8, color: '#000000' }} />
         </View>

@@ -6,12 +6,14 @@ import { CitySheet } from '@/components/home/CitySheet';
 import Notifications from '@/utils/notifications';
 import { FlatList, StyleSheet, Text, View, RefreshControl, ImageSourcePropType, NativeScrollEvent, NativeSyntheticEvent } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import {  StatusBar } from 'expo-status-bar';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAvailability, splitDateRange, parseDayLabel, todayDayNum, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet, onSplashGone } from '@/components';
+import { FlashSaleBanner } from '@/components/home/FlashSaleBanner';
+import { HomeCardsRow } from '@/components/home/HomeCardsRow';
 import { WelcomeSheet } from '@/components/home/WelcomeSheet';
 import { API } from '@/services/backend/api';
 import { isPastSearch, removeRecentSearch, RecentSearch } from '@/utils/recentSearches';
@@ -22,9 +24,10 @@ import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
 import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
-  HomeHero, ReferStrip, HomeSearchCard, HomeCategories, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
-  DestinationTile, BenefitsGrid, MemberBenefitsCard, RateUsCard, ConnectCard, HomePromoBanner, HERO_TOP,
+  HomeCategories, TripSearchCard, HomeSectionTitle, TopPickCard, TripMilestoneCard,
+  DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HomePromoBanner,
 } from '@/components/home/HomeSections';
+import { HomeTopBar, CategoryTiles, CAR_CATEGORIES, BikeCategoryTiles, ReferCard, Panel, HERO_TOP } from '@/components/home/HomeTopBar';
 import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
 import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
@@ -199,18 +202,7 @@ export default function HomeScreen() {
     return () => clearInterval(timer);
   }, [queryClient]);
 
-  // No location-permission request here: the app asks once at start-up (SawariContext's GPS
-  // auto-detect). Asking again from Home put a second system popup on screen at launch.
-
-  // No "Set Location" popup on opening the app: the customer picks a destination from the search card
-  // ("Select your Destination") when they want to.
-
   const { data: fetchedVehicles = [], refetch: refetchVehicles, isLoading: vehiclesLoading } = useVehicles();
-  // Real lowest car day rate for the hero's "from just ₹X" slide.
-  const fromRate = useMemo(() => {
-    const rates = fetchedVehicles.filter((v: any) => v.type !== 'Bike').map((v: any) => v.perDay).filter((n: number) => n > 0);
-    return rates.length ? Math.min(...rates) : undefined;
-  }, [fetchedVehicles]);
 
   // ── Top picks: vehicles the customer viewed (resume where they left), then curated favourites ──
   const recentKey = isAuthenticated ? customer?.id : null;
@@ -382,21 +374,25 @@ export default function HomeScreen() {
   // One cars row under the categories: Top Picks for a first-time visitor, which becomes Recently Viewed
   // as soon as the customer has opened a vehicle.
   const showRecent = recent.length > 0;
+  // Real lowest day rate in the fleet, for the "Your ride, from just ₹X" card.
+  const fromRate = useMemo(() => {
+    const rates = fetchedVehicles.filter((v) => !isInService(v)).map((v) => Number(v.perDay)).filter((n) => n > 0);
+    return rates.length ? Math.min(...rates) : undefined;
+  }, [fetchedVehicles]);
+  // Same order as the Figma Home (iPhone 16 - 77).
   const sections = useMemo(() => [
-    'top_hero',
-    'search_card',
-    'categories',
-    'searches',
-    'picks',
-    'position3_promo',
-    'exclusive_offers',
-    'milestone',
-    'middle_banner',
+    'top_hero',          // header + Cars / Bikes tabs + Select dates & times
+    'categories',        // SUV / Sedan / Hatchback / MUV
+    'cards_row',         // price card, Today's Deals card, Find the Perfect Ride
+    'searches',          // only when the customer has recent searches
+    'exclusive_offers',  // Today's Deals
+    'picks',             // Recommended Cars / Recently Viewed
+    'flash_banner',      // Flash Sale banner
+    'position3_promo',   // backend banner (only when one is live)
+    'milestone',         // Refer & Earn strip + Complete 4 trips
     'destinations',
-    'member',
     'benefits',
-    'rate_us',
-    'bottom_banner',
+    'member',
     'connect',
     'footer',
   ], []);
@@ -409,34 +405,43 @@ export default function HomeScreen() {
           <View onLayout={(event) => { heroSectionHeight.current = event.nativeEvent.layout.height; }}>
             {/* Pulling the page down (iOS bounce) shows more of the hero's purple instead of a white gap above it. */}
             <View pointerEvents="none" style={{ position: 'absolute', top: -1200, left: 0, right: 0, height: 1200, backgroundColor: HERO_TOP }} />
-            <HomeHero
+            <HomeTopBar
               topInset={insets.top}
               city={city}
               onCityPress={() => setShowCity(true)}
               sawariCash={isAuthenticated ? sawariCash : 0}
-              onWallet={() => {}}
-              fromRate={fromRate}
-            >
-              <ReferStrip earnText={referEarn} onPress={() => requireLogin(() => router.push('/refer'))} />
-            </HomeHero>
-          </View>
-        );
-      case 'search_card':
-        return (
-          <View style={[styles.sheet, { backgroundColor: p.page, borderColor: p.deliveryBorder }]}>
-            <HomeSearchCard vehicleType={vehicleType} onType={setVehicleType} onDates={openDates} />
+              vehicleType={vehicleType}
+              onType={setVehicleType}
+              dateLabel={dateRange && dateRange !== 'Select Dates' ? dateRange : undefined}
+              onDates={openDates}
+            />
           </View>
         );
       case 'categories':
         // A tile opens Explore with that body type (cars) or gear type (bikes) already applied.
-        content = <HomeCategories bike={vehicleType === 'bike'} onPick={(filter) => router.push({ pathname: '/explore', params: { ...filter, type: vehicleType, t: String(Date.now()) } })} />;
-        break;
-      case 'position3_promo': 
-        content = (
-          <View style={{ marginTop: 8, marginBottom: 4 }}>
-            <HomePromoBanner position="position3" />
-          </View>
+        if (vehicleType === 'bike') {
+          return (
+            <BikeCategoryTiles
+              dark={isDarkMode}
+              onPick={(filter) => router.push({ pathname: '/explore', params: { ...filter, type: vehicleType, t: String(Date.now()) } })}
+            />
+          );
+        }
+        return (
+          <CategoryTiles
+            items={CAR_CATEGORIES}
+            dark={isDarkMode}
+            onPick={(c) => router.push({ pathname: '/explore', params: { bodyType: c.value, type: vehicleType, t: String(Date.now()) } })}
+          />
         );
+      case 'flash_banner':
+        content = <FlashSaleBanner />;
+        break;
+      case 'position3_promo':
+        content = <HomePromoBanner position="position3" />;
+        break;
+      case 'cards_row':
+        content = <HomeCardsRow fromRate={fromRate} />;
         break;
       case 'exclusive_offers':
         content = <ExclusiveOffersSection />;
@@ -456,7 +461,7 @@ export default function HomeScreen() {
         }
         if (!showRecent && !picks.length) break;
         content = (
-          <>
+          <Panel dark={isDarkMode}>
             <HomeSectionTitle title={showRecent ? 'Recently Viewed' : 'Recommended Cars'} />
             <FlatList
               data={showRecent ? recent : picks}
@@ -470,7 +475,7 @@ export default function HomeScreen() {
               decelerationRate="fast"
               removeClippedSubviews={false}
             />
-          </>
+          </Panel>
         );
         break;
       case 'searches':
@@ -493,25 +498,27 @@ export default function HomeScreen() {
         );
         break;
       case 'milestone':
-        if (!milestone) break;
+        // Refer & Earn strip tucks into the top of the trip-milestone card.
         content = (
-          <TripMilestoneCard
-            rides={journey?.totalRides ?? 0}
-            target={milestone.rides}
-            reward={milestone.rewardAmount}
-            claimable={!!claimable}
-            claiming={false}
-            onClaim={claim}
-            onPress={() => requireLogin(() => router.push('/rewards'))}
-          />
+          <View>
+            <ReferCard dark={isDarkMode} onPress={() => requireLogin(() => router.push('/refer'))} />
+            {milestone ? (
+              <TripMilestoneCard
+                rides={journey?.totalRides ?? 0}
+                target={milestone.rides}
+                reward={milestone.rewardAmount}
+                claimable={!!claimable}
+                claiming={false}
+                onClaim={claim}
+                onPress={() => requireLogin(() => router.push('/rewards'))}
+              />
+            ) : null}
+          </View>
         );
-        break;
-      case 'middle_banner':
-        content = <HomePromoBanner position="middle" />;
         break;
       case 'destinations':
         content = (
-          <>
+          <Panel dark={isDarkMode}>
             <HomeSectionTitle title="Top Destination" />
             <FlatList
               data={DESTINATIONS}
@@ -526,7 +533,7 @@ export default function HomeScreen() {
               decelerationRate="fast"
               removeClippedSubviews={false}
             />
-          </>
+          </Panel>
         );
         break;
       case 'benefits':
@@ -540,12 +547,6 @@ export default function HomeScreen() {
       case 'member':
         content = <MemberBenefitsCard isMember={isMember} onPress={() => requireLogin(() => router.push('/membership'))} />;
         break;
-      case 'rate_us':
-        content = <RateUsCard />;
-        break;
-      case 'bottom_banner':
-        content = <HomePromoBanner position="bottom" />;
-        break;
       case 'connect':
         content = <ConnectCard />;
         break;
@@ -554,64 +555,65 @@ export default function HomeScreen() {
         return <CraftedFooter dark={isDarkMode} />;
     }
     if (!content) return null;
-    return <Reveal delay={Math.min(index, 6) * 40}>{content}</Reveal>;
-  }, [p, isDarkMode, insets.top, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, vehiclesLoading, showRecent, milestone, journey, claimable, claim, isMember, membership]);
+    // Figma: 16px gap between every block.
+    return <Reveal delay={Math.min(index, 6) * 40}><View style={{ marginTop: 16 }}>{content}</View></Reveal>;
+  }, [p, isDarkMode, insets.top, city, dateRange, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, vehiclesLoading, showRecent, fromRate, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>
       <Page bottomNav scroll={false}>
         <FlatList
-        data={sections}
-        keyExtractor={(k) => k}
-        renderItem={renderSection}
-        onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
-          if (!heroSectionHeight.current) return;
-          const threshold = Math.max(0, heroSectionHeight.current - insets.top - 140);
-          const pastHero = event.nativeEvent.contentOffset.y >= threshold;
-          setIsPastHero((current) => current === pastHero ? current : pastHero);
-        }}
-        scrollEventThrottle={16}
-        showsVerticalScrollIndicator={false}
-        style={{ backgroundColor: p.page }}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
-        removeClippedSubviews={false}
-        initialNumToRender={4}
-        refreshControl={
-          <RefreshControl
-            refreshing={manualRefreshing}
-            onRefresh={async () => {
-              setManualRefreshing(true);
-              try {
-                await Promise.all([refetchVehicles(), ...(isAuthenticated ? [refetchJourney(), fetchWallet()] : [])]);
-              } finally {
-                setManualRefreshing(false);
-              }
-            }}
-            tintColor="#FFFFFF"
-          />
-        }
-      />
-
-      {isPastHero && <View pointerEvents="none" style={[styles.statusBarSpacer, { height: insets.top, backgroundColor: p.page }]} />}
-
-      <RewardScratchModal card={scratch} onClose={() => setScratch(null)} />
-      <WelcomeSheet visible={showWelcome} onClose={() => setShowWelcome(false)} />
-      <CitySheet visible={showCity} value={city} onSelect={setCity} onClose={() => setShowCity(false)} />
-
-      <LoginBottomSheet
-        visible={showLogin}
-        onClose={() => {
-          setShowLogin(false);
-          setPendingAction(null);
-        }}
-        onLoginSuccess={() => {
-          setShowLogin(false);
-          if (pendingAction) {
-            pendingAction();
-            setPendingAction(null);
+          data={sections}
+          keyExtractor={(k) => k}
+          renderItem={renderSection}
+          onScroll={(event: NativeSyntheticEvent<NativeScrollEvent>) => {
+            if (!heroSectionHeight.current) return;
+            const threshold = Math.max(0, heroSectionHeight.current - insets.top - 140);
+            const pastHero = event.nativeEvent.contentOffset.y >= threshold;
+            setIsPastHero((current) => current === pastHero ? current : pastHero);
+          }}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={false}
+          style={{ backgroundColor: p.page }}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+          removeClippedSubviews={false}
+          initialNumToRender={4}
+          refreshControl={
+            <RefreshControl
+              refreshing={manualRefreshing}
+              onRefresh={async () => {
+                setManualRefreshing(true);
+                try {
+                  await Promise.all([refetchVehicles(), ...(isAuthenticated ? [refetchJourney(), fetchWallet()] : [])]);
+                } finally {
+                  setManualRefreshing(false);
+                }
+              }}
+              tintColor="#FFFFFF"
+            />
           }
-        }}
-      />
+        />
+
+        {isPastHero && <View pointerEvents="none" style={[styles.statusBarSpacer, { height: insets.top, backgroundColor: p.page }]} />}
+
+        <RewardScratchModal card={scratch} onClose={() => setScratch(null)} />
+        <WelcomeSheet visible={showWelcome} onClose={() => setShowWelcome(false)} />
+        <CitySheet visible={showCity} value={city} onSelect={setCity} onClose={() => setShowCity(false)} />
+
+        <LoginBottomSheet
+          visible={showLogin}
+          onClose={() => {
+            setShowLogin(false);
+            setPendingAction(null);
+          }}
+          onLoginSuccess={() => {
+            setShowLogin(false);
+            if (pendingAction) {
+              pendingAction();
+              setPendingAction(null);
+            }
+          }}
+        />
 
       </Page>
     </View>

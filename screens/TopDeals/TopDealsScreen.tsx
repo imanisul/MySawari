@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
-import { useVehicles } from '@/hooks/useVehicles';
+import { useDealCars, dealPricing } from '@/hooks/useDealCars';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
   dayNumToLabel,
@@ -71,44 +71,6 @@ function formatAvailableTill(endMs: number, nowMs: number): string {
     const monthCap = month ? month[0].toUpperCase() + month.slice(1) : '';
     return `Available till ${endParts.date} ${monthCap}, ${timeStr}`;
   }
-}
-
-/** Helper to parse ISO date strings or day labels like '15 Nov' to Indian timestamp ms */
-function parseCustomDateToMs(val: any, defaultTime = '08:00 AM'): number | null {
-  if (!val) return null;
-  if (val instanceof Date) return val.getTime();
-  if (typeof val === 'number') return val;
-  if (typeof val !== 'string') return null;
-  const s = val.trim();
-  if (!s || s.toLowerCase() === 'available now') return null;
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    const parts = s.split('-').map(Number);
-    const dayNum = toDayNum(parts[0], parts[1] - 1, parts[2]);
-    return dayNumAndTimeToMs(dayNum, defaultTime);
-  }
-
-  const parsed = Date.parse(s);
-  if (!isNaN(parsed)) {
-    return parsed;
-  }
-
-  const dayNum = parseDayLabel(s);
-  if (dayNum !== null) {
-    return dayNumAndTimeToMs(dayNum, defaultTime);
-  }
-  return null;
-}
-
-/**
- * A Top Deal charges the car's hourly rate for the hours left (never more than its day rate): the offer's hourly
- * rate, else day rate / 24 (at least ₹50). The server prices the booking with the same rule ("TOPDEAL-<hours>").
- */
-function dealPricing(car: any, hours: number) {
-  const perDay = Number(car.perDay || car.pricePerDay || 0);
-  const offerRate = Number(car.offer?.hourlyRate) || 0;
-  const rate = offerRate > 0 ? offerRate : Math.max(50, Math.round(perDay / 24));
-  return { perDay, rate, price: Math.min(perDay || Infinity, rate * hours) };
 }
 
 /** 4-pointed sparkle star matching Figma spec */
@@ -391,8 +353,6 @@ function VehicleCard({
 export default function TopDealsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { data: vehicles = [], isLoading } = useVehicles();
-  const { data: offers = [] } = useQuery(exclusiveOffersQueryOptions);
   const {
     selectCar,
     setDates,
@@ -426,145 +386,13 @@ export default function TopDealsScreen() {
       (!membership.expiresAt || new Date(membership.expiresAt) > new Date())
   );
 
-  // Target end time: Today's gap slot runs until 8:00 AM tomorrow (or 8:00 AM today if past midnight) in Indian Standard Time
-  const targetEndMs = useMemo(() => {
-    const p = getIndiaDateParts(nowMs);
-    const today = toDayNum(p.year, p.month, p.date);
-    if (p.hours < 8) {
-      return dayNumAndTimeToMs(today, '08:00 AM', 480);
-    } else {
-      return dayNumAndTimeToMs(today + 1, '08:00 AM', 480);
-    }
-  }, [Math.floor(nowMs / 60000)]);
-
+  const { dealCars, targetEndMs, isLoading } = useDealCars(nowMs);
   // Live countdown timer calculations for Frame 2147226222
   const msRemaining = Math.max(0, targetEndMs - nowMs);
   const timerHrs = Math.floor(msRemaining / 3600000);
   const timerMins = Math.floor((msRemaining % 3600000) / 60000);
   const timerSecs = Math.floor((msRemaining % 60000) / 1000);
   const hoursRemaining = Math.max(1, Math.ceil(msRemaining / (3600 * 1000)));
-
-  // Cars free for the whole deal window (now → 8 AM tomorrow)
-  const dealCars = useMemo(() => {
-    if (!vehicles || vehicles.length === 0) return [];
-
-    // Map offers configured from Operation App
-    // The lowest positive hourly rate a live top-deal offer sets for a car — the server picks the same one.
-    const offerMap = new Map<string, any>();
-    const setOffer = (vid: string, o: any) => {
-      const cur = offerMap.get(vid);
-      const rate = Number(o.hourlyRate) || 0;
-      if (!cur || (rate > 0 && (!(Number(cur.hourlyRate) > 0) || rate < Number(cur.hourlyRate)))) offerMap.set(vid, o);
-    };
-    offers.forEach((o: any) => {
-      if (o.isTopDeal || o.type === 'top_deal' || o.isExclusive || o.position === 'exclusive') {
-        if (o.vehicleId) {
-          setOffer(String(typeof o.vehicleId === 'object' ? o.vehicleId._id || o.vehicleId.id : o.vehicleId), o);
-        }
-        if (Array.isArray(o.applicableVehicleIds)) {
-          o.applicableVehicleIds.forEach((vid: any) => setOffer(String(vid), o));
-        }
-      }
-    });
-
-    const gapOf = (v: any) => {
-      // The car's free gap inside the deal window: from now until its next booking.
-      // A booking saved without a pickup time starts at the default 8:00 AM (its bare date would read as 5:30 AM in IST).
-      const withPickup = { ...v, bookedRanges: (v.bookedRanges || []).map((r: any) => (r.pickupTime ? r : { ...r, pickupTime: '8:00 AM' })) };
-      const blocks = buildBlocks(withPickup, todayDayNum()).filter((b) => Number.isFinite(b.startMs)).sort((a, b) => a.startMs - b.startMs);
-
-      // Busy now? The deal starts when the current booking(s) end, rounded up to the next whole hour.
-      let start = Math.floor(nowMs / 60000) * 60000;
-      for (const b of blocks) if (b.startMs <= start && b.endMs > start) start = b.endMs;
-      if (start > nowMs) start = Math.ceil(start / 3600000) * 3600000;
-
-      const vid = String(v.id || v._id);
-      const offer = offerMap.get(vid);
-
-      // Check membership 10-minute early access on offers from Operation App
-      if (offer) {
-        const earlyHours = Number(offer.notificationCampaign?.memberEarlyAccessHours || offer.memberEarlyAccessHours) || 0;
-        if (earlyHours > 0) {
-          const earlyMs = earlyHours * 3600 * 1000;
-          const createdMs = offer.createdAt ? new Date(offer.createdAt).getTime() : 0;
-          if (!isMember && createdMs > 0 && (nowMs - createdMs) < earlyMs) {
-            // Non-members don't get access during 10-minute early access period
-            return null;
-          }
-        }
-      }
-
-      // Next booking that starts after the free gap begins
-      const next = blocks.find((b) => b.startMs >= start);
-      let dealEndMs = next ? next.startMs : Infinity;
-
-      // Also check vehicle's availableToDate limit
-      const availToMs = parseCustomDateToMs(v.availableToDate, '08:00 AM');
-      if (availToMs && availToMs > start && availToMs < dealEndMs) {
-        dealEndMs = availToMs;
-      }
-
-      // Also check offer-specific return time/date if configured in Operation App
-      if (offer) {
-        if (offer.rentalEndDate && (offer.rentalEndTime || offer.returnTime)) {
-          const oMs = parseCustomDateToMs(offer.rentalEndDate, offer.rentalEndTime || offer.returnTime);
-          if (oMs && oMs > start && oMs < dealEndMs) {
-            dealEndMs = oMs;
-          }
-        }
-      }
-
-      // Today's Deal slot ends at 8:00 AM tomorrow (or at the car's next booking if at/before 8:00 AM)
-      if (!Number.isFinite(dealEndMs) || dealEndMs > targetEndMs) {
-        dealEndMs = targetEndMs;
-      }
-
-      const end = Math.floor(dealEndMs / 60000) * 60000;
-      // If the next booking starts at 8:00 AM tomorrow, this car is available today till 8:00 AM!
-      const hasBookingAt8AM = Boolean(next && Math.abs(next.startMs - targetEndMs) <= 60 * 60 * 1000);
-      const freeUntil = Math.min(next ? next.startMs : Infinity, availToMs && availToMs > start ? availToMs : Infinity);
-      const canExtend = !hasBookingAt8AM && freeUntil >= targetEndMs + 24 * 3600 * 1000;
-
-      // Cars must be available from now until 8:00 AM tomorrow (minimum 1 hour gap)
-      const isAvailableTill8AM = end >= Math.floor((targetEndMs - 5 * 60 * 1000) / 60000) * 60000;
-      if (!isAvailableTill8AM) return null;
-      if (end - start < 3600 * 1000) return null;
-
-      return { start, end, canExtend, hasBookingAt8AM };
-    };
-
-    const filtered = vehicles.map((v: any) => ({ v, gap: gapOf(v) })).filter(({ v, gap }: any) => {
-      if (!gap) return false;
-      if (isInService(v)) return false;
-      const st = String(v.dbStatus || v.status || '').toLowerCase().trim();
-      // Only workshop / maintenance blocks a vehicle entirely.
-      // If a vehicle is booked starting tomorrow at 8:00 AM, it is available today till 8:00 AM and must be shown!
-      if (
-        st === 'service' ||
-        st === 'maintenance' ||
-        st === 'under_maintenance'
-      ) {
-        return false;
-      }
-
-      return true;
-    });
-
-    return filtered.sort((x: any, y: any) => x.gap.start - y.gap.start).map(({ v, gap }: any) => {
-      const vid = String(v.id || v._id);
-      const offer = offerMap.get(vid);
-      return {
-        ...v,
-        hourlyRate: offer?.hourlyRate,
-        dealPrice: offer?.dealPrice,
-        dealStartMs: gap.start,
-        dealEndMs: gap.end,
-        canExtend: gap.canExtend,
-        hasBookingAt8AM: gap.hasBookingAt8AM,
-        offer,
-      };
-    });
-  }, [vehicles, offers, targetEndMs, isMember, Math.floor(nowMs / 60000)]);
 
   // Prefetch card photos for all deal cars so image loading is instant
   useEffect(() => {

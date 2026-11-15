@@ -41,8 +41,8 @@ function PicIcon({ source, size }: { source: any; size: number }) {
 
 export const HOME_PURPLE = '#323E71';
 // Hero gradient (Figma Home frame): 180deg, #6152D8 to #CEC9F3.
-export const HERO_TOP = '#6152D8';
-const HERO_BOTTOM = '#CEC9F3';
+export const HERO_TOP = '#332B72';
+const HERO_BOTTOM = '#6B5AED';
 
 // ── Top banner ───────────────────────────────────────────────────────────────
 
@@ -90,9 +90,7 @@ interface BenefitsSlide extends HeroSlideBase {
 type HeroSlide = TextSlide | ImageSlide | ComboSlide | PriceSlide | BenefitsSlide;
 
 // Default brand slides if no backend offers or to complement active offers.
-const DEFAULT_SLIDES: HeroSlide[] = [
-  { id: 'default-benefits', kind: 'benefits' },
-];
+const DEFAULT_SLIDES: HeroSlide[] = [];
 
 function splitTitleIntoTwoLines(title?: string, lines?: [string, string] | string[]): [string, string] {
   if (lines && Array.isArray(lines) && lines.length >= 2 && lines[0]?.trim() && lines[1]?.trim()) {
@@ -209,10 +207,14 @@ function ArcHeadline({ lines, idPrefix = 'arc' }: { lines: [string, string]; idP
   );
 }
 
-export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fromRate, children }: {
+export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fromRate, children, vehicleType, onType, onDates }: {
   /** Lowest real day rate; the price slide is left out until it is known. */
   fromRate?: number;
   children?: React.ReactNode;
+  vehicleType: 'car' | 'bike';
+  onType: (t: 'car' | 'bike') => void;
+  /** Opens the calendar to pick the rental dates. */
+  onDates: () => void;
   topInset: number;
   city: string;
   /** Opens the city picker. */
@@ -233,7 +235,8 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
   const { data: offers } = useQuery(offersQueryOptions);
 
   const slides = useMemo<HeroSlide[]>(() => {
-    const lead: HeroSlide[] = fromRate ? [{ id: 'default-from-price', kind: 'price' }] : [];
+    // The price and benefit cards now live in HomeCardsRow (their own row under the categories).
+    const lead: HeroSlide[] = [];
     if (!offers || !Array.isArray(offers)) return [...lead, ...DEFAULT_SLIDES];
 
     const offerSlides: HeroSlide[] = [];
@@ -426,11 +429,10 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
     // Two stops, no mid-tones.
     <LinearGradient
       colors={[HERO_TOP, HERO_BOTTOM]}
-      style={{ paddingTop: topInset, paddingBottom: 16 }}
+      locations={[0, 0.9385]}
+      style={{ paddingTop: topInset, borderBottomLeftRadius: 20, borderBottomRightRadius: 20, overflow: 'hidden' }}
       onLayout={(e) => setHeight(e.nativeEvent.layout.height)}
     >
-      {height > 0 && <Sunburst width={width} height={height} cy={topInset + 128} />}
-
       <View style={styles.heroTop}>
         <View style={{ flex: 1, marginRight: 12 }}>
           <Pressable
@@ -458,7 +460,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
       </View>
 
       {/* Slide area is 166 tall (Figma 137→303): the price slide sits at its top, the benefit cards at its bottom. */}
-      <ScrollView
+      {count > 0 && <ScrollView
         ref={pager}
         style={{ height: areaH }}
         horizontal
@@ -606,7 +608,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
             )}
           </View>
         ))}
-      </ScrollView>
+      </ScrollView>}
 
       {/* Page indicator: a short white thumb sliding along a faint track */}
       {slides.length > 1 && (
@@ -614,8 +616,62 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
           <View style={[styles.thumb, { left: (slide * (36 - 18)) / Math.max(1, slides.length - 1) }]} />
         </View>
       )}
+      <HeroTabs width={Math.min(width, 393)} vehicleType={vehicleType} onType={onType} />
+      <HeroSearch onDates={onDates} />
       {children}
     </LinearGradient>
+  );
+}
+
+// ── Hero tabs + search (Figma Frame 2147226254) ──────────────────────────────
+
+/** Folder-style tabs: the active one is outlined and open at the bottom, the other shows a faint outline. */
+function HeroTabs({ width, vehicleType, onType }: { width: number; vehicleType: 'car' | 'bike'; onType: (t: 'car' | 'bike') => void }) {
+  const car = vehicleType === 'car';
+  const line = 'rgba(255,255,255,0.65)';
+  const faint = 'rgba(255,255,255,0.4)';
+  return (
+    <View style={{ height: 49, marginTop: 12, width }} accessibilityRole="tablist">
+      <Svg width={393} height={49} viewBox="0 0 393 49" style={StyleSheet.absoluteFill} preserveAspectRatio="none" pointerEvents="none">
+        {car ? (
+          <>
+            <Path d="M212 10 Q213 0.5 222 0.5 H352 Q360 0.5 363 9 L371 36 Q372 39 377 39" stroke={faint} strokeWidth={1} fill="none" />
+            <Path d="M0 39 H22 Q26 39 27 33 L29 10 Q30 0.5 40 0.5 H170 Q177 0.5 179 9 L188 34 Q189.5 39 196 39 H393" stroke={line} strokeWidth={1} fill="rgba(51,43,114,0.45)" />
+          </>
+        ) : (
+          <>
+            <Path d="M30 10 Q31 0.5 40 0.5 H170 Q178 0.5 181 9 L189 36 Q190 39 195 39" stroke={faint} strokeWidth={1} fill="none" />
+            <Path d="M0 39 H196 Q202 39 204 34 L213 9 Q215 0.5 224 0.5 H352 Q361 0.5 363 10 L367 33 Q368 39 373 39 H393" stroke={line} strokeWidth={1} fill="rgba(51,43,114,0.45)" />
+          </>
+        )}
+      </Svg>
+      <View style={{ flexDirection: 'row', paddingHorizontal: 16, height: 49 }}>
+        {([['car', 'Cars'], ['bike', 'Bikes & Scooters']] as const).map(([key, label]) => {
+          const on = vehicleType === key;
+          return (
+            <Pressable key={key} accessibilityRole="tab" accessibilityState={{ selected: on }} onPress={() => { Haptics.selectionAsync(); onType(key); }} style={{ flex: 1, height: 39, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26, color: on ? '#FFFFFF' : 'rgba(255,255,255,0.8)', includeFontPadding: false }} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function HeroSearch({ onDates }: { onDates: () => void }) {
+  return (
+    <View style={{ paddingTop: 12, paddingHorizontal: 16, paddingBottom: 14, marginTop: 9 }}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Choose Your Rental Dates"
+        onPress={() => { Haptics.selectionAsync(); onDates(); }}
+        style={({ pressed }) => [{ height: 51, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#D1CCF9', borderRadius: 12 }, pressed && { opacity: 0.85 }]}
+      >
+        <Feather name="calendar" size={20} color="#737373" />
+        <Text style={{ fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22.5, color: '#737373', includeFontPadding: false }} numberOfLines={1}>Select dates & times</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -963,7 +1019,7 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
               ))}
             </View>
           </View>
-          {!!car.rating && (
+          {!!car.rating && ((car as any).reviewCount ?? 0) > 0 && (
             <View style={[styles.ratingPill, { backgroundColor: p.navy }]}>
               <Text style={styles.ratingText}>{car.rating.toFixed(1)}</Text>
               <Ionicons name="star" size={12} color={p.star} />
@@ -1022,8 +1078,8 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
       style={[styles.milestone, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }]}
     >
       <Image source={require('@/assets/images/MySawari_nobg.png')} style={styles.milestoneLogo} resizeMode="contain" />
-      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} Trips, Get up to {reward >= 1000 && reward % 1000 === 0 ? `₹${reward / 1000}K` : formatCurrency(reward)} Rewards</Text>
-      <Text style={[styles.milestoneSub, { color: p.muted }]}>Complete {target} trips to earn wallet rewards!</Text>
+      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} trips, earn {formatCurrency(reward)} off</Text>
+      <Text style={[styles.milestoneSub, { color: p.muted }]}>Get {formatCurrency(reward)} off after completing {target} trips.</Text>
 
       <View style={styles.track}>
         <View style={styles.trackRail}>
@@ -1509,7 +1565,7 @@ const styles = StyleSheet.create({
   pickAvail: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 14, letterSpacing: 0.18, flexShrink: 1 },
 
   // Milestone
-  milestone: { marginHorizontal: 16, marginTop: 16, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  milestone: { marginHorizontal: 16, marginTop: 0, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   // The logo's artwork fills 360 × 316 of its 470 × 480 file; this shows that part at 32 × 27.
   milestoneLogo: { position: 'absolute', top: 11.5, right: 2, width: 42, height: 40, opacity: 0.32 },
   milestoneTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },

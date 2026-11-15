@@ -140,7 +140,9 @@ function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available:
         <View style={{ gap: 6 }}>
           <Pressable onPress={openCar} accessibilityRole="button" accessibilityLabel={`${name}, ${formatCurrency(price)} for ${hours} hours`} style={styles.booking}>
             <Image source={photo} style={styles.carPhoto} contentFit="cover" transition={150} />
+            {/* Frame 2147225778: 174 × 92, padding 2/4/4/0, gap 10 — [brand + name, specs] 2 apart (62), then the price (14) */}
             <View style={styles.bookingText}>
+              <View style={{ gap: 2 }}>
               <View>
                 {!!car.brand && <Text style={styles.brand} numberOfLines={1}>{car.brand}</Text>}
                 <Text style={styles.name} numberOfLines={1}>{name}</Text>
@@ -152,6 +154,7 @@ function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available:
                     <Text style={styles.spec} numberOfLines={1}>{s}</Text>
                   </React.Fragment>
                 ))}
+              </View>
               </View>
               <View style={styles.priceLine}>
                 <Text style={styles.dealPrice}>{formatCurrency(price)}</Text>
@@ -222,8 +225,11 @@ const styles = StyleSheet.create({
   cardSunburst: { position: 'absolute', left: -110.5, top: -156.5, opacity: 0.18 },
   // price card
   priceBox: { position: 'absolute', width: 312.44, height: 164, left: (W - 312.44) / 2, top: (H - 164) / 2 + 0.5 },
-  priceShadow: { position: 'absolute', left: (312.44 - 289.69) / 2 + 0.6, top: 126.89 },
-  priceCars: { position: 'absolute', width: 312.44, height: 104.15, left: 0, top: 59.86 },
+  // The cars picture (522 × 174) has empty space round the cars (they fill x 37–490, y 32–158 of it). The design's
+  // cars span x 9–331, y 118–215 of the 340 card, so the picture is drawn 371 × 123.7 at card (−17.3, 95.2) — given
+  // here inside priceBox (which starts at 13.78, 42.5). The ground shadow follows the cars' wheels down.
+  priceShadow: { position: 'absolute', left: (312.44 - 289.69) / 2 + 0.6, top: 146 },
+  priceCars: { position: 'absolute', width: 371, height: 123.7, left: -17.3 - 13.78, top: 95.2 - 42.5 },
   priceRow: { position: 'absolute', top: 0, left: (312.44 - 282.48) / 2 - 0.6, width: 282.48, height: 93, flexDirection: 'row', alignItems: 'center', gap: 2.39 },
   priceLeadCol: { width: 128.09, alignItems: 'center' },
   priceLead: { fontFamily: F700, fontSize: 28.73, lineHeight: 43, letterSpacing: -0.57, color: '#FFFFFF', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 4.79 }, textShadowRadius: 7.18, includeFontPadding: false },
@@ -246,12 +252,13 @@ const styles = StyleSheet.create({
   bookingText: { flex: 1, height: 92, justifyContent: 'center', gap: 10, paddingTop: 2, paddingBottom: 4 },
   brand: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, color: '#737373', includeFontPadding: false },
   name: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26, color: '#262626', includeFontPadding: false },
-  specs: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -6 },
+  specs: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   spec: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, color: '#737373', flexShrink: 1, includeFontPadding: false },
   dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#737373' },
-  priceLine: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
-  dealPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 24, color: '#262626', includeFontPadding: false },
-  forHours: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 16, color: '#737373', includeFontPadding: false },
+  // Frame 2147225958: 14 high (Figma trims the text to its capitals), price and "for N hours" bottom-aligned 6 apart.
+  priceLine: { height: 14, flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  dealPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 24, marginBottom: -5, color: '#262626', includeFontPadding: false },
+  forHours: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 16, marginBottom: -3, color: '#737373', includeFontPadding: false },
   seeAll: { height: 31, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, backgroundColor: '#FBFAFE', borderWidth: 1, borderColor: '#E7EAF4', borderRadius: 6 },
   seeAllText: { fontFamily: F700, fontSize: 11, lineHeight: 16.5, color: '#6152D8', textTransform: 'uppercase', includeFontPadding: false },
   // find the perfect ride

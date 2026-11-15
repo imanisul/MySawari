@@ -747,23 +747,23 @@ export default function FlashSaleScreen() {
               {/* Frame 2147226247: "Members get early access" pill + line, above the frost */}
               {/* Frame 2147226248 pill: 250 × 39, gold 6% over a 10px blur, 1px #FBC422, fully rounded */}
               {membersOnlyNow && (
-                      <View style={styles.earlyAccessPillWrap} pointerEvents="none">
-                        <View>
-                          <View style={styles.earlyAccessOverlayPill}>
-                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
-                            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(251, 196, 34, 0.06)' }]} />
-                            <Text style={styles.earlyAccessWhiteText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                              Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
-                            </Text>
-                          </View>
-                          {/* Crown (Figma Vector): 16.66 × 11.66 at (17.48, −12), tilted −24.98°, sitting on the pill's edge */}
-                          <PillCrown />
-                        </View>
-                        {/* 4 below the pill: how early, from the offer */}
-                        <Text style={styles.earlyAccessSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
-                          Unlock this offer {earlyAccessMinutes} minutes early with Membership.
-                        </Text>
-                      </View>
+                <View style={styles.earlyAccessPillWrap} pointerEvents="none">
+                  <View>
+                    <View style={styles.earlyAccessOverlayPill}>
+                      <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(251, 196, 34, 0.06)' }]} />
+                      <Text style={styles.earlyAccessWhiteText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                        Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
+                      </Text>
+                    </View>
+                    {/* Crown (Figma Vector): 16.66 × 11.66 at (17.48, −12), tilted −24.98°, sitting on the pill's edge */}
+                    <PillCrown />
+                  </View>
+                  {/* 4 below the pill: how early, from the offer */}
+                  <Text style={styles.earlyAccessSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                    Unlock this offer {earlyAccessMinutes} minutes early with Membership.
+                  </Text>
+                </View>
               )}
             </Animated.View>
 

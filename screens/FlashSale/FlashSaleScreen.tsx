@@ -172,10 +172,10 @@ function LiveCountdownHeader({ expiryMs }: { expiryMs: number }) {
     <View style={styles.liveHeaderWrap}>
       {/* Left: Bolt + stacked FLASH SALE 3D Lettering */}
       <View style={styles.liveTitleCol}>
-        <Bolt width={16} line={0.6} near={0.5} far={1.5} style={{ left: -14, top: 10 }} />
+        <Bolt width={22} line={0.6} near={0.5} far={1.5} style={{ left: -10, top: 8 }} />
         <View style={{ marginLeft: 6 }}>
-          <Lettering text="FLASH" size={26} shadow={PINK_SHADOW} font={FONT} near={1.15} outline={1.3} skew="0deg" scaleY={1.12} />
-          <Lettering text="SALE" size={34} shadow={PINK_SHADOW} font={FONT} near={1.15} outline={1.3} skew="0deg" scaleY={1.12} />
+          <Lettering text="FLASH" size={32} shadow={PINK_SHADOW} font={FONT} near={1.15} outline={1.3} skew="0deg" scaleY={1.12} />
+          <Lettering text="SALE" size={42} shadow={PINK_SHADOW} font={FONT} near={1.15} outline={1.3} skew="0deg" scaleY={1.12} />
         </View>
       </View>
 
@@ -353,16 +353,33 @@ export default function FlashSaleScreen() {
     return fb.images[0].url;
   }, []);
 
-  // Safe car name
+  // Safe car name - Always displays a genuine vehicle model name (e.g. Thar 2025 RWD, Jeep 2026)
   const carDisplayName = useMemo(() => {
-    if (activeCar.displayName && activeCar.displayName.trim() && activeCar.displayName !== 'Test vehicle') {
-      return activeCar.displayName;
+    // 1. If fleet car or DB car has a real display name
+    const rawName = (activeCar.displayName || activeCar.vehicleName || '').trim();
+    if (rawName && rawName.toLowerCase() !== 'test vehicle' && rawName.toLowerCase() !== 'vehicle') {
+      return rawName;
     }
-    if (activeCar.vehicleName && activeCar.vehicleName.trim() && activeCar.vehicleName !== 'Test vehicle') {
-      return activeCar.vehicleName;
+    // 2. If manufacturer and model exist
+    const brandModel = [activeCar.manufacturer, activeCar.model].filter(Boolean).join(' ').trim();
+    if (brandModel && brandModel.toLowerCase() !== 'test') {
+      return brandModel;
     }
-    return activeOffer?.title || FALLBACK_VEHICLES[selectedCarIndex % FALLBACK_VEHICLES.length].displayName;
-  }, [activeCar, activeOffer, selectedCarIndex]);
+    // 3. Fallback vehicle name (e.g. Thar 2025 RWD, Nexon EV, Swift Dzire, Alto K10, Fronx White)
+    return FALLBACK_VEHICLES[selectedCarIndex % FALLBACK_VEHICLES.length].displayName;
+  }, [activeCar, selectedCarIndex]);
+
+  // Duration label (e.g. "3 Days" or "1 Day")
+  const durationLabel = useMemo(() => {
+    if (activeOffer?.rentalPeriodLabel) return activeOffer.rentalPeriodLabel;
+    if (activeOffer?.rentalDays) {
+      return `${activeOffer.rentalDays} ${activeOffer.rentalDays === 1 ? 'Day' : 'Days'}`;
+    }
+    if (activeOffer?.rentalHours) {
+      return `${activeOffer.rentalHours} Hours`;
+    }
+    return '3 Days';
+  }, [activeOffer]);
 
   // Pricing
   const dealPrice = activeCar.dealPrice || activeOffer?.promotionalPrice || 399;
@@ -488,8 +505,6 @@ export default function FlashSaleScreen() {
         >
           <Feather name="chevron-left" size={24} color="#FFFFFF" />
         </Pressable>
-
-        {isLive && <LiveCountdownHeader expiryMs={expiryMs} />}
       </View>
 
       {/* Content depending on state */}
@@ -516,8 +531,10 @@ export default function FlashSaleScreen() {
       ) : (
         // States 3, 4, 5, 6, 7: SCHEDULED or LIVE SALE
         <View style={styles.mainContainer}>
-          {/* Scheduled Header (Images 3, 4, 5) */}
-          {isScheduled && (
+          {/* Header: Live countdown (Images 6 & 7) vs Scheduled (Images 3, 4, 5) */}
+          {isLive ? (
+            <LiveCountdownHeader expiryMs={expiryMs} />
+          ) : isScheduled ? (
             <View style={styles.scheduledHeaderWrap}>
               <View style={styles.scheduledTitleRow}>
                 <Bolt width={18} line={0.61} near={0.51} far={1.53} style={{ position: 'relative' }} />
@@ -526,11 +543,11 @@ export default function FlashSaleScreen() {
               </View>
 
               <View style={styles.scheduledSubRow}>
-                <Lettering text={scheduleInfo.fullLabel} size={32} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
+                <Lettering text={scheduleInfo.fullLabel} size={30} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
                 <TripleUnderline width={220} />
               </View>
             </View>
-          )}
+          ) : null}
 
           {/* Ticket Card + Sparkles */}
           <View style={styles.ticketSection}>
@@ -573,6 +590,7 @@ export default function FlashSaleScreen() {
                         <Text style={styles.previewToggleText}>Tap to Preview Cars 👆</Text>
                       </Pressable>
                     </View>
+                    <Text style={styles.swipeToSeeMoreText}>Swipe to see more cars</Text>
                   </View>
                 ) : (
                   // Revealed mode photo contents (Images 5, 6, 7)
@@ -580,28 +598,26 @@ export default function FlashSaleScreen() {
                     {/* Top-left Amber Duration Badge */}
                     <View style={styles.durationBadge}>
                       <Text style={styles.durationBadgeText}>
-                        {activeOffer?.rentalDays ? `${activeOffer.rentalDays} ${activeOffer.rentalDays === 1 ? 'Day' : 'Days'}` : '3 Days'}
+                        {durationLabel}
                       </Text>
                     </View>
 
                     {/* Member Early Access Frosted Pill */}
-                    {(isScheduled || isEarlyAccessActive) && (
-                      <View style={styles.earlyAccessOverlayPill}>
-                        <View style={styles.earlyAccessRow}>
-                          <Image
-                            source={require('@/assets/images/crown_deal.png')}
-                            style={styles.earlyAccessCrown}
-                            contentFit="contain"
-                          />
-                          <Text style={styles.earlyAccessWhiteText}>
-                            Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
-                          </Text>
-                        </View>
-                        <Text style={styles.earlyAccessSub}>
-                          Unlock this offer {earlyAccessMinutes} minutes early with Membership.
+                    <View style={styles.earlyAccessOverlayPill}>
+                      <View style={styles.earlyAccessRow}>
+                        <Image
+                          source={require('@/assets/images/crown_deal.png')}
+                          style={styles.earlyAccessCrown}
+                          contentFit="contain"
+                        />
+                        <Text style={styles.earlyAccessWhiteText}>
+                          Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
                         </Text>
                       </View>
-                    )}
+                      <Text style={styles.earlyAccessSub}>
+                        Unlock this offer {earlyAccessMinutes} minutes early with Membership.
+                      </Text>
+                    </View>
 
                     {/* Carousel Dots */}
                     <View style={styles.dotsRow}>
@@ -822,16 +838,16 @@ export default function FlashSaleScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
   navRow: {
-    height: 56,
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     zIndex: 10,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.14)',
@@ -839,11 +855,14 @@ const styles = StyleSheet.create({
 
   /* Live header with ticking countdown timer (Images 6 & 7) */
   liveHeaderWrap: {
-    flex: 1,
+    width: 353,
+    alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingLeft: 12,
+    paddingHorizontal: 4,
+    marginTop: 2,
+    marginBottom: 8,
   },
   liveTitleCol: {
     flexDirection: 'row',
@@ -854,40 +873,41 @@ const styles = StyleSheet.create({
   },
   endsInLabel: {
     fontFamily: FONT,
-    fontSize: 11,
+    fontSize: 12,
     color: '#FFFFFF',
-    letterSpacing: 0.6,
+    letterSpacing: 0.8,
     marginBottom: 4,
   },
   timerRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: 8,
   },
   timerUnit: {
     alignItems: 'center',
   },
   timerBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+    width: 42,
+    height: 42,
+    borderRadius: 10,
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.18,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   timerNum: {
     fontFamily: FONT,
-    fontSize: 17,
+    fontSize: 19,
     color: '#3E2DC8',
   },
   timerUnitText: {
     fontFamily: FONT_SEMI,
     fontSize: 10,
     color: '#FFFFFF',
-    marginTop: 2,
+    marginTop: 3,
   },
 
   /* Coming Soon Screen (Images 1 & 2) */
@@ -1087,6 +1107,16 @@ const styles = StyleSheet.create({
     fontFamily: FONT_SEMI,
     fontSize: 12,
     color: '#3E2DC8',
+  },
+  swipeToSeeMoreText: {
+    fontFamily: FONT_MED,
+    fontSize: 12,
+    color: '#FFFFFF',
+    marginTop: 8,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
 
   /* Locked times row (Images 3 & 4) */

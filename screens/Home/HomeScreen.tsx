@@ -12,7 +12,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAvailability, splitDateRange, parseDayLabel, todayDayNum, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet, onSplashGone } from '@/components';
-import { FlashSaleBanner } from '@/components/home/FlashSaleBanner';
 import { HomeCardsRow } from '@/components/home/HomeCardsRow';
 import { WelcomeSheet } from '@/components/home/WelcomeSheet';
 import { API } from '@/services/backend/api';
@@ -28,7 +27,6 @@ import {
   DestinationTile, BenefitsGrid, MemberBenefitsCard, ConnectCard, HomePromoBanner,
 } from '@/components/home/HomeSections';
 import { HomeTopBar, DateSearchBox, CategoryTiles, CAR_CATEGORIES, BikeCategoryTiles, ReferCard, Panel, HERO_TOP } from '@/components/home/HomeTopBar';
-import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
 import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
 import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
 
@@ -380,21 +378,20 @@ export default function HomeScreen() {
     const rates = fetchedVehicles.filter((v) => !isInService(v)).map((v) => Number(v.perDay)).filter((n) => n > 0);
     return rates.length ? Math.min(...rates) : undefined;
   }, [fetchedVehicles]);
-  // Same order as the Figma Home (iPhone 16 - 77).
+  // Same order as the Figma Home (iPhone 16 - 77). Flash Sale is exclusively in the Flash Sale tab.
   const sections = useMemo(() => [
     'top_hero',          // header + Cars / Bikes tabs + Select dates & times
     'categories',        // SUV / Sedan / Hatchback / MUV
     'cards_row',         // price card, Today's Deals card, Find the Perfect Ride
     'searches',          // only when the customer has recent searches
-    'exclusive_offers',  // Today's Deals
     'picks',             // Recommended Cars / Recently Viewed
-    'flash_banner',      // Flash Sale banner
     'position3_promo',   // backend banner (only when one is live)
     'milestone',         // Refer & Earn strip + Complete 4 trips
     'destinations',
     'benefits',
     'member',
     'connect',
+    'footer',            // "Crafted in GUWAHATI"
   ], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
@@ -434,17 +431,11 @@ export default function HomeScreen() {
             onPick={(c) => router.push({ pathname: '/explore', params: { bodyType: c.value, type: vehicleType, t: String(Date.now()) } })}
           />
         );
-      case 'flash_banner':
-        content = <FlashSaleBanner />;
-        break;
       case 'position3_promo':
         content = <HomePromoBanner position="position3" />;
         break;
       case 'cards_row':
         content = <HomeCardsRow fromRate={fromRate} />;
-        break;
-      case 'exclusive_offers':
-        content = <ExclusiveOffersSection />;
         break;
       case 'picks':
         if (!showRecent && !picks.length && vehiclesLoading) {
@@ -550,6 +541,9 @@ export default function HomeScreen() {
       case 'connect':
         content = <ConnectCard />;
         break;
+      case 'footer':
+        // Full-width sign-off, outside Reveal so it never fades in late at the very end of the page.
+        return <CraftedFooter dark={isDarkMode} />;
     }
     if (!content) return null;
     // Figma: 16px gap between every block.
@@ -624,7 +618,20 @@ export default function HomeScreen() {
   );
 }
 
+/** Home footer: "Crafted in GUWAHATI". */
+function CraftedFooter({ dark }: { dark: boolean }) {
+  return (
+    <View style={styles.footer} accessibilityRole="text" accessibilityLabel="Crafted in Guwahati">
+      <Text style={[styles.footerSmall, { color: dark ? '#7C879B' : '#A3A3A3' }]}>Crafted in</Text>
+      <Text style={[styles.footerBig, { color: dark ? '#3A4760' : '#D4D7DE' }]} maxFontSizeMultiplier={1.1}>GUWAHATI</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  footer: { width: '100%', alignItems: 'center', paddingHorizontal: 16, paddingTop: 32, paddingBottom: 24 },
+  footerSmall: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, letterSpacing: 0.5 },
+  footerBig: { fontFamily: 'Anton_400Regular', fontSize: 56, lineHeight: 66, letterSpacing: 2, marginTop: 2 },
   screen: { flex: 1 },
   statusBarSpacer: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   row: { gap: 10, paddingHorizontal: 16 },

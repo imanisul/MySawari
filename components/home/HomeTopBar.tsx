@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, ImageSourcePropType, ImageStyle, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { G, Path } from 'react-native-svg';
+import Svg, { Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
 import HomeHeaderMask from '@/assets/images/home_header_mask.svg';
 import HomeHeaderUnion from '@/assets/images/home_header_union.svg';
 import HomeHeaderChevron from '@/assets/images/home_header_chevron.svg';
@@ -39,6 +39,18 @@ export function HomeTopBar({
 }: Props) {
   return (
     <LinearGradient colors={[HERO_TOP, HERO_BOTTOM]} locations={[0, 0.9385]} style={[s.hero, { paddingTop: topInset }]}>
+      {/* Ellipse 20: a 132 × 91 #FEFDF0 glow at (270.47, 51), blurred 42 — React Native has no blur, so it is a soft
+          radial fade over the blurred size (42 added on every side). Behind everything else (z-index 0). */}
+      <Svg width={216} height={175} style={[s.headerArtwork, { left: 270.47 - 42, top: topInset + 51 - 42 }]} pointerEvents="none">
+        <Defs>
+          <RadialGradient id="heroGlow" cx="50%" cy="50%" rx="50%" ry="50%">
+            <Stop offset="0" stopColor="#FEFDF0" stopOpacity={0.45} />
+            <Stop offset="0.45" stopColor="#FEFDF0" stopOpacity={0.2} />
+            <Stop offset="1" stopColor="#FEFDF0" stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Ellipse cx={108} cy={87.5} rx={108} ry={87.5} fill="url(#heroGlow)" />
+      </Svg>
       <HomeHeaderMask style={[s.headerArtwork, { left: vehicleType === 'bike' ? 200 : 19, top: topInset + 76 }]} pointerEvents="none" />
       {/* Location + SawariCash */}
       <View style={s.header}>
@@ -175,18 +187,45 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
         <Pressable key={t.value} style={{ flex: 1 }} onPress={() => onPick(t)} accessibilityRole="button" accessibilityLabel={t.label}>
           <LinearGradient
             colors={dark ? ['#2A2550', '#1A1D29'] : ['#EAE8FC', '#FFFFFF']}
-            style={[s.tile, dark && { borderColor: 'rgba(107,90,237,0.35)' }]}
+            style={s.tile}
           >
             <View style={[s.tileImageFrame, { width: t.imageFrameWidth }]}>
               <Image source={t.image} style={[s.tileImg, t.imageStyle]} resizeMode="stretch" />
             </View>
-            <View style={[s.tileLabelWrap, dark && { backgroundColor: '#1A1D29' }]}>
-              <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
-            </View>
+            {/* Label tab: white, top corners 6, outlined in purple — strongest on the left, light lavender on the right */}
+            <LinearGradient colors={[EDGE_FROM, EDGE_TO]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={s.tileLabelEdge}>
+              <View style={[s.tileLabelWrap, dark && { backgroundColor: '#1A1D29' }]}>
+                <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
+              </View>
+            </LinearGradient>
+            {/* The tile's 1px border is drawn last, as Figma draws a frame's stroke over its children: it runs along the
+                label's bottom too, instead of being covered by it. */}
+            <View pointerEvents="none" style={[s.tileStroke, dark && { borderColor: 'rgba(107,90,237,0.35)' }]} />
           </LinearGradient>
         </Pressable>
       ))}
     </View>
+  );
+}
+
+// Label outline (car and bike tiles): #6B5AED on the left, fading on the right to the light lavender of the tile's own
+// border (the right edge stays visible, as in the design, instead of vanishing).
+const EDGE_FROM = 'rgba(107, 90, 237, 0.7)';
+const EDGE_TO = 'rgba(107, 90, 237, 0.16)';
+
+/** "Bikes" / "Scooters" label: white, left corners rounded, outlined in the tile purple fading to nothing at the right. */
+function BikeLabel({ text, dark }: { text: string; dark?: boolean }) {
+  return (
+    <LinearGradient
+      colors={[EDGE_FROM, EDGE_TO]}
+      start={{ x: 0, y: 0.5 }}
+      end={{ x: 1, y: 0.5 }}
+      style={s.bikeBadgeEdge}
+    >
+      <View style={[s.bikeBadge, dark && { backgroundColor: '#1A1D29' }]}>
+        <Text style={[s.bikeBadgeText, dark && { color: '#E5E7EB' }]}>{text}</Text>
+      </View>
+    </LinearGradient>
   );
 }
 
@@ -213,9 +252,7 @@ export function BikeCategoryTiles({ onPick, dark }: { onPick: (filter: { transmi
             style={s.bikeImg}
             resizeMode="contain"
           />
-          <View style={[s.bikeBadge, dark && { backgroundColor: '#1A1D29' }]}>
-            <Text style={[s.bikeBadgeText, dark && { color: '#E5E7EB' }]}>Bikes</Text>
-          </View>
+          <BikeLabel text="Bikes" dark={dark} />
         </LinearGradient>
       </Pressable>
 
@@ -237,9 +274,7 @@ export function BikeCategoryTiles({ onPick, dark }: { onPick: (filter: { transmi
             style={s.bikeImg}
             resizeMode="contain"
           />
-          <View style={[s.bikeBadge, dark && { backgroundColor: '#1A1D29' }]}>
-            <Text style={[s.bikeBadgeText, dark && { color: '#E5E7EB' }]}>Scooters</Text>
-          </View>
+          <BikeLabel text="Scooters" dark={dark} />
         </LinearGradient>
       </Pressable>
     </View>
@@ -250,6 +285,9 @@ export function BikeCategoryTiles({ onPick, dark }: { onPick: (filter: { transmi
 
 export function ReferCard({ amount = '₹50+', onPress, dark }: { amount?: string; onPress: () => void; dark?: boolean }) {
   return (
+    // Outline as in the design: #6B5AED along the top, fading down the sides to the card's lavender (no bottom edge:
+    // the strip sits on the milestone card).
+    <LinearGradient colors={['rgba(107, 90, 237, 0.85)', 'rgba(107, 90, 237, 0.16)']} style={s.referEdge}>
     <Pressable onPress={onPress} accessibilityRole="button" style={[s.refer, dark && { backgroundColor: '#1F2233' }]}>
       <View style={[s.referIcon, dark && { backgroundColor: '#2A2D3E' }]}>
         <Image source={require('../../assets/images/refer_hand_coin.png')} style={{ width: 24, height: 24 }} resizeMode="contain" />
@@ -265,6 +303,7 @@ export function ReferCard({ amount = '₹50+', onPress, dark }: { amount?: strin
         <Text style={[s.referSub, dark && { color: '#9CA3AF' }]} numberOfLines={1}>Get 10% of your friend’s booking payment.</Text>
       </View>
     </Pressable>
+    </LinearGradient>
   );
 }
 
@@ -334,17 +373,22 @@ const s = StyleSheet.create({
   searchText: { flex: 1, fontFamily: F.medium, fontSize: 15, lineHeight: 22, color: '#737373' },
   tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 16 },
   tile: {
-    height: 53, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(107,90,237,0.16)',
+    height: 53, borderRadius: 8, borderWidth: 1, borderColor: 'transparent', // stroke drawn on top by tileStroke
     alignItems: 'center', paddingHorizontal: 8, paddingTop: 2, paddingBottom: 2, overflow: 'hidden',
   },
+  tileStroke: { position: 'absolute', top: -1, left: -1, right: -1, bottom: -1, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(107,90,237,0.16)' },
   tileImageFrame: { height: 48, position: 'relative', flexShrink: 0, overflow: 'hidden' },
   tileImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-  tileLabelWrap: {
+  // Figma 60 × 19 tab at the bottom (padding 2/4/1): a 1px edge on top and sides, the white fill inside it.
+  tileLabelEdge: {
     position: 'absolute', bottom: -1, alignSelf: 'center', width: 60, height: 19,
-    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#6B5AED', borderTopLeftRadius: 6, borderTopRightRadius: 6,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
-    paddingTop: 4, paddingBottom: 1, paddingHorizontal: 4,
-  },   
+    borderTopLeftRadius: 6, borderTopRightRadius: 6, paddingTop: 1, paddingHorizontal: 1,
+  },
+  tileLabelWrap: {
+    flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: 5, borderTopRightRadius: 5,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    paddingTop: 1, paddingBottom: 1, paddingHorizontal: 3,
+  },
   tileLabel: { flex: 1, fontFamily: F.bold, fontSize: 9, lineHeight: 14, color: '#262626', textAlign: 'center' },
 
   // Frame 2147226276: Bikes & Scooters
@@ -355,15 +399,20 @@ const s = StyleSheet.create({
     alignItems: 'center', paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(107, 90, 237, 0.5)',
     borderRadius: 8, overflow: 'hidden',
   },
-  bikeImg: { width: 98.5, height: 65.67, marginLeft: -4 },
+  // flex-grow 1: the picture box takes the space left of the label (≈100 wide), the bike centred in it.
+  bikeImg: { flex: 1, height: 65.67 },
+  // 76 × 27 label: a 1px purple outline that fades out towards the tile's right edge, around the white fill.
+  bikeBadgeEdge: { width: 76, height: 27, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, paddingTop: 1, paddingBottom: 1, paddingLeft: 1 },
   bikeBadge: {
-    width: 76, height: 27, backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 6, borderBottomLeftRadius: 6,
-    alignItems: 'center', justifyContent: 'center', padding: 4,
+    flex: 1, backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 5, borderBottomLeftRadius: 5,
+    alignItems: 'center', justifyContent: 'center', padding: 3,
   },
   bikeBadgeText: { fontFamily: F.bold, fontSize: 11, lineHeight: 16, textAlign: 'center', color: '#262626' },
   // Frame 2147225720: 331 × 57, flat top-rounded strip sitting directly on the milestone card
-  refer: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 31, padding: 8, backgroundColor: '#EFEDFD', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  // 331 × 57 strip: a 1px edge on top and sides (referEdge), the #EFEDFD strip inside (padding 8 − 1 for the edge).
+  referEdge: { marginHorizontal: 31, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 1, paddingHorizontal: 1 },
+  refer: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 7, paddingHorizontal: 7, paddingBottom: 8, backgroundColor: '#EFEDFD', borderTopLeftRadius: 15, borderTopRightRadius: 15 },
   referIcon: { width: 40, height: 40, borderRadius: 40, backgroundColor: '#FAFAFA', alignItems: 'center', justifyContent: 'center' },
   referTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   referTitle: { fontFamily: F.semi, fontSize: 13, lineHeight: 20, color: '#262626', includeFontPadding: false },

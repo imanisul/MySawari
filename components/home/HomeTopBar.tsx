@@ -1,7 +1,12 @@
 import React from 'react';
-import { Image, ImageSourcePropType, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, ImageSourcePropType, ImageStyle, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import Svg, { G, Path } from 'react-native-svg';
+import HomeHeaderMask from '@/assets/images/home_header_mask.svg';
+import HomeHeaderUnion from '@/assets/images/home_header_union.svg';
+import HomeHeaderChevron from '@/assets/images/home_header_chevron.svg';
+import HomeHeaderCalendar from '@/assets/images/home_header_calendar.svg';
 
 /** Figma "iPhone 16 - 77" – top block: header, Cars / Bikes tabs and the date search. */
 
@@ -13,6 +18,8 @@ const F = {
   semi: 'PlusJakartaSans_600SemiBold',
   bold: 'PlusJakartaSans_700Bold',
 };
+
+const INACTIVE_TAB_PATH = 'M 32.0772 46 C 36.7189 46 40.7504 42.8059 41.8121 38.2872 L 48.9955 7.7128 C 50.0572 3.1941 54.0887 0 58.7304 0 H 195.27 C 199.911 0 203.943 3.1941 205.004 7.7128 L 212.188 38.2872 C 213.25 42.8059 217.281 46 221.923 46';
 
 type Props = {
   topInset: number;
@@ -31,28 +38,48 @@ export function HomeTopBar({
   onCityPress, sawariCash, vehicleType, onType, dateLabel, onDates,
 }: Props) {
   return (
-    <LinearGradient colors={[HERO_TOP, HERO_BOTTOM]} locations={[0, 0.9385]} style={[s.hero, { paddingTop: topInset + 8 }]}>
+    <LinearGradient colors={[HERO_TOP, HERO_BOTTOM]} locations={[0, 0.9385]} style={[s.hero, { paddingTop: topInset }]}>
+      <HomeHeaderMask style={[s.headerArtwork, { left: vehicleType === 'bike' ? 200 : 19, top: topInset + 76 }]} pointerEvents="none" />
       {/* Location + SawariCash */}
       <View style={s.header}>
         <Pressable style={s.locWrap} onPress={onCityPress} hitSlop={6}>
           <View style={s.cityRow}>
             <Text style={s.city}>{city}</Text>
-            <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
+            <HomeHeaderChevron />
           </View>
           <Text style={s.address} numberOfLines={1}>{address}</Text>
         </Pressable>
         <View style={s.cashPill}>
           <Text style={s.cashText}>{sawariCash}</Text>
-          <MaterialCommunityIcons name="hand-coin" size={14} color="#F5A524" />
+          <Image source={require('@/assets/images/home_header_cash_icon.png')} style={{ width: 12, height: 12 }} resizeMode="contain" />
         </View>
       </View>
 
+      <HomeHeaderUnion
+        style={[
+          s.headerArtwork,
+          { left: -21, top: topInset + 76 },
+          vehicleType === 'bike' && { transform: [{ scaleX: -1 }] },
+        ]}
+        pointerEvents="none"
+      />
+      <Svg
+        width={435}
+        height={130}
+        viewBox="0 0 435 130"
+        style={[s.headerArtwork, { left: -21, top: topInset + 76 }]}
+        pointerEvents="none"
+      >
+        <G transform={vehicleType === 'bike' ? 'translate(435 0) scale(-1 1)' : undefined}>
+          <Path d={INACTIVE_TAB_PATH} fill="none" stroke="#FEFDF0" strokeOpacity={0.4} strokeWidth={2} />
+        </G>
+      </Svg>
       <TypeTabs value={vehicleType === 'bike' ? 'bike' : 'car'} onChange={onType} />
 
       {/* Select dates & times */}
       <View style={s.searchWrap}>
         <Pressable style={s.search} onPress={onDates} accessibilityRole="button">
-          <Ionicons name="calendar-outline" size={20} color="#737373" />
+          <HomeHeaderCalendar />
           <Text style={[s.searchText, dateLabel && { color: '#262626' }]} numberOfLines={1}>
             {dateLabel || 'Select dates & times'}
           </Text>
@@ -95,14 +122,43 @@ function TypeTabs({ value, onChange }: { value: 'car' | 'bike'; onChange: (t: 'c
 
 /* ───────────── Category tiles (SUV / Sedan / Hatchback / MUV) ───────────── */
 
-export type CategoryTile = { label: string; value: string; image: ImageSourcePropType; imgW?: number };
+export type CategoryTile = {
+  label: string;
+  value: string;
+  image: ImageSourcePropType;
+  imageFrameWidth: number;
+  imageStyle: ImageStyle;
+};
 
-// Export these four renders from Figma ("Silver SUV Three-Quarter Cutout Render" etc.) into assets/images.
 export const CAR_CATEGORIES: CategoryTile[] = [
-  { label: 'SUV', value: 'SUV', image: require('../../assets/images/cat_suv.png') },
-  { label: 'Sedan', value: 'Sedan', image: require('../../assets/images/cat_sedan.png'), imgW: 84 },
-  { label: 'Hatchback', value: 'Hatchback', image: require('../../assets/images/cat_hatchback.png'), imgW: 83 },
-  { label: 'MUV / MPV', value: 'MUV', image: require('../../assets/images/cat_muv.png') },
+  {
+    label: 'SUV',
+    value: 'SUV',
+    image: require('../../assets/images/home_category_suv.png'),
+    imageFrameWidth: 79,
+    imageStyle: { height: 52.67, top: -6.33 },
+  },
+  {
+    label: 'Sedan',
+    value: 'Sedan',
+    image: require('../../assets/images/home_category_sedan.png'),
+    imageFrameWidth: 84,
+    imageStyle: { width: 96.73, height: 48, left: -7.64, top: -6 },
+  },
+  {
+    label: 'Hatchback',
+    value: 'Hatchback',
+    image: require('../../assets/images/home_category_hatchback.png'),
+    imageFrameWidth: 83,
+    imageStyle: { height: 55.33, top: -9.67 },
+  },
+  {
+    label: 'MUV / MPV',
+    value: 'MUV',
+    image: require('../../assets/images/home_category_muv.png'),
+    imageFrameWidth: 79,
+    imageStyle: { height: 52.67, top: -6.33 },
+  },
 ];
 
 export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; onPick: (t: CategoryTile) => void; dark?: boolean }) {
@@ -114,7 +170,9 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
             colors={dark ? ['#2A2550', '#1A1D29'] : ['#EAE8FC', '#FFFFFF']}
             style={[s.tile, dark && { borderColor: 'rgba(107,90,237,0.35)' }]}
           >
-            <Image source={t.image} style={[s.tileImg, t.imgW ? { width: t.imgW } : null]} resizeMode="contain" />
+            <View style={[s.tileImageFrame, { width: t.imageFrameWidth }]}>
+              <Image source={t.image} style={[s.tileImg, t.imageStyle]} resizeMode="stretch" />
+            </View>
             <View style={[s.tileLabelWrap, dark && { backgroundColor: '#1A1D29' }]}>
               <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
             </View>
@@ -204,8 +262,18 @@ export function ReferCard({ amount = '₹50+', onPress, dark }: { amount?: strin
 }
 
 /** Light rounded container used around Recommended Cars and Top Destination. */
-export function Panel({ children, dark }: { children: React.ReactNode; dark?: boolean }) {
-  return <View style={[s.panel, dark && { backgroundColor: '#161925', borderColor: '#262A3A' }]}>{children}</View>;
+export function Panel({ children, dark, variant = 'recommended' }: { children: React.ReactNode; dark?: boolean; variant?: 'recommended' | 'destinations' }) {
+  return (
+    <View
+      style={[
+        s.panel,
+        variant === 'destinations' && s.destinationPanel,
+        dark && { backgroundColor: '#161925', borderColor: '#262A3A' },
+      ]}
+    >
+      {children}
+    </View>
+  );
 }
 
 const s = StyleSheet.create({
@@ -221,9 +289,11 @@ const s = StyleSheet.create({
     backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9',
   },
   cashText: { fontFamily: F.semi, fontSize: 13, color: '#2F3E75' },
+  headerArtwork: { position: 'absolute' },
   // Frame 2147226253: Cars / Bikes & Scooters tab switch
   tabsFrame: {
     height: 49,
+    marginTop: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -249,7 +319,7 @@ const s = StyleSheet.create({
   tabInactive: {
     color: 'rgba(255, 255, 255, 0.8)',
   },
-  searchWrap: { paddingTop: 12, paddingHorizontal: 16, paddingBottom: 14 },
+  searchWrap: { marginTop: 9, paddingTop: 12, paddingHorizontal: 16, paddingBottom: 14 },
   search: {
     height: 51, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12,
     backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#D1CCF9', borderRadius: 12,
@@ -258,15 +328,17 @@ const s = StyleSheet.create({
   tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 16 },
   tile: {
     height: 53, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(107,90,237,0.16)',
-    alignItems: 'center', paddingHorizontal: 8, paddingTop: 2, overflow: 'hidden',
+    alignItems: 'center', paddingHorizontal: 8, paddingTop: 2, paddingBottom: 2, overflow: 'hidden',
   },
-  tileImg: { width: 79, height: 48, flexShrink: 0 },
+  tileImageFrame: { height: 48, position: 'relative', flexShrink: 0, overflow: 'hidden' },
+  tileImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   tileLabelWrap: {
-    position: 'absolute', bottom: 0, alignSelf: 'center', width: 60, height: 19,
-    backgroundColor: '#FFFFFF', borderTopLeftRadius: 6, borderTopRightRadius: 6,
-    alignItems: 'center', justifyContent: 'center', paddingTop: 2, paddingBottom: 1, paddingHorizontal: 4,
-  },
-  tileLabel: { fontFamily: F.bold, fontSize: 9, lineHeight: 14, color: '#262626' },
+    position: 'absolute', bottom: -1, alignSelf: 'center', width: 60, height: 19,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#6B5AED', borderTopLeftRadius: 6, borderTopRightRadius: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    paddingTop: 4, paddingBottom: 1, paddingHorizontal: 4,
+  },   
+  tileLabel: { flex: 1, fontFamily: F.bold, fontSize: 9, lineHeight: 14, color: '#262626', textAlign: 'center' },
 
   // Frame 2147226276: Bikes & Scooters
   bikeTilesRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 8, marginTop: 16 },
@@ -292,8 +364,9 @@ const s = StyleSheet.create({
   referBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 20, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: '#2F3E75', borderRadius: 31 },
   referBtnText: { fontFamily: F.bold, fontSize: 8, lineHeight: 12, color: '#FFFFFF', includeFontPadding: false },
   panel: {
-    marginHorizontal: 16, paddingVertical: 12, borderRadius: 16,
-    backgroundColor: '#FAFAFE', borderWidth: 1, borderColor: '#EEEDFB', overflow: 'hidden',
+    marginHorizontal: 16, padding: 8, borderRadius: 12,
+    backgroundColor: '#F7F6FE', borderWidth: 1, borderColor: '#EFEDFD', overflow: 'hidden',
   },
+  destinationPanel: { backgroundColor: '#F8FCFA', borderColor: '#E4F1ED' },
 });
 

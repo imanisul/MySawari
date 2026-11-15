@@ -963,9 +963,16 @@ export function HomeCategories({ bike, onPick }: { bike?: boolean; onPick: (filt
   );
 }
 
-export function HomeSectionTitle({ title }: { title: string }) {
+export function HomeSectionTitle({ title, inset = true }: { title: string; inset?: boolean }) {
   const p = useDetailsPalette();
-  return <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">{title}</Text>;
+  return (
+    <Text
+      style={[styles.sectionTitle, inset ? styles.sectionTitleInset : styles.panelSectionTitle, { color: p.fg }]}
+      accessibilityRole="header"
+    >
+      {title}
+    </Text>
+  );
 }
 
 // ── Top picks card ───────────────────────────────────────────────────────────
@@ -1532,7 +1539,9 @@ const styles = StyleSheet.create({
   catTile: { alignSelf: 'stretch', height: 68, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   catLabel: { alignSelf: 'stretch', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 12, lineHeight: 16, textAlign: 'center' },
   // Figma sections each pad 8 top and bottom, so blocks sit 16 apart; title to content is 12.
-  sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginTop: 16, marginBottom: 12, paddingHorizontal: 16 },
+  sectionTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
+  sectionTitleInset: { marginBottom: 8, paddingHorizontal: 16 },
+  panelSectionTitle: { marginBottom: 6 },
 
   tripCard: { width: 246, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12 },
   tripWhere: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
@@ -1590,16 +1599,16 @@ const styles = StyleSheet.create({
   destTileBlurb: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5, color: '#FAFAFA' },
 
   // Benefits
-  benefits: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, columnGap: 12, rowGap: 12 },
+  benefits: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, columnGap: 12, rowGap: 10 },
   // Two equal columns 12 apart: both start at 40% and grow into the rest of the row.
   benefit: { flexBasis: '40%', flexGrow: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  benefitCircle: { width: 37, height: 37, borderRadius: 40, overflow: 'hidden', backgroundColor: 'rgba(234, 236, 241, 0.4)', alignItems: 'center', justifyContent: 'center' },
-  benefitTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5 },
+  benefitCircle: { width: 28, height: 28, borderRadius: 40, overflow: 'hidden', backgroundColor: 'rgba(234, 236, 241, 0.4)', alignItems: 'center', justifyContent: 'center' },
+  benefitTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5 },
   benefitSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Membership
   // Figma: 361x65 card, 10/8 padding, 12 gap; width follows the screen (16 side margins), height grows with the text.
-  member: { marginHorizontal: 16, marginTop: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, gap: 12, justifyContent: 'center', alignItems: 'stretch' },
+  member: { marginHorizontal: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, gap: 3, justifyContent: 'center', alignItems: 'stretch' },
   memberHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 3 },
   memberTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, flexShrink: 1 },
   memberBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 22, paddingHorizontal: 10, borderRadius: 31 },
@@ -1614,7 +1623,7 @@ const styles = StyleSheet.create({
   memberSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
   // Connect
-  connect: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginHorizontal: 16, marginTop: 16, minHeight: 77, borderWidth: 1, borderRadius: 12, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 },
+  connect: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginHorizontal: 16, minHeight: 77, borderWidth: 1, borderRadius: 12, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 },
   connectLeft: { flex: 1, gap: 6 },
   connectTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
   // Slots as in Figma: LinkedIn 21.12 wide, the others 18, X 17.92 × 16 inside 1 padding.
@@ -1628,7 +1637,7 @@ const styles = StyleSheet.create({
   connectTag: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: -4.5, marginBottom: -3.8, textAlign: 'right', alignSelf: 'stretch', includeFontPadding: false },
 
   // Section Promo Banners (Middle & Bottom positions)
-  promoBannerContainer: { paddingHorizontal: 16, marginTop: 16, alignItems: 'center', gap: 8 },
+  promoBannerContainer: { paddingHorizontal: 16, alignItems: 'center', gap: 8 },
   promoBannerCard: { height: 160, borderRadius: 12, overflow: 'hidden', backgroundColor: '#1E293B', position: 'relative' },
   promoBannerPhoto: { width: '100%', height: '100%' },
   promoBannerContent: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, justifyContent: 'flex-end' },

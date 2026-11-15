@@ -33,13 +33,13 @@ import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
 import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
 
 const DESTINATIONS: { id: string; title: string; blurb: string; image: ImageSourcePropType; faded?: boolean }[] = [
+  { id: 'meghalaya', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/dest_meghalaya.jpg') },
+  { id: 'sikkim', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/dest_sikkim.jpg') },
   { id: 'shillong', title: 'Shillong', blurb: 'Pine-covered hills, cafe culture, and Scotland of the East vibes.', image: require('../../assets/images/dest_shillong.jpg') },
   { id: 'tawang', title: 'Tawang', blurb: 'High-altitude passes, majestic monastery, and snow peaks.', image: require('../../assets/images/dest_tawang.jpg') },
   { id: 'cherrapunji', title: 'Cherrapunji', blurb: 'Living root bridges, roaring waterfalls, and misty cliffs.', image: require('../../assets/images/dest_cherrapunji.jpg') },
   { id: 'umrangso', title: 'Umrangso', blurb: 'Serene Kapili Lake, scenic golf course, and misty rolling hills.', image: require('../../assets/images/dest_umrangso.jpg') },
   { id: 'kaziranga', title: 'Kaziranga', blurb: 'Wild safaris, the one-horned rhino, and lush tea estates.', image: require('../../assets/images/dest_kaziranga.jpg') },
-  { id: 'meghalaya', title: 'Meghalaya', blurb: 'Discover scenic drives, waterfalls, rivers, and hidden villages.', image: require('../../assets/images/dest_meghalaya.jpg') },
-  { id: 'sikkim', title: 'Sikkim', blurb: 'Mountain escapes, peaceful monasteries, and Himalayan views.', image: require('../../assets/images/dest_sikkim.jpg') },
 ];
 
 const DESTINATION_LOCATIONS: Record<string, LocationResult> = {
@@ -394,7 +394,6 @@ export default function HomeScreen() {
     'benefits',
     'member',
     'connect',
-    'footer',
   ], []);
 
   const renderSection = useCallback(({ item, index }: { item: string; index: number }) => {
@@ -462,7 +461,7 @@ export default function HomeScreen() {
         if (!showRecent && !picks.length) break;
         content = (
           <Panel dark={isDarkMode}>
-            <HomeSectionTitle title={showRecent ? 'Recently Viewed' : 'Recommended Cars'} />
+            <HomeSectionTitle title={showRecent ? 'Recently Viewed' : 'Recommended Cars'} inset={false} />
             <FlatList
               data={showRecent ? recent : picks}
               horizontal
@@ -470,7 +469,7 @@ export default function HomeScreen() {
               // The real day rate (vehicle pricePerDay), not a member price: no membership passed to the card.
               renderItem={({ item: v }) => <TopPickCard car={v} onPress={() => openPick(v)} />}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.row, { gap: 8 }]}
+              contentContainerStyle={[styles.row, { gap: 8, paddingHorizontal: 0 }]}
               snapToInterval={254}
               decelerationRate="fast"
               removeClippedSubviews={false}
@@ -518,8 +517,8 @@ export default function HomeScreen() {
         break;
       case 'destinations':
         content = (
-          <Panel dark={isDarkMode}>
-            <HomeSectionTitle title="Top Destination" />
+          <Panel dark={isDarkMode} variant="destinations">
+            <HomeSectionTitle title="Top Destination" inset={false} />
             <FlatList
               data={DESTINATIONS}
               horizontal
@@ -528,7 +527,7 @@ export default function HomeScreen() {
                 <DestinationTile image={d.image} faded={d.faded} title={d.title} blurb={d.blurb} onPress={() => handleDestinationPress(d.title)} />
               )}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.row, { gap: 8 }]}
+              contentContainerStyle={[styles.row, { gap: 8, paddingHorizontal: 0 }]}
               snapToInterval={224}
               decelerationRate="fast"
               removeClippedSubviews={false}
@@ -550,9 +549,6 @@ export default function HomeScreen() {
       case 'connect':
         content = <ConnectCard />;
         break;
-      case 'footer':
-        // Full-width art, outside Reveal so it never fades in late at the very end of the page.
-        return <CraftedFooter dark={isDarkMode} />;
     }
     if (!content) return null;
     // Figma: 16px gap between every block.
@@ -620,23 +616,8 @@ export default function HomeScreen() {
   );
 }
 
-/** Home footer: just "Crafted in Guwahati" (the Assam artwork is hidden). */
-function CraftedFooter({ dark }: { dark: boolean }) {
-  return (
-    <View style={styles.footer} accessibilityRole="text" accessibilityLabel="Crafted in Guwahati">
-      <Text style={[styles.footerSmall, { color: dark ? '#7C879B' : '#A3A3A3' }]}>Crafted in</Text>
-      <Text style={[styles.footerBig, { color: dark ? '#3A4760' : '#D4D7DE' }]} maxFontSizeMultiplier={1.1}>GUWAHATI</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   statusBarSpacer: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
-  footer: { width: '100%', alignItems: 'center', paddingHorizontal: 16, paddingTop: 32, paddingBottom: 24 },
-  footerSmall: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, letterSpacing: 0.5 },
-  footerBig: { fontFamily: 'Anton_400Regular', fontSize: 56, lineHeight: 66, letterSpacing: 2, marginTop: 2 },
-  // The refer strip sits inside the banner (rays behind it); the white sheet's rounded top covers its foot.
-  sheet: { marginTop: -32, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderBottomWidth: 0, paddingTop: 10, paddingBottom: 8 },
   row: { gap: 10, paddingHorizontal: 16 },
 });

@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useDealCars, dealPricing } from '@/hooks/useDealCars';
+import HomeCardSunburst from '@/assets/images/home_card_sunburst.svg';
+import HomeDealsTitle from '@/assets/images/home_deals_title.svg';
 
 /** Figma Frame 2147226269: a row of 340 × 248 purple cards (price, Today's Deals, "Find the Perfect Ride"), gap 12. */
 const W = 340;
@@ -20,15 +22,10 @@ const TILES = [
   { label: 'DoorStep Delivery', img: require('@/assets/images/hero_benefit_doorstep.png'), w: 68 },
 ];
 
-// Sparkles around the title (Figma Group 1171275686 …): position inside the 118-wide title box, size, colour.
-const STARS = [
-  { x: 97.87, y: 4.49, s: 6, c: '#FBC422' }, { x: 12.87, y: 3.49, s: 6, c: '#FBC422' },
-  { x: 9.87, y: 25.49, s: 8, c: '#FFFFFF' }, { x: 99.87, y: 27.49, s: 7, c: '#FFFFFF' },
-];
-
 function PriceCard({ fromRate }: { fromRate: number }) {
   return (
     <LinearGradient colors={['#6152D8', '#CEC9F3']} style={styles.card} accessible accessibilityRole="header" accessibilityLabel={`Your ride, from just ${formatCurrency(fromRate)}`}>
+      <HomeCardSunburst style={styles.cardSunburst} pointerEvents="none" />
       {/* Frame 2147226207: 312.44 × 164, centred in the card */}
       <View style={styles.priceBox}>
         <Svg width={289.69} height={35.91} style={styles.priceShadow} pointerEvents="none">
@@ -62,7 +59,7 @@ function TimerBox({ value, label }: { value: number; label: string }) {
   );
 }
 
-function DealsCard() {
+function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available: boolean) => void }) {
   const router = useRouter();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [active, setActive] = useState(0);
@@ -72,6 +69,9 @@ function DealsCard() {
   }, []);
   const { dealCars, targetEndMs } = useDealCars(nowMs);
   const shown = dealCars.slice(0, 4);
+  useEffect(() => {
+    onAvailabilityChange(shown.length > 0);
+  }, [shown.length, onAvailabilityChange]);
   useEffect(() => {
     if (shown.length < 2) return;
     const t = setInterval(() => setActive((a) => (a + 1) % shown.length), 4000);
@@ -96,13 +96,7 @@ function DealsCard() {
     <LinearGradient colors={['#6152D8', '#ADA4F4']} style={[styles.card, styles.dealsCard]}>
       <View style={styles.dealsTop}>
         <View style={styles.dealsTitle}>
-          {STARS.map((st, i) => (
-            <Svg key={i} width={st.s} height={st.s} viewBox="0 0 24 24" style={{ position: 'absolute', left: st.x, top: st.y }} pointerEvents="none">
-              <Path d="M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C8 11 11 8 12 0Z" fill={st.c} />
-            </Svg>
-          ))}
-          <Text style={styles.dealsToday} allowFontScaling={false}>Today’s</Text>
-          <Text style={styles.dealsWord} allowFontScaling={false}>Deals</Text>
+          <HomeDealsTitle style={styles.dealsArtwork} pointerEvents="none" />
         </View>
         <View style={styles.endsIn}>
           <Text style={styles.endsInText} allowFontScaling={false}>ENDS IN</Text>
@@ -152,6 +146,7 @@ function DealsCard() {
 function FindCard() {
   return (
     <LinearGradient colors={['#6152D8', '#CEC9F3']} style={[styles.card, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8, gap: 12 }]}>
+      <HomeCardSunburst style={styles.cardSunburst} pointerEvents="none" />
       <Text style={styles.findTitle} allowFontScaling={false}>Find the Perfect Ride</Text>
       <View style={styles.tiles}>
         {TILES.map((t) => (
@@ -166,17 +161,31 @@ function FindCard() {
 }
 
 export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
+  const scrollRef = useRef<ScrollView>(null);
+  const { width: screenWidth } = useWindowDimensions();
+  const [dealsAvailable, setDealsAvailable] = useState(false);
+  const positionedAtDeals = useRef(false);
+  const onAvailabilityChange = useCallback((available: boolean) => setDealsAvailable(available), []);
+
+  useEffect(() => {
+    if (!fromRate || !dealsAvailable || positionedAtDeals.current) return;
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ x: W + 12, y: 0, animated: false }));
+    positionedAtDeals.current = true;
+    return () => cancelAnimationFrame(frame);
+  }, [fromRate, dealsAvailable]);
+
   return (
     <ScrollView
+      ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
       snapToInterval={W + 12}
       decelerationRate="fast"
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
+      contentContainerStyle={{ paddingHorizontal: Math.max(0, (screenWidth - W) / 2), gap: 12 }}
       style={{ height: H, flexGrow: 0 }}
     >
       {!!fromRate && <PriceCard fromRate={fromRate} />}
-      <DealsCard />
+      <DealsCard onAvailabilityChange={onAvailabilityChange} />
       <FindCard />
     </ScrollView>
   );
@@ -185,6 +194,7 @@ export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
 const F700 = 'PlusJakartaSans_700Bold';
 const styles = StyleSheet.create({
   card: { width: W, height: H, borderRadius: 12, overflow: 'hidden' },
+  cardSunburst: { position: 'absolute', left: -110.5, top: -156.5, opacity: 0.18 },
   // price card
   priceBox: { position: 'absolute', width: 312.44, height: 164, left: (W - 312.44) / 2, top: (H - 164) / 2 + 0.5 },
   priceShadow: { position: 'absolute', left: (312.44 - 289.69) / 2 + 0.6, top: 126.89 },
@@ -196,9 +206,8 @@ const styles = StyleSheet.create({
   // deals card
   dealsCard: { padding: 8, justifyContent: 'space-between', gap: 12 },
   dealsTop: { height: 53.38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, alignSelf: 'stretch' },
-  dealsTitle: { width: 118, height: 53, alignItems: 'center', justifyContent: 'center' },
-  dealsToday: { fontFamily: F700, fontSize: 20, lineHeight: 26, transform: [{ rotate: '-4deg' }], color: '#FBC422', textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 3, includeFontPadding: false },
-  dealsWord: { fontFamily: F700, fontSize: 30, lineHeight: 34, color: '#FFFFFF', marginTop: -4, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 4, includeFontPadding: false },
+  dealsTitle: { width: 118, height: 53, alignItems: 'center', justifyContent: 'center', overflow: 'visible' },
+  dealsArtwork: { position: 'absolute', top: -5, left: 0 },
   endsIn: { width: 97, gap: 2, justifyContent: 'center' },
   endsInText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF', textAlign: 'center', includeFontPadding: false },
   timerBox: { width: 27, height: 27, borderRadius: 6, backgroundColor: '#FFFBF0', borderWidth: 1, borderColor: '#F9D774', alignItems: 'center', justifyContent: 'center' },

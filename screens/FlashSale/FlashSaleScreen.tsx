@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
-import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import Svg, { Ellipse, Path } from 'react-native-svg';
+import { Feather } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -35,7 +35,6 @@ import { BACKEND_URL } from '@/services/backend/api';
 import * as Haptics from '@/utils/haptics';
 import { LoginBottomSheet } from '@/components';
 import FsTitle from '@/assets/images/flash_sale/fs_title.svg';
-import FsTitleGlow from '@/assets/images/flash_sale/fs_title_glow.svg';
 import FsRatingStar from '@/assets/images/flash_sale/fs_rating_star.svg';
 import FsChevron from '@/assets/images/flash_sale/fs_chevron.svg';
 import FsDash from '@/assets/images/flash_sale/fs_dash.svg';
@@ -62,31 +61,6 @@ const STAR_PATH = 'M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-
-/** Light rays radiating from slightly below center */
-function Rays({ width, height }: { width: number; height: number }) {
-  const cx = width / 2;
-  const cy = height / 2 + 5;
-  const r = Math.hypot(width, height);
-  const n = 32;
-  const d = Array.from({ length: n / 2 }, (_, i) => {
-    const a0 = ((i * 2) / n) * Math.PI * 2;
-    const a1 = ((i * 2 + 1) / n) * Math.PI * 2;
-    return `M${cx},${cy} L${cx + r * Math.cos(a0)},${cy + r * Math.sin(a0)} L${cx + r * Math.cos(a1)},${cy + r * Math.sin(a1)} Z`;
-  }).join(' ');
-
-  return (
-    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Defs>
-        <RadialGradient id="flashRays" cx={cx} cy={cy} r={565} gradientUnits="userSpaceOnUse">
-          <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0} />
-          <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0.08} />
-        </RadialGradient>
-      </Defs>
-      <Path d={d} fill="url(#flashRays)" />
-    </Svg>
-  );
-}
 
 /**
  * Gold crown (Figma Vector): #FBC422 with a 1.2px black outline and a 1px black hard shadow, rotated −24.98°.
@@ -147,6 +121,11 @@ function offerTrip(offer: any) {
   return { startLabel: label(start), endLabel: label(end), days, pickupT, returnT };
 }
 
+function indiaDayOrdinal(ms: number): number {
+  const p = getIndiaDateParts(ms);
+  return Date.UTC(p.year, p.month, p.date) / 86400000;
+}
+
 /** Arc slots (Figma Frame 2147226241, 312 wide): offset from the shown car → place, size and white ring strength. */
 const ARC_SLOTS = [
   { offset: 0, left: 130, top: 12, size: 52, ring: '#FFFFFF' },
@@ -200,8 +179,6 @@ function LiveCountdownHeader({ expiryMs }: { expiryMs: number }) {
 
   return (
     <View style={styles.liveHeaderWrap}>
-      {/* Ellipse 13 glow (154 × 70 at 18, 10; exported with its blur, so it spills 118.7 each way) behind the title */}
-      <FsTitleGlow width={391.449} height={307.449} style={{ position: 'absolute', left: 18 - 118.72, top: 10 - 118.72 }} pointerEvents="none" />
       {/* Frame 2147226232: the bolt + FLASH / SALE lettering, exported from Figma (172.87 × 92.42) */}
       <FsTitle width={174.073} height={92.4218} style={{ marginLeft: -1.2 }} />
 
@@ -250,8 +227,14 @@ export default function FlashSaleScreen() {
     enabled: !isLive,
   });
 
+  const [nowMs, setNowMs] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
   const scheduledStartsMs = nextSale?.startsAt ? new Date(nextSale.startsAt).getTime() : 0;
-  const isScheduled = !isLive && scheduledStartsMs > Date.now();
+  const isScheduled = !isLive && scheduledStartsMs > nowMs;
   const isComingSoon = !isLive && !isScheduled && !offersLoading && !nextLoading;
 
   // Membership status
@@ -274,26 +257,21 @@ export default function FlashSaleScreen() {
     return 0;
   }, [isLive, liveOffer]);
 
-  const [nowMs, setNowMs] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
   const isEarlyAccessActive = isLive && (
     Boolean(offers.some((o: any) => o.isEarlyAccessLocked)) ||
     Boolean(offers.some((o: any) => o.isEarlyAccessUnlocked)) ||
     (earlyAccessEndsMs > nowMs)
   );
 
-  // Before the sale opens the cars stay hidden from everyone (members included): only their photos are known.
-  const [previewLocked, setPreviewLocked] = useState(true);
-  useEffect(() => {
-    setPreviewLocked(!isLive);
-  }, [isLive]);
+  const todayOrdinal = indiaDayOrdinal(nowMs);
+  const saleOrdinal = scheduledStartsMs ? indiaDayOrdinal(scheduledStartsMs) : 0;
+  const todayWeekday = new Date(todayOrdinal * 86400000).getUTCDay();
+  const saleWeekday = saleOrdinal ? new Date(saleOrdinal * 86400000).getUTCDay() : -1;
+  const isSaturdayPreview = isScheduled && todayWeekday === 6 && saleWeekday === 0 && saleOrdinal - todayOrdinal === 1;
+  const isSundayNonMemberPreview = isScheduled && !isMember && todayWeekday === 0 && saleOrdinal === todayOrdinal;
+  const isScheduledPreview = isSaturdayPreview || isSundayNonMemberPreview;
 
-  // Only the cars and bikes the Operation App put in its live offers (every offer, not just the first), each with its
-  // own offer and that offer's prices. Nothing is added to fill space. Before a sale opens: the hidden cars' photos.
+  // Only show vehicles supplied by the live or upcoming offer; never invent vehicle data for a preview.
   const displayCars = useMemo(() => {
     const list: any[] = [];
     const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
@@ -305,7 +283,7 @@ export default function FlashSaleScreen() {
       if (!car) return;
       // Booked: this car's deal stock is used up, or the car is already taken for the deal's dates.
       const trip = offerTrip(offer);
-      const soldOut = Boolean(vp?.stockLimit && Number(vp.soldCount) >= Number(vp.stockLimit));
+      const soldOut = Boolean(vp?.stockLimit != null && Number(vp.soldCount) >= Number(vp.stockLimit));
       const taken = fleet ? !getAvailability(fleet, trip.startLabel, trip.endLabel, trip.pickupT, trip.returnT).available : false;
       list.push({
         ...car,
@@ -325,7 +303,15 @@ export default function FlashSaleScreen() {
       // Free cars first, booked ones after (still shown, locked).
       list.sort((a, b) => Number(!!a.booked) - Number(!!b.booked));
     } else if (isScheduled) {
-      (nextSale?.images || []).forEach((url, i) => list.push({ id: `hidden-${i}`, images: [{ url }] }));
+      const offer = nextSale?.offer;
+      if (offer) {
+        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice, vp));
+        (offer.applicableVehicleIds || []).forEach((v: any) => add(offer, v));
+        if (offer.vehicleId) add(offer, offer.vehicleId);
+      }
+      if (!list.length) {
+        (nextSale?.images || []).forEach((url, i) => list.push({ id: `hidden-${i}`, images: [{ url }] }));
+      }
     }
     return list;
   }, [offers, isLive, isScheduled, nextSale, fleetVehicles]);
@@ -333,17 +319,22 @@ export default function FlashSaleScreen() {
   const [selectedCarIndex, setSelectedCarIndex] = useState(0);
   const slideX = useRef(new Animated.Value(0)).current; // the ticket's sideways slide while swiping between cars
   const activeCar: any = displayCars[selectedCarIndex] || displayCars[0] || {};
-  const activeOffer: any = activeCar.offer || liveOffer || null;
+  const activeOffer: any = activeCar.offer || liveOffer || (isScheduled ? nextSale?.offer : null) || null;
 
   // Can the customer book this car now? (its own offer's early-access lock and members-only rule)
   const canBook = isLive && !activeCar.booked && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
 
-  // The ticket is locked (frosted, car hidden, member/everyone times, membership button) before the sale opens for
-  // everyone, and while it is live but members-only (early-access window, or a members-only deal) for a non-member.
-  const membersOnlyNow = isLive && !isMember && Boolean(activeOffer?.isEarlyAccessLocked || activeOffer?.isEligible === false);
-  const ticketLocked = isScheduled && previewLocked; // before the sale: the car itself stays hidden
+  // Scheduled preview days show the offer under the membership frost; other upcoming sales stay fully locked.
+  const membersOnlyNow = (
+    (isLive && !isMember && Boolean(activeOffer?.isEarlyAccessLocked || activeOffer?.isEligible === false)) ||
+    (isScheduledPreview && !isMember)
+  );
+  const ticketLocked = isScheduled && !isScheduledPreview;
   // When it opens to everyone: the scheduled start, or (live, members' window) the early-access end.
-  const opensMs = isScheduled ? scheduledStartsMs : (activeOffer?.earlyAccessEndsAt ? new Date(activeOffer.earlyAccessEndsAt).getTime() : 0);
+  const opensMs = isScheduled
+    ? scheduledStartsMs
+    : (activeOffer?.earlyAccessEndsAt ? new Date(activeOffer.earlyAccessEndsAt).getTime() : earlyAccessEndsMs);
+  const showScheduledHeader = isScheduled || (membersOnlyNow && opensMs > nowMs);
 
   // The car's own photo as an image source. The fleet gives full links, or the app's built-in picture of that model
   // when the car has no uploaded photo; a car straight from the offer gives {url} objects, maybe server-relative.
@@ -469,18 +460,20 @@ export default function FlashSaleScreen() {
 
   // Schedule text calculations
   const scheduleInfo = useMemo(() => {
-    if (!scheduledStartsMs) return { weekday: 'SUNDAY', timeStr: '8 AM', fullLabel: 'STARTS SUNDAY 8AM' };
-    const p = getIndiaDateParts(scheduledStartsMs);
+    const timeMs = opensMs || scheduledStartsMs;
+    if (!timeMs) return { weekday: 'SUNDAY', weekdayTitle: 'Sunday', timeStr: '8 AM', fullLabel: 'STARTS SUNDAY 8 AM' };
+    const p = getIndiaDateParts(timeMs);
     const day = WEEKDAYS[new Date(Date.UTC(p.year, p.month, p.date)).getUTCDay()];
     const hour12 = p.hours % 12 === 0 ? 12 : p.hours % 12;
     const ampm = p.hours >= 12 ? 'PM' : 'AM';
     const timeStr = p.minutes > 0 ? `${hour12}:${String(p.minutes).padStart(2, '0')} ${ampm}` : `${hour12} ${ampm}`;
     return {
       weekday: day,
+      weekdayTitle: day.charAt(0) + day.slice(1).toLowerCase(),
       timeStr,
       fullLabel: `STARTS ${day} ${timeStr}`,
     };
-  }, [scheduledStartsMs]);
+  }, [opensMs, scheduledStartsMs]);
 
   // Expiry timestamp for live sale
   const expiryMs = useMemo(() => {
@@ -495,10 +488,16 @@ export default function FlashSaleScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <StatusBar style="light" />
-      <Rays width={windowWidth} height={windowHeight} />
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <Image
+          source={require('@/assets/images/flash_sale/fs_rays.png')}
+          style={{ position: 'absolute', left: -369, top: -134, width: 1130, height: 1130 }}
+          contentFit="fill"
+          transition={0}
+        />
+      </View>
 
-      {/* Top Header */}
-      <View style={styles.navRow}>
+      <View style={styles.topSpacer}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back"
@@ -540,9 +539,9 @@ export default function FlashSaleScreen() {
         // States 3, 4, 5, 6, 7: SCHEDULED or LIVE SALE
         <View style={styles.mainContainer}>
           {/* Header: Live countdown (Images 6 & 7) vs Scheduled (Images 3, 4, 5) */}
-          {isLive ? (
+          {isLive && !showScheduledHeader ? (
             <LiveCountdownHeader expiryMs={expiryMs} />
-          ) : isScheduled ? (
+          ) : showScheduledHeader ? (
             <View style={styles.scheduledHeaderWrap}>
               <View style={styles.scheduledTitleRow}>
                 <Bolt width={18} line={0.61} near={0.51} far={1.53} style={{ position: 'relative' }} />
@@ -551,8 +550,40 @@ export default function FlashSaleScreen() {
               </View>
 
               <View style={styles.scheduledSubRow}>
-                <Lettering text={scheduleInfo.fullLabel} size={30} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
-                <TripleUnderline width={220} />
+                {isScheduled && !isScheduledPreview ? (
+                  <View style={styles.scheduleOnRow}>
+                    <Lettering
+                      text="Schedule on "
+                      width={windowWidth - 32 - Math.min(scheduleInfo.weekdayTitle.length * 18, windowWidth - 32 - 190)}
+                      size={30}
+                      shadow={BLACK_SHADOW}
+                      near={1.15}
+                      outline={1.37}
+                      skew="0deg"
+                      scaleY={1.15}
+                      font={FONT}
+                    />
+                    <View>
+                      <Lettering
+                        text={scheduleInfo.weekdayTitle}
+                        width={Math.min(scheduleInfo.weekdayTitle.length * 18, windowWidth - 32 - 190)}
+                        size={30}
+                        shadow={BLACK_SHADOW}
+                        near={1.15}
+                        outline={1.37}
+                        skew="0deg"
+                        scaleY={1.15}
+                        font={FONT}
+                      />
+                      <TripleUnderline width={Math.min(scheduleInfo.weekdayTitle.length * 18, windowWidth - 32 - 190)} />
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.scheduledStartLine}>
+                    <Lettering text={scheduleInfo.fullLabel} width={windowWidth - 32} size={30} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
+                    <TripleUnderline width={220} />
+                  </View>
+                )}
               </View>
             </View>
           ) : null}
@@ -726,8 +757,23 @@ export default function FlashSaleScreen() {
 
             {/* Main CTA Button */}
             {isScheduled ? (
-              // Scheduled State CTA Button (Images 3, 4, 5)
-              previewLocked ? (
+              isSundayNonMemberPreview ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }}
+                  style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
+                >
+                  <Text style={styles.mainCtaText}>Buy Membership to</Text>
+                  <FsLock width={20} height={20} />
+                  <Text style={styles.mainCtaText}>Unlock</Text>
+                </Pressable>
+              ) : ticketLocked && isMember ? (
+                <View style={styles.mainCtaBtn}>
+                  <Text style={styles.mainCtaText}>
+                    Your early access opens at {formatTime12(scheduledStartsMs - earlyAccessMinutes * 60000)}
+                  </Text>
+                </View>
+              ) : ticketLocked ? (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
@@ -739,6 +785,7 @@ export default function FlashSaleScreen() {
                   <Text style={styles.mainCtaText}>Get Membership &amp; Unlock Early Access</Text>
                 </Pressable>
               ) : (
+                // Saturday preview before Sunday's sale.
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
@@ -844,14 +891,11 @@ export default function FlashSaleScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: BG },
-  navRow: {
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    zIndex: 10,
-  },
+  topSpacer: { height: 44, position: 'relative' },
   backBtn: {
+    position: 'absolute',
+    left: 16,
+    top: 3,
     width: 38,
     height: 38,
     borderRadius: 19,
@@ -861,16 +905,17 @@ const styles = StyleSheet.create({
   },
 
   /* Live header with ticking countdown timer (Images 6 & 7) */
-  // Frame 2147226221: 361 × 92.42 row, centred, 8 between the title and the timer. Figma top 86 = 27 under a 59
-  // status bar; the 44-high back row sits above it here, so it moves up 17 to keep that 86.
+  // Frame 2147226221: 361 × 92.42 row, centred, 8 between the title and timer; the Figma row starts at y=86.
   liveHeaderWrap: {
     width: 361,
     maxWidth: '100%',
     height: 92.42,
     alignSelf: 'center',
+    transform: [{ translateX: -8.4 }],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingTop: 40,
     gap: 8,
     marginTop: -17,
   },
@@ -923,9 +968,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  scheduledSubRow: {
-    alignItems: 'center',
-  },
+  scheduledSubRow: { alignItems: 'center' },
+  scheduleOnRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' },
+  scheduledStartLine: { alignItems: 'center' },
 
   /* Ticket Section */
   ticketSection: {
@@ -1093,8 +1138,8 @@ const styles = StyleSheet.create({
   specsRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   specDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#737373' },
   viewDetailsRow: { flexDirection: 'row', alignItems: 'center' },
-  detailsRow3: { height: 25, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 4, gap: 8 },
-  priceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  detailsRow3: { height: 25, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4, gap: 8 },
+  priceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
   dealPriceText: { fontFamily: FONT_SEMI, fontSize: 19, lineHeight: 24, color: '#262626', includeFontPadding: false },
   struckPriceText: { fontFamily: FONT_MED, fontSize: 13, lineHeight: 16, color: '#737373', textDecorationLine: 'line-through', marginBottom: 2 },
   viewDetailsText: { fontFamily: FONT_SEMI, fontSize: 11, lineHeight: 16.5, color: '#737373', textDecorationLine: 'underline' },

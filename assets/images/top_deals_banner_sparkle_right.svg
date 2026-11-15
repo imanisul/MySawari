@@ -1,0 +1,22 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1171275685">
+<g id="Star 9" filter="url(#filter0_f_0_4)">
+<path d="M9 8L9.27009 8.72991L10 9L9.27009 9.27009L9 10L8.72991 9.27009L8 9L8.72991 8.72991L9 8Z" fill="#FBC422"/>
+</g>
+<g id="Star 10" filter="url(#filter1_f_0_4)">
+<path d="M9 8L9.27009 8.72991L10 9L9.27009 9.27009L9 10L8.72991 9.27009L8 9L8.72991 8.72991L9 8Z" fill="#FBC422"/>
+</g>
+</g>
+<defs>
+<filter id="filter0_f_0_4" x="7.6" y="7.6" width="2.8" height="2.8" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="0.2" result="effect1_foregroundBlur_0_4"/>
+</filter>
+<filter id="filter1_f_0_4" x="0" y="0" width="18" height="18" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="4" result="effect1_foregroundBlur_0_4"/>
+</filter>
+</defs>
+</svg>

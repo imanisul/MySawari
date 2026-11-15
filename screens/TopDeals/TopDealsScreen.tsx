@@ -36,17 +36,36 @@ import {
   getIndiaDateParts,
   bestFor,
   MONTH_NAMES,
+  type Car,
 } from '@/utils/sawari';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { HeartIcon } from '@/components/vehicle/HeartIcon';
 import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
-import { memberPriceFor } from '@/screens/Membership/MembershipScreen';
 import { exclusiveOffersQueryOptions } from '@/services/api/offers';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { getVehicleImage } from '@/utils/vehicleImages';
-import { SortSheet, type SortKey } from '@/components/booking/SortSheet';
-import { SortLinesIcon } from '@/components/common/FilterIcons';
+import {
+  ExploreFilterSheet,
+  EMPTY_FILTERS,
+  chipsFor,
+  chipOn,
+  toggleChip,
+  countActive,
+  matchesFilters,
+  useVehicleRatings,
+  type ExploreFilters,
+} from '@/components/explore/ExploreFilters';
+import TopDealsBackIcon from '@/assets/images/top_deals_back.svg';
+import TopDealsShareIcon from '@/assets/images/top_deals_share.svg';
+import TopDealsSearchIcon from '@/assets/images/top_deals_search.svg';
+import TopDealsSortIcon from '@/assets/images/top_deals_sort.svg';
+import TopDealsFilterIcon from '@/assets/images/top_deals_filter.svg';
+import TopDealsBannerSparkleLeft from '@/assets/images/top_deals_banner_sparkle_left.svg';
+import TopDealsBannerSparkleRight from '@/assets/images/top_deals_banner_sparkle_right.svg';
+import TopDealsRatingStar from '@/assets/images/top_deals_rating_star.svg';
+import TopDealsChevron from '@/assets/images/top_deals_chevron.svg';
+import TopDealsTitleArtwork from '@/assets/images/top_deals_title.svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -107,12 +126,9 @@ interface VehicleCardProps {
   car: any;
   nowMs: number;
   targetEndMs: number;
-  isMember: boolean;
-  memberPlan: string | null;
   isFav: boolean;
   onToggleFav: () => void;
   onPress: () => void;
-  onPressExtend?: () => void;
 }
 
 /** Vehicle Card matching Figma Frame 2147226289 design */
@@ -120,12 +136,9 @@ function VehicleCard({
   car,
   nowMs,
   targetEndMs,
-  isMember,
-  memberPlan,
   isFav,
   onToggleFav,
   onPress,
-  onPressExtend,
 }: VehicleCardProps) {
   const [photoIndex, setPhotoIndex] = useState(0);
 
@@ -178,7 +191,7 @@ function VehicleCard({
   const endMs = car.dealEndMs || targetEndMs;
   const hoursRemaining = Math.max(1, Math.ceil(Math.max(0, endMs - startMs) / (3600 * 1000)));
 
-  const { perDay, price: dealPrice } = dealPricing(car, hoursRemaining);
+  const { price: dealPrice } = dealPricing(car, hoursRemaining);
 
   const carName = car.displayName || car.vehicleName || car.name || 'Vehicle';
   const seatsNum = parseInt(String(car.seats || ''), 10);
@@ -199,6 +212,7 @@ function VehicleCard({
   const reviews = [...(car.reviews || []), ...dbReviews].filter((r: any) => r.rating >= MIN_PUBLIC_REVIEW_RATING);
   const ratingNum = car.rating ?? (reviews.length ? reviews.reduce((s: number, r: any) => s + r.rating, 0) / reviews.length : null);
   const reviewCount = car.reviewCount ? car.reviewCount + dbReviews.length : reviews.length;
+  const tag = bestFor(car) || 'Comfort';
 
   const currentSource = imageSources[photoIndex] || imageSources[0];
 
@@ -233,11 +247,7 @@ function VehicleCard({
           <View style={styles.photoTopRow}>
             {/* Pill Badge (Frame 2147225777) */}
             <View style={styles.comfortPill}>
-              {/* Crown Deal Icon (Figma image 588256529) */}
-              <View style={styles.crownWrap} pointerEvents="none">
-                <CrownDealIcon size={14} color="#FBC422" />
-              </View>
-              <Text style={styles.comfortText} numberOfLines={1}>Today’s Deal</Text>
+              <Text style={styles.comfortText} numberOfLines={1}>Best for {tag}</Text>
             </View>
 
             {/* Heart button (Frame 22) */}
@@ -311,7 +321,9 @@ function VehicleCard({
             <View style={styles.ratingCol}>
               <View style={styles.ratingPill}>
                 <Text style={styles.ratingVal}>{Number(ratingNum).toFixed(1)}</Text>
-                <Ionicons name="star" size={14} color="#FBBC04" />
+                <View style={styles.ratingStar}>
+                  <TopDealsRatingStar />
+                </View>
               </View>
               <Text style={styles.reviewsText}>({reviewCount} Reviews)</Text>
             </View>
@@ -329,26 +341,12 @@ function VehicleCard({
             {/* Right: Frame 51 View Details */}
             <Pressable onPress={onPress} hitSlop={6} style={styles.viewDetailsBtn}>
               <Text style={styles.viewDetailsText}>View Details</Text>
-              <Feather name="chevron-right" size={13} color="#737373" />
+              <TopDealsChevron />
             </Pressable>
           </View>
         </View>
       </Pressable>
 
-      {/* Frame 2147226290: Bottom Extension Bar */}
-      <Pressable
-        onPress={onPressExtend || onPress}
-        style={styles.extensionBar}
-        hitSlop={4}
-      >
-        <Text style={styles.extendText} numberOfLines={1}>
-          Need more time? Extend your booking
-        </Text>
-        <View style={styles.extendRateRow}>
-          <Text style={styles.extendRateText}>{formatCurrency(perDay)}/day</Text>
-          <Feather name="chevron-right" size={13} color="#737373" />
-        </View>
-      </Pressable>
     </View>
   );
 }
@@ -364,7 +362,6 @@ export default function TopDealsScreen() {
     setPickup,
     pickup,
     dropoff,
-    membership,
     favorites,
     toggleFavorite,
     setIsDeliveryRequested,
@@ -373,11 +370,11 @@ export default function TopDealsScreen() {
 
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  // Cars / Bikes & Scooters switch under the search box.
-  const [kind, setKind] = useState<'car' | 'bike'>('car');
-  // Sort button beside the search (same sheet as Explore). Recommended = the order deals start in.
-  const [sort, setSort] = useState<SortKey>('recommended');
-  const [showSort, setShowSort] = useState(false);
+  const [vehicleType, setVehicleType] = useState<'car' | 'bike'>('car');
+  const isBike = vehicleType === 'bike';
+  const quickFilters = chipsFor(isBike);
+  const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useFocusEffect(
@@ -393,13 +390,6 @@ export default function TopDealsScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const memberPlan = (membership?.plan || '').toLowerCase().trim() || null;
-  const isMember = Boolean(
-    membership?.plan &&
-      membership.plan.toLowerCase() !== 'none' &&
-      (!membership.expiresAt || new Date(membership.expiresAt) > new Date())
-  );
 
   const { dealCars, targetEndMs, isLoading } = useDealCars(nowMs);
   // Live countdown timer calculations for Frame 2147226222
@@ -422,26 +412,35 @@ export default function TopDealsScreen() {
     }
   }, [dealCars]);
 
+  const vehicleCars = useMemo(
+    () => dealCars.filter((car: Car) => (isBike ? car.type === 'Bike' : car.type !== 'Bike')),
+    [dealCars, isBike],
+  );
+  const ratingOf = useVehicleRatings(vehicleCars, showFilterSheet || !!filters.rating);
+
   const filteredCars = useMemo(() => {
-    const ofKind = dealCars.filter((c: any) => (c.type === 'Bike') === (kind === 'bike'));
-    const q = searchQuery.trim().toLowerCase();
-    const found = !q ? ofKind : ofKind.filter(
-      (c: any) =>
-        [c.displayName, c.name, c.vehicleName, c.brand, c.category, c.fuelType, c.fuel, c.transmission]
-          .some((f) => String(f || '').toLowerCase().includes(q))
-    );
-    if (sort === 'recommended') return found;
-    // The deal price shown on each card: hourly rate × the hours from its start (or now) to its end.
-    const now = Date.now();
-    const priceOf = (c: any) => {
-      const start = (c.dealStartMs || 0) > now ? c.dealStartMs : now;
-      return dealPricing(c, Math.max(1, Math.ceil(Math.max(0, (c.dealEndMs || targetEndMs) - start) / 3600000))).price;
-    };
-    const rated = (c: any) => Number(c.reviewCount) > 0 ? Number(c.rating) || 0 : 0;
-    return [...found].sort((a: any, b: any) =>
-      sort === 'price_asc' ? priceOf(a) - priceOf(b) : sort === 'price_desc' ? priceOf(b) - priceOf(a) : rated(b) - rated(a));
-  }, [dealCars, searchQuery, kind, sort, targetEndMs]);
-  const noun = kind === 'bike' ? (filteredCars.length === 1 ? 'Bike' : 'Bikes') : (filteredCars.length === 1 ? 'Car' : 'Cars');
+    const query = searchQuery.trim().toLowerCase();
+    return vehicleCars.filter((car: Car) => {
+      const name = String((car as any).displayName || car.name || (car as any).vehicleName || '').toLowerCase();
+      const categories = [car.category, car.type, (car as any).bodyType, (car as any).segment, (car as any).vehicleCategory]
+        .map((value) => String(value || '').toLowerCase());
+      const fuel = String(car.fuel || (car as any).fuelType || '').toLowerCase();
+      const manufacturer = String(car.manufacturer || '').toLowerCase();
+      if (query && ![name, ...categories, fuel, manufacturer].some((value) => value.includes(query))) return false;
+      return matchesFilters(car, filters, ratingOf);
+    });
+  }, [vehicleCars, filters, searchQuery, ratingOf]);
+  const noun = isBike
+    ? (filteredCars.length === 1 ? 'Bike' : 'Bikes')
+    : (filteredCars.length === 1 ? 'Car' : 'Cars');
+  const activeFilterCount = countActive(filters);
+
+  const handleVehicleTypeChange = (nextType: 'car' | 'bike') => {
+    if (nextType === vehicleType) return;
+    Haptics.selectionAsync();
+    setVehicleType(nextType);
+    setFilters(EMPTY_FILTERS);
+  };
 
   const handleSelectDeal = (car: any) => {
     Haptics.selectionAsync();
@@ -563,7 +562,9 @@ export default function TopDealsScreen() {
             onPress={() => safeBack(router)}
             style={styles.headerIconBtn}
           >
-            <Feather name="chevron-left" size={24} color="#737373" />
+            <View style={styles.backIconFlip}>
+              <TopDealsBackIcon />
+            </View>
           </Pressable>
           <View style={styles.headerTextCol}>
             <Text style={styles.headerTitle}>Today’s Deals</Text>
@@ -579,7 +580,7 @@ export default function TopDealsScreen() {
           onPress={handleShare}
           style={styles.headerIconBtn}
         >
-          <Feather name="external-link" size={17} color="#737373" />
+          <TopDealsShareIcon />
         </Pressable>
       </View>
 
@@ -587,92 +588,103 @@ export default function TopDealsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
       >
-        {/* Frame 2147225639: search (padding 12/16/4), then the Cars / Bikes & Scooters switch */}
-        <View style={styles.searchWrap}>
-          {/* Frame 2147225947: search field + sort button, 8 apart */}
+        <View style={styles.searchSection}>
           <View style={styles.searchRow}>
-            <View style={styles.searchBox}>
-              <Feather name="search" size={20} color="#737373" />
+            <View style={styles.searchInputWrap}>
+              <TopDealsSearchIcon />
               <TextInput
-                value={searchQuery}
-                onChangeText={setSearchQuery}
+                accessibilityLabel="Search cars and bike"
                 placeholder="Search cars and bike"
                 placeholderTextColor="#737373"
-                style={styles.searchInput}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                style={styles.searchBarInput}
                 returnKeyType="search"
-                autoCorrect={false}
-                accessibilityLabel="Search deals"
               />
-              {!!searchQuery && (
-                <Pressable onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
-                  <Feather name="x" size={16} color="#737373" />
-                </Pressable>
-              )}
             </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Sort deals" onPress={() => { Haptics.selectionAsync(); setShowSort(true); }} style={styles.sortBtn}>
-              <SortLinesIcon color={sort === 'recommended' ? '#737373' : '#6B5AED'} width={16} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Open filters"
+              onPress={() => setShowFilterSheet(true)}
+              style={styles.sortButton}
+            >
+              <TopDealsSortIcon />
             </Pressable>
-          </View>
-          <View style={styles.kindRow} accessibilityRole="tablist">
-            {([['car', 'Cars'], ['bike', 'Bikes & Scooters']] as const).map(([k, label]) => {
-              const on = kind === k;
-              return (
-                <Pressable
-                  key={k}
-                  accessibilityRole="tab"
-                  accessibilityState={{ selected: on }}
-                  onPress={() => { Haptics.selectionAsync(); setKind(k); }}
-                  style={[styles.kindPill, on && styles.kindPillOn]}
-                >
-                  <Text style={[styles.kindText, on && styles.kindTextOn]}>{label}</Text>
-                </Pressable>
-              );
-            })}
           </View>
         </View>
 
+        <View style={styles.vehicleTypeSection}>
+          {(['car', 'bike'] as const).map((type) => {
+            const selected = vehicleType === type;
+            return (
+              <Pressable
+                key={type}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                onPress={() => handleVehicleTypeChange(type)}
+                style={[styles.vehicleTypeChip, selected && styles.vehicleTypeChipSelected]}
+              >
+                <Text style={[styles.vehicleTypeText, selected && styles.vehicleTypeTextSelected]}>
+                  {type === 'car' ? 'Cars' : 'Bikes & Scooters'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={styles.quickFilterSection}>
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickFilterRow}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Filter${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
+              onPress={() => setShowFilterSheet(true)}
+              style={[styles.filterChip, activeFilterCount > 0 && styles.filterChipActive]}
+            >
+              <TopDealsFilterIcon />
+              <Text style={styles.filterChipText}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
+            </Pressable>
+            {quickFilters.map((chip) => {
+              const selected = chipOn(filters, chip);
+              return (
+                <Pressable
+                  key={chip.label}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setFilters((current) => toggleChip(current, chip));
+                  }}
+                  style={[styles.quickFilterChip, selected && styles.quickFilterChipActive]}
+                >
+                  <Text style={[styles.quickFilterText, selected && styles.quickFilterTextActive]}>
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         {/* Frame 2147226218: Today's Deals Banner */}
-        <LinearGradient
-          colors={['#6152D8', '#ADA4F4']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={styles.bannerContainer}
-        >
-          {/* Frame 2147226221 */}
-          <View style={styles.bannerRow}>
-            {/* Left: Frame 2147226220 (Today's Deals + Stars) */}
-            <View style={styles.bannerLeft}>
-              {/* Ellipse 13: Glow */}
-              <Svg style={styles.bannerGlow} width={160} height={110} pointerEvents="none">
-                <Defs>
-                  <RadialGradient id="tdGlow" cx="50%" cy="50%" rx="50%" ry="50%">
-                    <Stop offset="0" stopColor="#FCDF8A" stopOpacity={0.45} />
-                    <Stop offset="1" stopColor="#FCDF8A" stopOpacity={0} />
-                  </RadialGradient>
-                </Defs>
-                <Ellipse cx={80} cy={55} rx={80} ry={55} fill="url(#tdGlow)" />
-              </Svg>
-
-              {/* Sparkle Stars matching exact positions */}
-              <View style={styles.sparkleTopLeft} pointerEvents="none">
-                <FourPointStar size={11} color="#FBC422" />
+        <View style={styles.bannerSection}>
+          <LinearGradient
+            colors={['#6152D8', '#ADA4F4']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.bannerContainer}
+          >
+            <View style={styles.bannerRow}>
+              <TopDealsBannerSparkleLeft style={styles.bannerSparkleLeft} pointerEvents="none" />
+              <TopDealsBannerSparkleRight style={styles.bannerSparkleRight} pointerEvents="none" />
+              <View style={styles.bannerLeft}>
+                <TopDealsTitleArtwork style={styles.bannerTitleArtwork} pointerEvents="none" />
               </View>
-              <View style={styles.sparkleTopRight} pointerEvents="none">
-                <FourPointStar size={11} color="#FBC422" />
-              </View>
-              <View style={styles.sparkleBottomLeft} pointerEvents="none">
-                <FourPointStar size={14} color="#FFFFFF" />
-              </View>
-              <View style={styles.sparkleBottomRight} pointerEvents="none">
-                <FourPointStar size={12} color="#FFFFFF" />
-              </View>
-
-              <Text style={styles.todaysText}>Today’s</Text>
-              <Text style={styles.dealsText}>Deals</Text>
-            </View>
 
             {/* Right: Frame 2147226222 (ENDS IN + Timer) */}
             <View style={styles.bannerRight}>
@@ -704,58 +716,65 @@ export default function TopDealsScreen() {
                 </View>
               </View>
             </View>
-          </View>
-        </LinearGradient>
+            </View>
+          </LinearGradient>
+        </View>
 
-        {/* Vehicles Feed */}
-        {isLoading ? (
-          <View style={styles.emptyBox}>
-            <ActivityIndicator size="large" color="#6152D8" />
-            <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
-              Loading available {kind === 'bike' ? 'bikes' : 'cars'}...
-            </Text>
-          </View>
-        ) : filteredCars.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Feather name="clock" size={38} color="#6152D8" />
-            <Text style={styles.emptyTitle}>{searchQuery.trim() ? `No ${kind === 'bike' ? 'bikes' : 'cars'} match “${searchQuery.trim()}”` : `No ${kind === 'bike' ? 'Bikes' : 'Cars'} Available Right Now`}</Text>
-            <Text style={styles.emptySubtitle}>
-              Cars and bikes that are free until 8:00 AM will appear here
-              automatically. Check back soon!
-            </Text>
-            <Pressable
-              onPress={() => safeBack(router)}
-              style={styles.exploreBtn}
-            >
-              <Text style={styles.exploreBtnText}>Explore All Fleet</Text>
-            </Pressable>
-          </View>
-        ) : (
-          filteredCars.map((car) => {
-            const carId = String(car.id || car._id);
-            const isFav = favorites.includes(carId);
+        <View style={styles.vehicleFeed}>
+          {isLoading ? (
+            <View style={styles.emptyBox}>
+              <ActivityIndicator size="large" color="#6152D8" />
+              <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
+                Loading available {isBike ? 'bikes' : 'cars'}...
+              </Text>
+            </View>
+          ) : filteredCars.length === 0 ? (
+            <View style={styles.emptyBox}>
+              <Feather name="clock" size={38} color="#6152D8" />
+              <Text style={styles.emptyTitle}>No {noun} Available Right Now</Text>
+              <Text style={styles.emptySubtitle}>
+                Cars and bikes that are free until 8:00 AM will appear here
+                automatically. Check back soon!
+              </Text>
+              <Pressable
+                onPress={() => safeBack(router)}
+                style={styles.exploreBtn}
+              >
+                <Text style={styles.exploreBtnText}>Explore All Fleet</Text>
+              </Pressable>
+            </View>
+          ) : (
+            filteredCars.map((car) => {
+              const carId = String(car.id || car._id);
+              const isFav = favorites.includes(carId);
 
-            return (
-              <VehicleCard
-                key={carId}
-                car={car}
-                nowMs={nowMs}
-                targetEndMs={targetEndMs}
-                isMember={isMember}
-                memberPlan={memberPlan}
-                isFav={isFav}
-                onToggleFav={() => {
-                  Haptics.selectionAsync();
-                  toggleFavorite(carId);
-                }}
-                onPress={() => handleSelectDeal(car)}
-                onPressExtend={() => handleExtendBooking(car)}
-              />
-            );
-          })
-        )}
+              return (
+                <VehicleCard
+                  key={carId}
+                  car={car}
+                  nowMs={nowMs}
+                  targetEndMs={targetEndMs}
+                  isFav={isFav}
+                  onToggleFav={() => {
+                    Haptics.selectionAsync();
+                    toggleFavorite(carId);
+                  }}
+                  onPress={() => handleSelectDeal(car)}
+                />
+              );
+            })
+          )}
+        </View>
       </ScrollView>
-      <SortSheet visible={showSort} onClose={() => setShowSort(false)} value={sort} onApply={(k) => { setSort(k); setShowSort(false); }} />
+      <ExploreFilterSheet
+        visible={showFilterSheet}
+        onClose={() => setShowFilterSheet(false)}
+        value={filters}
+        onApply={setFilters}
+        cars={vehicleCars}
+        bike={isBike}
+        ratingOf={ratingOf}
+      />
     </View>
   );
 }
@@ -789,6 +808,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#F5F5F5',
   },
+  backIconFlip: { transform: [{ rotate: '180deg' }] },
   headerTextCol: {
     flex: 1,
     gap: 2,
@@ -805,40 +825,150 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     color: '#525252',
   },
-  searchBarWrap: {
+  searchSection: {
+    width: '100%',
+    paddingHorizontal: 0,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  vehicleTypeSection: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 10,
-    paddingHorizontal: 12,
-    height: 42,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  vehicleTypeChip: {
+    height: 32,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E7EAF4',
+  },
+  vehicleTypeChipSelected: {
+    backgroundColor: '#6D52ED',
+    borderColor: '#6D52ED',
+  },
+  vehicleTypeText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#737373',
+  },
+  vehicleTypeTextSelected: {
+    color: '#FFFFFF',
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 45,
+  },
+  searchInputWrap: {
+    flex: 1,
+    height: 45,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAECF1',
+  },
+  sortButton: {
+    width: 54,
+    height: 45,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    backgroundColor: '#F9F9FB',
+    borderWidth: 1,
+    borderColor: '#EAECF1',
   },
   searchBarInput: {
     flex: 1,
     fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 15,
+    lineHeight: 22.5,
+    color: '#737373',
+    paddingVertical: 0,
+  },
+  quickFilterSection: {
+    width: '100%',
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  quickFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterChip: {
+    minWidth: 68,
+    height: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAECF1',
+  },
+  filterChipActive: {
+    borderColor: '#323E71',
+  },
+  filterChipText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 13,
     color: '#1E293B',
   },
-  searchWrap: { width: '100%', maxWidth: 393, paddingTop: 12 },
-  searchRow: { flexDirection: 'row', gap: 8, height: 45 },
-  searchBox: { flex: 1, height: 45, flexDirection: 'row', alignItems: 'center', gap: 9, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: '#EAECF1', backgroundColor: '#FFFFFF' },
-  searchInput: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22.5, color: '#262626', paddingVertical: 0, includeFontPadding: false },
-  sortBtn: { width: 54, height: 45, alignItems: 'center', justifyContent: 'center', paddingVertical: 5, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: '#EAECF1', backgroundColor: '#F9F9FB' },
-  // Frame 2147225816: the Cars / Bikes & Scooters filter, 50 high (4 above + the search block's 4 below, 8 under).
-  kindRow: { flexDirection: 'row', gap: 8, height: 50, paddingTop: 8, paddingBottom: 8, alignItems: 'center' },
-  kindPill: { height: 34, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, borderColor: '#E7EAF4', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  kindPillOn: { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
-  kindText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5, color: '#737373' },
-  kindTextOn: { color: '#FFFFFF' },
+  quickFilterChip: {
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAECF1',
+  },
+  quickFilterChipActive: {
+    backgroundColor: '#323E71',
+    borderColor: '#323E71',
+  },
+  quickFilterText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13,
+    color: '#737373',
+  },
+  quickFilterTextActive: {
+    color: '#FFFFFF',
+  },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 0, // the search block on top brings its own 12
     paddingBottom: 40,
+    alignItems: 'center',
+    width: '100%',
+  },
+  vehicleFeed: {
+    width: '100%',
+    paddingHorizontal: 0,
+    paddingVertical: 8,
+    gap: 12,
+    alignItems: 'center',
+  },
+  bannerSection: {
+    width: '100%',
+    paddingHorizontal: 0,
+    paddingVertical: 8,
     alignItems: 'center',
   },
 
@@ -851,15 +981,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 20,
     justifyContent: 'center',
-    marginBottom: 16,
     overflow: 'hidden',
-    shadowColor: '#6152D8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 5,
   },
   bannerRow: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -872,57 +997,27 @@ const styles = StyleSheet.create({
     height: 59.46,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'visible',
   },
-  bannerGlow: {
+  bannerSparkleLeft: {
     position: 'absolute',
-    left: -9.3,
-    top: -28.8,
+    left: 60,
+    top: -7,
   },
-  sparkleTopLeft: {
+  bannerSparkleRight: {
     position: 'absolute',
-    left: 14.31,
-    top: 3.88,
+    left: 148,
+    top: -8,
   },
-  sparkleTopRight: {
+  bannerTitleArtwork: {
     position: 'absolute',
-    left: 108.87,
-    top: 5,
-  },
-  sparkleBottomLeft: {
-    position: 'absolute',
-    left: 10.98,
-    top: 28.36,
-  },
-  sparkleBottomRight: {
-    position: 'absolute',
-    left: 111.1,
-    top: 30.58,
-  },
-  todaysText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 24,
-    lineHeight: 29,
-    color: '#FBC422',
-    letterSpacing: -0.5,
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 3.28 },
-    textShadowRadius: 3.28,
-  },
-  dealsText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 34,
-    lineHeight: 34,
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-    marginTop: -4,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 4.45 },
-    textShadowRadius: 4.45,
+    left: 0,
+    top: -1.676,
   },
 
   // ── Timer Box (Frame 2147226222) ──
   bannerRight: {
-    width: 114,
+    width: 106,
     height: 63,
     gap: 4,
     alignItems: 'center',
@@ -939,26 +1034,26 @@ const styles = StyleSheet.create({
   timerRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 6,
+    gap: 8,
   },
   timerCol: {
     alignItems: 'center',
-    width: 34,
+    width: 30,
   },
   timerBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 7,
+    width: 30,
+    height: 30,
+    borderRadius: 6,
     backgroundColor: '#FFFBF0',
-    borderWidth: 1.5,
-    borderColor: '#FBC422',
+    borderWidth: 1,
+    borderColor: '#FBBC04',
     alignItems: 'center',
     justifyContent: 'center',
   },
   timerNum: {
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 14,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19.5,
     color: '#6152D8',
     textAlign: 'center',
     includeFontPadding: false,
@@ -966,8 +1061,8 @@ const styles = StyleSheet.create({
   },
   timerLbl: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 10,
-    lineHeight: 14,
+    fontSize: 9,
+    lineHeight: 13.5,
     color: '#FFFFFF',
     alignSelf: 'stretch',
     textAlign: 'center',
@@ -978,27 +1073,18 @@ const styles = StyleSheet.create({
   outerCard: {
     width: '100%',
     maxWidth: 361,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E7EAF4',
-    borderRadius: 16,
-    paddingBottom: 8,
-    gap: 4,
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
+    marginBottom: 0,
   },
   vehicleCard: {
     width: '100%',
+    maxWidth: 361,
     backgroundColor: '#F4F6FA',
     borderWidth: 1,
     borderColor: '#E7EAF4',
     borderRadius: 12,
-    padding: 4,
-    paddingBottom: 6,
+    paddingTop: 4,
+    paddingHorizontal: 4,
+    paddingBottom: 8,
     gap: 8,
   },
   photoBox: {
@@ -1027,8 +1113,8 @@ const styles = StyleSheet.create({
   },
   comfortPill: {
     height: 28,
-    paddingHorizontal: 12,
-    backgroundColor: '#6B5AED',
+    paddingHorizontal: 10,
+    backgroundColor: '#2F3E75',
     borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1036,20 +1122,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   comfortText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
+    fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 11,
     lineHeight: 16,
     color: '#FFFFFF',
     includeFontPadding: false,
     textAlignVertical: 'center',
-  },
-  crownWrap: {
-    position: 'absolute',
-    left: -4,
-    top: -6,
-    width: 14,
-    height: 14,
-    transform: [{ rotate: '-30deg' }],
   },
   heartBtn: {
     width: 32,
@@ -1149,6 +1227,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#2F3E75',
     borderRadius: 20,
   },
+  ratingStar: {
+    width: 14,
+    height: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   ratingVal: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 13,
@@ -1171,7 +1255,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    height: 28,
+    height: 25,
     paddingHorizontal: 4,
     alignSelf: 'stretch',
   },

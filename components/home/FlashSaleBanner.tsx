@@ -101,7 +101,6 @@ export function FlashSaleBanner() {
             <Lettering text={subText} width={260} size={23} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
           </View>
         </View>
-        <FlashSaleUnderline style={styles.underline} pointerEvents="none" />
       </Pressable>
     </View>
   );
@@ -110,7 +109,16 @@ export function FlashSaleBanner() {
 const styles = StyleSheet.create({
   row: { height: 106, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' },
   card: { width: 361, maxWidth: '100%', height: 106, borderRadius: 16, backgroundColor: '#3E2DC8', overflow: 'hidden' },
-  rays: { position: 'absolute', left: -100, top: -227.5 },
-  text: { position: 'absolute', top: 23, left: (361 - 223.93) / 2 + 0.47, width: 223.93, alignItems: 'center' },
-  underline: { position: 'absolute', left: 247, top: 82.8, transform: [{ rotate: '-1deg' }] },
+  rays: { position: 'absolute', left: -100, top: -228.5, mixBlendMode: 'overlay' },
+  text: { position: 'absolute', top: 23, left: (361 - 223.93) / 2 + 0.47, width: 223.93, height: 54.307, alignItems: 'center', overflow: 'visible' },
+  underlineFrame: {
+    position: 'absolute',
+    left: 247,
+    top: 84,
+    width: 45.855,
+    height: 2.84,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '-1deg' }],
+  },
 });

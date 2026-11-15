@@ -36,6 +36,7 @@ import {
   getIndiaDateParts,
   bestFor,
   MONTH_NAMES,
+  type Car,
 } from '@/utils/sawari';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
@@ -44,7 +45,17 @@ import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
 import { exclusiveOffersQueryOptions } from '@/services/api/offers';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { getVehicleImage } from '@/utils/vehicleImages';
-import { FilterSheet, defaultFilters, FilterState } from '@/components/booking/FilterSheet';
+import {
+  ExploreFilterSheet,
+  EMPTY_FILTERS,
+  chipsFor,
+  chipOn,
+  toggleChip,
+  countActive,
+  matchesFilters,
+  useVehicleRatings,
+  type ExploreFilters,
+} from '@/components/explore/ExploreFilters';
 import TopDealsBackIcon from '@/assets/images/top_deals_back.svg';
 import TopDealsShareIcon from '@/assets/images/top_deals_share.svg';
 import TopDealsSearchIcon from '@/assets/images/top_deals_search.svg';
@@ -59,14 +70,6 @@ import TopDealsTitleArtwork from '@/assets/images/top_deals_title.svg';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const pad2 = (n: number) => String(Math.max(0, Math.floor(n))).padStart(2, '0');
-const QUICK_FILTERS = [
-  { label: 'All', width: 52 },
-  { label: 'SUV', width: 66 },
-  { label: 'Diesel', width: 64 },
-  { label: 'Petrol', width: 64 },
-  { label: 'Sedan', width: 64 },
-] as const;
-type QuickFilter = (typeof QUICK_FILTERS)[number]['label'];
 
 /** Formats "Available till 8:00 AM" or "Available till Tomorrow, 8:00 AM" in Indian Standard Time */
 function formatAvailableTill(endMs: number, nowMs: number): string {
@@ -367,8 +370,10 @@ export default function TopDealsScreen() {
 
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
-  const [quickFilter, setQuickFilter] = useState<QuickFilter>('All');
-  const [filters, setFilters] = useState<FilterState>({ ...defaultFilters });
+  const [vehicleType, setVehicleType] = useState<'car' | 'bike'>('car');
+  const isBike = vehicleType === 'bike';
+  const quickFilters = chipsFor(isBike);
+  const [filters, setFilters] = useState<ExploreFilters>(EMPTY_FILTERS);
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
 
@@ -407,30 +412,35 @@ export default function TopDealsScreen() {
     }
   }, [dealCars]);
 
+  const vehicleCars = useMemo(
+    () => dealCars.filter((car: Car) => (isBike ? car.type === 'Bike' : car.type !== 'Bike')),
+    [dealCars, isBike],
+  );
+  const ratingOf = useVehicleRatings(vehicleCars, showFilterSheet || !!filters.rating);
+
   const filteredCars = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    return dealCars.filter((car: any) => {
-      const categories = [car.category, car.bodyType, car.segment, car.vehicleCategory]
+    return vehicleCars.filter((car: Car) => {
+      const name = String((car as any).displayName || car.name || (car as any).vehicleName || '').toLowerCase();
+      const categories = [car.category, car.type, (car as any).bodyType, (car as any).segment, (car as any).vehicleCategory]
         .map((value) => String(value || '').toLowerCase());
-      const fuel = String(car.fuelType || car.fuel || '').toLowerCase();
-      const transmission = String(car.transmission || '').toLowerCase();
-      const name = String(car.displayName || car.name || car.vehicleName || '').toLowerCase();
-
-      if (query && ![name, ...categories, fuel].some((value) => value.includes(query))) return false;
-      if (quickFilter === 'Diesel' || quickFilter === 'Petrol') {
-        if (fuel !== quickFilter.toLowerCase()) return false;
-      } else if (quickFilter !== 'All' && !categories.some((value) => value.includes(quickFilter.toLowerCase()))) {
-        return false;
-      }
-
-      if (filters.category !== 'All' && !categories.some((value) => value.includes(String(filters.category).toLowerCase()))) return false;
-      if (filters.fuel !== 'All' && fuel !== filters.fuel.toLowerCase()) return false;
-      if (filters.transmission !== 'All' && transmission !== filters.transmission.toLowerCase()) return false;
-      const dayRate = Number(car.perDay || car.pricePerDay || car.dayRate || 0);
-      if (dayRate > 0 && dayRate > filters.maxPrice) return false;
-      return true;
+      const fuel = String(car.fuel || (car as any).fuelType || '').toLowerCase();
+      const manufacturer = String(car.manufacturer || '').toLowerCase();
+      if (query && ![name, ...categories, fuel, manufacturer].some((value) => value.includes(query))) return false;
+      return matchesFilters(car, filters, ratingOf);
     });
-  }, [dealCars, filters, quickFilter, searchQuery]);
+  }, [vehicleCars, filters, searchQuery, ratingOf]);
+  const noun = isBike
+    ? (filteredCars.length === 1 ? 'Bike' : 'Bikes')
+    : (filteredCars.length === 1 ? 'Car' : 'Cars');
+  const activeFilterCount = countActive(filters);
+
+  const handleVehicleTypeChange = (nextType: 'car' | 'bike') => {
+    if (nextType === vehicleType) return;
+    Haptics.selectionAsync();
+    setVehicleType(nextType);
+    setFilters(EMPTY_FILTERS);
+  };
 
   const handleSelectDeal = (car: any) => {
     Haptics.selectionAsync();
@@ -604,6 +614,25 @@ export default function TopDealsScreen() {
           </View>
         </View>
 
+        <View style={styles.vehicleTypeSection}>
+          {(['car', 'bike'] as const).map((type) => {
+            const selected = vehicleType === type;
+            return (
+              <Pressable
+                key={type}
+                accessibilityRole="tab"
+                accessibilityState={{ selected }}
+                onPress={() => handleVehicleTypeChange(type)}
+                style={[styles.vehicleTypeChip, selected && styles.vehicleTypeChipSelected]}
+              >
+                <Text style={[styles.vehicleTypeText, selected && styles.vehicleTypeTextSelected]}>
+                  {type === 'car' ? 'Cars' : 'Bikes & Scooters'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
         <View style={styles.quickFilterSection}>
           <ScrollView
             horizontal
@@ -613,34 +642,32 @@ export default function TopDealsScreen() {
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Open filters"
+              accessibilityLabel={`Filter${activeFilterCount ? ` (${activeFilterCount} active)` : ''}`}
               onPress={() => setShowFilterSheet(true)}
-              style={styles.filterChip}
+              style={[styles.filterChip, activeFilterCount > 0 && styles.filterChipActive]}
             >
               <TopDealsFilterIcon />
-              <Text style={styles.filterChipText}>Filter</Text>
+              <Text style={styles.filterChipText}>Filter{activeFilterCount ? ` (${activeFilterCount})` : ''}</Text>
             </Pressable>
-            {QUICK_FILTERS.map(({ label, width }) => (
-              <Pressable
-                key={label}
-                accessibilityRole="button"
-                accessibilityState={{ selected: quickFilter === label }}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setQuickFilter(label);
-                  if (label === 'All') setFilters({ ...defaultFilters });
-                }}
-                style={[
-                  styles.quickFilterChip,
-                  { width },
-                  quickFilter === label && styles.quickFilterChipActive,
-                ]}
-              >
-                <Text style={[styles.quickFilterText, quickFilter === label && styles.quickFilterTextActive]}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
+            {quickFilters.map((chip) => {
+              const selected = chipOn(filters, chip);
+              return (
+                <Pressable
+                  key={chip.label}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setFilters((current) => toggleChip(current, chip));
+                  }}
+                  style={[styles.quickFilterChip, selected && styles.quickFilterChipActive]}
+                >
+                  <Text style={[styles.quickFilterText, selected && styles.quickFilterTextActive]}>
+                    {chip.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
         </View>
 
@@ -698,13 +725,13 @@ export default function TopDealsScreen() {
             <View style={styles.emptyBox}>
               <ActivityIndicator size="large" color="#6152D8" />
               <Text style={[styles.emptySubtitle, { marginTop: 12 }]}>
-                Loading available cars...
+                Loading available {isBike ? 'bikes' : 'cars'}...
               </Text>
             </View>
           ) : filteredCars.length === 0 ? (
             <View style={styles.emptyBox}>
               <Feather name="clock" size={38} color="#6152D8" />
-              <Text style={styles.emptyTitle}>No Cars Available Right Now</Text>
+              <Text style={styles.emptyTitle}>No {noun} Available Right Now</Text>
               <Text style={styles.emptySubtitle}>
                 Cars and bikes that are free until 8:00 AM will appear here
                 automatically. Check back soon!
@@ -739,12 +766,14 @@ export default function TopDealsScreen() {
           )}
         </View>
       </ScrollView>
-      <FilterSheet
+      <ExploreFilterSheet
         visible={showFilterSheet}
         onClose={() => setShowFilterSheet(false)}
-        filters={filters}
-        setFilters={setFilters}
-        vehicleType="Cars"
+        value={filters}
+        onApply={setFilters}
+        cars={vehicleCars}
+        bike={isBike}
+        ratingOf={ratingOf}
       />
     </View>
   );
@@ -798,9 +827,40 @@ const styles = StyleSheet.create({
   },
   searchSection: {
     width: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingTop: 12,
     paddingBottom: 4,
+  },
+  vehicleTypeSection: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  vehicleTypeChip: {
+    height: 32,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E7EAF4',
+  },
+  vehicleTypeChipSelected: {
+    backgroundColor: '#6D52ED',
+    borderColor: '#6D52ED',
+  },
+  vehicleTypeText: {
+    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontSize: 13,
+    lineHeight: 20,
+    color: '#737373',
+  },
+  vehicleTypeTextSelected: {
+    color: '#FFFFFF',
   },
   searchRow: {
     flexDirection: 'row',
@@ -840,7 +900,6 @@ const styles = StyleSheet.create({
   },
   quickFilterSection: {
     width: '100%',
-    paddingHorizontal: 16,
     paddingTop: 4,
     paddingBottom: 8,
   },
@@ -850,25 +909,50 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterChip: {
-    width: 68,
+    minWidth: 68,
     height: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 4,
-    padding: 8,
+    paddingHorizontal: 8,
     borderRadius: 8,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#EAECF1',
+  },
+  filterChipActive: {
+    borderColor: '#323E71',
   },
   filterChipText: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 13,
     color: '#1E293B',
   },
+  quickFilterChip: {
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAECF1',
+  },
+  quickFilterChipActive: {
+    backgroundColor: '#323E71',
+    borderColor: '#323E71',
+  },
+  quickFilterText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 13,
+    color: '#737373',
+  },
+  quickFilterTextActive: {
+    color: '#FFFFFF',
+  },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 0, // the search block on top brings its own 12
     paddingBottom: 40,
     alignItems: 'center',
@@ -876,14 +960,14 @@ const styles = StyleSheet.create({
   },
   vehicleFeed: {
     width: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingVertical: 8,
     gap: 12,
     alignItems: 'center',
   },
   bannerSection: {
     width: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     paddingVertical: 8,
     alignItems: 'center',
   },

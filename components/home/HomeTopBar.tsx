@@ -146,6 +146,8 @@ export type CategoryTile = {
   value: string;
   image: ImageSourcePropType;
   imageFrameWidth: number;
+  /** Figma nudges each label a fraction off centre (left: 50% − 30 ± x). */
+  labelShift?: number;
   imageStyle: ImageStyle;
 };
 
@@ -154,29 +156,33 @@ export const CAR_CATEGORIES: CategoryTile[] = [
     label: 'SUV',
     value: 'SUV',
     image: require('../../assets/images/home_category_suv.png'),
-    imageFrameWidth: 79,
-    imageStyle: { height: 52.67, top: -6.33 },
+    imageFrameWidth: 74,
+    labelShift: -0.12,
+    imageStyle: {},
   },
   {
     label: 'Sedan',
     value: 'Sedan',
     image: require('../../assets/images/home_category_sedan.png'),
-    imageFrameWidth: 84,
-    imageStyle: { width: 96.73, height: 48, left: -7.64, top: -6 },
+    imageFrameWidth: 79,
+    labelShift: -0.38,
+    imageStyle: {},
   },
   {
     label: 'Hatchback',
     value: 'Hatchback',
     image: require('../../assets/images/home_category_hatchback.png'),
-    imageFrameWidth: 83,
-    imageStyle: { height: 55.33, top: -9.67 },
+    imageFrameWidth: 78,
+    labelShift: 0.38,
+    imageStyle: {},
   },
   {
     label: 'MUV / MPV',
     value: 'MUV',
     image: require('../../assets/images/home_category_muv.png'),
-    imageFrameWidth: 79,
-    imageStyle: { height: 52.67, top: -6.33 },
+    imageFrameWidth: 74,
+    labelShift: 0.12,
+    imageStyle: {},
   },
 ];
 
@@ -185,15 +191,12 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
     <View style={s.tiles}>
       {items.map((t) => (
         <Pressable key={t.value} style={{ flex: 1 }} onPress={() => onPick(t)} accessibilityRole="button" accessibilityLabel={t.label}>
-          <LinearGradient
-            colors={dark ? ['#2A2550', '#1A1D29'] : ['#EAE8FC', '#FFFFFF']}
-            style={s.tile}
-          >
+          <View style={[s.tile, { backgroundColor: dark ? '#1F1B3D' : '#F7F6FE' }]}>
             <View style={[s.tileImageFrame, { width: t.imageFrameWidth }]}>
-              <Image source={t.image} style={[s.tileImg, t.imageStyle]} resizeMode="stretch" />
+              <Image source={t.image} style={s.tileImg} resizeMode="contain" />
             </View>
             {/* Label tab: white, top corners 6, a 1px purple outline — strongest on the left, light on the right */}
-            <View style={[s.tileLabelWrap, dark && { backgroundColor: '#1A1D29' }]}>
+            <View style={[s.tileLabelWrap, !!t.labelShift && { transform: [{ translateX: t.labelShift }] }, dark && { backgroundColor: '#1A1D29' }]}>
               {/* Open at the bottom: left, top and right, purple fading to the tile border's lavender on the right */}
               <FadeOutline id={`tileEdge${t.value}`} width={60} height={19} end={0.16} d="M0.5 19 V6.5 A6 6 0 0 1 6.5 0.5 H53.5 A6 6 0 0 1 59.5 6.5 V19" />
               <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
@@ -201,7 +204,7 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
             {/* The tile's 1px border is drawn last, as Figma draws a frame's stroke over its children: it runs along the
                 label's bottom too, instead of being covered by it. */}
             <View pointerEvents="none" style={[s.tileStroke, dark && { borderColor: 'rgba(107,90,237,0.35)' }]} />
-          </LinearGradient>
+          </View>
         </Pressable>
       ))}
     </View>
@@ -382,11 +385,12 @@ const s = StyleSheet.create({
   searchText: { flex: 1, fontFamily: F.medium, fontSize: 15, lineHeight: 22, color: '#737373' },
   tiles: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginTop: 16 },
   tile: {
-    height: 53, borderRadius: 8, borderWidth: 1, borderColor: 'transparent', // stroke drawn on top by tileStroke
+    // Figma Frame 2147226269: 51 high, flat #F7F6FE, 1px rgba(107,90,237,0.16) (drawn on top by tileStroke), radius 8.
+    height: 51, borderRadius: 8, borderWidth: 1, borderColor: 'transparent',
     alignItems: 'center', paddingHorizontal: 8, paddingTop: 2, paddingBottom: 2, overflow: 'hidden',
   },
   tileStroke: { position: 'absolute', top: -1, left: -1, right: -1, bottom: -1, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(107,90,237,0.16)' },
-  tileImageFrame: { height: 48, position: 'relative', flexShrink: 0, overflow: 'hidden' },
+  tileImageFrame: { height: 45, position: 'relative', flexShrink: 0 },
   tileImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
   // Figma 60 × 19 tab at the bottom (padding 2/4/1); its fading outline is the FadeOutline SVG inside it.
   tileLabelWrap: {

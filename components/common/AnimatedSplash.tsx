@@ -148,10 +148,10 @@ export function AnimatedSplash({
     };
   }, []);
 
-  // Brand splash is capped at 1.2s whatever the Operation app's Flash screen setting says; it exits earlier once data is ready.
+  // Flash screen duration (default 2.5s, configurable via Operation App)
   const durationMs = useMemo(() => {
     const sec = Number(config?.durationSeconds);
-    return !isNaN(sec) && sec >= 1 && sec <= 12 ? Math.min(sec * 1000, 1200) : 1200;
+    return !isNaN(sec) && sec >= 1 && sec <= 8 ? sec * 1000 : 2500;
   }, [config?.durationSeconds]);
 
   // If splash screen is explicitly disabled by admin, complete immediately
@@ -170,23 +170,23 @@ export function AnimatedSplash({
     // Fade in brand container
     Animated.timing(brandOpacity, {
       toValue: 1,
-      duration: 250,
+      duration: 300,
       useNativeDriver: true,
     }).start();
 
     // Staggered entrance for logo, title & tagline
-    Animated.stagger(60, [
+    Animated.stagger(100, [
       Animated.parallel([
-        Animated.timing(logoOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.spring(logoScale, { toValue: 1, tension: 22, friction: 6, useNativeDriver: true }),
+        Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.spring(logoScale, { toValue: 1, tension: 30, friction: 6, useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(titleY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]),
       Animated.parallel([
-        Animated.timing(taglineOpacity, { toValue: 1, duration: 250, useNativeDriver: true }),
-        Animated.timing(taglineY, { toValue: 0, duration: 250, useNativeDriver: true }),
+        Animated.timing(taglineOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+        Animated.timing(taglineY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
       ]),
     ]).start();
 
@@ -301,7 +301,7 @@ export function AnimatedSplash({
 
   // Content values
   const displayTitle = config?.brandTitle || 'MySawari';
-  const displayTagline = config?.occasionGreeting || config?.brandTagline || 'Festival of Lights • Lighting Every Journey';
+  const displayTagline = config?.brandTagline || 'Your ride, your way.';
   const displayBadge = config?.occasionBadge || '✦ HAPPY DIWALI ✦';
 
   // Interpolated animated values for celestial rings
@@ -619,13 +619,34 @@ export function AnimatedSplash({
             /* ======================================================== */
             /* MODE 3: SIGNATURE CLASSIC SPLASH                         */
             /* ======================================================== */
-            <View style={styles.classicContainer}>
-              <Image
-                source={require('@/assets/images/splash_final.png')}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
-            </View>
+            <Animated.View
+              style={[
+                styles.classicContainer,
+                {
+                  paddingTop: insets.top,
+                  paddingBottom: insets.bottom,
+                  opacity: brandOpacity,
+                },
+              ]}
+            >
+              <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
+                <Image
+                  source={require('@/assets/images/MySawari_nobg.png')}
+                  style={styles.classicLogoImage}
+                  resizeMode="contain"
+                />
+              </Animated.View>
+              <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 14 }}>
+                <Text style={styles.classicTitle}>
+                  {displayTitle}
+                </Text>
+              </Animated.View>
+              <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 8 }}>
+                <Text style={styles.classicTagline}>
+                  {displayTagline}
+                </Text>
+              </Animated.View>
+            </Animated.View>
           )}
 
           {/* Fallback trouble actions if connection is completely unresponsive */}
@@ -679,8 +700,28 @@ const styles = StyleSheet.create({
   },
   classicContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
     width: '100%',
-    height: '100%',
+  },
+  classicLogoImage: {
+    width: 140,
+    height: 140,
+  },
+  classicTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 36,
+    color: '#1C2A53',
+    letterSpacing: -0.6,
+    textAlign: 'center',
+  },
+  classicTagline: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 16.5,
+    color: '#5A6689',
+    letterSpacing: 0.3,
+    textAlign: 'center',
   },
   // Diwali Layout Styles
   diwaliContainer: {

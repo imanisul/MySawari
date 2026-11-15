@@ -226,8 +226,11 @@ function VehicleCard({
     }
   };
 
+  // The "Need more time?" bar only when the car is also free after the deal ends (the next day), Figma 2147226289:
+  // then the card sits in a white 16-radius frame with the bar under it; otherwise just the card.
+  const extendable = Boolean(onPressExtend && car.canExtend);
   return (
-    <View style={styles.outerCard}>
+    <View style={[styles.outerCard, extendable && styles.outerCardExtend]}>
       {/* Vehicle Card (Frame 2147226289 -> Vehicle Card) */}
       <Pressable onPress={onPress} style={styles.vehicleCard}>
         {/* Frame 20: Photo Container */}
@@ -351,6 +354,7 @@ function VehicleCard({
       </Pressable>
 
       {/* Frame 2147226290: "Need more time? Extend your booking" · the day rate (an extension is a normal full-day booking) */}
+      {extendable && (
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Need more time? Extend your booking at ${formatCurrency(perDay)} per day`}
@@ -366,6 +370,7 @@ function VehicleCard({
           </View>
         )}
       </Pressable>
+      )}
     </View>
   );
 }
@@ -467,18 +472,8 @@ export default function TopDealsScreen() {
 
   const handleExtendBooking = (car: any) => {
     Haptics.selectionAsync();
-    // Extending is a normal booking at the full day rate: from when the deal starts to 8 AM the day after the deal ends.
+    // Extending is a normal booking at the full day rate: the customer picks the days in this car's calendar.
     selectCar(car);
-    const dayLabel = (ms: number) => {
-      const p = getIndiaDateParts(ms);
-      return dayNumToLabel(toDayNum(p.year, p.month, p.date));
-    };
-    // The calendar's pickup times are whole hours/half hours: start at the next whole hour the car is free.
-    const startMs = Math.ceil(((car.dealStartMs || 0) > nowMs ? car.dealStartMs : nowMs) / 3600000) * 3600000;
-    const endMs = targetEndMs + 24 * 3600 * 1000;
-
-    setDates(`${dayLabel(startMs)} – ${dayLabel(endMs)}`, '2 Days');
-    setTimes(formatTime12(startMs), formatTime12(endMs));
     setIsDeliveryRequested(false);
     if (!pickup?.name) {
       setPickup({ id: 'hub_pickup', name: MYSAWARI_HUB_NAME, address: 'MySawari Hub, Kahilipara', latitude: 26.1412, longitude: 91.7645, source: 'database' });
@@ -499,7 +494,8 @@ export default function TopDealsScreen() {
     };
 
     // The date & time calendar opens for this car: days it cannot be booked are off, and Apply goes on to car details.
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', deal: JSON.stringify(deal) } });
+    // Nothing pre-picked: the customer chooses the days (the deal day shows its OFF tag, unavailable days are off).
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', fresh: 'true', deal: JSON.stringify(deal) } });
   };
 
   const handleShare = async () => {
@@ -1038,6 +1034,15 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 361,
     marginBottom: 0,
+  },
+  // Frame 2147226289: white, 1px #E7EAF4, radius 16, 8 under the bar, 4 between the card and the bar.
+  outerCardExtend: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E7EAF4',
+    borderRadius: 16,
+    paddingBottom: 8,
+    gap: 4,
   },
   vehicleCard: {
     width: '100%',

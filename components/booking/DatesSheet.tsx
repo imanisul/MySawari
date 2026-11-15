@@ -451,11 +451,9 @@ export function DatesSheet() {
 
   // For one car or bike: whether it is free for the chosen dates and times, shown above the button as you pick.
   const availLine = (() => {
-    if (forSpecificCar !== 'true' || !liveSelectedCar || !start) return null;
+    // Not in the Today's Deals "Need more time?" calendar: the OFF tag and the greyed-out days already say it all.
+    if (forSpecificCar !== 'true' || !liveSelectedCar || !start || deal) return null;
     const noun = liveSelectedCar.type === 'Bike' ? 'Bike' : 'Car';
-    if (deal && isOffDay(start) && (!end || end.getTime() === start.getTime())) {
-      return { ok: true, text: `Today's Deal: ${noun} available until ${formatTime12(deal.endMs)}` };
-    }
     const ok = checkCarAvailability(liveSelectedCar, formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', tempReturnTime || '8:00 AM');
     return ok
       ? { ok: true, text: `${noun} is available for your dates` }

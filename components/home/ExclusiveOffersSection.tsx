@@ -27,7 +27,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 246; // same width as the Top Picks cards
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-export function ExclusiveOffersSection() {
+/** layout 'row': the Home row (title, LIVE tag, sideways cards). 'list': full-width cards stacked, for the Flash Sale page. */
+export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'list' } = {}) {
   const router = useRouter();
   const p = useDetailsPalette();
   const {
@@ -84,7 +85,8 @@ export function ExclusiveOffersSection() {
     recordOfferView(offer._id || offer.id);
 
     if (offer.isEarlyAccessLocked || (offer.isEligible === false && !isMember)) {
-      router.push('/top-deals');
+      // Members-only for now (early access or a members deal): the way in is a membership.
+      router.push('/membership');
       return;
     }
 
@@ -269,7 +271,7 @@ export function ExclusiveOffersSection() {
       }
     }
 
-    // Resolve car image with priority: item.image -> specific vehicle photo -> first fleet vehicle photo
+    // Resolve car image with priority: dealCar -> item.image -> specific vehicle photo -> first fleet vehicle photo -> high quality fallback
     const vehicleImage =
       (typeof item.vehicleId === 'object' ? item.vehicleId?.images?.[0] : null) ||
       (typeof item.vehicleId === 'string'
@@ -283,9 +285,10 @@ export function ExclusiveOffersSection() {
     // A deal on specific cars shows that car's own photo; others use the deal's banner.
     const dealCar = specificCarOf(item, vehicles);
     const dealCarImage = dealCar?.image || dealCar?.images?.[0];
-    const imageUrl = dealCarImage || item.image?.url || item.image?.uri || vehicleImage;
+    const fleetFallback = vehicles.find((v: any) => v?.image || (Array.isArray(v?.images) && v.images.length > 0))?.image || 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1779773847/my-sawari/vehicles/vehicle-1779773846844-5b6cp5.jpg';
+    const imageUrl = dealCarImage || item.image?.url || item.image?.uri || vehicleImage || fleetFallback;
 
-    const resolvedVehicleName =
+    const rawVehicleName =
       (typeof item.vehicleId === 'object'
         ? (item.vehicleId?.displayName || item.vehicleId?.vehicleName || item.vehicleId?.name)
         : null) ||
@@ -295,13 +298,17 @@ export function ExclusiveOffersSection() {
       (Array.isArray(item.vehiclePrices) && item.vehiclePrices.length > 0
         ? (item.vehiclePrices[0].vehicleName ||
             vehicles.find((v: any) => String(v.id || v._id) === String(item.vehiclePrices![0].vehicleId))?.name)
-        : null) ||
-      (isAllCars ? 'All Fleet Cars' : vehicles[0]?.name || 'Available Fleet');
+        : null);
+
+    const resolvedVehicleName =
+      (rawVehicleName && rawVehicleName !== 'Test vehicle' && rawVehicleName !== 'Test Vehicle')
+        ? rawVehicleName
+        : item.title || (isAllCars ? 'All Fleet Cars' : vehicles[0]?.name || 'Thar 2025 RWD');
 
     return (
       <TouchableOpacity
         onPress={() => handleCardPress(item)}
-        style={[styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}
+        style={[styles.card, layout === 'list' && { width: '100%' }, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}
         activeOpacity={0.9}
       >
         {/* Banner Thumbnail */}
@@ -421,7 +428,7 @@ export function ExclusiveOffersSection() {
   return (
     <View style={styles.container}>
       {/* Section Header */}
-      <View style={styles.sectionHeader}>
+      {layout === 'row' && <View style={styles.sectionHeader}>
         <View style={styles.titleWithZap}>
           <Feather name="zap" size={17} color="#E11D48" />
           <Text style={[styles.sectionTitle, { color: p.fg }]} accessibilityRole="header">Flash Sale</Text>
@@ -430,17 +437,18 @@ export function ExclusiveOffersSection() {
           <View style={styles.liveDot} />
           <Text style={styles.liveTagText}>LIVE</Text>
         </View>
-      </View>
+      </View>}
 
       {/* Cards List */}
       <FlatList
         data={offers}
         renderItem={renderOfferCard}
         keyExtractor={(item) => item._id || item.id}
-        horizontal
+        horizontal={layout === 'row'}
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
-        snapToInterval={CARD_WIDTH + 8}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={layout === 'row' ? styles.listContainer : { padding: 16, gap: 12 }}
+        snapToInterval={layout === 'row' ? CARD_WIDTH + 8 : undefined}
         decelerationRate="fast"
       />
 

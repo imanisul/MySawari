@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
@@ -478,7 +479,7 @@ export function ReviewsSection({ car }: { car: Car }) {
           </View>
         )}
 
-        <Modal visible={isWriteModalVisible} animationType="slide" transparent={true} statusBarTranslucent navigationBarTranslucent>
+        <SheetModal visible={isWriteModalVisible}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
               <WriteReviewBottomSheet
@@ -489,7 +490,7 @@ export function ReviewsSection({ car }: { car: Car }) {
               />
             </View>
           </View>
-        </Modal>
+        </SheetModal>
       </View>
     );
   }
@@ -549,7 +550,7 @@ export function ReviewsSection({ car }: { car: Car }) {
         </Pressable>
       )}
 
-      <Modal visible={isWriteModalVisible} animationType="slide" transparent={true} statusBarTranslucent navigationBarTranslucent>
+      <SheetModal visible={isWriteModalVisible}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <WriteReviewBottomSheet
@@ -560,7 +561,7 @@ export function ReviewsSection({ car }: { car: Car }) {
             />
           </View>
         </View>
-      </Modal>
+      </SheetModal>
     </View>
   );
 }
@@ -899,7 +900,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'transparent', // the shared popup blur + dim sits behind (SheetModal)
     justifyContent: 'flex-end',
   },
   modalContent: {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { Modal, StyleSheet, View, Pressable, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,9 +16,8 @@ export function ReviewModal({ trip, onClose }: { trip: ReviewTrip | null; onClos
   const insets = useSafeAreaInsets();
 
   return (
-    <Modal visible={!!trip} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <SheetModal visible={!!trip} onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
-        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} style={styles.close}>
           <Feather name="x" size={20} color="#737373" />
@@ -28,7 +28,7 @@ export function ReviewModal({ trip, onClose }: { trip: ReviewTrip | null; onClos
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
-    </Modal>
+    </SheetModal>
   );
 }
 

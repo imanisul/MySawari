@@ -15,12 +15,13 @@ import { Image as CachedImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Defs, RadialGradient, Stop, Ellipse, Circle } from 'react-native-svg';
 import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
 import { useDealCars, dealPricing } from '@/hooks/useDealCars';
+import { VEHICLES_KEY } from '@/hooks/useVehicles';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
   dayNumToLabel,
@@ -36,7 +37,7 @@ import {
   bestFor,
   MONTH_NAMES,
 } from '@/utils/sawari';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { HeartIcon } from '@/components/vehicle/HeartIcon';
 import { MIN_PUBLIC_REVIEW_RATING } from '@/utils/sawari';
@@ -364,11 +365,18 @@ export default function TopDealsScreen() {
     applyCoupon,
   } = useSawari();
 
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [quickFilter, setQuickFilter] = useState<QuickFilter>('All');
   const [filters, setFilters] = useState<FilterState>({ ...defaultFilters });
   const [showFilterSheet, setShowFilterSheet] = useState(false);
   const [nowMs, setNowMs] = useState(() => Date.now());
+
+  useFocusEffect(
+    React.useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: VEHICLES_KEY });
+    }, [queryClient])
+  );
 
   // Second-by-second live countdown & price decrease
   useEffect(() => {
@@ -506,8 +514,19 @@ export default function TopDealsScreen() {
       setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
     }
 
+    // The deal itself, so the calendar can mark its day "OFF" and still book it at the hourly deal price when that
+    // day alone is chosen (any longer trip is a normal full-day-rate booking).
+    const dealStartMs = (car.dealStartMs || 0) > nowMs ? car.dealStartMs : Math.floor(nowMs / 60000) * 60000;
+    const dp = getIndiaDateParts(dealStartMs);
+    const deal = {
+      day: toDayNum(dp.year, dp.month, dp.date),
+      startMs: dealStartMs,
+      endMs: car.dealEndMs || targetEndMs,
+      rate: dealPricing(car, 1).rate,
+    };
+
     // The date & time calendar opens for this car: days it cannot be booked are off, and Apply goes on to car details.
-    router.push({ pathname: '/dates', params: { forSpecificCar: 'true' } });
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', deal: JSON.stringify(deal) } });
   };
 
   const handleShare = async () => {
@@ -540,7 +559,7 @@ export default function TopDealsScreen() {
           <View style={styles.headerTextCol}>
             <Text style={styles.headerTitle}>Today’s Deals</Text>
             <Text style={styles.headerSub}>
-              Showing {filteredCars.length} {filteredCars.length === 1 ? 'Car' : 'Cars'} available
+              Showing {filteredCars.length} {noun} available
             </Text>
           </View>
         </View>
@@ -846,33 +865,11 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontFamily: 'PlusJakartaSans_500Medium',
     fontSize: 13,
-    lineHeight: 19.5,
-    color: '#737373',
-  },
-  quickFilterChip: {
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#EAECF1',
-  },
-  quickFilterChipActive: {
-    backgroundColor: '#2F3E75',
-    borderColor: '#2F3E75',
-  },
-  quickFilterText: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 13,
-    lineHeight: 19.5,
-    color: '#737373',
-  },
-  quickFilterTextActive: {
-    color: '#FFFFFF',
+    color: '#1E293B',
   },
   scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 0, // the search block on top brings its own 12
     paddingBottom: 40,
     alignItems: 'center',
     width: '100%',

@@ -53,19 +53,19 @@ const PLANS: PlanDef[] = [
   {
     key: 'starter', name: 'Starter', price: 999, pctLabel: '5%', perTripCap: 499, annualCap: 10000,
     icon: require('@/assets/images/plan_starter.png'), iconSize: 16,
-    art: require('@/assets/images/membership_art_starter.png'), headerTop: '#323E71', headerBottom: '#4B5A9E', lightHeader: false,
+    art: require('@/assets/images/membership_art_starter.png'), headerTop: '#332B72', headerBottom: '#6B5AED', lightHeader: false,
     accent: '#323E71', innerBorder: '#D9DDEC',
   },
   {
     key: 'plus', name: 'Plus', price: 1999, pctLabel: '10%', perTripCap: 799, annualCap: 15000,
     icon: require('@/assets/images/plan_plus.png'), iconSize: 17,
-    art: require('@/assets/images/membership_art_plus.png'), headerTop: '#323E71', headerBottom: '#4B5A9E', lightHeader: false,
+    art: require('@/assets/images/membership_art_plus.png'), headerTop: '#332B72', headerBottom: '#6B5AED', lightHeader: false,
     accent: '#323E71', innerBorder: '#D9DDEC',
   },
   {
     key: 'pro', name: 'Pro', price: 2999, pctLabel: '12.5%', perTripCap: 999, annualCap: 20000,
     icon: require('@/assets/images/plan_pro.png'), iconSize: 16,
-    art: require('@/assets/images/membership_art_pro.png'), headerTop: '#323E71', headerBottom: '#4B5A9E', lightHeader: false,
+    art: require('@/assets/images/membership_art_pro.png'), headerTop: '#332B72', headerBottom: '#6B5AED', lightHeader: false,
     accent: '#323E71', innerBorder: '#D9DDEC',
   },
 ];
@@ -322,8 +322,8 @@ export default function MembershipScreen() {
   // nothing picked). A non-member with nothing picked sees "Subscribe" and is asked to choose.
   const target = selectedPlan ?? (activePlan ? offered[0] : undefined);
   const lightHeader = !!activePlan?.lightHeader;
-  const headerTop = activePlan ? activePlan.headerTop : '#323E71';
-  const headerBottom = activePlan ? activePlan.headerBottom : '#4B5A9E';
+  const headerTop = activePlan ? activePlan.headerTop : '#332B72';
+  const headerBottom = activePlan ? activePlan.headerBottom : '#6B5AED';
   const ctaLabel = target ? (activePlan ? `Upgrade to ${target.name}` : `Get ${target.name}`) : 'Subscribe';
   const showCta = offered.length > 0;
   const payOpen = checkoutStatus === 'PAYMENT_PENDING' && !!razorpayOrder;

@@ -62,6 +62,16 @@ function HomeIcon({ color, active }: IconProps) {
 //   );
 // }
 
+// "Search" tab: a magnifier (solid lens when selected) with a thick handle.
+function SearchIcon({ color, active }: IconProps) {
+  return (
+    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
+      <Circle cx={10.5} cy={10.5} r={7.5} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
+      <Path d="M16.5 16.5L21.5 21.5" stroke={color} strokeWidth={active ? 2 : 1.2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
 function ExploreIcon({ color, fill, active }: IconProps) {
   return (
     <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
@@ -232,10 +242,12 @@ const ALL_ITEMS: {
   label: string;
   route: Route;
   Icon: (p: IconProps) => React.ReactElement;
+  /** Small pink tag over the icon (the Sale tab's "Flash"). */
+  badge?: string;
 }[] = [
   { id: 'home', label: 'Home', route: '/', Icon: HomeIcon },
-  { id: 'explore', label: 'Explore', route: '/explore', Icon: ExploreIcon },
-  { id: 'top-deals', label: 'Top Deals', route: '/flash-sale', Icon: TopDealsIcon },
+  { id: 'explore', label: 'Search', route: '/explore', Icon: SearchIcon },
+  { id: 'flash-sale', label: 'Sale', route: '/flash-sale', Icon: TopDealsIcon, badge: 'Flash' }, // the exclusive deals (Flash Sale page)
   { id: 'bookings', label: 'My Trips', route: '/bookings', Icon: ActivityIcon },
   { id: 'profile', label: 'Profile', route: '/profile', Icon: ProfileIcon },
 ];
@@ -260,7 +272,7 @@ export function BottomNavigation() {
       <BottomBlur height={fadeHeight} fadeTo={fadeTo} />
       <View pointerEvents="box-none" style={styles.row}>
         <View style={[styles.pill, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
-          {ALL_ITEMS.map(({ id, label, route, Icon }) => {
+          {ALL_ITEMS.map(({ id, label, route, Icon, badge }) => {
             const active = route === '/' ? pathname === '/' : pathname.startsWith(route);
             const color = active ? activeInk : inactiveInk;
             return (
@@ -283,6 +295,11 @@ export function BottomNavigation() {
                 style={({ pressed }) => [styles.navItem, pressed && !active && { opacity: 0.7 }]}
               >
                 <Icon color={color} fill={isDarkMode ? colors.card : '#FFFFFF'} active={active} />
+                {!!badge && (
+                  <View pointerEvents="none" style={[styles.badge, { backgroundColor: active ? '#FF008B' : '#6B5AED' }]}>
+                    <Text style={styles.badgeText} allowFontScaling={false}>{badge}</Text>
+                  </View>
+                )}
                 <Text
                   style={[styles.navLabel, active && styles.navLabelActive, { color }]}
                   numberOfLines={1}
@@ -304,7 +321,7 @@ export function BottomNavigation() {
 }
 
 const HELP_INK = '#008758'; // Green/green-500 (design Help button icon and label)
-const NAV_ACTIVE = '#2F3E75'; // Primary/blue-500 (Figma active tab: icon and label)
+const NAV_ACTIVE = '#6B5AED'; // Figma tab icons and labels
 const NAV_ACTIVE_DARK = '#A5B6FF';
 const NAV_INACTIVE = '#737373'; // Neutral/500
 // Figma's two-layer upward glow, drawn the same on iOS and Android.
@@ -349,14 +366,14 @@ const styles = StyleSheet.create({
   },
   helpMenu: { alignItems: 'center', gap: 12, marginBottom: 12 },
   helpOption: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  // Equal-width tabs: padding 2 + icon 24 + gap 2 + label 12 + 2 = 42, in a 46px-high slot of the 64 pill.
+  // Figma tab (Frame 2147225810): 42 high, padding 2/0, gap 2, equal widths (51.8 on a 393 screen): 2 + icon 24 + 2 + label 12 + 2.
   navItem: {
     alignItems: 'center',
     flexBasis: 0,
     flexGrow: 1,
     minWidth: 0,
     gap: 2,
-    height: 46,
+    height: 42,
     paddingVertical: 2,
     justifyContent: 'center',
   },
@@ -368,4 +385,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   navLabelActive: {},
+  // "Flash" tag on the Sale tab: pink pill overlapping the icon's foot.
+  badge: { position: 'absolute', top: 22, alignSelf: 'center', height: 10, paddingHorizontal: 4, borderRadius: 8, backgroundColor: '#FF008B', alignItems: 'center', justifyContent: 'center' },
+  badgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 6.5, lineHeight: 9, color: '#FFFFFF', includeFontPadding: false },
 });

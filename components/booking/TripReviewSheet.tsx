@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { View, Text, StyleSheet, Pressable, TextInput, Image, ActivityIndicator, Alert, Linking, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -363,9 +364,8 @@ function PhotoSourceSheet({ visible, left, onPick, onClose }: {
     </Pressable>
   );
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <SheetModal visible={visible} onRequestClose={onClose}>
       <View style={styles.chooserOverlay}>
-        <ModalBlur />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
         <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={onClose} hitSlop={8} style={styles.chooserClose}>
           <Feather name="x" size={20} color="#737373" />
@@ -386,7 +386,7 @@ function PhotoSourceSheet({ visible, left, onPick, onClose }: {
           </Pressable>
         </View>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

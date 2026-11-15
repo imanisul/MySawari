@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import {
   View,
   Text,
@@ -183,9 +184,8 @@ export function RefundTrackingModal({
     : 'IN REVIEW';
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <SheetModal visible={visible} onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <ModalBlur />
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <View
           style={[
@@ -634,7 +634,7 @@ export function RefundTrackingModal({
           </ScrollView>
         </View>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

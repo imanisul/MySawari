@@ -1,5 +1,6 @@
+import React, { useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { QueryClient, useQuery } from '@tanstack/react-query';
+import { QueryClient, useQuery, useQueryClient } from '@tanstack/react-query';
 import { API } from '@/services/backend/api';
 import { offersQueryOptions, hydrateOffers, exclusiveOffersQueryOptions, hydrateExclusiveOffers } from '@/services/api/offers';
 
@@ -91,9 +92,10 @@ export const vehiclesQueryOptions = {
       throw err;
     }
   },
-  staleTime: 5 * 60 * 1000, // fresh for 5 min
-  refetchInterval: 5 * 60 * 1000, // re-check every 5 min
+  staleTime: 10 * 1000, // 10 seconds: quick stale time so bookings reflect in real time
+  refetchInterval: 15 * 1000, // 15 seconds: live polling keeps vehicle availability in real time
   refetchOnWindowFocus: true, // re-checked when the app comes back to the foreground
+  refetchOnMount: true,
   refetchOnReconnect: true,
 } as const;
 
@@ -102,18 +104,41 @@ export function useVehicles() {
 }
 
 /**
- * The car with its bookings read live from the server for this one vehicle (refreshed every 20 s while open), so the
- * car page and checkout agree with the bookings table. Until that arrives — or if it fails — the list's copy is used.
+ * The car with its bookings read live from the server for this one vehicle (refreshed every 10 s while open), so the
+ * car page and checkout agree with the bookings table. Also synchronizes the live availability facts back into the
+ * global vehicles list cache so other screens don't show stale availability.
  */
 export function useLiveCar<T extends { id: string } | null | undefined>(car: T): T {
   const id = car?.id ? String(car.id) : '';
+  const queryClient = useQueryClient();
   const { data } = useQuery({
     queryKey: ['vehicle-availability', id],
     queryFn: () => API.getVehicleAvailability(id),
     enabled: /^[a-f0-9]{24}$/i.test(id),
-    staleTime: 15 * 1000,
-    refetchInterval: 20 * 1000,
+    staleTime: 5 * 1000,
+    refetchInterval: 10 * 1000,
   });
+
+  // Sync this vehicle's live availability back into the global vehicles list
+  useEffect(() => {
+    if (data && id) {
+      queryClient.setQueryData<any[]>(VEHICLES_KEY, (old) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((v) => {
+          if (String(v.id) === id || (v as any)._id === id) {
+            return {
+              ...v,
+              bookedRanges: data.bookedRanges,
+              dbStatus: data.status || (v as any).dbStatus,
+              maintenanceUntil: data.maintenanceUntil,
+            };
+          }
+          return v;
+        });
+      });
+    }
+  }, [data, id, queryClient]);
+
   if (!car || !data) return car;
   return { ...car, bookedRanges: data.bookedRanges, dbStatus: data.status || (car as any).dbStatus, maintenanceUntil: data.maintenanceUntil } as T;
 }

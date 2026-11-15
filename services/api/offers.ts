@@ -352,6 +352,31 @@ export const exclusiveOffersQueryOptions = {
   refetchOnWindowFocus: true,
 };
 
+/** The next scheduled flash sale: when it opens to everyone, the members-first minutes, and up to 5 vehicle photos. */
+export type NextFlashSale = { startsAt: string; earlyAccessMinutes: number; images: string[]; offer?: any };
+
+export const nextFlashSaleQueryOptions = {
+  queryKey: ['exclusive-offers-next'] as const,
+  queryFn: async (): Promise<NextFlashSale | null> => {
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/offers/exclusive/next`);
+      if (!res.ok) return null;
+      const d = (await res.json())?.data;
+      if (!d?.startsAt) return null;
+      return {
+        startsAt: String(d.startsAt),
+        earlyAccessMinutes: Math.max(0, Number(d.earlyAccessMinutes) || 0),
+        images: Array.isArray(d.images) ? d.images.filter((u: unknown) => typeof u === 'string').slice(0, 5) : [],
+        offer: d.offer || undefined,
+      };
+    } catch {
+      return null;
+    }
+  },
+  staleTime: 60 * 1000,
+  refetchInterval: 60 * 1000,
+};
+
 export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
   try {
     const res = await fetchWithAuth(`${BACKEND_URL}/offers/exclusive`);

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { SheetModal } from '@/components/common/SheetModal';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
@@ -33,8 +34,7 @@ export function SortSheet({
   }, [visible, value]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <ModalBlur />
+    <SheetModal visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close sort" />
       <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.header}>
@@ -81,7 +81,7 @@ export function SortSheet({
           <Text style={styles.ctaText}>Apply</Text>
         </Pressable>
       </View>
-    </Modal>
+    </SheetModal>
   );
 }
 

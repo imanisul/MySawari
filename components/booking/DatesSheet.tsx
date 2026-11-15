@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView, LayoutAnimation, Alert, Linking, Modal, Animated } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { FontAwesome, Ionicons } from '@expo/vector-icons';
@@ -17,7 +17,7 @@ import { useColors } from '@/hooks/useColors';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { calculateRentalDays } from '@/services/backend/pricingEngine';
-import { checkCarAvailability, buildBlocks, todayDayNum } from '@/utils/sawari';
+import { checkCarAvailability, buildBlocks, todayDayNum, toDayNum, dayNumAndTimeToMs, getIndiaDateParts, parseTimeToMinutes, dayNumToLabel, formatTime12 } from '@/utils/sawari';
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
@@ -51,7 +51,8 @@ const DAY_TIME = '8:00 AM';
 
 const HOUR = 3600 * 1000;
 const hourLabel = (ms: number) => {
-  const h = new Date(ms).getHours();
+  const p = getIndiaDateParts(ms);
+  const h = p.hours;
   return `${h % 12 || 12}:00 ${h >= 12 ? 'PM' : 'AM'}`;
 };
 /**
@@ -59,14 +60,16 @@ const hourLabel = (ms: number) => {
  * whole hour its next booking begins (null = nothing follows). A car whose last booking ends at 1 PM is free from 1 PM.
  */
 const carGapOn = (car: any, date: Date) => {
+  const dayNum = toDayNum(date.getFullYear(), date.getMonth(), date.getDate());
   const blocks = buildBlocks(car, todayDayNum()).filter((b) => Number.isFinite(b.startMs)).sort((a, b) => a.startMs - b.startMs);
-  const dayEnd = date.getTime() + 24 * HOUR;
-  let from = Math.ceil(Math.max(date.getTime() + 8 * HOUR, Date.now()) / HOUR) * HOUR;
+  const dayStart8Am = dayNumAndTimeToMs(dayNum, '08:00 AM', 480);
+  const dayEndMs = dayNumAndTimeToMs(dayNum, '11:59 PM', 1439);
+  let from = Math.ceil(Math.max(dayStart8Am, Date.now()) / HOUR) * HOUR;
   for (let c = blocks.find((b) => b.startMs < from + HOUR && b.endMs > from); c; c = blocks.find((b) => b.startMs < from + HOUR && b.endMs > from)) {
     if (!Number.isFinite(c.endMs)) return null;
     from = Math.ceil(c.endMs / HOUR) * HOUR;
   }
-  if (from >= dayEnd) return null;
+  if (from >= dayEndMs) return null;
   const next = blocks.find((b) => b.startMs > from);
   return { from, until: next ? Math.floor(next.startMs / HOUR) * HOUR : null };
 };
@@ -176,7 +179,9 @@ export function DatesSheet() {
   const router = useRouter();
   // fresh: opened right after choosing a destination (or for a trip whose dates have passed) — the
   // customer picks the dates themselves, nothing is pre-filled from an earlier search.
-  const { returnBack, fresh, forSpecificCar, fromDestination, thenLocation, thenBook } = useLocalSearchParams<{
+  const { returnBack, fresh, forSpecificCar, fromDestination, thenLocation, thenBook, deal: dealParam } = useLocalSearchParams<{
+    /** From Today's Deals "Need more time?": the deal (day number, start/end ms, hourly rate) as JSON. */
+    deal?: string;
     thenLocation?: string;
     thenBook?: string;
     returnBack?: string;
@@ -185,15 +190,21 @@ export function DatesSheet() {
     fromDestination?: string;
   }>();
   const freshPick = fresh === 'true';
+  const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, selectCar, dropoff, isDarkMode, isAuthenticated, applyCoupon } = useSawari();
+  const deal = useMemo(() => {
+    try { return dealParam ? (JSON.parse(dealParam) as { day: number; startMs: number; endMs: number; rate: number }) : null; } catch { return null; }
+  }, [dealParam]);
+  const isOffDay = (date: Date) => !!deal && toDayNum(date.getFullYear(), date.getMonth(), date.getDate()) === deal.day;
   const { data: fetchedVehicles = [] } = useVehicles();
-  const { setDates, setTimes, dateRange, pickupTime, returnTime, selectedCar, selectCar, dropoff, isDarkMode, isAuthenticated } = useSawari();
+  const liveSelectedCar = selectedCar ? (fetchedVehicles.find((v) => String(v.id) === String(selectedCar.id)) || selectedCar) : selectedCar;
 
   // Figma palette in light mode; dark mode keeps the theme tokens.
   const ui = isDarkMode
     ? { page: colors.background, text: colors.foreground, muted: colors.mutedForeground, border: colors.border, card: colors.card, cardBorder: colors.border, calendar: colors.card, month: colors.mutedForeground, band: colors.tintLight, navy: colors.primary, sel: colors.primary, onNavy: colors.primaryForeground, past: colors.mutedForeground, chipText: colors.primaryText, dash: colors.mutedForeground }
     : { page: '#FFFFFF', text: '#262626', muted: '#737373', border: '#D4D4D4', card: '#F4F6FA', cardBorder: '#E7EAF4', calendar: '#F9F9FB', month: '#525252', band: '#E9EAF1', navy: '#2F3E75', sel: '#6B5AED', onNavy: '#FFFFFF', past: '#A3A3A3', chipText: '#2F3E75', dash: '#A3A8C3' };
 
-  const today = new Date();
+  const istTodayParts = getIndiaDateParts();
+  const today = new Date(istTodayParts.year, istTodayParts.month, istTodayParts.date);
   today.setHours(0, 0, 0, 0);
 
   const parseDateStr = (dateStr: string) => {
@@ -227,6 +238,8 @@ export function DatesSheet() {
   const [showEarlyPickupModal, setShowEarlyPickupModal] = useState(false);
   const [hasShownLateNotice, setHasShownLateNotice] = useState(false);
   const [showLateReturnModal, setShowLateReturnModal] = useState(false);
+  // Popup shown when Apply finds the chosen car busy (Explore → car → dates): says when it is free.
+  const [unavailable, setUnavailable] = useState<{ title: string; body: string; note?: string } | null>(null);
 
   // Slim scroll thumb (Figma: 4x42, 9 from the right edge) -- the native indicator is hidden.
   const calScroll = useRef(new Animated.Value(0)).current;
@@ -238,22 +251,20 @@ export function DatesSheet() {
   });
   const months = Array.from({ length: MONTHS_AHEAD }, (_, i) => new Date(today.getFullYear(), today.getMonth() + i, 1));
 
-  // A new start date: with a car chosen, pickup moves to when the car is free that day (after its last booking) and the
-  // drop-off straight to the hour before its next booking (e.g. 14 Nov 1 PM → 15 Nov 8 AM); otherwise the same-day default.
+  // A new start date: with a car chosen, pickup moves to when the car is free that day (after its last booking).
   const startDefaults = (date: Date) => {
     setHasShownLateNotice(false);
-    const gap = forSpecificCar === 'true' && selectedCar ? carGapOn(selectedCar, date) : null;
-    if (!gap) {
-      setTempReturnTime(SAME_DAY_RETURN);
-      return;
-    }
     autoMovedPickup.current = false;
-    setTempPickupTime(hourLabel(gap.from));
-    if (gap.until && gap.until - gap.from <= 24 * HOUR && new Date(gap.until).getHours() >= 8) {
-      const untilDay = new Date(gap.until);
-      untilDay.setHours(0, 0, 0, 0);
-      if (untilDay.getTime() > date.getTime()) setEnd(untilDay);
-      setTempReturnTime(hourLabel(gap.until));
+    const gap = forSpecificCar === 'true' && liveSelectedCar ? carGapOn(liveSelectedCar, date) : null;
+    if (gap) {
+      setTempPickupTime(hourLabel(gap.from));
+      const dayNum = toDayNum(date.getFullYear(), date.getMonth(), date.getDate());
+      const dateEndMs = dayNumAndTimeToMs(dayNum, '11:59 PM', 1439);
+      if (gap.until && gap.until <= dateEndMs && getIndiaDateParts(gap.until).hours < 20) {
+        setTempReturnTime(hourLabel(gap.until));
+      } else {
+        setTempReturnTime(SAME_DAY_RETURN);
+      }
     } else {
       setTempReturnTime(SAME_DAY_RETURN);
     }
@@ -261,15 +272,33 @@ export function DatesSheet() {
 
   // True Date Range Picker Logic
   const handlePress = (date: Date) => {
-    if (date < today) return; 
+    if (isDisabledDay(date)) return;
     Haptics.selectionAsync();
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     
-    // If both are selected, reset and start fresh with this date as the new start
+    // If both are selected
     if (start && end) {
-      setStart(date);
-      setEnd(null);
-      startDefaults(date);
+      if (date.getTime() === start.getTime()) {
+        // Tapping start date deselects end date (leaves only start selected)
+        setEnd(null);
+        setTempReturnTime(SAME_DAY_RETURN);
+        setHasShownLateNotice(false);
+      } else if (date.getTime() === end.getTime()) {
+        // Tapping end date deselects end date
+        setEnd(null);
+        setTempReturnTime(SAME_DAY_RETURN);
+        setHasShownLateNotice(false);
+      } else if (date > start && endsTrip(date)) {
+        // Tapping another valid date after start changes the end date
+        setEnd(date);
+        setTempReturnTime(DAY_TIME);
+        setHasShownLateNotice(false);
+      } else {
+        // Start fresh with this date as the new start
+        setStart(date);
+        setEnd(null);
+        startDefaults(date);
+      }
       return;
     }
     
@@ -286,6 +315,11 @@ export function DatesSheet() {
         setEnd(null);
         setTempReturnTime(DAY_TIME);
         setHasShownLateNotice(false);
+      } else if (!endsTrip(date)) {
+        // The car is booked in between: this day starts a new trip instead.
+        setStart(date);
+        setEnd(null);
+        startDefaults(date);
       } else {
         // Picked a date after start, make it the end: a multi-day trip, back to 8 AM drop-off.
         setEnd(date);
@@ -295,7 +329,7 @@ export function DatesSheet() {
       return;
     }
     
-    // Default fallback (should never hit if initialized properly)
+    // Default fallback (no dates selected)
     setStart(date);
     setEnd(null);
     startDefaults(date);
@@ -324,20 +358,47 @@ export function DatesSheet() {
 
   // Today: hours that have already passed are hidden from the Pickup wheel (3:43 PM → 4 PM onwards).
   const isToday = (d: Date | null) => !!d && d.getTime() === today.getTime();
-  const firstHourToday = new Date().getHours() + 1;
+  const firstHourToday = getIndiaDateParts().hours + 1;
   const hourOf = (time: string) => { const i = ALL_TIMES.indexOf(time); return i < 0 ? -1 : Math.floor(i / 2); };
 
-  const isDisabledDay = (date: Date) => {
-    if (date < today) return true;
-    if (isToday(date) && firstHourToday > 23) return true; // no pickup hour left today
-    if (forSpecificCar === 'true' && selectedCar) {
-      // Choosing the return day: only the times matter, and they are checked when applying.
-      if (start && !end && date > start) return false;
-      // A start day is usable when the car has a free hour that day (it may be busy until 1 PM, or from 8 AM).
-      return !carGapOn(selectedCar, date);
+  // With a pickup day chosen: can the trip end on `date`? Not past the car's next booking (8 AM return rule).
+  const returnBlocked = (date: Date) => {
+    if (!start || !liveSelectedCar) return true;
+    const startDayNum = toDayNum(start.getFullYear(), start.getMonth(), start.getDate());
+    const dateDayNum = toDayNum(date.getFullYear(), date.getMonth(), date.getDate());
+    const pickupH = hourOf(tempPickupTime || DAY_TIME);
+    const startPickupMs = dayNumAndTimeToMs(startDayNum, tempPickupTime || '08:00 AM', pickupH >= 0 ? pickupH * 60 : 480);
+    const nextBlock = buildBlocks(liveSelectedCar, todayDayNum())
+      .filter((b) => Number.isFinite(b.startMs))
+      .sort((x, y) => x.startMs - y.startMs)
+      .find((b) => b.startMs > startPickupMs);
+    if (!nextBlock) return false; // nothing booked after pickup
+    const nb = getIndiaDateParts(nextBlock.startMs);
+    const nbDayNum = toDayNum(nb.year, nb.month, nb.date);
+    if (dateDayNum > nbDayNum) return true; // would run through the next booking
+    if (dateDayNum === nbDayNum) {
+      // Same day: needs an hour before the booking; later day: the 8 AM return must be before it.
+      return dateDayNum === startDayNum ? nextBlock.startMs - startPickupMs < HOUR : nb.hours < 8;
     }
     return false;
   };
+
+  // A day is greyed out only when the car can neither be picked up nor returned on it. After a pickup day is
+  // chosen, later days the car is free on stay tappable: they start a new trip if they can't end this one.
+  const isDisabledDay = (date: Date) => {
+    if (date < today) return true;
+    if (isToday(date) && firstHourToday > 23) return true; // no pickup hour left today
+    if (forSpecificCar === 'true' && liveSelectedCar) {
+      const pickupOk = !!carGapOn(liveSelectedCar, date);
+      if (start && date.getTime() === start.getTime()) return false; // tapping the start day deselects it
+      if (start && date > start) return !pickupOk && returnBlocked(date);
+      return !pickupOk;
+    }
+    return false;
+  };
+
+  // Tapping a later day ends the trip there when the car allows it; otherwise it becomes the new pickup day.
+  const endsTrip = (date: Date) => !(forSpecificCar === 'true' && liveSelectedCar) || !returnBlocked(date);
 
   const handlePickupTime = (time: string) => {
     Haptics.selectionAsync();
@@ -372,24 +433,74 @@ export function DatesSheet() {
     return true;
   };
 
+  // "14 Nov, 10:00 AM" in India time, for the free-window note.
+  const whenLabel = (ms: number) => `${getIndiaDateParts(ms).date} ${MONTHS[getIndiaDateParts(ms).month]}, ${hourLabel(ms)}`;
+  // When the car is free around the chosen start day, else the next day it is.
+  const freeWindowNote = (car: any, from: Date) => {
+    const gapNote = (g: { from: number; until: number | null }) =>
+      g.until ? `Free from ${whenLabel(g.from)} until ${whenLabel(g.until)}.` : `Free from ${whenLabel(g.from)}, with no booking after that.`;
+    const here = carGapOn(car, from);
+    if (here) return `On your pickup day: ${gapNote(here)}`;
+    for (let i = 1; i <= 90; i++) {
+      const d = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
+      const g = carGapOn(car, d);
+      if (g) return `Next available: ${gapNote(g)}`;
+    }
+    return 'No free dates in the next 90 days.';
+  };
+
+  // For one car or bike: whether it is free for the chosen dates and times, shown above the button as you pick.
+  const availLine = (() => {
+    if (forSpecificCar !== 'true' || !liveSelectedCar || !start) return null;
+    const noun = liveSelectedCar.type === 'Bike' ? 'Bike' : 'Car';
+    if (deal && isOffDay(start) && (!end || end.getTime() === start.getTime())) {
+      return { ok: true, text: `Today's Deal: ${noun} available until ${formatTime12(deal.endMs)}` };
+    }
+    const ok = checkCarAvailability(liveSelectedCar, formatDateStr(start), formatDateStr(effectiveEnd), tempPickupTime || '8:00 AM', tempReturnTime || '8:00 AM');
+    return ok
+      ? { ok: true, text: `${noun} is available for your dates` }
+      : { ok: false, text: `${noun} is not available for these dates. ${freeWindowNote(liveSelectedCar, start)}` };
+  })();
+
   const handleApply = () => {
     if (!start) return;
+    // Only the "OFF" day chosen: book the Today's Deal itself (hourly price, its own hours), as the deal card does.
+    if (deal && liveSelectedCar && isOffDay(start) && (!end || end.getTime() === start.getTime())) {
+      const startMs = Math.max(deal.startMs, Math.floor(Date.now() / 60000) * 60000);
+      const hours = Math.max(1, Math.ceil(Math.max(0, deal.endMs - startMs) / HOUR));
+      const perDay = Number(liveSelectedCar.perDay || 0);
+      const dealPrice = Math.min(perDay || Infinity, deal.rate * hours);
+      const label = (ms: number) => { const q = getIndiaDateParts(ms); return dayNumToLabel(toDayNum(q.year, q.month, q.date)); };
+      selectCar({ ...liveSelectedCar, hourlyRate: deal.rate } as any);
+      applyCoupon(`TOPDEAL-${hours}`);
+      setDates(`${label(startMs)} – ${label(deal.endMs)}`, '1 Day');
+      setTimes(formatTime12(startMs), formatTime12(deal.endMs));
+      router.replace({
+        pathname: '/car-details',
+        params: {
+          id: String(liveSelectedCar.id), vehicleId: String(liveSelectedCar.id), lockDates: 'true', isFixedDates: 'true', isTopDeal: 'true',
+          pickupTime: formatTime12(startMs), returnTime: formatTime12(deal.endMs),
+          dealPrice: String(dealPrice), hourlyPrice: String(deal.rate), rentalHours: String(hours),
+        },
+      });
+      return;
+    }
     const finalReturnTime = tempReturnTime || '8:00 AM';
     const finalPickupTime = tempPickupTime || '8:00 AM';
-    if (forSpecificCar === 'true' && selectedCar) {
-      const isAvail = checkCarAvailability(selectedCar, formatDateStr(start), formatDateStr(effectiveEnd), finalPickupTime, finalReturnTime);
+    if (forSpecificCar === 'true' && liveSelectedCar) {
+      const isAvail = checkCarAvailability(liveSelectedCar, formatDateStr(start), formatDateStr(effectiveEnd), finalPickupTime, finalReturnTime);
       if (!isAvail) {
         if (fromDestination === 'true') {
           // Check if another vehicle of the same type is available
-          const altCar = fetchedVehicles.find((v) => v.type === selectedCar.type && checkCarAvailability(v, formatDateStr(start), formatDateStr(effectiveEnd), finalPickupTime, finalReturnTime));
+          const altCar = fetchedVehicles.find((v) => v.type === liveSelectedCar.type && checkCarAvailability(v, formatDateStr(start), formatDateStr(effectiveEnd), finalPickupTime, finalReturnTime));
           if (altCar) {
             selectCar(altCar);
           } else {
-            Alert.alert('Vehicles In High Demand', 'Vehicles are not available for these selected dates. Please choose different dates.');
+            setUnavailable({ title: 'Vehicles In High Demand', body: 'Vehicles are not available for these selected dates. Please choose different dates.' });
             return;
           }
         } else {
-          Alert.alert('Car Not Available', 'The selected car is not available for these dates. Please choose different dates.');
+          setUnavailable({ title: 'Car Not Available', body: 'The selected car is not available for these dates. Please choose different dates.', note: freeWindowNote(liveSelectedCar, start) });
           return;
         }
       }
@@ -573,7 +684,7 @@ export function DatesSheet() {
           contentContainerStyle={styles.calendarContent}
           scrollEventThrottle={16}
           onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: calScroll } } }], { useNativeDriver: true })}
-          onLayout={(e) => setCalSize((c) => ({ ...c, view: e.nativeEvent.layout.height }))}
+          onLayout={(e) => { const view = e.nativeEvent.layout.height; setCalSize((c) => ({ ...c, view })); }}
           onContentSizeChange={(_, h) => setCalSize((c) => ({ ...c, content: h }))}
         >
           {months.map((m) => {
@@ -617,13 +728,20 @@ export function DatesSheet() {
                               styles.dayCircle,
                               selected && { backgroundColor: ui.sel },
                               pressed && !selected && { backgroundColor: 'transparent' },
+                              !selected && isOffDay(date) && { borderWidth: 1.5, borderColor: '#6B5AED' },
                             ]}
                           >
+                            {isOffDay(date) && (
+                              // Figma Frame 2147226285: tilted "OFF" tag on the deal day (white on a chosen day, purple otherwise).
+                              <View pointerEvents="none" style={[styles.offTag, selected ? { backgroundColor: '#FFFFFF' } : { backgroundColor: '#6B5AED' }]}>
+                                <Text style={[styles.offText, { color: selected ? '#6B5AED' : '#FFFFFF' }]} allowFontScaling={false}>OFF</Text>
+                              </View>
+                            )}
                             <Text
                               style={[
                                 styles.dayText,
                                 { color: selected ? ui.onNavy : disabled ? ui.past : ui.text },
-                                disabled && styles.struck,
+                                disabled && !selected && date < today && styles.struck,
                               ]}
                             >
                               {date.getDate()}
@@ -651,6 +769,12 @@ export function DatesSheet() {
       </View>
 
       <View style={[styles.footer, { paddingBottom: insets.bottom + 16, backgroundColor: ui.page }]}>
+        {availLine && (
+          <View style={styles.availRow} accessibilityLiveRegion="polite">
+            <Ionicons name={availLine.ok ? 'checkmark-circle' : 'close-circle'} size={14} color={availLine.ok ? '#339F79' : '#D04646'} />
+            <Text style={[styles.availText, { color: availLine.ok ? '#339F79' : '#D04646' }]} numberOfLines={2}>{availLine.text}</Text>
+          </View>
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityState={{ disabled: !canApply }}
@@ -752,6 +876,41 @@ export function DatesSheet() {
         </View>
       </Modal>
 
+      {/* Car not available for the chosen dates: same card as Late Return, with when the car is free. */}
+      <Modal visible={!!unavailable} transparent animationType="fade" onRequestClose={() => setUnavailable(null)} statusBarTranslucent navigationBarTranslucent>
+        <View style={styles.popupOverlay}>
+          <ModalBlur />
+          <View style={[styles.early, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
+            <Ionicons name="warning" size={30} color="#FACC15" />
+            <View style={styles.earlyCopy}>
+              <Text style={[styles.earlyTitle, { color: ui.text, lineHeight: 29, marginTop: 0 }]}>{unavailable?.title}</Text>
+              <Text style={[styles.earlyBody, { color: ui.muted, marginTop: 0, paddingHorizontal: 0, fontFamily: 'PlusJakartaSans_500Medium' }]}>
+                {unavailable?.body}
+                {!!unavailable?.note && <Text style={[styles.lateExtra, { color: ui.navy }]}>{'\n'}{unavailable.note}</Text>}
+              </Text>
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setUnavailable(null)}
+              style={({ pressed }) => [styles.lateBtn, { backgroundColor: ui.navy }, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.lateBtnText}>Choose different dates</Text>
+            </Pressable>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={8}
+            onPress={() => setUnavailable(null)}
+            style={({ pressed }) => [styles.earlyClose, { backgroundColor: isDarkMode ? colors.card : '#FAFAFA' }, pressed && { opacity: 0.7 }]}
+          >
+            <Svg width={20} height={20} viewBox="0 0 20 20">
+              <Path d="M5 5L15 15M15 5L5 15" stroke={ui.muted} strokeWidth={1.2} strokeLinecap="round" />
+            </Svg>
+          </Pressable>
+        </View>
+      </Modal>
+
     </View>
   );
 }
@@ -827,6 +986,10 @@ const styles = StyleSheet.create({
   dayCircle: { width: 36, height: 36, borderRadius: 18, paddingBottom: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent'},
   dayText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13 },
   struck: { textDecorationLine: 'line-through' },
+  availRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 8, paddingHorizontal: 4 },
+  availText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, flexShrink: 1, textAlign: 'center' },
+  offTag: { position: 'absolute', top: -6, left: 18 - 11.5 - 10.36, width: 23, height: 14, borderRadius: 10, borderWidth: 1, borderColor: '#6B5AED', paddingHorizontal: 2, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-29.06deg' }], zIndex: 1 },
+  offText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, includeFontPadding: false },
   wheels: {
   flexDirection: 'row',
   gap: 12,

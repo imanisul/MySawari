@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, ImageSourcePropType, ImageStyle, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import Svg, { Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Defs, Ellipse, G, LinearGradient as SvgLinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import HomeHeaderMask from '@/assets/images/home_header_mask.svg';
 import HomeHeaderUnion from '@/assets/images/home_header_union.svg';
 import HomeHeaderChevron from '@/assets/images/home_header_chevron.svg';
@@ -34,7 +34,7 @@ type Props = {
 };
 
 export function HomeTopBar({
-  topInset, city, address = 'MySawari - Self Drive Car Rental Guwahati, Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019',
+  topInset, city, address = 'Kahilipara',
   onCityPress, sawariCash, vehicleType, onType, dateLabel, onDates,
 }: Props) {
   return (
@@ -192,12 +192,12 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
             <View style={[s.tileImageFrame, { width: t.imageFrameWidth }]}>
               <Image source={t.image} style={[s.tileImg, t.imageStyle]} resizeMode="stretch" />
             </View>
-            {/* Label tab: white, top corners 6, outlined in purple — strongest on the left, light lavender on the right */}
-            <LinearGradient colors={[EDGE_FROM, EDGE_TO]} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={s.tileLabelEdge}>
-              <View style={[s.tileLabelWrap, dark && { backgroundColor: '#1A1D29' }]}>
-                <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
-              </View>
-            </LinearGradient>
+            {/* Label tab: white, top corners 6, a 1px purple outline — strongest on the left, light on the right */}
+            <View style={[s.tileLabelWrap, dark && { backgroundColor: '#1A1D29' }]}>
+              {/* Open at the bottom: left, top and right, purple fading to the tile border's lavender on the right */}
+              <FadeOutline id={`tileEdge${t.value}`} width={60} height={19} end={0.16} d="M0.5 19 V6.5 A6 6 0 0 1 6.5 0.5 H53.5 A6 6 0 0 1 59.5 6.5 V19" />
+              <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
+            </View>
             {/* The tile's 1px border is drawn last, as Figma draws a frame's stroke over its children: it runs along the
                 label's bottom too, instead of being covered by it. */}
             <View pointerEvents="none" style={[s.tileStroke, dark && { borderColor: 'rgba(107,90,237,0.35)' }]} />
@@ -208,24 +208,33 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
   );
 }
 
-// Label outline (car and bike tiles): #6B5AED on the left, fading on the right to the light lavender of the tile's own
-// border (the right edge stays visible, as in the design, instead of vanishing).
-const EDGE_FROM = 'rgba(107, 90, 237, 0.7)';
-const EDGE_TO = 'rgba(107, 90, 237, 0.16)';
 
-/** "Bikes" / "Scooters" label: white, left corners rounded, outlined in the tile purple fading to nothing at the right. */
+/** "Bikes" / "Scooters" label: white, left corners rounded, 1px purple outline strongest on the left, none on the right. */
 function BikeLabel({ text, dark }: { text: string; dark?: boolean }) {
   return (
-    <LinearGradient
-      colors={[EDGE_FROM, EDGE_TO]}
-      start={{ x: 0, y: 0.5 }}
-      end={{ x: 1, y: 0.5 }}
-      style={s.bikeBadgeEdge}
-    >
-      <View style={[s.bikeBadge, dark && { backgroundColor: '#1A1D29' }]}>
-        <Text style={[s.bikeBadgeText, dark && { color: '#E5E7EB' }]}>{text}</Text>
-      </View>
-    </LinearGradient>
+    <View style={[s.bikeBadge, dark && { backgroundColor: '#1A1D29' }]}>
+      {/* Open on the right (it runs into the tile's edge): top, left and bottom, purple fading out to the right */}
+      <FadeOutline id="bikeEdge" width={76} height={27} d="M76 0.5 H6.5 A6 6 0 0 0 0.5 6.5 V20.5 A6 6 0 0 0 6.5 26.5 H76" />
+      <Text style={[s.bikeBadgeText, dark && { color: '#E5E7EB' }]}>{text}</Text>
+    </View>
+  );
+}
+
+/**
+ * 1px label outline drawn in SVG so it can fade along its length (a border can't): #6B5AED 70% on the left fading to
+ * nothing on the right, as in the design.
+ */
+function FadeOutline({ id, width, height, d, end = 0 }: { id: string; width: number; height: number; d: string; end?: number }) {
+  return (
+    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <SvgLinearGradient id={id} x1="0" y1="0" x2={width} y2="0" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#6B5AED" stopOpacity={0.7} />
+          <Stop offset="1" stopColor="#6B5AED" stopOpacity={end} />
+        </SvgLinearGradient>
+      </Defs>
+      <Path d={d} stroke={`url(#${id})`} strokeWidth={1} fill="none" />
+    </Svg>
   );
 }
 
@@ -379,15 +388,12 @@ const s = StyleSheet.create({
   tileStroke: { position: 'absolute', top: -1, left: -1, right: -1, bottom: -1, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(107,90,237,0.16)' },
   tileImageFrame: { height: 48, position: 'relative', flexShrink: 0, overflow: 'hidden' },
   tileImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-  // Figma 60 × 19 tab at the bottom (padding 2/4/1): a 1px edge on top and sides, the white fill inside it.
-  tileLabelEdge: {
-    position: 'absolute', bottom: -1, alignSelf: 'center', width: 60, height: 19,
-    borderTopLeftRadius: 6, borderTopRightRadius: 6, paddingTop: 1, paddingHorizontal: 1,
-  },
+  // Figma 60 × 19 tab at the bottom (padding 2/4/1); its fading outline is the FadeOutline SVG inside it.
   tileLabelWrap: {
-    flex: 1, backgroundColor: '#FFFFFF', borderTopLeftRadius: 5, borderTopRightRadius: 5,
+    position: 'absolute', bottom: -1, alignSelf: 'center', width: 60, height: 19,
+    backgroundColor: '#FFFFFF', borderTopLeftRadius: 6, borderTopRightRadius: 6,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    paddingTop: 1, paddingBottom: 1, paddingHorizontal: 3,
+    paddingTop: 2, paddingBottom: 1, paddingHorizontal: 4,
   },
   tileLabel: { flex: 1, fontFamily: F.bold, fontSize: 9, lineHeight: 14, color: '#262626', textAlign: 'center' },
 
@@ -401,12 +407,11 @@ const s = StyleSheet.create({
   },
   // flex-grow 1: the picture box takes the space left of the label (≈100 wide), the bike centred in it.
   bikeImg: { flex: 1, height: 65.67 },
-  // 76 × 27 label: a 1px purple outline that fades out towards the tile's right edge, around the white fill.
-  bikeBadgeEdge: { width: 76, height: 27, borderTopLeftRadius: 6, borderBottomLeftRadius: 6, paddingTop: 1, paddingBottom: 1, paddingLeft: 1 },
+  // 76 × 27 label, left corners 6, padding 4; its fading outline is the FadeOutline SVG inside it.
   bikeBadge: {
-    flex: 1, backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 5, borderBottomLeftRadius: 5,
-    alignItems: 'center', justifyContent: 'center', padding: 3,
+    width: 76, height: 27, backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 6, borderBottomLeftRadius: 6,
+    alignItems: 'center', justifyContent: 'center', padding: 4,
   },
   bikeBadgeText: { fontFamily: F.bold, fontSize: 11, lineHeight: 16, textAlign: 'center', color: '#262626' },
   // Frame 2147225720: 331 × 57, flat top-rounded strip sitting directly on the milestone card

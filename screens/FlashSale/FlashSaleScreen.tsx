@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Dimensions,
   PanResponder,
   Pressable,
@@ -10,8 +11,9 @@ import {
   View,
 } from 'react-native';
 import { Image } from 'expo-image';
+import { BlurView } from 'expo-blur';
 import Svg, { Defs, Ellipse, Path, RadialGradient, Stop } from 'react-native-svg';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -22,13 +24,29 @@ import {
   exclusiveOffersQueryOptions,
   nextFlashSaleQueryOptions,
   recordOfferView,
+  claimExclusiveOffer,
 } from '@/services/api/offers';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
-import { formatTime12, getIndiaDateParts } from '@/utils/sawari';
+import { formatTime12, getIndiaDateParts, getAvailability } from '@/utils/sawari';
 import { Bolt, Lettering } from '@/components/home/FlashSaleBanner';
-import { formatCurrency } from '@/services/backend/pricingEngine';
+import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
+import { BACKEND_URL } from '@/services/backend/api';
 import * as Haptics from '@/utils/haptics';
+import { LoginBottomSheet } from '@/components';
+import FsTitle from '@/assets/images/flash_sale/fs_title.svg';
+import FsTitleGlow from '@/assets/images/flash_sale/fs_title_glow.svg';
+import FsRatingStar from '@/assets/images/flash_sale/fs_rating_star.svg';
+import FsChevron from '@/assets/images/flash_sale/fs_chevron.svg';
+import FsDash from '@/assets/images/flash_sale/fs_dash.svg';
+import FsLock from '@/assets/images/flash_sale/fs_lock.svg';
+import FsCrown from '@/assets/images/flash_sale/fs_crown.svg';
+import FsStar from '@/assets/images/flash_sale/fs_star.svg';
+import FsStarGlow from '@/assets/images/flash_sale/fs_star_glow.svg';
+import FsStarSmall from '@/assets/images/flash_sale/fs_star_small.svg';
+import FsStarSmallGlow from '@/assets/images/flash_sale/fs_star_small_glow.svg';
+import { CustomAlert } from '@/components/common/CustomAlert';
+import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BG = '#3E2DC8';
@@ -44,69 +62,6 @@ const STAR_PATH = 'M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** High-resolution fallback vehicle fleet to ensure 5 gorgeous cars are always present */
-const FALLBACK_VEHICLES = [
-  {
-    id: 'thar_2025',
-    displayName: 'Thar 2025 RWD',
-    vehicleName: 'Thar 2025 RWD',
-    transmission: 'Manual',
-    fuelType: 'Petrol',
-    seatingCapacity: 5,
-    dealPrice: 399,
-    originalPrice: 1000,
-    ratings: { averageRating: 4.2, reviewCount: 48 },
-    images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1779773847/my-sawari/vehicles/vehicle-1779773846844-5b6cp5.jpg' }],
-  },
-  {
-    id: 'nexon_ev',
-    displayName: 'Nexon EV',
-    vehicleName: 'Nexon EV',
-    transmission: 'Automatic',
-    fuelType: 'Electric',
-    seatingCapacity: 5,
-    dealPrice: 4200,
-    originalPrice: 4800,
-    ratings: { averageRating: 4.5, reviewCount: 32 },
-    images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1791272042/my-sawari/vehicles/vehicle-1791272042393-1msi5f.jpg' }],
-  },
-  {
-    id: 'dzire_vxi',
-    displayName: 'Swift Dzire',
-    vehicleName: 'Swift Dzire',
-    transmission: 'Manual',
-    fuelType: 'Petrol',
-    seatingCapacity: 5,
-    dealPrice: 1700,
-    originalPrice: 2200,
-    ratings: { averageRating: 4.4, reviewCount: 65 },
-    images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1779773847/my-sawari/vehicles/vehicle-1779773846844-5b6cp5.jpg' }],
-  },
-  {
-    id: 'alto_k10',
-    displayName: 'Alto K10',
-    vehicleName: 'Alto K10',
-    transmission: 'Manual',
-    fuelType: 'Petrol',
-    seatingCapacity: 4,
-    dealPrice: 1000,
-    originalPrice: 1400,
-    ratings: { averageRating: 4.1, reviewCount: 19 },
-    images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1791177935/my-sawari/vehicles/vehicle-1791177934459-v5r5vh.jpg' }],
-  },
-  {
-    id: 'fronx_alpha',
-    displayName: 'Fronx White',
-    vehicleName: 'Fronx White',
-    transmission: 'Automatic',
-    fuelType: 'Petrol',
-    seatingCapacity: 5,
-    dealPrice: 1800,
-    originalPrice: 2400,
-    ratings: { averageRating: 4.6, reviewCount: 54 },
-    images: [{ url: 'https://res.cloudinary.com/duyuzd9ra/image/upload/v1794706851/my-sawari/vehicles/vehicle-1794706850058-xl0ewu.png' }],
-  },
-];
 
 /** Light rays radiating from slightly below center */
 function Rays({ width, height }: { width: number; height: number }) {
@@ -133,12 +88,87 @@ function Rays({ width, height }: { width: number; height: number }) {
   );
 }
 
-/** 4-pointed golden sparkle star at ticket corners */
-function Sparkle({ size, left, top }: { size: number; left: number; top: number }) {
+/**
+ * Gold crown (Figma Vector): #FBC422 with a 1.2px black outline and a 1px black hard shadow, rotated −24.98°.
+ */
+function PillCrown({ left = 17.48, top = -12 }: { left?: number; top?: number } = {}) {
   return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" style={{ position: 'absolute', left, top }} pointerEvents="none">
-      <Path d={STAR_PATH} fill={GOLD} />
+    <View style={{ position: 'absolute', left, top, width: 20.028, height: 17.606, alignItems: 'center', justifyContent: 'center' }} pointerEvents="none">
+      <View style={{ width: 16.663, height: 11.66, transform: [{ rotate: '-24.98deg' }] }}>
+        <FsCrown width={20.0633} height={15.0599} style={{ position: 'absolute', left: -16.663 * 0.072, top: -11.66 * 0.1029 }} />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The ticket (Figma "Union" 353 × 361, radius 16, minus two 28-wide circles centred on its side edges at y 239.3):
+ * the bites are real cut-outs, so the page shows through and the outline follows them.
+ */
+const TICKET_W = 353;
+const TICKET_H = 361;
+const BITE_R = 14;
+const BITE_Y = 225.38 + 13.96;
+const TICKET_PATH = [
+  'M16.5 0.5', `H${TICKET_W - 16.5}`, `A16 16 0 0 1 ${TICKET_W - 0.5} 16.5`,
+  `V${BITE_Y - BITE_R}`, `A${BITE_R} ${BITE_R} 0 0 0 ${TICKET_W - 0.5} ${BITE_Y + BITE_R}`,
+  `V${TICKET_H - 16.5}`, `A16 16 0 0 1 ${TICKET_W - 16.5} ${TICKET_H - 0.5}`,
+  'H16.5', `A16 16 0 0 1 0.5 ${TICKET_H - 16.5}`,
+  `V${BITE_Y + BITE_R}`, `A${BITE_R} ${BITE_R} 0 0 0 0.5 ${BITE_Y - BITE_R}`,
+  'V16.5', 'A16 16 0 0 1 16.5 0.5', 'Z',
+].join(' ');
+function TicketShape({ fill = 'none', stroke }: { fill?: string; stroke?: string }) {
+  return (
+    <Svg width={TICKET_W} height={TICKET_H} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Path d={TICKET_PATH} fill={fill} stroke={stroke} strokeWidth={stroke ? 1 : 0} />
     </Svg>
+  );
+}
+
+/**
+ * The trip a deal books: its own dates if the Operation App set them, else its number of days from today, else
+ * today → tomorrow; times from the offer. Used to fill the booking and to tell whether a car is free for it.
+ */
+function offerTrip(offer: any) {
+  const label = (d: Date) => `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+  const today = new Date();
+  const overnight = Boolean(offer?.isOvernight || (offer?.pickupTime?.includes('PM') && offer?.returnTime?.includes('AM')));
+  const pickupT = offer?.rentalStartTime || offer?.pickupTime || (overnight ? '08:00 PM' : '08:00 AM');
+  const returnT = offer?.rentalEndTime || offer?.returnTime || '08:00 AM';
+  let start = today, end: Date, days: number;
+  if (offer?.rentalStartDate && offer?.rentalEndDate) {
+    start = new Date(offer.rentalStartDate);
+    end = new Date(offer.rentalEndDate);
+    days = offer.rentalDays || Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000));
+  } else {
+    days = Math.max(1, Number(offer?.rentalDays) || 1);
+    end = new Date(today.getTime() + days * 86400000);
+  }
+  return { startLabel: label(start), endLabel: label(end), days, pickupT, returnT };
+}
+
+/** Arc slots (Figma Frame 2147226241, 312 wide): offset from the shown car → place, size and white ring strength. */
+const ARC_SLOTS = [
+  { offset: 0, left: 130, top: 12, size: 52, ring: '#FFFFFF' },
+  { offset: 1, left: 208, top: 20, size: 44, ring: 'rgba(255,255,255,0.9)' },
+  { offset: -1, left: 60, top: 20, size: 44, ring: 'rgba(255,255,255,0.9)' },
+  { offset: 2, left: 272, top: 35, size: 40, ring: 'rgba(255,255,255,0.8)' },
+  { offset: -2, left: 0, top: 35, size: 40, ring: 'rgba(255,255,255,0.8)' },
+];
+
+/** Gold sparkle at a ticket corner (Figma Star 8/14 big, Star 9/11 small): the star and its blurred glow. */
+function Sparkle({ size, left, top }: { size: number; left: number; top: number }) {
+  const big = size > 10;
+  const box = big ? 13.867 : 6.934;
+  const Star = big ? FsStar : FsStarSmall;
+  const Glow = big ? FsStarGlow : FsStarSmallGlow;
+  const star = big ? 15.2802 : 9.70707;
+  const glow = big ? 55.469 : 10.466;
+  return (
+    <View style={{ position: 'absolute', left, top, width: box, height: box }} pointerEvents="none">
+      <Glow width={glow} height={glow} style={{ position: 'absolute', left: (box - glow) / 2, top: (box - glow) / 2 }} />
+      <Star width={star} height={star} style={{ position: 'absolute', left: (box - star) / 2, top: (box - star) / 2 }} />
+    </View>
   );
 }
 
@@ -170,14 +200,10 @@ function LiveCountdownHeader({ expiryMs }: { expiryMs: number }) {
 
   return (
     <View style={styles.liveHeaderWrap}>
-      {/* Left: Bolt + stacked FLASH SALE 3D Lettering */}
-      <View style={styles.liveTitleCol}>
-        <Bolt width={22} line={0.6} near={0.5} far={1.5} style={{ left: -10, top: 8 }} />
-        <View style={{ marginLeft: 6 }}>
-          <Lettering text="FLASH" size={32} shadow={PINK_SHADOW} font={FONT} near={1.15} outline={1.3} skew="0deg" scaleY={1.12} />
-          <Lettering text="SALE" size={42} shadow={PINK_SHADOW} font={FONT} near={1.15} outline={1.3} skew="0deg" scaleY={1.12} />
-        </View>
-      </View>
+      {/* Ellipse 13 glow (154 × 70 at 18, 10; exported with its blur, so it spills 118.7 each way) behind the title */}
+      <FsTitleGlow width={391.449} height={307.449} style={{ position: 'absolute', left: 18 - 118.72, top: 10 - 118.72 }} pointerEvents="none" />
+      {/* Frame 2147226232: the bolt + FLASH / SALE lettering, exported from Figma (172.87 × 92.42) */}
+      <FsTitle width={174.073} height={92.4218} style={{ marginLeft: -1.2 }} />
 
       {/* Right: ENDS IN + 3 white square boxes */}
       <View style={styles.liveTimerCol}>
@@ -211,7 +237,7 @@ export default function FlashSaleScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
-  const { membership, selectCar, setDates, setTimes, applyCoupon, setPickup, setDropoff } = useSawari();
+  const { membership, selectCar, isAuthenticated, applyCoupon, setDates, setTimes, pickup, dropoff, setPickup, setDropoff } = useSawari();
   const { data: fleetVehicles = [] } = useVehicles();
 
   // Queries
@@ -260,209 +286,186 @@ export default function FlashSaleScreen() {
     (earlyAccessEndsMs > nowMs)
   );
 
-  // View state for scheduled sale: locked teaser vs unblurred preview
-  const [previewLocked, setPreviewLocked] = useState(!isMember);
+  // Before the sale opens the cars stay hidden from everyone (members included): only their photos are known.
+  const [previewLocked, setPreviewLocked] = useState(true);
   useEffect(() => {
-    if (isLive) {
-      setPreviewLocked(false);
-    } else if (isMember) {
-      setPreviewLocked(false);
-    }
-  }, [isLive, isMember]);
+    setPreviewLocked(!isLive);
+  }, [isLive]);
 
-  // Construct cars list: ensures exactly 5 attractive cars for the bottom arc
+  // Only the cars and bikes the Operation App put in its live offers (every offer, not just the first), each with its
+  // own offer and that offer's prices. Nothing is added to fill space. Before a sale opens: the hidden cars' photos.
   const displayCars = useMemo(() => {
     const list: any[] = [];
     const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
-
-    const add = (offer: any, ref: any, dealPrice?: number, originalPrice?: number) => {
+    const add = (offer: any, ref: any, dealPrice?: number, originalPrice?: number, vp?: any) => {
       const id = asId(ref);
-      if (!id || list.some((c) => String(c.id || c._id) === id)) return;
+      if (!id || list.some((c) => String(c.id) === id)) return;
       const fleet: any = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === id);
-      const car: any = fleet || (typeof ref === 'object' ? { ...ref, id } : null);
+      const car: any = fleet || (ref && typeof ref === 'object' ? { ...ref, id } : null);
       if (!car) return;
+      // Booked: this car's deal stock is used up, or the car is already taken for the deal's dates.
+      const trip = offerTrip(offer);
+      const soldOut = Boolean(vp?.stockLimit && Number(vp.soldCount) >= Number(vp.stockLimit));
+      const taken = fleet ? !getAvailability(fleet, trip.startLabel, trip.endLabel, trip.pickupT, trip.returnT).available : false;
       list.push({
         ...car,
         id,
         offer,
-        dealPrice: dealPrice ?? offer?.promotionalPrice ?? offer?.dealPrice ?? (car.pricePerDay ? Math.round(car.pricePerDay * 0.7) : 399),
-        originalPrice: originalPrice ?? offer?.originalPrice ?? (car.pricePerDay || 1000),
+        booked: soldOut || taken,
+        dealPrice: dealPrice ?? offer?.promotionalPrice ?? offer?.dealPrice ?? null,
+        originalPrice: originalPrice ?? offer?.originalPrice ?? null,
       });
     };
-
     if (isLive) {
       for (const offer of offers as any[]) {
-        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice));
+        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice, vp));
         (offer.applicableVehicleIds || []).forEach((v: any) => add(offer, v));
         if (offer.vehicleId) add(offer, offer.vehicleId);
       }
-      // Complement from fleet vehicles to have 5 cars
-      for (const fv of fleetVehicles as any[]) {
-        if (list.length >= 5) break;
-        add(liveOffer, fv);
-      }
-      // If still fewer than 5, complement from FALLBACK_VEHICLES
-      for (const fb of FALLBACK_VEHICLES) {
-        if (list.length >= 5) break;
-        if (!list.some((c) => String(c.id || c._id) === fb.id)) {
-          list.push({ ...fb, offer: liveOffer, dealPrice: liveOffer?.promotionalPrice || fb.dealPrice });
-        }
-      }
+      // Free cars first, booked ones after (still shown, locked).
+      list.sort((a, b) => Number(!!a.booked) - Number(!!b.booked));
     } else if (isScheduled) {
-      const schOffer = nextSale?.offer;
-      if (schOffer) {
-        (schOffer.vehiclePrices || []).forEach((vp: any) => add(schOffer, vp.vehicleId, vp.dealPrice, vp.originalPrice));
-        (schOffer.applicableVehicleIds || []).forEach((v: any) => add(schOffer, v));
-        if (schOffer.vehicleId) add(schOffer, schOffer.vehicleId);
-      }
-      (nextSale?.images || []).forEach((url, i) => {
-        if (list.length < 5) list.push({ id: `hidden-${i}`, images: [{ url }], displayName: 'Upcoming Deal Car' });
-      });
-      for (const fb of FALLBACK_VEHICLES) {
-        if (list.length >= 5) break;
-        if (!list.some((c) => String(c.id || c._id) === fb.id)) {
-          list.push({ ...fb, offer: schOffer, dealPrice: schOffer?.promotionalPrice || fb.dealPrice });
-        }
-      }
-    } else {
-      // Coming soon fallbacks
-      FALLBACK_VEHICLES.forEach((fb) => list.push(fb));
+      (nextSale?.images || []).forEach((url, i) => list.push({ id: `hidden-${i}`, images: [{ url }] }));
     }
-
-    return list.slice(0, 5);
-  }, [offers, isLive, isScheduled, nextSale, fleetVehicles, liveOffer]);
+    return list;
+  }, [offers, isLive, isScheduled, nextSale, fleetVehicles]);
 
   const [selectedCarIndex, setSelectedCarIndex] = useState(0);
-  const activeCar: any = displayCars[selectedCarIndex] || displayCars[0] || FALLBACK_VEHICLES[0];
+  const slideX = useRef(new Animated.Value(0)).current; // the ticket's sideways slide while swiping between cars
+  const activeCar: any = displayCars[selectedCarIndex] || displayCars[0] || {};
   const activeOffer: any = activeCar.offer || liveOffer || null;
 
-  // Can the customer book this car now?
-  const canBook = isLive && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
+  // Can the customer book this car now? (its own offer's early-access lock and members-only rule)
+  const canBook = isLive && !activeCar.booked && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
 
-  // Helper to extract safe photo URL - NEVER returns empty string
-  const getCarImage = useCallback((car: any, fallbackIdx = 0): string => {
-    const raw = car?.images?.[0];
-    const url = typeof raw === 'string' ? raw : raw?.url;
-    if (url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('/uploads'))) {
-      return url;
-    }
-    if (car?.image && typeof car.image === 'string' && (car.image.startsWith('http') || car.image.startsWith('/uploads'))) {
-      return car.image;
-    }
-    const fb = FALLBACK_VEHICLES[fallbackIdx % FALLBACK_VEHICLES.length];
-    return fb.images[0].url;
-  }, []);
+  // The ticket is locked (frosted, car hidden, member/everyone times, membership button) before the sale opens for
+  // everyone, and while it is live but members-only (early-access window, or a members-only deal) for a non-member.
+  const membersOnlyNow = isLive && !isMember && Boolean(activeOffer?.isEarlyAccessLocked || activeOffer?.isEligible === false);
+  const ticketLocked = isScheduled && previewLocked; // before the sale: the car itself stays hidden
+  // When it opens to everyone: the scheduled start, or (live, members' window) the early-access end.
+  const opensMs = isScheduled ? scheduledStartsMs : (activeOffer?.earlyAccessEndsAt ? new Date(activeOffer.earlyAccessEndsAt).getTime() : 0);
 
-  // Safe car name - Always displays a genuine vehicle model name (e.g. Thar 2025 RWD, Jeep 2026)
-  const carDisplayName = useMemo(() => {
-    // 1. If fleet car or DB car has a real display name
-    const rawName = (activeCar.displayName || activeCar.vehicleName || '').trim();
-    if (rawName && rawName.toLowerCase() !== 'test vehicle' && rawName.toLowerCase() !== 'vehicle') {
-      return rawName;
-    }
-    // 2. If manufacturer and model exist
-    const brandModel = [activeCar.manufacturer, activeCar.model].filter(Boolean).join(' ').trim();
-    if (brandModel && brandModel.toLowerCase() !== 'test') {
-      return brandModel;
-    }
-    // 3. Fallback vehicle name (e.g. Thar 2025 RWD, Nexon EV, Swift Dzire, Alto K10, Fronx White)
-    return FALLBACK_VEHICLES[selectedCarIndex % FALLBACK_VEHICLES.length].displayName;
-  }, [activeCar, selectedCarIndex]);
+  // The car's own photo as an image source. The fleet gives full links, or the app's built-in picture of that model
+  // when the car has no uploaded photo; a car straight from the offer gives {url} objects, maybe server-relative.
+  const getCarImage = useCallback((car: any, _idx = 0): any => {
+    const pick = (v: any): any => {
+      if (!v) return null;
+      if (typeof v === 'number') return v; // bundled picture (require)
+      if (typeof v === 'string') {
+        if (/^https?:\/\//.test(v)) return { uri: v };
+        if (v.startsWith('/')) return { uri: `${BACKEND_URL.replace(/\/api$/, '')}${v}` };
+        return null;
+      }
+      if (typeof v === 'object') return pick(v.uri ?? v.url ?? null);
+      return null;
+    };
+    const fleet: any = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === String(car?.id));
+    return pick(car?.images?.[0]) ?? pick(car?.image) ?? pick(fleet?.images?.[0]) ?? pick(fleet?.image) ?? null;
+  }, [fleetVehicles]);
 
-  // Duration label (e.g. "3 Days" or "1 Day")
-  const durationLabel = useMemo(() => {
-    if (activeOffer?.rentalPeriodLabel) return activeOffer.rentalPeriodLabel;
-    if (activeOffer?.rentalDays) {
-      return `${activeOffer.rentalDays} ${activeOffer.rentalDays === 1 ? 'Day' : 'Days'}`;
-    }
-    if (activeOffer?.rentalHours) {
-      return `${activeOffer.rentalHours} Hours`;
-    }
-    return '3 Days';
-  }, [activeOffer]);
+  // The car's real name, as the dashboard has it.
+  const carDisplayName = (activeCar.displayName || activeCar.vehicleName || activeCar.name || '').trim() || 'Vehicle';
 
-  // Pricing
-  const dealPrice = activeCar.dealPrice || activeOffer?.promotionalPrice || 399;
-  const originalPrice = activeCar.originalPrice || activeOffer?.originalPrice || (dealPrice ? Math.round(dealPrice * 1.4) : 1000);
+  // The offer's rental length only ("1 Day", "3 Days"; hours for a shorter deal) — never its dates and times
+  // (rentalPeriodLabel is "15 Nov 2026, 09:00 AM → 16 Nov 2026, 09:00 AM (1 Day (24h))").
+  const durationLabel: string | null =
+    (activeOffer?.rentalDays ? `${activeOffer.rentalDays} ${activeOffer.rentalDays === 1 ? 'Day' : 'Days'}` : null)
+    || (activeOffer?.rentalHours ? `${activeOffer.rentalHours} Hours` : null);
+
+  // The offer's real prices only (no estimates).
+  const dealPrice: number | null = activeCar.dealPrice ?? null;
+  const originalPrice: number | null = activeCar.originalPrice ?? null;
 
   // Swiping card gesture
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => false,
-        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 15 && Math.abs(gesture.dy) < 30,
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dx < -40) {
-            Haptics.selectionAsync();
-            setSelectedCarIndex((prev) => (prev + 1) % displayCars.length);
-          } else if (gesture.dx > 40) {
-            Haptics.selectionAsync();
-            setSelectedCarIndex((prev) => (prev - 1 + displayCars.length) % displayCars.length);
+        // Take a clearly sideways drag before the buttons inside the ticket do, so the swipe always works.
+        onMoveShouldSetPanResponderCapture: (_, g) => displayCars.length > 1 && Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        onMoveShouldSetPanResponder: (_, g) => displayCars.length > 1 && Math.abs(g.dx) > 12 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderMove: (_, g) => slideX.setValue(g.dx),
+        onPanResponderRelease: (_, g) => {
+          const dir = g.dx < -60 || g.vx < -0.5 ? 1 : g.dx > 60 || g.vx > 0.5 ? -1 : 0;
+          if (!dir) {
+            Animated.spring(slideX, { toValue: 0, useNativeDriver: true, friction: 7 }).start();
+            return;
           }
+          Haptics.selectionAsync();
+          // Slide out, swap the car, bring the next one in from the other side.
+          Animated.timing(slideX, { toValue: -dir * windowWidth, duration: 160, useNativeDriver: true }).start(() => {
+            setSelectedCarIndex((prev) => (prev + dir + displayCars.length) % displayCars.length);
+            slideX.setValue(dir * windowWidth);
+            Animated.spring(slideX, { toValue: 0, useNativeDriver: true, friction: 8 }).start();
+          });
         },
+        onPanResponderTerminate: () => Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start(),
       }),
-    [displayCars.length]
+    [displayCars.length, windowWidth, slideX]
   );
 
-  // Booking action
-  const handleBookNow = useCallback(() => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const targetOffer = activeOffer || liveOffer;
-    if (targetOffer) {
-      recordOfferView(targetOffer._id || targetOffer.id);
-    }
+  // Book Now: claim the deal on the server (it hands back this customer's coupon, priced and held by the server), apply
+  // that coupon, fill in the offer's dates and times, and open the car's page. The dates are locked unless the
+  // offer is set to flexible in the Operation App.
+  const [showLogin, setShowLogin] = useState(false);
+  const [booking, setBooking] = useState(false);
+  const handleBookNow = useCallback(async (justLoggedIn = false) => {
+    if (booking || !activeOffer || !activeCar?.id || String(activeCar.id).startsWith('hidden-')) return;
+    Haptics.selectionAsync();
+    if (!isAuthenticated && !justLoggedIn) { setShowLogin(true); return; }
+    if (activeCar.booked) return;
+    if (!canBook) { router.push('/membership'); return; }
 
-    // 1. Select vehicle
-    const bookingCar = fleetVehicles.find((fv: any) => String(fv.id || fv._id) === String(activeCar.id || activeCar._id)) || activeCar;
-    if (bookingCar) {
-      selectCar(bookingCar);
-    }
+    setBooking(true);
+    try {
+      const offerId = String(activeOffer._id || activeOffer.id);
+      recordOfferView(offerId);
+      let code: string | undefined = activeOffer.activeClaim?.couponCode;
+      if (!code) {
+        const res = await claimExclusiveOffer(offerId);
+        code = res.claim?.couponCode || res.claim?.claimToken;
+        if (!res.success || !code) {
+          CustomAlert.alert('Couldn’t book this deal', res.message || 'This offer couldn’t be claimed right now. Please try again.');
+          return;
+        }
+      }
 
-    // 2. Pre-fill dates and duration
-    const today = new Date();
-    const daysCount = targetOffer?.rentalDays || 1;
-    const endD = new Date(today.getTime() + daysCount * 24 * 3600 * 1000);
-    const travelRange = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${endD.getDate()} ${MONTHS_SHORT[endD.getMonth()]}`;
-
-    const isOvernight = Boolean(targetOffer?.isOvernight);
-    const pickupT = targetOffer?.pickupTime || (isOvernight ? '08:00 PM' : '08:00 AM');
-    const returnT = targetOffer?.returnTime || (isOvernight ? '08:00 AM' : '08:00 AM');
-
-    setDates(travelRange, `${daysCount} ${daysCount === 1 ? 'Day' : 'Days'}`);
-    setTimes(targetOffer?.rentalStartTime || pickupT, targetOffer?.rentalEndTime || returnT);
-
-    // 3. Set pickup/dropoff default to hub
-    setPickup({ id: 'hub', name: 'MySawari Hub', address: 'Silchar Main Hub', latitude: 24.8333, longitude: 92.7789, source: 'database' });
-    setDropoff({ id: 'hub', name: 'MySawari Hub', address: 'Silchar Main Hub', latitude: 24.8333, longitude: 92.7789, source: 'database' });
-
-    // 4. Apply coupon
-    const code = (targetOffer as any)?.userClaim?.couponCode || targetOffer?.code;
-    if (code) {
+      const car = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === String(activeCar.id)) || activeCar;
+      selectCar(car);
       applyCoupon(code);
-    }
 
-    // 5. Navigate to booking
-    router.push({
-      pathname: '/booking',
-      params: {
-        exclusiveOfferId: String(targetOffer?._id || targetOffer?.id || ''),
-        dealPrice: String(dealPrice),
-      },
-    });
-  }, [activeCar, activeOffer, liveOffer, fleetVehicles, router, selectCar, setDates, setTimes, setPickup, setDropoff, applyCoupon, dealPrice]);
+      const trip = offerTrip(activeOffer);
+      setDates(`${trip.startLabel} – ${trip.endLabel}`, `${trip.days} ${trip.days === 1 ? 'Day' : 'Days'}`);
+      setTimes(trip.pickupT, trip.returnT);
+      if (!pickup?.name) setPickup({ id: 'hub_pickup', name: MYSAWARI_HUB_NAME, address: 'MySawari Hub, Kahilipara', latitude: 26.1412, longitude: 91.7645, source: 'database' });
+      if (!dropoff?.name) setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
+
+      const carId = String(car.id ?? car._id);
+      const flexible = activeOffer.rentalPeriodMode === 'flexible';
+      router.push({
+        pathname: '/car-details',
+        params: { id: carId, vehicleId: carId, allowExtend: 'true', ...(flexible ? {} : { lockDates: 'true', isFixedDates: 'true' }) },
+      });
+    } finally {
+      setBooking(false);
+    }
+  }, [booking, activeOffer, activeCar, isAuthenticated, canBook, router, fleetVehicles, selectCar, applyCoupon, setDates, setTimes, pickup, dropoff, setPickup, setDropoff]);
 
   // View details action
   const handleViewDetails = useCallback(() => {
     Haptics.selectionAsync();
     const car = fleetVehicles.find((fv: any) => String(fv.id || fv._id) === String(activeCar.id || activeCar._id)) || activeCar;
-    if (car) {
-      selectCar(car);
-      router.push({
-        pathname: '/car-details',
-        params: { id: String(car.id || car._id) },
-      });
+    if (!car || String(car.id).startsWith('hidden-')) return;
+    selectCar(car);
+    // The deal's trip, so the car page shows its dates and price (and "Need more time?" to add days).
+    if (activeOffer) {
+      const trip = offerTrip(activeOffer);
+      setDates(`${trip.startLabel} – ${trip.endLabel}`, `${trip.days} ${trip.days === 1 ? 'Day' : 'Days'}`);
+      setTimes(trip.pickupT, trip.returnT);
     }
-  }, [activeCar, fleetVehicles, router, selectCar]);
+    router.push({ pathname: '/car-details', params: { id: String(car.id || car._id), allowExtend: 'true' } });
+  }, [activeCar, activeOffer, fleetVehicles, router, selectCar, setDates, setTimes]);
 
   // Schedule text calculations
   const scheduleInfo = useMemo(() => {
@@ -508,7 +511,12 @@ export default function FlashSaleScreen() {
       </View>
 
       {/* Content depending on state */}
-      {isComingSoon ? (
+      {isLive && displayCars.length === 0 ? (
+        // Live offers that name no car (all cars / a category): the offers themselves.
+        <View style={{ flex: 1, paddingBottom: insets.bottom }}>
+          <ExclusiveOffersSection layout="list" />
+        </View>
+      ) : isComingSoon ? (
         // State 1 & 2: COMING SOON / NO ACTIVE SALE
         <View style={styles.centerComingSoon} accessible accessibilityRole="header" accessibilityLabel="Flash Sale Coming Soon">
           <View style={styles.comingSoonGroup}>
@@ -550,45 +558,48 @@ export default function FlashSaleScreen() {
           ) : null}
 
           {/* Ticket Card + Sparkles */}
-          <View style={styles.ticketSection}>
-            <Sparkle size={14} left={-10} top={-10} />
-            <Sparkle size={7} left={-14} top={-16} />
-            <Sparkle size={14} left={348} top={-10} />
-            <Sparkle size={7} left={358} top={-16} />
+          <View style={[styles.ticketSection, { position: 'absolute', left: (windowWidth - 353) / 2, top: windowHeight / 2 - 208 - insets.top - 44 }]}>
+            <Sparkle size={13.867} left={-8.87} top={-9} />
+            <Sparkle size={6.934} left={-12} top={-14} />
+            <Sparkle size={13.867} left={348} top={-9} />
+            <Sparkle size={6.934} left={358.07} top={-14} />
 
-            <View style={styles.ticketCard} {...panResponder.panHandlers}>
-              {/* Side bite notches */}
-              <View style={[styles.notch, { left: -14 }]} />
-              <View style={[styles.notch, { right: -14 }]} />
-              <View style={styles.dashedDivider} />
+            <Animated.View style={[styles.ticketCard, { transform: [{ translateX: slideX }] }]} {...panResponder.panHandlers}>
+              {/* Ticket shape (Figma Union/Subtract): rounded 16, with real half-circle bites cut out of both sides */}
+              <TicketShape fill="#FEFDF0" />
+              {/* Locked (before the sale): the Subtract frost, #595959 at 40%, over the whole ticket */}
+              {ticketLocked && <TicketShape fill="rgba(89, 89, 89, 0.4)" />}
+              {/* Line 18: 320 dashed line at (16.5, 240), #6152D8 40% → 100% → 40% (Figma export) */}
+              <FsDash width={320} height={1} style={styles.dashedDivider} />
 
               {/* Photo Area */}
               <View style={styles.photoContainer}>
                 <Image
-                  source={{ uri: getCarImage(activeCar, selectedCarIndex) }}
+                  source={getCarImage(activeCar, selectedCarIndex)}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
-                  blurRadius={isScheduled && previewLocked ? 24 : 0}
+                  blurRadius={ticketLocked ? 24 : 0}
                   transition={200}
                 />
+                {/* Sold out (Figma 1844:16201): red ribbon across the photo's top-right corner, rotated 39.76° */}
+                {isLive && activeCar.booked && (
+                  <View style={styles.soldRibbonBox} pointerEvents="none">
+                    <View style={styles.soldRibbon}>
+                      <View style={styles.soldRibbonInner}>
+                        <Text style={styles.soldRibbonText}>SOLD OUT</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
 
                 {/* If locked preview: frosted overlay + members access card */}
-                {isScheduled && previewLocked ? (
+                {ticketLocked ? (
                   <View style={[StyleSheet.absoluteFill, { backgroundColor: FROST_OVERLAY, alignItems: 'center', justifyContent: 'center' }]}>
                     <View style={styles.lockedCardOverlay}>
                       <Text style={styles.lockedCardTitle}>
                         Members Get {earlyAccessMinutes} Minutes.{'\n'}
                         <Text style={{ color: '#3E2DC8' }}>Exclusive Access.</Text>
                       </Text>
-                      <Pressable
-                        onPress={() => {
-                          Haptics.selectionAsync();
-                          setPreviewLocked(false);
-                        }}
-                        style={styles.previewToggleBtn}
-                      >
-                        <Text style={styles.previewToggleText}>Tap to Preview Cars 👆</Text>
-                      </Pressable>
                     </View>
                     <Text style={styles.swipeToSeeMoreText}>Swipe to see more cars</Text>
                   </View>
@@ -596,49 +607,31 @@ export default function FlashSaleScreen() {
                   // Revealed mode photo contents (Images 5, 6, 7)
                   <>
                     {/* Top-left Amber Duration Badge */}
-                    <View style={styles.durationBadge}>
-                      <Text style={styles.durationBadgeText}>
-                        {durationLabel}
-                      </Text>
-                    </View>
-
-                    {/* Member Early Access Frosted Pill */}
-                    <View style={styles.earlyAccessOverlayPill}>
-                      <View style={styles.earlyAccessRow}>
-                        <Image
-                          source={require('@/assets/images/crown_deal.png')}
-                          style={styles.earlyAccessCrown}
-                          contentFit="contain"
-                        />
-                        <Text style={styles.earlyAccessWhiteText}>
-                          Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
-                        </Text>
+                    {!!durationLabel && (
+                      <View style={styles.durationBadge}>
+                        <Text style={styles.durationBadgeText}>{durationLabel}</Text>
                       </View>
-                      <Text style={styles.earlyAccessSub}>
-                        Unlock this offer {earlyAccessMinutes} minutes early with Membership.
-                      </Text>
-                    </View>
+                    )}
 
-                    {/* Carousel Dots */}
-                    <View style={styles.dotsRow}>
-                      {[0, 1, 2, 3].map((dotIdx) => (
-                        <View
-                          key={dotIdx}
-                          style={[styles.dot, dotIdx === (selectedCarIndex % 4) && styles.dotActive]}
-                        />
-                      ))}
-                    </View>
+                    {/* Frame 25: one dot per car in the sale (only when there is more than one), the shown car as a bar */}
+                    {displayCars.length > 1 && (
+                      <View style={styles.dotsRow}>
+                        {displayCars.map((c, dotIdx) => (
+                          <View key={String(c.id)} style={[styles.dot, dotIdx === selectedCarIndex && styles.dotActive]} />
+                        ))}
+                      </View>
+                    )}
                   </>
                 )}
               </View>
 
               {/* Bottom Details Section */}
-              {isScheduled && previewLocked ? (
+              {ticketLocked && opensMs > 0 ? (
                 // Locked times row (Images 3 & 4)
                 <View style={styles.lockedTimesRow}>
                   <View style={[styles.timeBox, styles.timeBoxGold]}>
                     <Text style={styles.timeBoxMain} numberOfLines={1}>
-                      {formatTime12(scheduledStartsMs - earlyAccessMinutes * 60000)} – {formatTime12(scheduledStartsMs)}
+                      {formatTime12(opensMs - earlyAccessMinutes * 60000)} – {formatTime12(opensMs)}
                     </Text>
                     <Text style={[styles.timeBoxSub, { color: '#E58900' }]} numberOfLines={1}>
                       Exclusive Member Access
@@ -646,7 +639,7 @@ export default function FlashSaleScreen() {
                   </View>
                   <View style={styles.timeBox}>
                     <Text style={styles.timeBoxMain} numberOfLines={1}>
-                      {formatTime12(scheduledStartsMs)} onwards
+                      {formatTime12(opensMs)} onwards
                     </Text>
                     <Text style={styles.timeBoxSub} numberOfLines={1}>
                       Open to Everyone
@@ -655,57 +648,81 @@ export default function FlashSaleScreen() {
                 </View>
               ) : (
                 // Revealed Vehicle Details (Images 5, 6, 7)
+                // Figma Frame 2147225778: 329 × 93 at (12, 256), #6152D8 5%, radius 8, padding 6, rows 6 apart.
                 <View style={styles.detailsContainer}>
-                  {/* Row 1: Car Name & Rating */}
+                  {/* Frame 2147225757: name + specs on the left, rating on the right (padding 0 4, 50 high) */}
                   <View style={styles.detailsRow1}>
-                    <Text style={styles.carTitle} numberOfLines={1}>
-                      {carDisplayName}
-                    </Text>
-
-                    <View style={styles.ratingCol}>
-                      <View style={styles.ratingBadge}>
-                        <Text style={styles.ratingNum}>
-                          {(activeCar.ratings?.averageRating || 4.2).toFixed(1)}
-                        </Text>
-                        <Text style={styles.ratingStar}> ★</Text>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={styles.carTitle} numberOfLines={1}>{carDisplayName}</Text>
+                      <View style={styles.specsRow}>
+                        {[
+                          activeCar.transmission,
+                          activeCar.fuel || activeCar.fuelType,
+                          activeCar.type === 'Bike' ? null : (parseInt(String(activeCar.seats ?? activeCar.seatingCapacity ?? ''), 10) ? `${parseInt(String(activeCar.seats ?? activeCar.seatingCapacity), 10)} Seater` : null),
+                        ].filter(Boolean).map((spec, i) => (
+                          <React.Fragment key={String(spec)}>
+                            {i > 0 && <View style={styles.specDot} />}
+                            <Text style={styles.specsText} numberOfLines={1}>{spec}</Text>
+                          </React.Fragment>
+                        ))}
                       </View>
-                      <Text style={styles.reviewCount}>
-                        ({activeCar.ratings?.reviewCount || 48} Reviews)
-                      </Text>
                     </View>
+
+                    {/* Only a real rating backed by real reviews */}
+                    {Number(activeCar.reviewCount ?? activeCar.ratings?.reviewCount) > 0 && Number(activeCar.rating ?? activeCar.ratings?.averageRating) > 0 && (
+                      <View style={styles.ratingCol}>
+                        <View style={styles.ratingBadge}>
+                          <Text style={styles.ratingNum}>{Number(activeCar.rating ?? activeCar.ratings?.averageRating).toFixed(1)}</Text>
+                          <View style={{ width: 14, height: 14 }}>
+                            <FsRatingStar width={10.8239} height={10.3534} style={{ position: 'absolute', left: 14 * 0.1134, top: 14 * 0.0958 }} />
+                          </View>
+                        </View>
+                        <Text style={styles.reviewCount}>({Number(activeCar.reviewCount ?? activeCar.ratings?.reviewCount)} Reviews)</Text>
+                      </View>
+                    )}
                   </View>
 
-                  {/* Row 2: Specs */}
-                  <Text style={styles.specsText} numberOfLines={1}>
-                    {[
-                      activeCar.transmission || 'Manual',
-                      activeCar.fuelType || 'Petrol',
-                      `${activeCar.seatingCapacity || 5} Seater`,
-                    ].join(' • ')}
-                  </Text>
-
-                  {/* Row 3: Deal Price + Original Struck Price + View Details */}
+                  {/* Frame 2147225762: price + struck price on the left, View Details on the right (padding 4, 25 high) */}
                   <View style={styles.detailsRow3}>
                     <View style={styles.priceRow}>
-                      <Text style={styles.dealPriceText}>
-                        {formatCurrency(dealPrice)}
-                      </Text>
-                      <Text style={styles.struckPriceText}>
-                        {formatCurrency(originalPrice)}
-                      </Text>
+                      {dealPrice != null && <Text style={styles.dealPriceText}>{formatCurrency(dealPrice)}</Text>}
+                      {dealPrice != null && originalPrice != null && originalPrice > dealPrice && (
+                        <Text style={styles.struckPriceText}>{formatCurrency(originalPrice)}</Text>
+                      )}
                     </View>
-
-                    <Pressable
-                      hitSlop={10}
-                      onPress={handleViewDetails}
-                      style={({ pressed }) => pressed && { opacity: 0.7 }}
-                    >
-                      <Text style={styles.viewDetailsText}>View Details &gt;</Text>
+                    <Pressable hitSlop={10} onPress={handleViewDetails} style={({ pressed }) => [styles.viewDetailsRow, pressed && { opacity: 0.7 }]}>
+                      <Text style={styles.viewDetailsText}>View Details</Text>
+                      <FsChevron width={13} height={13} />
                     </Pressable>
                   </View>
                 </View>
               )}
-            </View>
+              {/* Members-only right now (non-member): the car is shown under the Subtract frost, #595959 at 40% */}
+              {membersOnlyNow && <TicketShape fill="rgba(89, 89, 89, 0.4)" />}
+              {/* Subtract: the 1px #FBC422 outline, following the bites, drawn over everything in the ticket */}
+              <TicketShape stroke={GOLD} />
+              {/* Frame 2147226247: "Members get early access" pill + line, above the frost */}
+              {/* Frame 2147226248 pill: 250 × 39, gold 6% over a 10px blur, 1px #FBC422, fully rounded */}
+              {membersOnlyNow && (
+                      <View style={styles.earlyAccessPillWrap} pointerEvents="none">
+                        <View>
+                          <View style={styles.earlyAccessOverlayPill}>
+                            <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
+                            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(251, 196, 34, 0.06)' }]} />
+                            <Text style={styles.earlyAccessWhiteText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                              Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
+                            </Text>
+                          </View>
+                          {/* Crown (Figma Vector): 16.66 × 11.66 at (17.48, −12), tilted −24.98°, sitting on the pill's edge */}
+                          <PillCrown />
+                        </View>
+                        {/* 4 below the pill: how early, from the offer */}
+                        <Text style={styles.earlyAccessSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                          Unlock this offer {earlyAccessMinutes} minutes early with Membership.
+                        </Text>
+                      </View>
+              )}
+            </Animated.View>
 
             {/* Main CTA Button */}
             {isScheduled ? (
@@ -740,6 +757,21 @@ export default function FlashSaleScreen() {
                   </View>
                 </Pressable>
               )
+            ) : isLive && activeCar.booked ? (
+              // Sold out (Figma 1844:16246): red, nothing to tap
+              <View style={[styles.mainCtaBtn, styles.soldCta]} accessibilityRole="button" accessibilityState={{ disabled: true }}>
+                <Text style={[styles.mainCtaText, { color: '#FFFFFF' }]}>SOLD OUT</Text>
+              </View>
+            ) : membersOnlyNow ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }}
+                style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
+              >
+                <Text style={styles.mainCtaText}>Buy Membership to</Text>
+                <FsLock width={20} height={20} />
+                <Text style={styles.mainCtaText}>Unlock</Text>
+              </Pressable>
             ) : isLive && !canBook ? (
               // Live Early Access Window for non-member (Image 6)
               <Pressable
@@ -760,77 +792,52 @@ export default function FlashSaleScreen() {
               // Live Open to Member / Everyone -> BOOK NOW (Image 7)
               <Pressable
                 accessibilityRole="button"
-                onPress={handleBookNow}
+                onPress={() => handleBookNow()}
                 style={({ pressed }) => [styles.mainCtaBtn, pressed && { opacity: 0.9 }]}
               >
-                <Text style={[styles.mainCtaText, styles.bookNowText]}>BOOK NOW</Text>
+                <Text style={[styles.mainCtaText, styles.bookNowText]}>{booking ? 'PLEASE WAIT…' : 'BOOK NOW'}</Text>
               </Pressable>
             )}
           </View>
 
-          {/* Interactive Bottom Arc with 5 Circular Thumbnails */}
-          <View style={styles.arcWrap}>
-            <Svg width={SCREEN_WIDTH} height={120} style={StyleSheet.absoluteFill} pointerEvents="none">
-              <Ellipse
-                cx={SCREEN_WIDTH / 2}
-                cy={150}
-                rx={SCREEN_WIDTH * 0.46}
-                ry={110}
-                stroke="rgba(255,255,255,0.4)"
-                strokeWidth={1}
-                strokeDasharray="6 6"
-                fill="none"
-              />
+          {/* Frame 2147226241 (312 × 86, Figma top 675): the sale's cars on a dashed arc — the shown car in the middle
+              (52, white 2px ring, crown), its neighbours either side (44, ring 90%), the next ones at the ends (40,
+              ring 80%). Before the sale opens they are frosted with a gold ring instead (Ellipse 17/18/19). */}
+          <View style={[styles.arcWrap, { marginBottom: Math.max(0, 91 - 16 - insets.bottom) }]}>
+            <Svg width={712} height={300} style={{ position: 'absolute', left: -200, top: 35 }} pointerEvents="none">
+              <Ellipse cx={356} cy={150} rx={355.5} ry={149.5} stroke="rgba(255,255,255,0.4)" strokeWidth={1} strokeDasharray="6 6" fill="none" />
             </Svg>
-
-            <View style={styles.arcThumbnailsRow}>
-              {displayCars.map((car, idx) => {
-                const isSelected = idx === selectedCarIndex;
-                const uri = getCarImage(car, idx);
-
-                const size = isSelected ? 56 : idx === 1 || idx === 3 ? 46 : 40;
-                const ring = size + (isSelected ? 4 : 2);
-
-                return (
-                  <Pressable
-                    key={String(car.id || car._id || idx)}
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      setSelectedCarIndex(idx);
-                      if (previewLocked && !isScheduled) setPreviewLocked(false);
-                    }}
-                    style={[
-                      styles.arcThumbBtn,
-                      { width: ring, height: ring, borderRadius: ring / 2 },
-                      isSelected && styles.arcThumbActive,
-                    ]}
-                  >
-                    <Image
-                      source={{ uri }}
-                      style={StyleSheet.absoluteFill}
-                      contentFit="cover"
-                      blurRadius={isScheduled && previewLocked ? 12 : 0}
-                      transition={150}
-                    />
-                    {isScheduled && previewLocked && (
-                      <View style={[StyleSheet.absoluteFill, { backgroundColor: FROST_OVERLAY }]} />
-                    )}
-
-                    {/* Floating Gold Crown on selected thumbnail */}
-                    {isSelected && (
-                      <Image
-                        source={require('@/assets/images/crown_deal.png')}
-                        style={styles.crownDealIcon}
-                        contentFit="contain"
-                      />
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
+            {ARC_SLOTS.slice(0, displayCars.length).map((slot) => {
+              const n = displayCars.length;
+              const idx = (((selectedCarIndex + slot.offset) % n) + n) % n;
+              const car = displayCars[idx];
+              const locked = ticketLocked;
+              return (
+                <Pressable
+                  key={slot.offset}
+                  accessibilityRole="button"
+                  accessibilityLabel={slot.offset === 0 ? 'Car shown' : 'Show this car'}
+                  onPress={() => { if (slot.offset !== 0) { Haptics.selectionAsync(); setSelectedCarIndex(idx); } }}
+                  style={[
+                    styles.arcThumb,
+                    { left: slot.left, top: slot.top, width: slot.size, height: slot.size, borderRadius: slot.size / 2 },
+                    locked ? { borderWidth: 1, borderColor: GOLD } : { borderWidth: 2, borderColor: slot.ring },
+                  ]}
+                >
+                  <Image source={getCarImage(car, idx)} style={StyleSheet.absoluteFill} contentFit="cover" blurRadius={locked ? 12 : 0} transition={150} />
+                  {locked && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(89, 89, 89, 0.32)' }]} />}
+                </Pressable>
+              );
+            })}
+            {displayCars.length > 0 && <PillCrown left={128} top={2} />}
           </View>
         </View>
       )}
+      <LoginBottomSheet
+        visible={showLogin}
+        onClose={() => setShowLogin(false)}
+        onLoginSuccess={() => { setShowLogin(false); handleBookNow(true); }}
+      />
     </View>
   );
 }
@@ -854,61 +861,30 @@ const styles = StyleSheet.create({
   },
 
   /* Live header with ticking countdown timer (Images 6 & 7) */
+  // Frame 2147226221: 361 × 92.42 row, centred, 8 between the title and the timer. Figma top 86 = 27 under a 59
+  // status bar; the 44-high back row sits above it here, so it moves up 17 to keep that 86.
   liveHeaderWrap: {
-    width: 353,
+    width: 361,
+    maxWidth: '100%',
+    height: 92.42,
     alignSelf: 'center',
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 4,
-    marginTop: 2,
-    marginBottom: 8,
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: -17,
   },
   liveTitleCol: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  liveTimerCol: {
-    alignItems: 'center',
-  },
-  endsInLabel: {
-    fontFamily: FONT,
-    fontSize: 12,
-    color: '#FFFFFF',
-    letterSpacing: 0.8,
-    marginBottom: 4,
-  },
-  timerRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  timerUnit: {
-    alignItems: 'center',
-  },
-  timerBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  timerNum: {
-    fontFamily: FONT,
-    fontSize: 19,
-    color: '#3E2DC8',
-  },
-  timerUnitText: {
-    fontFamily: FONT_SEMI,
-    fontSize: 10,
-    color: '#FFFFFF',
-    marginTop: 3,
-  },
+  liveTimerCol: { alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  endsInLabel: { fontFamily: FONT, fontSize: 11.872, lineHeight: 17.8, color: '#FFFFFF', textAlign: 'center' },
+  timerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 11.872 },
+  timerUnit: { alignItems: 'center' },
+  timerBox: { width: 40.07, paddingVertical: 5.936, borderRadius: 8.904, borderWidth: 1.484, borderColor: '#FF008B', backgroundColor: '#FFFBF0', alignItems: 'center', justifyContent: 'center' },
+  timerNum: { fontFamily: FONT_SEMI, fontSize: 16.325, lineHeight: 24.5, color: '#6152D8', textAlign: 'center', includeFontPadding: false },
+  timerUnitText: { fontFamily: FONT_SEMI, fontSize: 11.872, lineHeight: 17.8, color: '#FFFFFF', textAlign: 'center' },
 
   /* Coming Soon Screen (Images 1 & 2) */
   centerComingSoon: {
@@ -957,124 +933,65 @@ const styles = StyleSheet.create({
     width: 353,
     marginTop: 10,
   },
+  // Shape, fill and outline are drawn by TicketShape (the bites can't be cut out of a plain rounded box).
   ticketCard: {
     width: 353,
-    height: 360,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: GOLD,
-    backgroundColor: '#FEFDF0',
-    overflow: 'hidden',
+    height: 361,
   },
-  notch: {
-    position: 'absolute',
-    top: 226,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: BG,
-    borderWidth: 1,
-    borderColor: GOLD,
-    zIndex: 2,
-  },
-  dashedDivider: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    top: 240,
-    borderTopWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(107,90,237,0.5)',
-    zIndex: 1,
-  },
+  dashedDivider: { position: 'absolute', left: 16.5, top: 239, zIndex: 1 },
 
   /* Photo inside ticket */
-  photoContainer: {
-    position: 'absolute',
-    left: 12,
-    top: 12,
-    width: 329,
-    height: 216,
-    borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-  },
-  durationBadge: {
-    position: 'absolute',
-    left: 10,
-    top: 10,
-    backgroundColor: GOLD_AMBER,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    zIndex: 3,
-  },
-  durationBadgeText: {
-    fontFamily: FONT,
-    fontSize: 12,
-    color: '#262626',
-  },
+  photoContainer: { position: 'absolute', left: 12, top: 12, width: 329, height: 212, borderRadius: 8, overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  durationBadge: { position: 'absolute', left: 6, top: 6, height: 28, paddingHorizontal: 10, borderRadius: 20, backgroundColor: '#FBC422', alignItems: 'center', justifyContent: 'center', zIndex: 3 },
+  durationBadgeText: { fontFamily: FONT_SEMI, fontSize: 11, lineHeight: 16.5, color: '#3D0700', includeFontPadding: false },
+  // Frame 2147226247: 269 × 60, pill + line 4 apart, centred; top = 50% − 30 − 23 of the 361 ticket = 127.5.
+  // Figma 1724:14343: #FEFDF0, 1px #FBC422, radius 12, padding 8, 4 between text and lock.
+  memberCta: { flexDirection: 'row', gap: 4, backgroundColor: '#FEFDF0', borderWidth: 1 },
+  // Sold out ribbon: a 181.39 × 159.42 box at (195.81, −43.15) on the photo; the 206-wide band is centred in it and
+  // rotated 39.76° — #EC2526 with 3 above and below, inside it #EA2626 with a 1px white border, "SOLD OUT" 17 semibold.
+  soldRibbonBox: { position: 'absolute', left: 195.81, top: -43.15, width: 181.389, height: 159.418, alignItems: 'center', justifyContent: 'center' },
+  soldRibbon: { width: 206, paddingVertical: 3, backgroundColor: '#EC2526', transform: [{ rotate: '39.76deg' }] },
+  soldRibbonInner: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10, paddingVertical: 1, backgroundColor: '#EA2626', borderWidth: 1, borderColor: '#FFFFFF' },
+  soldRibbonText: { fontFamily: FONT_SEMI, fontSize: 17, lineHeight: 25.5, color: '#FFFFFF', includeFontPadding: false },
+  // Sold out button (Figma 1844:16246): #EA2626, 1px #F5F5F5, white "SOLD OUT".
+  soldCta: { backgroundColor: '#EA2626', borderColor: '#F5F5F5' },
+  earlyAccessPillWrap: { position: 'absolute', left: 0, right: 0, top: 127.5, alignItems: 'center', gap: 4 },
   earlyAccessOverlayPill: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 22,
-    backgroundColor: 'rgba(28, 28, 30, 0.86)',
-    borderWidth: 1,
-    borderColor: 'rgba(251, 196, 34, 0.65)',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-  },
-  earlyAccessRow: {
+    width: 250,
+    height: 39,
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  earlyAccessCrown: {
-    width: 16,
-    height: 16,
-    marginRight: 6,
-    transform: [{ rotate: '-18deg' }],
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: GOLD,
+    borderRadius: 50,
+    overflow: 'hidden',
   },
   earlyAccessWhiteText: {
     fontFamily: FONT,
-    fontSize: 13,
+    fontSize: 17,
+    lineHeight: 21,
     color: '#FFFFFF',
+    includeFontPadding: false,
   },
   earlyAccessGoldText: {
     fontFamily: FONT,
-    color: GOLD_AMBER,
+    color: GOLD,
   },
   earlyAccessSub: {
+    width: 269,
     fontFamily: FONT_MED,
-    fontSize: 10.5,
+    fontSize: 11,
+    lineHeight: 16.5,
     color: '#FFFFFF',
-    marginTop: 2,
     textAlign: 'center',
   },
-  dotsRow: {
-    position: 'absolute',
-    bottom: 8,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 4,
-  },
-  dot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  dotActive: {
-    width: 18,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#FFFFFF',
-  },
+  dotsRow: { position: 'absolute', bottom: 6, left: 0, right: 0, height: 4, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5 },
+  dot: { width: 4, height: 4, borderRadius: 20, backgroundColor: '#D4D4D4' },
+  dotActive: { width: 16, height: 4, borderRadius: 20, backgroundColor: '#FFFFFF' },
 
   /* Locked overlay card (Images 3 & 4) */
   lockedCardOverlay: {
@@ -1160,112 +1077,32 @@ const styles = StyleSheet.create({
   },
 
   /* Revealed vehicle details (Images 5, 6, 7) */
-  detailsContainer: {
-    position: 'absolute',
-    left: 14,
-    right: 14,
-    bottom: 10,
-    height: 104,
-    justifyContent: 'space-between',
-  },
-  detailsRow1: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  carTitle: {
-    fontFamily: FONT,
-    fontSize: 18,
-    color: '#1E1E1E',
-    flex: 1,
-    marginRight: 8,
-  },
-  ratingCol: {
-    alignItems: 'flex-end',
-  },
-  ratingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#24366A',
-    paddingHorizontal: 8,
-    paddingVertical: 2.5,
-    borderRadius: 10,
-  },
-  ratingNum: {
-    fontFamily: FONT,
-    fontSize: 12,
-    color: '#FFFFFF',
-  },
+  detailsContainer: { position: 'absolute', left: 12, top: 256, width: 329, height: 93, padding: 6, gap: 6, borderRadius: 8, backgroundColor: 'rgba(97, 82, 216, 0.05)' },
+  detailsRow1: { height: 50, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 },
+  carTitle: { fontFamily: FONT_SEMI, fontSize: 17, lineHeight: 25.5, color: '#262626', includeFontPadding: false },
+  ratingCol: { width: 67, alignItems: 'center', gap: 4 },
+  ratingBadge: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 4, paddingBottom: 4, paddingLeft: 10, paddingRight: 9, borderRadius: 20, backgroundColor: '#2F3E75' },
+  ratingNum: { fontFamily: FONT_SEMI, fontSize: 13, lineHeight: 19.5, color: '#FFFFFF', includeFontPadding: false },
   ratingStar: {
     fontFamily: FONT,
     fontSize: 11,
     color: GOLD_AMBER,
   },
-  reviewCount: {
-    fontFamily: FONT_MED,
-    fontSize: 10,
-    color: '#737373',
-    marginTop: 2,
-  },
-  specsText: {
-    fontFamily: FONT_MED,
-    fontSize: 12.5,
-    color: '#737373',
-  },
-  detailsRow3: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  dealPriceText: {
-    fontFamily: FONT,
-    fontSize: 22,
-    color: '#1E1E1E',
-  },
-  struckPriceText: {
-    fontFamily: FONT_MED,
-    fontSize: 13,
-    color: '#8E8E93',
-    textDecorationLine: 'line-through',
-    marginLeft: 8,
-  },
-  viewDetailsText: {
-    fontFamily: FONT_SEMI,
-    fontSize: 13,
-    color: '#737373',
-  },
+  reviewCount: { fontFamily: FONT_MED, fontSize: 11, lineHeight: 16.5, color: '#525252' },
+  specsText: { fontFamily: FONT_MED, fontSize: 13, lineHeight: 19.5, color: '#737373', flexShrink: 1 },
+  specsRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  specDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#737373' },
+  viewDetailsRow: { flexDirection: 'row', alignItems: 'center' },
+  detailsRow3: { height: 25, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 4, gap: 8 },
+  priceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
+  dealPriceText: { fontFamily: FONT_SEMI, fontSize: 19, lineHeight: 24, color: '#262626', includeFontPadding: false },
+  struckPriceText: { fontFamily: FONT_MED, fontSize: 13, lineHeight: 16, color: '#737373', textDecorationLine: 'line-through', marginBottom: 2 },
+  viewDetailsText: { fontFamily: FONT_SEMI, fontSize: 11, lineHeight: 16.5, color: '#737373', textDecorationLine: 'underline' },
 
   /* Main CTA Button */
-  mainCtaBtn: {
-    width: 353,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: GOLD,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginTop: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 3 },
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  mainCtaText: {
-    fontFamily: FONT,
-    fontSize: 16,
-    color: '#3E2DC8',
-  },
-  bookNowText: {
-    fontSize: 17,
-    letterSpacing: 0.6,
-  },
+  mainCtaBtn: { width: 353, height: 46, borderRadius: 12, backgroundColor: '#F4F6FA', borderWidth: 1, borderColor: GOLD, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 12, padding: 8 },
+  mainCtaText: { fontFamily: FONT, fontSize: 17, lineHeight: 25.5, color: '#3E2DC8', textAlign: 'center' },
+  bookNowText: {},
   ctaLockRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1276,36 +1113,8 @@ const styles = StyleSheet.create({
   },
 
   /* Bottom Arc with 5 Circular Thumbnails */
-  arcWrap: {
-    alignSelf: 'center',
-    width: SCREEN_WIDTH,
-    height: 105,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arcThumbnailsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    paddingTop: 10,
-  },
-  arcThumbBtn: {
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: GOLD,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 3,
-  },
-  arcThumbActive: {
-    borderWidth: 2,
-    borderColor: GOLD_AMBER,
-    shadowOpacity: 0.35,
-    shadowRadius: 5,
-  },
+  arcThumb: { position: 'absolute', overflow: 'hidden', backgroundColor: '#FFFFFF' },
+  arcWrap: { alignSelf: 'center', width: 312, height: 86 },
   crownDealIcon: {
     position: 'absolute',
     top: -3,

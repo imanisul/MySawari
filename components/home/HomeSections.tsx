@@ -15,7 +15,8 @@ import BenefitCards from './BenefitCards';
 import { formatCurrency, memberDayPrice, type QuoteParams } from '@/services/backend/pricingEngine';
 import { offersQueryOptions, isOfferLive } from '@/services/api/offers';
 import type { RecentSearch } from '@/utils/recentSearches';
-import { Car, carTitle, getAvailability, bestFor } from '@/utils/sawari';
+import { Car, carTitle, getAvailability, bestFor, splitDateRange } from '@/utils/sawari';
+import { useSawari } from '@/context/SawariContext';
 import { SOCIAL_LINKS } from '@/constants/social';
 import { openStorePage } from '@/services/rateApp';
 import LowestPriceIcon from '@/assets/images/benefit_lowest_price.png';
@@ -445,7 +446,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
             <Text style={styles.city}>{city}</Text>
             <Feather name="chevron-right" size={15} color="#FFFFFF" />
           </Pressable>
-          <Text style={styles.brandLine} numberOfLines={1} ellipsizeMode="tail">MySawari - Self Drive Car Rental Guwahati, Ganesh Turning, Bongshar, Kahilipara, Guwahati, Assam 781019</Text>
+          <Text style={styles.brandLine} numberOfLines={1} ellipsizeMode="tail">Kahilipara</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -866,9 +867,19 @@ export function HomeSearchCard({ vehicleType, onType, onDates }: {
 }
 
 /** A trip the customer searched (where, which dates, what time), MakeMyTrip style: tap to resume or search again. */
-export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSearch; onPress: () => void; onRemove?: () => void }) {
+export function TripSearchCard({ search, car, onPress, onRemove, onViewDetails }: {
+  search: RecentSearch;
+  /** The searched car, when the search was for one car: its availability for those dates is shown. */
+  car?: Car & { availability?: any; isAvailable?: boolean };
+  onPress: () => void;
+  onRemove?: () => void;
+  onViewDetails?: () => void;
+}) {
   const p = useDetailsPalette();
   const time = search.pickupTime && search.returnTime ? `${search.pickupTime} – ${search.returnTime}` : '';
+  // For a car search that is free for the searched dates and times: "View Details" (nothing when it is not).
+  const [startLabel, endLabel] = car && search.dateRange && search.dateRange !== 'Upcoming Trip' ? splitDateRange(search.dateRange) : ['', ''];
+  const availability = car ? getAvailability(car, startLabel || undefined, endLabel || undefined, search.pickupTime, search.returnTime) : null;
 
   return (
     <Pressable
@@ -882,7 +893,9 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
       ]}
     >
       <View style={{ flex: 1 }}>
-        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{search.dropoff.name}</Text>
+        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+          {car ? (search.carName || carTitle(car)) : search.dropoff.name}
+        </Text>
         <View style={styles.tripLine}>
           <Feather name="calendar" size={11} color={p.muted} />
           <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{search.dateRange}</Text>
@@ -892,6 +905,18 @@ export function TripSearchCard({ search, onPress, onRemove }: { search: RecentSe
             <Feather name="clock" size={11} color={p.muted} />
             <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{time}</Text>
           </View>
+        )}
+        {availability?.available && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`View details of ${search.carName || carTitle(car!)}`}
+            hitSlop={8}
+            onPress={() => { Haptics.selectionAsync(); (onViewDetails || onPress)(); }}
+            style={({ pressed }) => [styles.tripStatus, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={[styles.tripViewDetails, { color: p.muted }]}>View Details</Text>
+            <Feather name="chevron-right" size={12} color={p.muted} />
+          </Pressable>
         )}
       </View>
       {onRemove ? (
@@ -1040,11 +1065,12 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
           </View>
           {/* Availability line */}
           <Text style={[styles.pickAvail, { color: (available || availability.availableToday || availability.nextAvailableFrom) && availability.reason !== 'service' ? AVAILABLE_GREEN : p.red }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-              {availability.availableWindowLabel || (available
-                ? (availability.headline || 'Available now')
+              {/* Dates only, never hours ("Available Today, 4 PM – 8 PM" was too much on a small card) */}
+              {available
+                ? 'Available now'
                 : availability.nextAvailableFrom
                   ? `Available on ${cardDate(availability.nextAvailableFrom)}`
-                  : availability.headline)}
+                  : availability.headline}
           </Text>
         </View>
       </View>
@@ -1066,6 +1092,7 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
   onPress: () => void;
 }) {
   const p = useDetailsPalette();
+  const { isDarkMode: dark } = useSawari();
   const done = Math.min(rides, target);
   // Figma: an invisible stop at the start, then 1, 2, 3 and the coin, spaced evenly across the 335 bar
   // (centres at 76.5, 160, 243.5 and 327 → % of the bar). Stops are trip counts; the fill runs from 0 trips.
@@ -1085,7 +1112,8 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
       accessibilityRole="button"
       accessibilityLabel={`Complete ${target} trips, get up to ${formatCurrency(reward)} rewards. ${done} of ${target} completed.`}
       onPress={onPress}
-      style={[styles.milestone, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }]}
+      // Figma "Membership" card: #EFEDFD fill, 1px #D1CCF9 border (dark mode keeps the palette's dark card).
+      style={[styles.milestone, dark ? { backgroundColor: p.purpleBg, borderColor: p.memberBorder } : { backgroundColor: '#EFEDFD', borderColor: '#D1CCF9' }]}
     >
       <Image source={require('@/assets/images/MySawari_nobg.png')} style={styles.milestoneLogo} resizeMode="contain" />
       <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} trips, earn {formatCurrency(reward)} off</Text>
@@ -1550,6 +1578,9 @@ const styles = StyleSheet.create({
   tripWhere: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   tripWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   tripLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  // Recent car search: "View Details ›" when free for the searched dates.
+  tripStatus: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
+  tripViewDetails: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, textDecorationLine: 'underline' },
 
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },

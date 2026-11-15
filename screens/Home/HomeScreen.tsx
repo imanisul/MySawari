@@ -274,6 +274,17 @@ export default function HomeScreen() {
     router.push('/search');
   }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, router]);
 
+  // A recent search for one car that is free for its dates: that car's page with the searched trip filled in.
+  const openSearchedCar = useCallback((t: RecentSearch, car: any) => {
+    setBookingSource('home');
+    selectCar(car);
+    prefetchCarGallery(car);
+    if (t.dropoff) setDropoff(t.dropoff);
+    if (t.dateRange && t.duration && t.dateRange !== 'Upcoming Trip') setDates(t.dateRange, t.duration);
+    if (t.pickupTime && t.returnTime) setTimes(t.pickupTime, t.returnTime);
+    router.push('/car-details');
+  }, [setBookingSource, selectCar, setDropoff, setDates, setTimes, router]);
+
   const openPick = useCallback((item: any) => {
     selectCar(item);
     prefetchCarGallery(item);
@@ -478,7 +489,18 @@ export default function HomeScreen() {
               data={tripSearches}
               horizontal
               keyExtractor={(t) => `trip-${t.id}`}
-              renderItem={({ item: t }) => <TripSearchCard search={t} onPress={() => openTripSearch(t)} onRemove={() => removeTripSearch(t.id)} />}
+              renderItem={({ item: t }) => {
+                const car = t.carId ? fetchedVehicles.find((v) => String(v.id) === String(t.carId)) : undefined;
+                return (
+                  <TripSearchCard
+                    search={t}
+                    car={car}
+                    onPress={() => openTripSearch(t)}
+                    onRemove={() => removeTripSearch(t.id)}
+                    onViewDetails={car ? () => openSearchedCar(t, car) : undefined}
+                  />
+                );
+              }}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={[styles.row, { gap: 8 }]}
               snapToInterval={254}
@@ -548,7 +570,7 @@ export default function HomeScreen() {
     if (!content) return null;
     // Figma: 16px gap between every block.
     return <Reveal delay={Math.min(index, 6) * 40}><View style={{ marginTop: 16 }}>{content}</View></Reveal>;
-  }, [p, isDarkMode, insets.top, city, dateRange, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openPick, vehiclesLoading, showRecent, fromRate, milestone, journey, claimable, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, city, dateRange, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openSearchedCar, fetchedVehicles, openPick, vehiclesLoading, showRecent, fromRate, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>

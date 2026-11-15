@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { Animated, Dimensions, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager, Alert } from 'react-native';
+import { Animated, Dimensions, Easing, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager, Alert } from 'react-native';
 import * as Haptics from '@/utils/haptics';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,6 +68,7 @@ export default function CarDetailsScreen() {
     isFixedDates?: string;
     lockDates?: string;
     isTopDeal?: string;
+    allowExtend?: string;
     dealPrice?: string;
     hourlyPrice?: string;
     rentalHours?: string;
@@ -161,11 +162,23 @@ export default function CarDetailsScreen() {
   const tripPrice = useTripPrice(hasTrip);
   const tripDays = hasTrip ? Math.max(1, parseInt(duration, 10) || requestedEnd! - requestedStart!) : 1;
   // "Add 1 day" (Figma card): only on a 1-day trip with free dates; 2+ days are already unlimited km.
-  const canAddDay = hasTrip && tripDays === 1 && !isDatesLocked;
+  // From the Flash Sale (allowExtend) a locked deal trip can still get more days; the server prices the longer trip.
+  const canAddDay = hasTrip && tripDays === 1 && (!isDatesLocked || params.allowExtend === 'true');
   const addOneDay = () => {
     if (requestedStart === null || requestedEnd === null) return;
     const end = requestedEnd + 1;
     setDates(`${dayNumToLabel(requestedStart)} – ${dayNumToLabel(end)}`, `${tripDays + 1} Days`);
+  };
+  // "Add more days" (floating card): if the car is also free the day after, add it, then open this car's calendar
+  // with the longer trip selected so more days can be picked (the calendar only lets free days be chosen).
+  const addMoreDays = () => {
+    if (requestedStart === null || requestedEnd === null || !selectedCar) return;
+    Haptics.selectionAsync();
+    const nextEnd = dayNumToLabel(requestedEnd + 1);
+    if (getAvailability(selectedCar, dayNumToLabel(requestedStart), nextEnd, pickupTime, returnTime).available) {
+      setDates(`${dayNumToLabel(requestedStart)} – ${nextEnd}`, `${tripDays + 1} Days`);
+    }
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
   const freeCancelUntil = requestedStart !== null ? `${dayNumToLabel(requestedStart - 1)}, ${pickupTime}` : null;
 
@@ -184,12 +197,20 @@ export default function CarDetailsScreen() {
   const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
   const [agreed, setAgreed] = useState(true); // pre-ticked; the customer can untick it
   const [barHeight, setBarHeight] = useState(165 + Math.max(insets.bottom, 12));
-  // "Want to keep it longer?" floats above the bar (fading in) once the Policy Agreement scrolls into view.
+  // "Want to keep it longer?" floats above the bar once the in-page "Need more time on the road?" card has scrolled
+  // up out of view, and goes away again at the Policy Agreement (and when scrolling back up to that card).
   const [floatAddDay, setFloatAddDay] = useState(false);
   const policyTop = useRef(0);
+  const mileageEnd = useRef(0);
   const floatFade = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(floatFade, { toValue: floatAddDay ? 1 : 0, duration: 220, useNativeDriver: true }).start();
+    // Rises 16px while it fades in, sinks while it fades out — one smooth native-driven motion.
+    Animated.timing(floatFade, {
+      toValue: floatAddDay ? 1 : 0,
+      duration: floatAddDay ? 260 : 200,
+      easing: floatAddDay ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
   }, [floatAddDay, floatFade]);
 
   const openDates = () => {
@@ -307,8 +328,11 @@ export default function CarDetailsScreen() {
   };
 
   const onScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const seen = policyTop.current > 0 && e.nativeEvent.contentOffset.y + e.nativeEvent.layoutMeasurement.height >= policyTop.current + 24;
-    if (seen !== floatAddDay) setFloatAddDay(seen);
+    const y = e.nativeEvent.contentOffset.y;
+    const pastCard = mileageEnd.current > 0 && y > mileageEnd.current - pillsHeight.current;
+    const reached = policyTop.current > 0 && y + e.nativeEvent.layoutMeasurement.height >= policyTop.current + 24;
+    const show = pastCard && !reached;
+    if (show !== floatAddDay) setFloatAddDay(show);
     if (Date.now() < jumpingUntil.current) return;
     const line = e.nativeEvent.contentOffset.y + pillsHeight.current + 24;
     let next: SectionKey = 'overview';
@@ -405,7 +429,9 @@ export default function CarDetailsScreen() {
           <DriverCard />
           <View style={{ height: 8 }} />
 
-          <MileageLimits onAddDay={canAddDay ? addOneDay : undefined} />
+          <View onLayout={(e) => { mileageEnd.current = e.nativeEvent.layout.y + e.nativeEvent.layout.height; }}>
+            <MileageLimits onAddDay={canAddDay ? addOneDay : undefined} />
+          </View>
           <View style={{ height: 8 }} />
         </View>
 
@@ -452,14 +478,14 @@ export default function CarDetailsScreen() {
 
       {/* Figma "Add 1 more day": 297 × 45 floating card above the bottom bar */}
       {canAddDay && (
-        <Animated.View pointerEvents={floatAddDay ? 'box-none' : 'none'} style={[styles.floatWrap, { bottom: barHeight + 8, opacity: floatFade }]}>
+        <Animated.View pointerEvents={floatAddDay ? 'box-none' : 'none'} style={[styles.floatWrap, { bottom: barHeight + 8, opacity: floatFade, transform: [{ translateY: floatFade.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
           <View style={[styles.floatCard, { borderColor: p.deliveryBorder }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.floatTitle, { color: p.fg }]} numberOfLines={1}>Want to keep it longer?</Text>
               <Text style={[styles.floatSub, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Extend your booking at {formatCurrency(selectedCar.perDay)}/day.</Text>
             </View>
             <Pressable
-              onPress={() => { Haptics.selectionAsync(); addOneDay(); }}
+              onPress={addMoreDays}
               accessibilityRole="button"
               accessibilityLabel="Add more days"
               style={({ pressed }) => [styles.floatBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}

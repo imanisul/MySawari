@@ -1968,6 +1968,15 @@ export const API = {
   },
 
   /**
+   * Eagerly wakes up the backend on app start / auth sheet open so customer encounters 0ms cold starts
+   */
+  warmUpBackend() {
+    try {
+      fetch(`${BASE_URL}/health`, { method: 'GET' }).catch(() => {});
+    } catch {}
+  },
+
+  /**
    * POST /api/auth/send-otp
    */
   async sendOtp(mobile: string, deviceId?: string) {

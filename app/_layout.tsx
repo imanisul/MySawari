@@ -47,6 +47,9 @@ import { preloadFlashScreenConfig } from '@/services/api/flashScreen';
 // Pre-hydrate flash screen settings immediately so only the PROPER ONE ever appears
 preloadFlashScreenConfig().catch(() => {});
 
+// Eagerly pre-warm backend on launch so OTP and API requests have 0ms cold-start latency
+API.warmUpBackend();
+
 // The native splash is the only splash. It stays up until the first usable screen is ready (see AppGate).
 SplashScreen.preventAutoHideAsync().catch(() => {});
 

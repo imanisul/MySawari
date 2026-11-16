@@ -301,7 +301,7 @@ export function BottomNavigation() {
                 <View style={styles.iconWrapper}>
                   <Icon color={color} fill={isDarkMode ? colors.card : '#FFFFFF'} active={active} />
                   {!!badge && (
-                    <View pointerEvents="none" style={styles.badge}>
+                    <View pointerEvents="none" style={[styles.badge, { backgroundColor: active ? '#FF008B' : '#6B5AED' }]}>
                       <Text style={styles.badgeText} allowFontScaling={false}>{badge}</Text>
                     </View>
                   )}

@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, AppState, BackHandler, Dimensions, Easing, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, AppState, BackHandler, Dimensions, Easing, Keyboard, LayoutAnimation, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -179,6 +179,7 @@ export function LoginBottomSheet({
 
   // Fresh sheet every time it opens.
   useEffect(() => {
+    API.warmUpBackend();
     if (!visible) return;
     setStep('phone'); setMobile(''); setOtp(''); setOtpId(null); setIsExisting(false);
     setName(''); setEmail(''); setReferral(''); setConfirmed(false);
@@ -744,10 +745,28 @@ export function LoginBottomSheet({
                   <Feather name="x" size={20} color={ui.copy} />
                 </Pressable>)}
               </View>
-              <Text style={[styles.small, styles.center, { color: ui.copy }]}>
-                Enter the 6-digit code sent to WhatsApp{'\n'}{masked(mobile)} ·{' '}
-                <Text style={{ color: ui.navy, fontFamily: 'PlusJakartaSans_600SemiBold' }} onPress={back} accessibilityRole="button">Change</Text>
-              </Text>
+
+              <View style={[styles.waNoticeCard, { backgroundColor: isDarkMode ? '#064E3B28' : '#F0FDF4', borderColor: isDarkMode ? '#05966950' : '#BBF7D0' }]}>
+                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={[styles.waNoticeTitle, { color: isDarkMode ? '#34D399' : '#15803D' }]}>Code sent to your WhatsApp</Text>
+                  <Text style={[styles.waNoticeSub, { color: isDarkMode ? '#A7F3D0' : '#166534' }]}>{masked(mobile)}</Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => {});
+                    Linking.openURL('whatsapp://app').catch(() => {
+                      Linking.openURL(`https://wa.me/91${mobile}`).catch(() => {});
+                    });
+                  }}
+                  style={[styles.waOpenBtn, { backgroundColor: '#25D366' }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open WhatsApp"
+                >
+                  <Text style={styles.waOpenBtnText}>Open</Text>
+                  <Feather name="arrow-up-right" size={13} color="#FFFFFF" />
+                </Pressable>
+              </View>
               {detectedClipOtp && otp !== detectedClipOtp && (
                 <Pressable
                   onPress={() => {
@@ -1106,6 +1125,38 @@ const styles = StyleSheet.create({
   detectedOtpText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 12,
+  },
+  waNoticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: -2,
+    marginBottom: 4,
+  },
+  waNoticeTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 13,
+  },
+  waNoticeSub: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 11.5,
+  },
+  waOpenBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  waOpenBtnText: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 12,
+    color: '#FFFFFF',
   },
 
   // Navi referral card (Step 3)

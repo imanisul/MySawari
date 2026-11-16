@@ -1,0 +1,6 @@
+appId: com.anisul17.mysawari
+---
+- launchApp
+- assertVisible: "Home"
+- assertVisible: "Profile"
+- assertVisible: "Search for a vehicle"

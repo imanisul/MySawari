@@ -1,6 +1,6 @@
 import React from 'react';
-import { PlannerSheet } from '@/components';
+import { Redirect } from 'expo-router';
 
-export default function PlannerScreen() {
-  return <PlannerSheet />;
+export default function Route() {
+  return <Redirect href="/" />;
 }

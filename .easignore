@@ -1,2 +1,10 @@
 node_modules/
-package-lock.json
+mysawari_customer_backend/
+build-artifacts/
+dist/
+web-build/
+.expo/
+graphify-out/
+docs/
+.claude/
+.git/

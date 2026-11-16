@@ -1,6 +1,6 @@
 import React from 'react';
-import { DriverChargesSheet } from '@/components';
+import DriverChargesScreen from '@/screens/Booking/DriverChargesScreen';
 
-export default function DriverChargesScreen() {
-  return <DriverChargesSheet />;
+export default function Route() {
+  return <DriverChargesScreen />;
 }

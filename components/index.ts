@@ -3,6 +3,7 @@ export * from './support/FloatingSupport';
 export * from './common/CategoryTabs';
 export * from './common/AnimatedSplash';
 export * from './common/CustomAlert';
+export * from './common/FlashSaleButton';
 export * from './booking/TripField';
 export * from './common/PrimaryButton';
 export * from './booking/DriverModeRow';

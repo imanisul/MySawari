@@ -12,24 +12,21 @@ import { useSawari } from '@/context/SawariContext';
 import { useRegisterNavHelp } from '@/hooks/useSupportFab';
 import { shadows } from '@/constants/shadows';
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
+import { FlashSaleButton } from '@/components/common/FlashSaleButton';
 
 type IconProps = { color: string; fill: string; active: boolean };
 type Route = '/' | '/explore' | '/flash-sale' | '/bookings' | '/profile';
 
-// Figma exact rounded solid lightning bolt (24px frame, smooth curves and rounded tips)
+// Exact rounded solid lightning bolt matching the Figma & Flash Sale specification
 const BOLT_PATH =
-  'M13.2 2.5C14.1 2.5 14.8 3.1 14.7 4.0L12.0 11.5L17.5 11.5C18.5 11.5 19.0 12.4 18.5 13.2L11.5 21.2C10.8 22.0 9.8 21.8 9.5 21.0L12.0 14.5L6.5 14.5C5.5 14.5 4.8 13.6 5.3 12.8L12.5 2.8C12.7 2.5 13.0 2.5 13.2 2.5Z';
+  'M17.5 0.5C18.8 0.5 19.8 1.5 19.4 2.8L18.2 13.0L26.5 13.8C27.8 14.0 28.5 15.6 27.6 16.7L19.5 26.8C19.0 27.4 18.2 27.8 17.5 27.8L9.8 27.8C8.8 27.8 8.1 26.8 8.5 25.9L10.5 21.2L2.0 20.8C0.6 20.7 -0.2 19.1 0.6 18.0L15.8 1.2C16.2 0.7 16.8 0.5 17.5 0.5Z';
 
-function TopDealsIcon({ color, fill, active }: IconProps) {
+function TopDealsIcon({ color, active }: IconProps) {
   return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
+    <Svg width={ICON} height={ICON} viewBox="0 0 29 28" fill="none">
       <Path
         d={BOLT_PATH}
-        fill={active ? color : 'none'}
-        stroke={color}
-        strokeWidth={active ? 0.5 : 1.3}
-        strokeLinecap="round"
-        strokeLinejoin="round"
+        fill={active ? color : '#6B5AED'}
       />
     </Svg>
   );
@@ -278,6 +275,26 @@ export function BottomNavigation() {
         <View style={[styles.pill, { backgroundColor: isDarkMode ? colors.card : '#FFFFFF' }]}>
           {ALL_ITEMS.map(({ id, label, route, Icon, badge }) => {
             const active = route === '/' ? pathname === '/' : pathname.startsWith(route);
+
+            if (id === 'flash-sale') {
+              return (
+                <FlashSaleButton
+                  key={id}
+                  size="tab"
+                  active={active}
+                  isDarkMode={isDarkMode}
+                  onPress={() => {
+                    if (active) return;
+                    Haptics.selectionAsync();
+                    if (pathname === '/') router.push(route);
+                    else router.replace(route);
+                  }}
+                  style={styles.navItem}
+                  testID={`tab-${id}`}
+                />
+              );
+            }
+
             const color = active ? activeInk : inactiveInk;
             return (
               <Pressable

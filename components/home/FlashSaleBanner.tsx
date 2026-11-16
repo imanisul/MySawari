@@ -165,8 +165,7 @@ export function FlashSaleBanner() {
           <View style={styles.lettering}>
             {subText === 'EVERY SUNDAY 8AM' ? (
               <CurvedLettering id="flashSaleScheduleArc" text={subText} width={260} size={22} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} font="PlusJakartaSans_700Bold" rise={8.5} />
-            ) : (
-              {when ? (
+            ) : when ? (
               // Design: "EVERY SUNDAY 8AM" — day, then the time with the hand-drawn underline under it.
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
                 <Lettering text={when.lead} size={23} shadow={LINE2_SHADOW} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
@@ -180,8 +179,7 @@ export function FlashSaleBanner() {
                 </View>
               </View>
             ) : (
-              <Lettering text={subText as string} width={260} size={23} shadow={LINE2_SHADOW} near={0.78} outline={0.93} skew="1deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
-            )}
+              <Lettering text={subText ?? 'LIVE NOW · BOOK DEALS'} width={260} size={23} shadow={LINE2_SHADOW} near={0.78} outline={0.93} skew="1deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
             )}
           </View>
         </View>

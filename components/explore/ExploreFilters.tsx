@@ -560,7 +560,8 @@ const styles = StyleSheet.create({
   sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 56 },
   sortText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
 
-  split: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, height: 420 },
+  // 420 on normal phones; shrinks on short ones (the sheet is capped at 78% of the screen) so Apply stays on screen.
+  split: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1, height: 420, flexShrink: 1 },
   tabs: { width: 120, borderRightWidth: 1 },
   tab: { height: 52, justifyContent: 'flex-start', paddingLeft: 16, paddingRight: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
   tabBar: { position: 'absolute', left: 0, top: 10, bottom: 10, width: 3, borderTopRightRadius: 3, borderBottomRightRadius: 3 },

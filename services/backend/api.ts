@@ -1437,6 +1437,8 @@ export const API = {
         // priced at ₹0 off on the server and rejected as a mismatch.
         couponCode: quote.couponDiscount > 0 ? quote.couponCode : undefined,
         couponDiscount: quote.couponDiscount || 0,
+        // Self Drive / With Driver: the server then accepts only that price and saves it on the booking for ops.
+        driverMode: quote.driverMode,
       })
     });
     const saved = await response.json().catch(() => ({}));
@@ -1754,6 +1756,9 @@ export const API = {
           dropLocationName: dropName,
           pickupCharge: asAmount(p.pickupCharge) || undefined,
           dropCharge: asAmount(p.dropCharge) || undefined,
+          // Saved by the server since bookings record the driver option (older bookings have neither → Self Drive).
+          driverMode: b.driverMode || (asAmount(p.driverCharge) > 0 ? 'With Driver' : 'Self Drive'),
+          driverCharge: asAmount(p.driverCharge) || undefined,
           fastagAmount: asAmount(p.fastagAmount) || undefined,
           securityDeposit: asAmount(p.securityDeposit) || undefined,
           couponCode,

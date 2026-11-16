@@ -56,13 +56,13 @@ export function HomeTopBar({
       <View style={s.header}>
         <Pressable style={s.locWrap} onPress={onCityPress} hitSlop={6}>
           <View style={s.cityRow}>
-            <Text style={s.city}>{city}</Text>
+            <Text allowFontScaling={false} style={s.city}>{city}</Text>
             <HomeHeaderChevron />
           </View>
-          <Text style={s.address} numberOfLines={1}>{address}</Text>
+          <Text allowFontScaling={false} style={s.address} numberOfLines={1}>{address}</Text>
         </Pressable>
         <View style={s.cashPill}>
-          <Text style={s.cashText}>{sawariCash}</Text>
+          <Text allowFontScaling={false} style={s.cashText}>{sawariCash}</Text>
           <Image source={require('@/assets/images/home_header_cash_icon.png')} style={{ width: 12, height: 12 }} resizeMode="contain" />
         </View>
       </View>
@@ -101,7 +101,7 @@ export function DateSearchBox({ dateLabel, onDates }: { dateLabel?: string; onDa
   return (
     <Pressable style={s.search} onPress={onDates} accessibilityRole="button" accessibilityLabel={dateLabel ? `Trip dates ${dateLabel}` : 'Select dates and times'}>
       <HomeHeaderCalendar />
-      <Text style={[s.searchText, dateLabel && { color: '#262626' }]} numberOfLines={1}>
+      <Text allowFontScaling={false} style={[s.searchText, dateLabel && { color: '#262626' }]} numberOfLines={1}>
         {dateLabel || 'Select dates & times'}
       </Text>
     </Pressable>
@@ -119,7 +119,7 @@ function TypeTabs({ value, onChange }: { value: 'car' | 'bike'; onChange: (t: 'c
         accessibilityRole="tab"
         accessibilityState={{ selected: value === 'car' }}
       >
-        <Text style={[s.tabText, value === 'car' ? s.tabActive : s.tabInactive]}>
+        <Text allowFontScaling={false} style={[s.tabText, value === 'car' ? s.tabActive : s.tabInactive]}>
           Cars
         </Text>
       </Pressable>
@@ -131,7 +131,7 @@ function TypeTabs({ value, onChange }: { value: 'car' | 'bike'; onChange: (t: 'c
         accessibilityRole="tab"
         accessibilityState={{ selected: value === 'bike' }}
       >
-        <Text style={[s.tabText, value === 'bike' ? s.tabActive : s.tabInactive]}>
+        <Text allowFontScaling={false} style={[s.tabText, value === 'bike' ? s.tabActive : s.tabInactive]}>
           Bikes & Scooters
         </Text>
       </Pressable>
@@ -192,14 +192,14 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
       {items.map((t) => (
         <Pressable key={t.value} style={{ flex: 1 }} onPress={() => onPick(t)} accessibilityRole="button" accessibilityLabel={t.label}>
           <View style={[s.tile, { backgroundColor: dark ? '#1F1B3D' : '#F7F6FE' }]}>
-            <View style={[s.tileImageFrame, { width: t.imageFrameWidth }]}>
+            <View style={[s.tileImageFrame, { width: t.imageFrameWidth, maxWidth: '100%' }]}>
               <Image source={t.image} style={s.tileImg} resizeMode="contain" />
             </View>
             {/* Label tab (Figma 1781:15405): white, top corners 6, a 1px inside stroke that is #6B5AED at the top and
                 fades to nothing at the bottom (linear gradient, top → bottom) */}
             <View style={[s.tileLabelWrap, !!t.labelShift && { transform: [{ translateX: t.labelShift }] }, dark && { backgroundColor: '#1A1D29' }]}>
               <FadeOutline id={`tileEdge${t.value}`} width={60} height={19} vertical start={1} end={0} d="M0.5 19 V6.5 A6 6 0 0 1 6.5 0.5 H53.5 A6 6 0 0 1 59.5 6.5 V19" />
-              <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
+              <Text allowFontScaling={false} style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
             </View>
             {/* The tile's 1px border is drawn last, as Figma draws a frame's stroke over its children: it runs along the
                 label's bottom too, instead of being covered by it. */}
@@ -218,7 +218,7 @@ function BikeLabel({ text, dark }: { text: string; dark?: boolean }) {
     <View style={[s.bikeBadge, dark && { backgroundColor: '#1A1D29' }]}>
       {/* Open on the right (it runs into the tile's edge): top, left and bottom, purple fading out to the right */}
       <FadeOutline id="bikeEdge" width={76} height={27} d="M76 0.5 H6.5 A6 6 0 0 0 0.5 6.5 V20.5 A6 6 0 0 0 6.5 26.5 H76" />
-      <Text style={[s.bikeBadgeText, dark && { color: '#E5E7EB' }]}>{text}</Text>
+      <Text allowFontScaling={false} style={[s.bikeBadgeText, dark && { color: '#E5E7EB' }]}>{text}</Text>
     </View>
   );
 }
@@ -296,13 +296,13 @@ export function ReferCard({ amount = '₹50+', onPress, dark }: { amount?: strin
       </View>
       <View style={{ flex: 1 }}>
         <View style={s.referTop}>
-          <Text style={[s.referTitle, dark && { color: '#F3F4F6' }]}>Refer & Earn {amount}</Text>
+          <Text allowFontScaling={false} style={[s.referTitle, dark && { color: '#F3F4F6' }]}>Refer & Earn {amount}</Text>
           <View style={s.referBtn}>
-            <Text style={s.referBtnText}>Refer</Text>
+            <Text allowFontScaling={false} style={s.referBtnText}>Refer</Text>
             <Ionicons name="arrow-forward" size={8} color="#FFFFFF" />
           </View>
         </View>
-        <Text style={[s.referSub, dark && { color: '#9CA3AF' }]} numberOfLines={1}>Get 10% of your friend’s booking payment.</Text>
+        <Text allowFontScaling={false} style={[s.referSub, dark && { color: '#9CA3AF' }]} numberOfLines={1}>Get 10% of your friend’s booking payment.</Text>
       </View>
     </Pressable>
     </LinearGradient>

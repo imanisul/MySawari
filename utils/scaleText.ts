@@ -1,10 +1,12 @@
 import React from 'react';
 import { Dimensions, StyleSheet } from 'react-native';
 
-// The app is designed on a 393-wide phone. Every StyleSheet font size and line height is scaled by the real screen
-// width (kept within 90%-115%) so text fits small phones and is not tiny on big ones. Must load before any screen
-// creates its styles, so index.js imports this first. Sizes set inline (not via StyleSheet.create) are not scaled.
-const k = Math.min(Math.max(Dimensions.get('window').width / 393, 0.9), 1.15);
+// The app is designed on a 393-wide phone. Every StyleSheet font size and line height is scaled down on narrower
+// screens (to 90% at most) so text fits small phones. It is never scaled UP: the boxes around the text (cards, pills,
+// tabs, buttons) keep their Figma sizes, so on wider phones (Moto Edge / Pixel / Samsung at 412, Pro Max at 430) the
+// bigger text spilled out of them. Must load before any screen creates its styles, so index.js imports this first.
+// Sizes set inline (not via StyleSheet.create) are not scaled.
+const k = Math.min(Math.max(Dimensions.get('window').width / 393, 0.9), 1);
 
 if (Math.abs(k - 1) > 0.01) {
   const create = StyleSheet.create as any;

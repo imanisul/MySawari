@@ -145,26 +145,26 @@ function DealsCard({ onAvailabilityChange }: { onAvailabilityChange: (available:
             <View style={styles.bookingText}>
               <View style={{ gap: 2, alignSelf: 'stretch' }}>
               <View>
-                {!!car.brand && <Text style={styles.brand} numberOfLines={1}>{car.brand}</Text>}
-                <Text style={styles.name} numberOfLines={1}>{name}</Text>
+                {!!car.brand && <Text allowFontScaling={false} style={styles.brand} numberOfLines={1}>{car.brand}</Text>}
+                <Text allowFontScaling={false} style={styles.name} numberOfLines={1}>{name}</Text>
               </View>
               <View style={styles.specs}>
                 {specs.map((s, i) => (
                   <React.Fragment key={s}>
                     {i > 0 && <View style={styles.dot} />}
-                    <Text style={styles.spec} numberOfLines={1}>{s}</Text>
+                    <Text allowFontScaling={false} style={styles.spec} numberOfLines={1}>{s}</Text>
                   </React.Fragment>
                 ))}
               </View>
               </View>
               <View style={styles.priceLine}>
-                <Text style={styles.dealPrice}>{formatCurrency(price)}</Text>
-                <Text style={styles.forHours}>for {hours} hours</Text>
+                <Text allowFontScaling={false} style={styles.dealPrice}>{formatCurrency(price)}</Text>
+                <Text allowFontScaling={false} style={styles.forHours}>for {hours} hours</Text>
               </View>
             </View>
           </Pressable>
           <Pressable onPress={open} accessibilityRole="button" style={styles.seeAll}>
-            <Text style={styles.seeAllText}>See All</Text>
+            <Text allowFontScaling={false} style={styles.seeAllText}>See All</Text>
           </Pressable>
         </View>
       </View>
@@ -194,13 +194,25 @@ export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
   const [dealsAvailable, setDealsAvailable] = useState(false);
   const positionedAtDeals = useRef(false);
   const onAvailabilityChange = useCallback((available: boolean) => setDealsAvailable(available), []);
+  // Cards are drawn at the Figma 340 × 248. On a 393 phone the next card peeks 37 in; narrower screens (Moto Edge with
+  // a larger display size, small phones) shrink the whole card to keep that peek instead of running off the edge.
+  const { width: winW } = useWindowDimensions();
+  const k = Math.min(1, (winW - 53) / W);
+  const step = W * k + 12;
+  const fit = (card: React.ReactNode) => (
+    <View style={{ width: W * k, height: H * k }}>
+      <View style={{ width: W, height: H, transform: [{ scale: k }], marginLeft: -(W * (1 - k)) / 2, marginTop: -(H * (1 - k)) / 2 }}>
+        {card}
+      </View>
+    </View>
+  );
 
   useEffect(() => {
     if (!fromRate || !dealsAvailable || positionedAtDeals.current) return;
-    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ x: W + 12, y: 0, animated: false }));
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ x: step, y: 0, animated: false }));
     positionedAtDeals.current = true;
     return () => cancelAnimationFrame(frame);
-  }, [fromRate, dealsAvailable]);
+  }, [fromRate, dealsAvailable, step]);
 
   return (
     <ScrollView
@@ -209,16 +221,16 @@ export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
       showsHorizontalScrollIndicator={false}
       // Each card stops with its left edge on the page's 16px margin, in line with the tiles above, and one swipe moves
       // exactly one card (it used to centre cards 26.5 in and could fly past a card on a quick flick).
-      snapToInterval={W + 12}
+      snapToInterval={step}
       snapToAlignment="start"
       disableIntervalMomentum
       decelerationRate="fast"
       contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-      style={{ height: H, flexGrow: 0 }}
+      style={{ height: H * k, flexGrow: 0 }}
     >
-      {!!fromRate && <PriceCard fromRate={fromRate} />}
-      <DealsCard onAvailabilityChange={onAvailabilityChange} />
-      <FindCard />
+      {!!fromRate && fit(<PriceCard fromRate={fromRate} />)}
+      {fit(<DealsCard onAvailabilityChange={onAvailabilityChange} />)}
+      {fit(<FindCard />)}
     </ScrollView>
   );
 }

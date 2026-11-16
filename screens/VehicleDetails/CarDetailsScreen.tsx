@@ -428,7 +428,7 @@ export default function CarDetailsScreen() {
           <View style={{ height: 8 }} />
 
           <View onLayout={(e) => { mileageEnd.current = e.nativeEvent.layout.y + e.nativeEvent.layout.height; }}>
-            <MileageLimits onAddDay={canAddDay ? addOneDay : undefined} />
+            <MileageLimits onAddDay={canAddDay ? addMoreDays : undefined} />
           </View>
           <View style={{ height: 8 }} />
         </View>

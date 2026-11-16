@@ -19,6 +19,7 @@ import {
   ExclusiveOffer,
   exclusiveOffersQueryOptions,
   recordOfferView,
+  isOfferLive,
   specificCarOf,
 } from '@/services/api/offers';
 import { ExclusiveOfferDetailModal } from '@/components/offers/ExclusiveOfferDetailModal';
@@ -50,7 +51,10 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
   const [selectedOffer, setSelectedOffer] = useState<ExclusiveOffer | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const { data: offers = [], refetch } = useQuery(exclusiveOffersQueryOptions);
+  const { data: allOffers = [], refetch } = useQuery(exclusiveOffersQueryOptions);
+  // Only offers still running right now: one remembered from before that has since ended is dropped at once, not
+  // shown until the fresh list arrives.
+  const offers = allOffers.filter((o) => isOfferLive(o as any, Date.now(), true));
 
   // Directly navigate to car details if deep-linked via push notification
   useEffect(() => {

@@ -12,6 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getAvailability, splitDateRange, parseDayLabel, todayDayNum, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet, onSplashGone } from '@/components';
+import { FlashSaleBanner } from '@/components/home/FlashSaleBanner';
 import { HomeCardsRow } from '@/components/home/HomeCardsRow';
 import { WelcomeSheet } from '@/components/home/WelcomeSheet';
 import { API } from '@/services/backend/api';
@@ -396,6 +397,7 @@ export default function HomeScreen() {
     'cards_row',         // price card, Today's Deals card, Find the Perfect Ride
     'searches',          // only when the customer has recent searches
     'picks',             // Recommended Cars / Recently Viewed
+    'flash_banner',      // Flash Sale banner: live now / scheduled day & time / coming soon
     'position3_promo',   // backend banner (only when one is live)
     'milestone',         // Refer & Earn strip + Complete 4 trips
     'destinations',
@@ -438,9 +440,13 @@ export default function HomeScreen() {
           <CategoryTiles
             items={CAR_CATEGORIES}
             dark={isDarkMode}
-            onPick={(c) => router.push({ pathname: '/explore', params: { bodyType: c.value, type: vehicleType, t: String(Date.now()) } })}
+            // Explore reads `body` (it was sent as `bodyType`, so the SUV / Sedan / … filter never applied).
+            onPick={(c) => router.push({ pathname: '/explore', params: { body: c.value, type: 'car', t: String(Date.now()) } })}
           />
         );
+      case 'flash_banner':
+        content = <FlashSaleBanner />;
+        break;
       case 'position3_promo':
         content = <HomePromoBanner position="position3" />;
         break;

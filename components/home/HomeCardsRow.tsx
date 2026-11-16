@@ -191,7 +191,6 @@ function FindCard() {
 
 export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
   const scrollRef = useRef<ScrollView>(null);
-  const { width: screenWidth } = useWindowDimensions();
   const [dealsAvailable, setDealsAvailable] = useState(false);
   const positionedAtDeals = useRef(false);
   const onAvailabilityChange = useCallback((available: boolean) => setDealsAvailable(available), []);
@@ -208,9 +207,13 @@ export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
+      // Each card stops with its left edge on the page's 16px margin, in line with the tiles above, and one swipe moves
+      // exactly one card (it used to centre cards 26.5 in and could fly past a card on a quick flick).
       snapToInterval={W + 12}
+      snapToAlignment="start"
+      disableIntervalMomentum
       decelerationRate="fast"
-      contentContainerStyle={{ paddingHorizontal: Math.max(0, (screenWidth - W) / 2), gap: 12 }}
+      contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
       style={{ height: H, flexGrow: 0 }}
     >
       {!!fromRate && <PriceCard fromRate={fromRate} />}
@@ -231,7 +234,7 @@ const styles = StyleSheet.create({
   // here inside priceBox (which starts at 13.78, 42.5). The ground shadow follows the cars' wheels down.
   priceShadow: { position: 'absolute', left: (312.44 - 289.69) / 2 + 0.6, top: 146 },
   priceCars: { position: 'absolute', width: 371, height: 123.7, left: -17.3 - 13.78, top: 95.2 - 42.5 },
-  priceRow: { position: 'absolute', top: 0, left: (312.44 - 282.48) / 2 - 0.6, width: 282.48, height: 93, flexDirection: 'row', alignItems: 'center', gap: 2.39 },
+  priceRow: { position: 'absolute', top: -1, left: (312.44 - 282.48) / 2 - 0.6, width: 282.48, height: 93, flexDirection: 'row', alignItems: 'center', gap: 2.39 },
   priceLeadCol: { width: 128.09, height: 74.03, alignItems: 'center' },
   priceLead: { fontFamily: F700, fontSize: 28.73, lineHeight: 43, letterSpacing: -0.57, color: '#FFFFFF', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 4.79 }, textShadowRadius: 7.18, includeFontPadding: false },
   priceAmount: { width: 152, fontFamily: F700, fontSize: 62.25, lineHeight: 93, letterSpacing: -1.25, color: '#FAC64C', textAlign: 'center', textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 3.83 }, textShadowRadius: 3.83, includeFontPadding: false },

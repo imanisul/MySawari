@@ -623,14 +623,25 @@ let preloadedOrderCache: {
 } | null = null;
 
 /** Infer a car's body category when the DB record omitted `vehicleType` or stored a generic `'car'`. */
-function inferCarBodyCategory(name: string, rawType?: string, seats?: number): Car['category'] {
-  const trimmed = typeof rawType === 'string' ? rawType.trim() : '';
-  if (trimmed && !/^(car|other)$/i.test(trimmed)) return trimmed as Car['category'];
+// Body type from the car's model name first: the Operation App's "vehicle type" is typed in by hand and is often wrong
+// (Tiago / Alto K10 saved as SUV, Punch / Nexon / Fronx as Hatchback, every Ertiga / Triber / Rumion as SUV), which put
+// cars under the wrong Home tile and Explore filter. That field is only used for models not listed here.
+// Names are matched on word starts only, so "WagonR", "XUV300" and "AltoK10" are recognised too.
+const MUV_MODELS = /\b(ertiga|rumion|innova|hycross|crysta|triber|carens|xl6|marazzo|lodgy|enjoy|mobilio|hexa|bolero\s*neo\s*plus)/;
+const SUV_MODELS = /\b(creta|seltos|brezza|venue|nexon|punch|xuv|scorpio|thar|fronx|taisor|curvv|harrier|safari|bolero|jimny|elevate|vitara|kushaq|taigun|hector|sonet|magnite|kiger|exter|fortuner|endeavour|alcazar|compass|urban\s*cruiser|hyryder)/;
+const SEDAN_MODELS = /\b(dzire|amaze|city|ciaz|aura|tigor|verna|slavia|virtus|civic|camry|accord|etios|xcent|rapid|ciaz)/;
+const HATCH_MODELS = /\b(swift|baleno|i20|i10|grand\s*i10|tiago|altroz|glanza|wagon|alto|ignis|santro|celerio|kwid|polo|s-?presso|k10)/;
+
+export function inferCarBodyCategory(name: string, rawType?: string, seats?: number): Car['category'] {
   const n = name.toLowerCase();
-  if (/\b(ertiga|rumion|innova|hycross|crysta|triber|carens|xl6|marazzo|lodgy|enjoy|mobilio|hexa)\b/.test(n) || (Number(seats) >= 6 && !/\b(scorpio|safari|fortuner|endeavour|xuv\s*700|alcazar)\b/.test(n))) return 'MUV';
-  if (/\b(creta|seltos|brezza|venue|nexon|punch|xuv|scorpio|thar|fronx|taisor|curvv|harrier|safari|bolero|jimny|elevate|vitara|kushaq|taigun|hector|sonet|magnite|kiger|exter)\b/.test(n)) return 'SUV';
-  if (/\b(dzire|amaze|city|ciaz|aura|tigor|verna|slavia|virtus|civic|mercedes|bmw|audi|camry|accord)\b/.test(n)) return 'Sedan';
-  if (/\b(swift|baleno|i20|i10|tiago|altroz|glanza|wagon|alto|ignis|santro|celerio|kwid|polo|spresso)\b/.test(n)) return 'Hatchback';
+  if (MUV_MODELS.test(n)) return 'MUV';
+  if (SUV_MODELS.test(n)) return 'SUV';
+  if (SEDAN_MODELS.test(n)) return 'Sedan';
+  if (HATCH_MODELS.test(n)) return 'Hatchback';
+  const trimmed = typeof rawType === 'string' ? rawType.trim() : '';
+  if (/mpv|muv/i.test(trimmed)) return 'MUV';
+  if (trimmed && !/^(car|other)$/i.test(trimmed)) return trimmed as Car['category'];
+  if (Number(seats) >= 7) return 'MUV';
   return 'Sedan';
 }
 
@@ -888,7 +899,7 @@ export const API = {
         name: resolvedDisplayName,
         displayName: resolvedDisplayName,
         vehicleName: resolvedDisplayName,
-        category: isBike ? 'Bike' : inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''}`, v.vehicleType, v.seatingCapacity),
+        category: isBike ? 'Bike' : inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''} ${v.model || ''}`, v.vehicleType, v.seatingCapacity),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
         image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,

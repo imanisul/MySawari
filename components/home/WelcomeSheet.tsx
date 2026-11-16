@@ -8,7 +8,7 @@ import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalBlur } from '@/components/common/ModalBlur';
 
-/** Figma "Set Location" popup after opening the app: six promise chips, "Your ride, your way", Continue. */
+/** Figma "Set Location" popup after opening the app: six promise chips, "Your Ride, Your Way", Continue. */
 type Chip = { label: string; icon: any; iconSize: number; w: number; h?: number; left: number; top: number; rot: number };
 
 // Each row is a positioned box inside the 361 × 244 chip area (Figma Frames 2147226286 / 87 / 88); chips are placed
@@ -82,7 +82,8 @@ export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: 
                         <View style={styles.chipIcon}>
                           <Image source={c.icon} style={{ width: c.iconSize, height: c.iconSize }} contentFit="contain" />
                         </View>
-                        <Text style={styles.chipText} numberOfLines={1}>{c.label}</Text>
+                        {/* Whole label always shows (never "Security Depo…"): shrinks a little instead of cutting off. */}
+                        <Text style={styles.chipText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{c.label}</Text>
                       </View>
                     ))}
                   </View>
@@ -92,7 +93,7 @@ export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: 
 
               {/* Frame 2147226278 */}
               <View style={styles.textBlock}>
-                <Text style={styles.title}>Your ride, your way</Text>
+                <Text style={styles.title} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>Your Ride, Your Way</Text>
                 <Text style={styles.subtitle}>Find vehicles that match your preferences and enjoy a hassle-free rental experience.</Text>
               </View>
             </View>
@@ -140,7 +141,7 @@ const styles = StyleSheet.create({
     borderRadius: 52,
   },
   chipIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  chipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, lineHeight: 16, color: '#2B386A', includeFontPadding: false },
+  chipText: { flexShrink: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, lineHeight: 16, color: '#2B386A', includeFontPadding: false },
   textBlock: { gap: 8 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 30, lineHeight: 45, textAlign: 'center', color: '#2B386A' },
   subtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', color: '#737373' },

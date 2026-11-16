@@ -74,13 +74,36 @@ function BannerRays({ style }: { style?: object }) {
 }
 
 import { useQuery } from '@tanstack/react-query';
-import { exclusiveOffersQueryOptions } from '@/services/api/offers';
+import { exclusiveOffersQueryOptions, isOfferLive, nextFlashSaleQueryOptions } from '@/services/api/offers';
+import { getIndiaDateParts } from '@/utils/sawari';
+
+const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+/** "LIVE TODAY 8PM" / "LIVE TOMORROW 8AM" / "LIVE ON SUNDAY 8AM" / "LIVE ON 22 NOV 8AM" in India time; null if none. */
+function saleWhen(startsAt?: string | null): string | null {
+  const ms = startsAt ? new Date(startsAt).getTime() : NaN;
+  if (!Number.isFinite(ms) || ms <= Date.now()) return null;
+  const p = getIndiaDateParts(ms);
+  const day = (t: number) => { const q = getIndiaDateParts(t); return Date.UTC(q.year, q.month, q.date) / 86400000; };
+  const ahead = day(ms) - day(Date.now());
+  const h = p.hours % 12 || 12;
+  const time = `${h}${p.minutes ? `:${String(p.minutes).padStart(2, '0')}` : ''}${p.hours >= 12 ? 'PM' : 'AM'}`;
+  if (ahead <= 0) return `LIVE TODAY ${time}`;
+  if (ahead === 1) return `LIVE TOMORROW ${time}`;
+  if (ahead < 7) return `LIVE ON ${WEEKDAYS[new Date(Date.UTC(p.year, p.month, p.date)).getUTCDay()]} ${time}`;
+  return `LIVE ON ${p.date} ${MONTHS[p.month]} ${time}`;
+}
 
 export function FlashSaleBanner() {
   const router = useRouter();
   const { data: offers = [] } = useQuery(exclusiveOffersQueryOptions);
-  const isLive = offers.length > 0;
-  const subText = isLive ? 'LIVE NOW · BOOK DEALS' : 'EVERY SUNDAY 8AM';
+  // Only offers still running right now — a remembered offer that has ended never shows as LIVE, even before the refresh.
+  const isLive = offers.some((o: any) => isOfferLive(o, Date.now(), true));
+  // The second line follows the real sale: live now, else the next scheduled sale's day and time (set in the Operation
+  // App), else coming soon.
+  // Always loaded (not only when nothing is live) so the Flash Sale page opens with it already known.
+  const { data: nextSale } = useQuery(nextFlashSaleQueryOptions);
+  const subText = isLive ? 'LIVE NOW · BOOK DEALS' : saleWhen(nextSale?.startsAt) ?? 'COMING SOON';
   // Its lettering sits at fixed spots on a 361-wide card: on narrower phones the whole banner shrinks to fit.
   const { width } = useWindowDimensions();
   const k = Math.min(1, (width - 32) / 361);
@@ -97,7 +120,8 @@ export function FlashSaleBanner() {
         <View style={styles.text}>
           <View style={{ width: 183.21, height: 32.58, marginVertical: -3.1, alignItems: 'center', justifyContent: 'center' }}>
             <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 2.32, top: 6.27 }} />
-            <Lettering text="FLASH SALE" width={156.73} size={28} shadow={{ dx: -2.3, dy: 2.3, color: '#FF008B' }} font="PlusJakartaSans_700Bold" />
+            {/* Figma: upright, 0.93 black outline, 0.78 black + 2.33 #FF008B drop shadows; 156.73 wide (size 26.6 fits it) */}
+            <Lettering text="FLASH SALE" width={156.73} size={26.6} shadow={{ dx: -2.33, dy: 2.33, color: '#FF008B' }} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
             <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 166.47, top: 6.27 }} />
           </View>
           <View style={{ marginTop: -4 }}>

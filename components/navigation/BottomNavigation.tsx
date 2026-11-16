@@ -232,7 +232,7 @@ function HelpButton() {
         style={({ pressed }) => [styles.help, isDarkMode && { backgroundColor: colors.card, borderColor: colors.border }, pressed && { opacity: 0.85 }]}
       >
         <HeadsetIcon color={helpColor} />
-        <Text style={[styles.navLabel, { color: helpColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={1.15}>Help</Text>
+        <Text style={[styles.navLabel, { color: helpColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} allowFontScaling={false}>Help</Text>
       </Pressable>
     </View>
   );
@@ -326,10 +326,12 @@ export function BottomNavigation() {
                 <Text
                   style={[styles.navLabel, active && styles.navLabelActive, { color }]}
                   numberOfLines={1}
-                  // Big system font sizes used to push the labels out of the pill.
-                  maxFontSizeMultiplier={1.15}
+                  // Fixed size like the "Sale" tab: the tab is exactly 42 high (2 + icon 24 + 2 + label 12 + 2), so any
+                  // system-font enlargement grew the 12pt line and cut the label off at the bottom. On narrow phones
+                  // (iPhone 6 / SE, ~37–48 per tab) a long label like "My Trips" shrinks to fit instead of clipping.
+                  allowFontScaling={false}
                   adjustsFontSizeToFit
-                  minimumFontScale={0.85}
+                  minimumFontScale={0.8}
                 >
                   {label}
                 </Text>

@@ -160,8 +160,9 @@ export function primeVehicles(queryClient: QueryClient) {
         const raw = JSON.parse(cached);
         if (Array.isArray(raw)) {
           const mapped = API.mapVehicles(raw);
-          queryClient.setQueryData(VEHICLES_KEY, mapped);
-          liveVehiclesAt = Date.now();
+          // The saved copy shows at once but is marked old (updatedAt 0): every screen that opens before the live list
+          // arrives asks the server again, and nothing treats the saved bookings as current.
+          if (!queryClient.getQueryData(VEHICLES_KEY)) queryClient.setQueryData(VEHICLES_KEY, mapped, { updatedAt: 0 });
           prefetchVehicleImages(mapped);
         }
       } catch (e) {}

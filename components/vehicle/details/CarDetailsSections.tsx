@@ -190,16 +190,16 @@ export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; t
         <View style={[styles.addDayCard, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.addDayTitle, { color: p.fg }]}>Need more time on the road?</Text>
-            <Text style={[styles.addDaySub, { color: p.muted }]}>Add 1 day to unlock unlimited kilometres.</Text>
+            <Text style={[styles.addDaySub, { color: p.muted }]}>Add more days to unlock unlimited kilometres.</Text>
           </View>
           <Pressable
             onPress={() => { Haptics.selectionAsync(); onAddDay(); }}
             accessibilityRole="button"
-            accessibilityLabel="Add 1 day"
+            accessibilityLabel="Add more days"
             style={({ pressed }) => [styles.addDayBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
           >
             <Feather name="plus" size={16} color={p.onNavy} />
-            <Text style={[styles.addDayBtnText, { color: p.onNavy }]}>Add 1 day</Text>
+            <Text style={[styles.addDayBtnText, { color: p.onNavy }]}>Add more days</Text>
           </Pressable>
         </View>
       )}

@@ -1102,36 +1102,12 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         try {
           invalidateWalletCache();
-          // Both calls need the session, so they run before the tokens are deleted — but side by side, and
-          // never for more than 1.5 s in total (they used to run one after the other, up to 5 s on a slow network).
           const refreshToken = await SecureStore.getItemAsync('refresh_token').catch(() => null);
           const authToken = await SecureStore.getItemAsync('auth_token').catch(() => null);
-          await Promise.race([
-            Promise.allSettled([
-              // Logged while the session still exists, so the entry carries the customer's id and number.
-              import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('AUTH_LOGOUT', 'System')),
-              // This phone must stop receiving this customer's booking pushes.
-              unregisterDeviceForPushNotifications(authToken),
-            ]),
-            new Promise((r) => setTimeout(r, 1500)),
-          ]);
-          // Revoke the session server-side too (a copied refresh token stops working right away).
-          API.logoutServer(refreshToken);
-          await SecureStore.deleteItemAsync('auth_token');
-          await SecureStore.deleteItemAsync('refresh_token');
-          await SecureStore.deleteItemAsync('user_id');
-          await AsyncStorage.removeItem(LAST_ACTIVE_KEY).catch(() => {});
 
-
-          if (customer?.mobile) {
-            try {
-              const sanitizedMobile = customer.mobile.replace(/[^a-zA-Z0-9-_.~%]/g, '');
-              // (Removed FCM Topic Unsubscribe Failed logic to let expo-notifications handle pushes)
-            } catch (fcmError: any) {
-              if (__DEV__) console.warn('FCM Topic Unsubscribe Failed:', fcmError?.message);
-            }
-          }
-
+          // Logged out on screen straight away, so the sign-in sheet comes up with no wait. The server calls below
+          // still use the saved session (it is deleted only after them), they just no longer hold the screen up
+          // (they used to add up to 1.5 s before the sign-in sheet appeared).
           setCustomer({
             id: '', name: '', mobile: '', email: '', license: '', dob: '', gender: '', joinedOn: '', referralCode: ''
           });
@@ -1146,6 +1122,26 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           API.setWalletSnapshotUser(null);
           queryClient.clear();
           setIsAuthenticated(false);
+
+          await Promise.race([
+            Promise.allSettled([
+              // Logged while the session still exists, so the entry carries the customer's id and number.
+              import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('AUTH_LOGOUT', 'System')),
+              // This phone must stop receiving this customer's booking pushes.
+              unregisterDeviceForPushNotifications(authToken),
+            ]),
+            new Promise((r) => setTimeout(r, 1500)),
+          ]);
+          // Revoke the session server-side too (a copied refresh token stops working right away).
+          API.logoutServer(refreshToken);
+          // Someone may have signed in again in the meantime: only delete the session if it is still the old one.
+          const current = await SecureStore.getItemAsync('auth_token').catch(() => null);
+          if (current === authToken) {
+            await SecureStore.deleteItemAsync('auth_token');
+            await SecureStore.deleteItemAsync('refresh_token');
+            await SecureStore.deleteItemAsync('user_id');
+            await AsyncStorage.removeItem(LAST_ACTIVE_KEY).catch(() => {});
+          }
         } catch (e) {
           if (__DEV__) console.warn('Logout failed', e);
         }

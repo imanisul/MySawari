@@ -14,7 +14,6 @@ import Svg, { Path, Circle, G } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   FlashScreenConfig,
   getCachedFlashScreenConfig,
@@ -77,6 +76,10 @@ const FESTIVE_HALO = 'rgba(212, 154, 61, 0.14)';
  *  - Mode 2: Custom Admin Uploaded Splash Screen (when uploaded and festive mode is off).
  *  - Mode 3: Signature Classic MySawari Branding.
  */
+// The launch-screen logo (app.json expo-splash-screen: MySawari_nobg.png, 470 × 480, imageWidth 160, centred).
+const LOGO_W = 160;
+const LOGO_H = (160 * 480) / 470;
+
 export function AnimatedSplash({
   isReady,
   isDataReady = true,
@@ -149,10 +152,11 @@ export function AnimatedSplash({
     };
   }, []);
 
-  // Flash screen duration (matches the 1.13s opening animation + 250ms hold)
+  // Flash screen duration (short; configurable via Operation App, capped)
   const durationMs = useMemo(() => {
     const sec = Number(config?.durationSeconds);
-    return !isNaN(sec) && sec >= 1 && sec <= 8 ? sec * 1000 : 1400;
+    // Short on purpose: 1.2 s by default, and never more than 1.5 s whatever the Operation App setting says.
+    return !isNaN(sec) && sec >= 0.5 ? Math.min(sec, 1.5) * 1000 : 1200;
   }, [config?.durationSeconds]);
 
   // If splash screen is explicitly disabled by admin, complete immediately
@@ -302,7 +306,8 @@ export function AnimatedSplash({
 
   // Content values
   const displayTitle = config?.brandTitle || 'MySawari';
-  const displayTagline = config?.brandTagline || 'Your ride, your way.';
+  // Fixed brand line, same as the welcome popup (an Operation App tagline no longer overrides it).
+  const displayTagline = 'Your Ride, Your Way';
   const displayBadge = config?.occasionBadge || '✦ HAPPY DIWALI ✦';
 
   // Interpolated animated values for celestial rings
@@ -329,12 +334,12 @@ export function AnimatedSplash({
   // - OR occasionTheme is diwali_animated / diwali_gold
   // - OR animationStyle is diwali_animated
   // - OR no custom static image was uploaded
-  // Always the classic MySawari splash (logo + "Your ride, your way."): the Diwali splash and any admin-uploaded
+  // Always the classic MySawari splash (logo + "Your Ride, Your Way"): the Diwali splash and any admin-uploaded
   // splash image are switched off. Flip these back to re-enable them.
   const isFestiveMode = false;
   const hasCustomActiveImage = false;
 
-  const activeBg = isFestiveMode ? FESTIVE_BG : '#2D2565';
+  const activeBg = isFestiveMode ? FESTIVE_BG : (config?.backgroundColor || '#FFFFFF');
   const showProblem = !isDataReady && (loadFailed || isSlow);
 
   return (
@@ -353,7 +358,7 @@ export function AnimatedSplash({
             },
           ]}
         >
-          <StatusBar barStyle={isFestiveMode ? "dark-content" : "light-content"} backgroundColor={activeBg} translucent />
+          <StatusBar barStyle="dark-content" backgroundColor={activeBg} />
 
           {/* ======================================================== */}
           {/* MODE 1: SENIOR DESIGNER DIWALI SPECIAL / FESTIVE MODE     */}
@@ -618,25 +623,26 @@ export function AnimatedSplash({
             />
           ) : (
             /* ======================================================== */
-            /* OPENING ANIMATION FLASH SCREEN                           */
+            /* MODE 3: SIGNATURE CLASSIC SPLASH                         */
             /* ======================================================== */
-            <LinearGradient
-              colors={['#2D2565', '#3A3184', '#5E4EE0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.animBgGradient}
-            >
-              <ExpoImage
-                source={require('@/assets/animations/opening_animation.gif')}
-                style={{
-                  width: Math.min(windowWidth * 0.95, 420),
-                  height: Math.min(windowWidth * 0.95, 420),
-                }}
-                contentFit="contain"
-                cachePolicy="memory-disk"
-                priority="high"
+            // One screen, not two: the phone's own launch screen (app.json: white, this logo 160 wide, centred) hands
+            // over to this view with the logo already showing in exactly the same place and size — nothing blinks or
+            // jumps. Only the name and tagline fade in under it.
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF' }]}>
+              <Image
+                source={require('@/assets/images/MySawari_nobg.png')}
+                style={{ position: 'absolute', width: LOGO_W, height: LOGO_H, left: (windowWidth - LOGO_W) / 2, top: (windowHeight - LOGO_H) / 2 }}
+                resizeMode="contain"
               />
-            </LinearGradient>
+              <View style={{ position: 'absolute', left: 0, right: 0, top: (windowHeight + LOGO_H) / 2 + 14, alignItems: 'center' }}>
+                <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }] }}>
+                  <Text style={styles.classicTitle}>{displayTitle}</Text>
+                </Animated.View>
+                <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 8 }}>
+                  <Text style={styles.classicTagline}>{displayTagline}</Text>
+                </Animated.View>
+              </View>
+            </View>
           )}
 
           {/* Fallback trouble actions if connection is completely unresponsive */}
@@ -687,11 +693,6 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     zIndex: 99999,
-  },
-  animBgGradient: {
-    ...StyleSheet.absoluteFill,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   classicContainer: {
     flex: 1,

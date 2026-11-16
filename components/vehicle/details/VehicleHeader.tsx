@@ -33,23 +33,16 @@ export function VehicleHeader({
   const handleShare = async () => {
     Haptics.selectionAsync();
     try {
-      // A public page (not the app itself) so chat apps can draw a card with the car's name, price and photo, and
-      // so the link still works for someone without the app installed.
-      const url = `${BACKEND_URL.replace(/\/api\/?$/, '')}/share/car/${selectedCar.id}`;
       const price = selectedCar.perDay ? ` from ${formatCurrency(selectedCar.perDay)}/day` : '';
 
-      // Auto-fetch dynamic Play Store & App Store links (cached < 1ms)
+      // Only the store links (fetched from the server's settings, with the app's own as fallback) — no server link.
       const config = await API.getAppConfig().catch(() => null);
       const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
       const appStore = config?.appStoreUrl || 'https://apps.apple.com/app/id6829408836';
 
-      const message = `Check out the ${title} on MySawari${price}!\n\n🚗 Car link: ${url}\n\n📲 Download the MySawari App:\nAndroid: ${playStore}\niOS: ${appStore}`;
+      const message = `Check out the ${title} on MySawari${price}!\n\n📲 Download the MySawari App:\nAndroid: ${playStore}\niPhone: ${appStore}`;
 
-      await Share.share({
-        message,
-        title: `Rent ${title} on MySawari`,
-        ...(Platform.OS === 'ios' ? { url } : {}),
-      });
+      await Share.share({ message, title: `Rent ${title} on MySawari` });
     } catch (error: any) {
       if (__DEV__) console.warn('Vehicle sharing dismissed or failed');
     }

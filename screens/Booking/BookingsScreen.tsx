@@ -48,6 +48,8 @@ export default function BookingsScreen() {
     ...bookingsQueryOptions,
     enabled: isAuthenticated === true,
     refetchInterval: 30 * 1000, // status changes (e.g. trip completed by the ops team) appear on their own
+    // Shown at once from the saved list, but always re-read from the server on opening (it could be minutes old).
+    refetchOnMount: 'always',
   });
 
   // Which trips are already reviewed, so "Rate us" only shows where it is still wanted.

@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   // RN has no box-sizing, so this is the 359 content width -- 361 minus both strokes -- pinned rather than
   // stretched, which keeps the strip exactly as designed on every device instead of tracking the gutters.
   // Padding is 10px 0 only: no side inset, the row centres its items, gap 10 between them.
-  banner: { borderWidth: 1, borderRadius: 8, alignSelf: 'center', width: 359, minHeight: 39, paddingVertical: 10, paddingHorizontal: 8,
+  banner: { borderWidth: 1, borderRadius: 8, alignSelf: 'center', width: '100%', maxWidth: 359, minHeight: 39, paddingVertical: 10, paddingHorizontal: 8,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 10 },
   // Medium/xs: 11px on a 16.5px line, "Gold/Text" #B58703.
   bannerIcon: { fontSize: 11, lineHeight: 16.5 },

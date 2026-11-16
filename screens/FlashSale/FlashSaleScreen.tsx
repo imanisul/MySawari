@@ -24,6 +24,7 @@ import {
   exclusiveOffersQueryOptions,
   nextFlashSaleQueryOptions,
   recordOfferView,
+  isOfferLive,
   claimExclusiveOffer,
 } from '@/services/api/offers';
 import { useSawari } from '@/context/SawariContext';
@@ -230,14 +231,24 @@ export default function FlashSaleScreen() {
   const { data: fleetVehicles = [] } = useVehicles();
 
   // Queries
-  const { data: offers = [], isLoading: offersLoading } = useQuery(exclusiveOffersQueryOptions);
-  const liveOffer = offers[0] || null;
+  // Real time: every time the page opens it asks the server again and waits for that answer, instead of first showing
+  // the offers remembered from earlier (an ended sale used to flash its car, then switch to "Coming Soon"). It then
+  // refreshes every 20 s, and an offer is dropped the moment its end time passes, without waiting for a refresh.
+  const { data: rawOffers = [], isFetchedAfterMount: offersFresh, isError: offersFailed, dataUpdatedAt: offersAt } = useQuery({ ...exclusiveOffersQueryOptions, refetchOnMount: 'always' });
+  // A list fetched in the last minute (Home already loaded it) is shown at once; an older one waits for the server.
+  const offersReady = offersFresh || offersFailed || (offersAt > 0 && Date.now() - offersAt < 60 * 1000);
+  const offers = rawOffers.filter((o: any) => isOfferLive(o, Date.now(), true));
+  const liveOffer = offersReady ? offers[0] || null : null;
   const isLive = Boolean(liveOffer);
 
-  const { data: nextSale, isLoading: nextLoading } = useQuery({
+  // Asked at the same time as the offers (not after them), so the two waits don't add up.
+  const { data: nextSale, isFetchedAfterMount: nextFresh, isError: nextFailed, dataUpdatedAt: nextAt } = useQuery({
     ...nextFlashSaleQueryOptions,
-    enabled: !isLive,
+    refetchOnMount: 'always',
   });
+  const nextReady = nextFresh || nextFailed || (nextAt > 0 && Date.now() - nextAt < 60 * 1000);
+  // Nothing is decided until the server has answered (both questions when there is no live sale).
+  const ready = offersReady && (isLive || nextReady);
 
   const [nowMs, setNowMs] = useState(Date.now());
   useEffect(() => {
@@ -246,8 +257,8 @@ export default function FlashSaleScreen() {
   }, []);
 
   const scheduledStartsMs = nextSale?.startsAt ? new Date(nextSale.startsAt).getTime() : 0;
-  const isScheduled = !isLive && scheduledStartsMs > nowMs;
-  const isComingSoon = !isLive && !isScheduled && !offersLoading && !nextLoading;
+  const isScheduled = ready && !isLive && scheduledStartsMs > nowMs;
+  const isComingSoon = ready && !isLive && !isScheduled;
 
   // Membership status
   const userTier = (membership?.plan || '').toLowerCase().trim();
@@ -522,7 +533,12 @@ export default function FlashSaleScreen() {
       </View>
 
       {/* Content depending on state */}
-      {isLive && displayCars.length === 0 ? (
+      {!ready ? (
+        // Waiting for the server's current answer
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 56 }}>
+          <ActivityIndicator color="#FFFFFF" />
+        </View>
+      ) : isLive && displayCars.length === 0 ? (
         // Live offers that name no car (all cars / a category): the offers themselves.
         <View style={{ flex: 1, paddingBottom: insets.bottom }}>
           <ExclusiveOffersSection layout="list" />

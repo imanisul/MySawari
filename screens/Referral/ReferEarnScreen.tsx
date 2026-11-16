@@ -65,17 +65,19 @@ export default function ReferEarnScreen() {
 
   const code = customer.referralCode || '';
 
-  // One link for everyone: this page sends an iPhone friend to the App Store and an Android friend to Google Play on
-  // its own, copies the invite code for them, and shows who invited them.
+  // The store links, fetched from the server's referral settings (Operation App), with the app's own as fallback. The
+  // Play link carries the invite code as the install referrer, so it can be picked up on Android after install.
+  const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
+  const appStore = config?.appStoreUrl || 'https://apps.apple.com/app/id6829408836';
   const link = useMemo(
-    () => (code ? `${BACKEND_URL}/auth/refer/${encodeURIComponent(code)}` : ''),
-    [code],
+    () => (code ? `${playStore}${playStore.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref_code=${code}`)}` : ''),
+    [code, playStore],
   );
 
   const shortLink = link.replace(/^https?:\/\//, '');
   const pct = config?.referralRewardType === 'PERCENTAGE' && config?.referralRewardAmount ? `${config.referralRewardAmount}%` : '10%';
   const friendGets = '100 SawariCash';
-  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\n📲 Download the app:\n${link}\n\n(Referral code: *${code}*)`;
+  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\n📲 Download the app:\nAndroid: ${link}\niPhone: ${appStore}\n\n(Referral code: *${code}*)`;
 
   const faqs = useMemo(() => [
     { q: 'How does the Refer & Earn program work?', a: `Share your personal invite link or code. When your friend signs up and completes their trip, you earn ${pct} commission of their total trip amount directly in your wallet.` },
@@ -94,7 +96,7 @@ export default function ReferEarnScreen() {
 
   const copy = async () => {
     if (needLogin()) return;
-    await Clipboard.setStringAsync(link);
+    await Clipboard.setStringAsync(message);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);

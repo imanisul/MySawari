@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, AppState, BackHandler, Dimensions, Easing, Keyboard, LayoutAnimation, Linking, Modal, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Animated, AppState, BackHandler, Dimensions, Easing, Keyboard, LayoutAnimation, Modal, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useKeyboardPad } from '@/hooks/useKeyboardPad';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -151,12 +151,15 @@ export function LoginBottomSheet({
   // Focus the number field once the sheet has finished sliding up. With autoFocus the keyboard rose while the sheet
   // was still moving, and the two motions fought each other (the "shake").
   const phoneRef = useRef<TextInput>(null);
+  const slidingRef = useRef(false);
   const isVerifyingRef = useRef(false);
   const stepAnim = useRef(new Animated.Value(1)).current;
   const sheetAnim = useRef(new Animated.Value(SHEET_OFFSET)).current;
   const doneScale = useRef(new Animated.Value(0)).current;
   const [welcomeName, setWelcomeName] = useState('');
   const [step, setStep] = useState<'phone' | 'otp' | 'profile' | 'done'>('phone');
+  const stepRef = useRef(step);
+  stepRef.current = step;
   const [mobile, setMobile] = useState('');
   const [otp, setOtp] = useState('');
   const [otpId, setOtpId] = useState<string | null>(null);
@@ -221,12 +224,17 @@ export function LoginBottomSheet({
     }).catch(() => {});
 
     sheetAnim.setValue(SHEET_OFFSET);
+    slidingRef.current = true;
     Animated.timing(sheetAnim, {
       toValue: 0,
-      duration: 420,
+      duration: 320,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
-    }).start();
+    }).start(() => {
+      slidingRef.current = false;
+      // Keyboard up the moment the sheet lands (not on a fixed timer that could fire late or mid-slide).
+      if (stepRef.current === 'phone') phoneRef.current?.focus();
+    });
   }, [visible]);
 
   // Ensure referral code is populated if detected during flow when entering profile step
@@ -302,9 +310,11 @@ export function LoginBottomSheet({
   useEffect(() => {
     if (!visible || step !== 'phone') return;
 
+    // Opening: the slide's end focuses it (above). Coming back to this step inside an open sheet: focus right away.
+    if (slidingRef.current) return;
     const t = setTimeout(() => {
       phoneRef.current?.focus();
-    }, 460);
+    }, 60);
 
     return () => clearTimeout(t);
   }, [visible, step]);
@@ -746,27 +756,10 @@ export function LoginBottomSheet({
                 </Pressable>)}
               </View>
 
-              <View style={[styles.waNoticeCard, { backgroundColor: isDarkMode ? '#064E3B28' : '#F0FDF4', borderColor: isDarkMode ? '#05966950' : '#BBF7D0' }]}>
-                <Ionicons name="logo-whatsapp" size={20} color="#25D366" />
-                <View style={{ flex: 1, gap: 1 }}>
-                  <Text style={[styles.waNoticeTitle, { color: isDarkMode ? '#34D399' : '#15803D' }]}>Code sent to your WhatsApp</Text>
-                  <Text style={[styles.waNoticeSub, { color: isDarkMode ? '#A7F3D0' : '#166534' }]}>{masked(mobile)}</Text>
-                </View>
-                <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync().catch(() => {});
-                    Linking.openURL('whatsapp://app').catch(() => {
-                      Linking.openURL(`https://wa.me/91${mobile}`).catch(() => {});
-                    });
-                  }}
-                  style={[styles.waOpenBtn, { backgroundColor: '#25D366' }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open WhatsApp"
-                >
-                  <Text style={styles.waOpenBtnText}>Open</Text>
-                  <Feather name="arrow-up-right" size={13} color="#FFFFFF" />
-                </Pressable>
-              </View>
+              <Text style={[styles.small, styles.center, { color: ui.copy }]}>
+                Enter the 6-digit code sent to WhatsApp{'\n'}{masked(mobile)} ·{' '}
+                <Text style={{ color: ui.navy, fontFamily: 'PlusJakartaSans_600SemiBold' }} onPress={back} accessibilityRole="button">Change</Text>
+              </Text>
               {detectedClipOtp && otp !== detectedClipOtp && (
                 <Pressable
                   onPress={() => {
@@ -952,6 +945,7 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
   ui: typeof LIGHT;
   hasError: boolean;
 }) {
+  const { width: winW } = useWindowDimensions();
   const inputs = useRef<(TextInput | null)[]>([]);
   const [focused, setFocused] = useState<number | null>(null);
   const slots = Array.from({ length: OTP_LENGTH }, (_, i) => (value[i] && value[i] !== ' ' ? value[i] : ''));
@@ -996,6 +990,9 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
     if (i < OTP_LENGTH - 1) inputs.current[i + 1]?.focus();
   };
 
+  // Six 46-wide boxes + gaps need 306 + the sheet's 32 padding: narrower phones (320 wide) pushed the last box
+  // off the screen. Shrink the boxes to fit there instead.
+  const boxW = Math.min(46, (winW - 32 - 5 * 6) / 6);
   return (
     <View style={styles.otpRow}>
       {slots.map((d, i) => (
@@ -1018,6 +1015,7 @@ function OtpBoxes({ value, onChange, onComplete, editable, ui, hasError }: {
           style={[
             styles.otpBox,
             {
+              width: boxW,
               color: ui.title,
               backgroundColor: hasError ? ui.errorBg : ui.fieldBg,
               borderColor: hasError ? ui.errorBorder : focused === i ? ui.fieldFocus : ui.fieldBorder,
@@ -1125,38 +1123,6 @@ const styles = StyleSheet.create({
   detectedOtpText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
     fontSize: 12,
-  },
-  waNoticeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginTop: -2,
-    marginBottom: 4,
-  },
-  waNoticeTitle: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 13,
-  },
-  waNoticeSub: {
-    fontFamily: 'PlusJakartaSans_500Medium',
-    fontSize: 11.5,
-  },
-  waOpenBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  waOpenBtnText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 12,
-    color: '#FFFFFF',
   },
 
   // Navi referral card (Step 3)

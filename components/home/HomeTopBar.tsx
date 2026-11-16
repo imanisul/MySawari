@@ -195,10 +195,10 @@ export function CategoryTiles({ items, onPick, dark }: { items: CategoryTile[]; 
             <View style={[s.tileImageFrame, { width: t.imageFrameWidth }]}>
               <Image source={t.image} style={s.tileImg} resizeMode="contain" />
             </View>
-            {/* Label tab: white, top corners 6, a 1px purple outline — strongest on the left, light on the right */}
+            {/* Label tab (Figma 1781:15405): white, top corners 6, a 1px inside stroke that is #6B5AED at the top and
+                fades to nothing at the bottom (linear gradient, top → bottom) */}
             <View style={[s.tileLabelWrap, !!t.labelShift && { transform: [{ translateX: t.labelShift }] }, dark && { backgroundColor: '#1A1D29' }]}>
-              {/* Open at the bottom: left, top and right, purple fading to the tile border's lavender on the right */}
-              <FadeOutline id={`tileEdge${t.value}`} width={60} height={19} end={0.16} d="M0.5 19 V6.5 A6 6 0 0 1 6.5 0.5 H53.5 A6 6 0 0 1 59.5 6.5 V19" />
+              <FadeOutline id={`tileEdge${t.value}`} width={60} height={19} vertical start={1} end={0} d="M0.5 19 V6.5 A6 6 0 0 1 6.5 0.5 H53.5 A6 6 0 0 1 59.5 6.5 V19" />
               <Text style={[s.tileLabel, dark && { color: '#E5E7EB' }]} numberOfLines={1}>{t.label}</Text>
             </View>
             {/* The tile's 1px border is drawn last, as Figma draws a frame's stroke over its children: it runs along the
@@ -227,12 +227,12 @@ function BikeLabel({ text, dark }: { text: string; dark?: boolean }) {
  * 1px label outline drawn in SVG so it can fade along its length (a border can't): #6B5AED 70% on the left fading to
  * nothing on the right, as in the design.
  */
-function FadeOutline({ id, width, height, d, end = 0 }: { id: string; width: number; height: number; d: string; end?: number }) {
+function FadeOutline({ id, width, height, d, start = 0.7, end = 0, vertical = false }: { id: string; width: number; height: number; d: string; start?: number; end?: number; vertical?: boolean }) {
   return (
     <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
       <Defs>
-        <SvgLinearGradient id={id} x1="0" y1="0" x2={width} y2="0" gradientUnits="userSpaceOnUse">
-          <Stop offset="0" stopColor="#6B5AED" stopOpacity={0.7} />
+        <SvgLinearGradient id={id} x1="0" y1="0" x2={vertical ? 0 : width} y2={vertical ? height : 0} gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#6B5AED" stopOpacity={start} />
           <Stop offset="1" stopColor="#6B5AED" stopOpacity={end} />
         </SvgLinearGradient>
       </Defs>
@@ -253,19 +253,14 @@ export function BikeCategoryTiles({ onPick, dark }: { onPick: (filter: { transmi
         accessibilityRole="button"
         accessibilityLabel="Bikes"
       >
-        <LinearGradient
-          colors={dark ? ['#332B72', '#1A1D29'] : ['#6B5AED', '#FFFFFF']}
-          start={{ x: 0.02, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={[s.bikeTile, dark && { borderColor: 'rgba(107, 90, 237, 0.4)' }]}
-        >
+        <View style={[s.bikeTile, dark && { backgroundColor: '#1F1B3D', borderColor: 'rgba(107, 90, 237, 0.4)' }]}>
           <Image
             source={require('../../assets/images/category_bike.png')}
             style={s.bikeImg}
             resizeMode="contain"
           />
           <BikeLabel text="Bikes" dark={dark} />
-        </LinearGradient>
+        </View>
       </Pressable>
 
       {/* Frame 2147226270: Scooters */}
@@ -275,19 +270,14 @@ export function BikeCategoryTiles({ onPick, dark }: { onPick: (filter: { transmi
         accessibilityRole="button"
         accessibilityLabel="Scooters"
       >
-        <LinearGradient
-          colors={dark ? ['#332B72', '#1A1D29'] : ['#6B5AED', '#FFFFFF']}
-          start={{ x: 0.02, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={[s.bikeTile, dark && { borderColor: 'rgba(107, 90, 237, 0.4)' }]}
-        >
+        <View style={[s.bikeTile, dark && { backgroundColor: '#1F1B3D', borderColor: 'rgba(107, 90, 237, 0.4)' }]}>
           <Image
             source={require('../../assets/images/category_scooter.png')}
             style={s.bikeImg}
             resizeMode="contain"
           />
           <BikeLabel text="Scooters" dark={dark} />
-        </LinearGradient>
+        </View>
       </Pressable>
     </View>
   );
@@ -392,7 +382,7 @@ const s = StyleSheet.create({
   tileStroke: { position: 'absolute', top: -1, left: -1, right: -1, bottom: -1, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(107,90,237,0.16)' },
   tileImageFrame: { height: 45, position: 'relative', flexShrink: 0 },
   tileImg: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-  // Figma 60 × 19 tab at the bottom (padding 2/4/1); its fading outline is the FadeOutline SVG inside it.
+  // Figma 60 × 19 tab at the bottom (padding 2/4/1); its gradient stroke is the FadeOutline SVG inside it.
   tileLabelWrap: {
     position: 'absolute', bottom: -1, alignSelf: 'center', width: 60, height: 19,
     backgroundColor: '#FFFFFF', borderTopLeftRadius: 6, borderTopRightRadius: 6,
@@ -403,10 +393,11 @@ const s = StyleSheet.create({
 
   // Frame 2147226276: Bikes & Scooters
   bikeTilesRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, gap: 8, marginTop: 16 },
-  bikeTileWrap: { flex: 1, height: 53 },
+  bikeTileWrap: { flex: 1, height: 51 },
   bikeTile: {
-    flex: 1, height: 53, flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingVertical: 2, borderWidth: 1, borderColor: 'rgba(107, 90, 237, 0.5)',
+    // Figma Frame 2147226269 (bikes): 51 high, flat #EFEDFD, 1px #D1CCF9, radius 8, padding 2/0, picture and label apart.
+    flex: 1, height: 51, flexDirection: 'row', justifyContent: 'space-between', backgroundColor: '#EFEDFD',
+    alignItems: 'center', paddingVertical: 2, borderWidth: 1, borderColor: '#D1CCF9',
     borderRadius: 8, overflow: 'hidden',
   },
   // flex-grow 1: the picture box takes the space left of the label (≈100 wide), the bike centred in it.

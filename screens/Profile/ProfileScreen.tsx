@@ -66,7 +66,7 @@ export default function ProfileScreen() {
     // so the sign-in sheet slides up over a settled Home instead of over a popup and a transition at once.
     setConfirmLogout(false);
     router.replace('/');
-    await new Promise((r) => setTimeout(r, 700));
+    await new Promise((r) => setTimeout(r, 300)); // just long enough for Home to settle
     await logout();
   };
   const [refreshing, setRefreshing] = useState(false);
@@ -153,14 +153,8 @@ export default function ProfileScreen() {
         <LinearGradient colors={HEADER} locations={headerStops} style={[styles.header, { paddingTop: insets.top + 4 }]}>
           {isAuthenticated ? (
             <>
-              <View style={styles.headerTop}>
-                <Pressable ref={moreRef} collapsable={false} accessibilityRole="button" accessibilityLabel="More options" hitSlop={10} onPress={() => {
-                  Haptics.selectionAsync();
-                  moreRef.current?.measureInWindow((x, y) => { setMenuPos({ top: y, right: screenW - x + 4 }); setMenuOpen(true); });
-                }} style={styles.more}>
-                  <Feather name="more-vertical" size={24} color="#FFFFFF" />
-                </Pressable>
-              </View>
+              {/* Space for the ⋮, which is pinned over the page (below) so it never scrolls away. */}
+              <View style={styles.headerTop} />
               <Text style={styles.name} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{customer.name?.trim() || 'Add your name'}</Text>
               {!!customer.mobile && <Text style={styles.contact}>{maskMobile(customer.mobile)}</Text>}
               {!!customer.email && <Text style={styles.contact} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{customer.email}</Text>}
@@ -295,12 +289,29 @@ export default function ProfileScreen() {
       >
         <Text style={styles.stickyTitle}>My Profile</Text>
       </Animated.View>
+      {/* ⋮ pinned top-right, on top of the purple "My Profile" bar, so it is always there however far you scroll. */}
+      {isAuthenticated && (
+        <View style={[styles.morePinned, { top: insets.top + 4 }]}>
+          <Pressable ref={moreRef} collapsable={false} accessibilityRole="button" accessibilityLabel="More options" hitSlop={10} onPress={() => {
+                  Haptics.selectionAsync();
+                  // The menu always drops down just under the ⋮, right edges lined up, wherever the page is scrolled.
+                  // (It used to sit 40 below the dots' top and to their left, so it looked like it opened somewhere random.)
+                  moreRef.current?.measureInWindow((x, y, w, h) => {
+                    const ok = [x, y, w, h].every(Number.isFinite) && w > 0;
+                    setMenuPos(ok ? { top: y + h + 6, right: Math.max(8, screenW - (x + w)) } : null);
+                    setMenuOpen(true);
+                  });
+                }} style={({ pressed }) => [styles.more, pressed && { opacity: 0.6 }]}>
+                  <Feather name="more-vertical" size={24} color="#FFFFFF" />
+                </Pressable>
+        </View>
+      )}
       <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
 
       {/* ── ⋮ menu (design: Edit Profile / Settings / Logout) ── */}
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)} statusBarTranslucent navigationBarTranslucent>
         <Pressable style={styles.menuOverlay} onPress={() => setMenuOpen(false)}>
-          <View style={[styles.menu, { top: menuPos?.top ?? insets.top + 4, right: menuPos?.right ?? 44, backgroundColor: p.page, borderColor: p.segBorder }]}>
+          <View style={[styles.menu, { top: menuPos?.top ?? insets.top + 34, right: menuPos?.right ?? 16, backgroundColor: p.page, borderColor: p.segBorder }]}>
             {[
               { label: 'Edit Profile', onPress: () => go('/edit-profile') },
               { label: 'Settings', onPress: () => go('/settings') },
@@ -309,7 +320,12 @@ export default function ProfileScreen() {
               <Pressable
                 key={m.label}
                 accessibilityRole="menuitem"
-                onPress={() => { setMenuOpen(false); m.onPress(); }}
+                onPress={() => {
+                  setMenuOpen(false);
+                  // Let the menu fade out first: opening the Logout popup (or a new page) while it is still closing
+                  // made iOS drop the popup and the screens jump on top of each other.
+                  setTimeout(m.onPress, 250);
+                }}
                 style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: p.soft }]}
               >
                 <Text style={[styles.menuText, { color: p.fg }]}>{m.label}</Text>
@@ -376,6 +392,8 @@ const styles = StyleSheet.create({
   header: { paddingLeft: 16, paddingRight: 16, paddingBottom: 16 + 24 },
   headerTop: { flexDirection: 'row', justifyContent: 'flex-end', height: 24, alignItems: 'center', marginBottom: 32 },
   more: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  // Same spot as the header row it used to sit in (16 from the right, 4 under the status bar, 24 high).
+  morePinned: { position: 'absolute', right: 16, zIndex: 10, elevation: 10 },
   name: { fontFamily: FONT.bold, fontSize: 19, lineHeight: 28, color: '#FFFFFF', marginBottom: 2 },
   contact: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20, color: '#FFFFFF' },
 
@@ -420,7 +438,7 @@ const styles = StyleSheet.create({
 
   menuOverlay: { flex: 1 },
   // Figma: 92×111 white card, radius 8, three 35px rows, 12px side padding.
-  menu: { position: 'absolute' ,marginTop: 40, width: 92, borderRadius: 8, paddingVertical: 3, borderWidth: 1 },
+  menu: { position: 'absolute', width: 92, borderRadius: 8, paddingVertical: 3, borderWidth: 1 },
   menuItem: { paddingHorizontal: 12, height: 35, justifyContent: 'center' },
   menuText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
   dialogOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 18 },

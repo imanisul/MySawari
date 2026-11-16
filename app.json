@@ -44,7 +44,7 @@
       }
     },
     "android": {
-      "backgroundColor": "#FFFFFF",
+      "backgroundColor": "#362C88",
       "package": "com.mysawari.customer",
       "allowBackup": false,
       "blockedPermissions": [
@@ -133,10 +133,10 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/MySawari_nobg.png",
-          "imageWidth": 160,
+          "image": "./assets/images/splash_white_icon.png",
+          "imageWidth": 100,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "backgroundColor": "#362C88"
         }
       ],
       "expo-font",

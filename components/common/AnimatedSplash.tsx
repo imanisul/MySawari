@@ -14,6 +14,7 @@ import Svg, { Path, Circle, G } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   FlashScreenConfig,
   getCachedFlashScreenConfig,
@@ -148,10 +149,10 @@ export function AnimatedSplash({
     };
   }, []);
 
-  // Flash screen duration (default 2.5s, configurable via Operation App)
+  // Flash screen duration (matches the 1.13s opening animation + 250ms hold)
   const durationMs = useMemo(() => {
     const sec = Number(config?.durationSeconds);
-    return !isNaN(sec) && sec >= 1 && sec <= 8 ? sec * 1000 : 2500;
+    return !isNaN(sec) && sec >= 1 && sec <= 8 ? sec * 1000 : 1400;
   }, [config?.durationSeconds]);
 
   // If splash screen is explicitly disabled by admin, complete immediately
@@ -333,7 +334,7 @@ export function AnimatedSplash({
   const isFestiveMode = false;
   const hasCustomActiveImage = false;
 
-  const activeBg = isFestiveMode ? FESTIVE_BG : (config?.backgroundColor || '#FFFFFF');
+  const activeBg = isFestiveMode ? FESTIVE_BG : '#2D2565';
   const showProblem = !isDataReady && (loadFailed || isSlow);
 
   return (
@@ -352,7 +353,7 @@ export function AnimatedSplash({
             },
           ]}
         >
-          <StatusBar barStyle="dark-content" backgroundColor={activeBg} />
+          <StatusBar barStyle={isFestiveMode ? "dark-content" : "light-content"} backgroundColor={activeBg} translucent />
 
           {/* ======================================================== */}
           {/* MODE 1: SENIOR DESIGNER DIWALI SPECIAL / FESTIVE MODE     */}
@@ -617,36 +618,25 @@ export function AnimatedSplash({
             />
           ) : (
             /* ======================================================== */
-            /* MODE 3: SIGNATURE CLASSIC SPLASH                         */
+            /* OPENING ANIMATION FLASH SCREEN                           */
             /* ======================================================== */
-            <Animated.View
-              style={[
-                styles.classicContainer,
-                {
-                  paddingTop: insets.top,
-                  paddingBottom: insets.bottom,
-                  opacity: brandOpacity,
-                },
-              ]}
+            <LinearGradient
+              colors={['#2D2565', '#3A3184', '#5E4EE0']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.animBgGradient}
             >
-              <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
-                <Image
-                  source={require('@/assets/images/MySawari_nobg.png')}
-                  style={styles.classicLogoImage}
-                  resizeMode="contain"
-                />
-              </Animated.View>
-              <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }], marginTop: 14 }}>
-                <Text style={styles.classicTitle}>
-                  {displayTitle}
-                </Text>
-              </Animated.View>
-              <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 8 }}>
-                <Text style={styles.classicTagline}>
-                  {displayTagline}
-                </Text>
-              </Animated.View>
-            </Animated.View>
+              <ExpoImage
+                source={require('@/assets/animations/opening_animation.gif')}
+                style={{
+                  width: Math.min(windowWidth * 0.95, 420),
+                  height: Math.min(windowWidth * 0.95, 420),
+                }}
+                contentFit="contain"
+                cachePolicy="memory-disk"
+                priority="high"
+              />
+            </LinearGradient>
           )}
 
           {/* Fallback trouble actions if connection is completely unresponsive */}
@@ -697,6 +687,11 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     zIndex: 99999,
+  },
+  animBgGradient: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   classicContainer: {
     flex: 1,

@@ -3,8 +3,6 @@ import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-na
 import Svg, { Defs, G, LinearGradient, Path, Stop, Text as SvgText, TextPath } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
-import FlashSaleTitle from '@/assets/images/home_flash_sale_title.svg';
-import FlashSaleUnderline from '@/assets/images/home_flash_sale_underline.svg';
 
 /** Figma "Frame 2147226271": the Flash Sale banner, 361 × 106 on #3E2DC8 (tap opens the Today's Deals screen). */
 
@@ -106,21 +104,31 @@ import { exclusiveOffersQueryOptions, isOfferLive, nextFlashSaleQueryOptions } f
 import { getIndiaDateParts } from '@/utils/sawari';
 
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-/** "LIVE TODAY 8PM" / "LIVE TOMORROW 8AM" / "LIVE ON SUNDAY 8AM" / "LIVE ON 22 NOV 8AM" in India time; null if none. */
-function saleWhen(startsAt?: string | null): string | null {
+/**
+ * The design's line "EVERY SUNDAY" + "8AM" (the time gets the hand-drawn underline), from the next sale's real day and
+ * time in India time. Null when there's no upcoming sale.
+ */
+function saleWhen(startsAt?: string | null): { lead: string; time: string } | null {
   const ms = startsAt ? new Date(startsAt).getTime() : NaN;
   if (!Number.isFinite(ms) || ms <= Date.now()) return null;
   const p = getIndiaDateParts(ms);
-  const day = (t: number) => { const q = getIndiaDateParts(t); return Date.UTC(q.year, q.month, q.date) / 86400000; };
-  const ahead = day(ms) - day(Date.now());
   const h = p.hours % 12 || 12;
   const time = `${h}${p.minutes ? `:${String(p.minutes).padStart(2, '0')}` : ''}${p.hours >= 12 ? 'PM' : 'AM'}`;
-  if (ahead <= 0) return `LIVE TODAY ${time}`;
-  if (ahead === 1) return `LIVE TOMORROW ${time}`;
-  if (ahead < 7) return `LIVE ON ${WEEKDAYS[new Date(Date.UTC(p.year, p.month, p.date)).getUTCDay()]} ${time}`;
-  return `LIVE ON ${p.date} ${MONTHS[p.month]} ${time}`;
+  return { lead: `EVERY ${WEEKDAYS[new Date(Date.UTC(p.year, p.month, p.date)).getUTCDay()]}`, time };
 }
+
+/** Figma "Vector 3": the hand-drawn white underline under the time (1.55 stroke, thin black drop shadow). */
+const UNDERLINE = 'M0.0038 0.7799C0.0038 0.7799 14.1727 0.7077 22.7766 1.178C32.1027 1.6877 45.8303 2.8166 45.8303 2.8166';
+function Underline({ width }: { width: number }) {
+  return (
+    <Svg width={width} height={4.37} viewBox="0 0 45.8938 4.36582" preserveAspectRatio="none" pointerEvents="none">
+      <Path d={UNDERLINE} stroke="#000000" strokeWidth={1.55} transform="translate(0.6 0.6)" fill="none" />
+      <Path d={UNDERLINE} stroke="#FFFFFF" strokeWidth={1.55} fill="none" />
+    </Svg>
+  );
+}
+
+const LINE2_SHADOW = { dx: -0.78, dy: 0.78, color: '#000000' };
 
 export function FlashSaleBanner() {
   const router = useRouter();
@@ -131,7 +139,9 @@ export function FlashSaleBanner() {
   // App), else the weekly schedule.
   // Always loaded (not only when nothing is live) so the Flash Sale page opens with it already known.
   const { data: nextSale } = useQuery(nextFlashSaleQueryOptions);
-  const subText = isLive ? 'LIVE NOW · BOOK DEALS' : saleWhen(nextSale?.startsAt) ?? 'EVERY SUNDAY 8AM';
+  const when = isLive ? null : saleWhen(nextSale?.startsAt);
+  const subText = isLive ? 'LIVE NOW · BOOK DEALS' : when ? null : 'EVERY SUNDAY 8AM';
+  const [timeW, setTimeW] = React.useState(0);
   // Its lettering sits at fixed spots on a 361-wide card: on narrower phones the whole banner shrinks to fit.
   const { width } = useWindowDimensions();
   const k = Math.min(1, (width - 32) / 361);
@@ -156,7 +166,22 @@ export function FlashSaleBanner() {
             {subText === 'EVERY SUNDAY 8AM' ? (
               <CurvedLettering id="flashSaleScheduleArc" text={subText} width={260} size={22} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} font="PlusJakartaSans_700Bold" rise={8.5} />
             ) : (
-              <Lettering text={subText} width={260} size={23} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} skew="1deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
+              {when ? (
+              // Design: "EVERY SUNDAY 8AM" — day, then the time with the hand-drawn underline under it.
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                <Lettering text={when.lead} size={23} shadow={LINE2_SHADOW} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
+                <View onLayout={(e) => setTimeW(e.nativeEvent.layout.width)}>
+                  <Lettering text={when.time} size={23} shadow={LINE2_SHADOW} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
+                  {timeW > 0 && (
+                    <View style={{ alignItems: 'center', marginTop: 1, transform: [{ rotate: '-1deg' }] }}>
+                      <Underline width={timeW * 0.96} />
+                    </View>
+                  )}
+                </View>
+              </View>
+            ) : (
+              <Lettering text={subText as string} width={260} size={23} shadow={LINE2_SHADOW} near={0.78} outline={0.93} skew="1deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
+            )}
             )}
           </View>
         </View>
@@ -169,17 +194,8 @@ const styles = StyleSheet.create({
   row: { height: 106, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   card: { width: 361, height: 106, borderRadius: 16, backgroundColor: '#3E2DC8', overflow: 'hidden' },
   rays: { position: 'absolute', left: -100, top: -228.5, mixBlendMode: 'overlay' },
-  text: { position: 'absolute', top: 23, left: (361 - 223.93) / 2 + 0.47, width: 223.93, height: 54.307, alignItems: 'center', overflow: 'visible' },
-  underlineFrame: {
-    position: 'absolute',
-    left: 247,
-    top: 84,
-    width: 45.855,
-    height: 2.84,
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '-1deg' }],
-  },
+  // Figma Group 1171275692: 223.93 × 63.84 (both lines + the underline), centred +0.47 across, +1.92 down.
+  text: { position: 'absolute', top: (106 - 63.84) / 2 + 1.92, left: (361 - 223.93) / 2 + 0.47, width: 223.93, height: 63.84, alignItems: 'center', overflow: 'visible' },
   lettering: {
      marginTop: -2, 
     //  transform: [{ rotate: '-1deg' }],

@@ -28,6 +28,7 @@ import WalletCoinsIcon from '@/assets/images/wallet_coins.png';
 import ReferHandCoinIcon from '@/assets/images/refer_hand_coin.png';
 import HomeTabCarIcon from '@/assets/images/home_tab_car.svg';
 import HomeTabBikeIcon from '@/assets/images/home_tab_bike.svg';
+import { BannerRays } from './FlashSaleBanner';
 
 // Home page (Figma "Home"): purple banner, refer strip, Cars / Bikes search card, then the sections below.
 /** Icons pre-sized to 4x their display size (smooth on every phone, unlike a 512 px picture shrunk 20x at draw time). */
@@ -236,8 +237,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
   const { data: offers } = useQuery(offersQueryOptions);
 
   const slides = useMemo<HeroSlide[]>(() => {
-    // The price and benefit cards now live in HomeCardsRow (their own row under the categories).
-    const lead: HeroSlide[] = [];
+    const lead: HeroSlide[] = [{ id: 'home-price-banner', kind: 'price' }];
     if (!offers || !Array.isArray(offers)) return [...lead, ...DEFAULT_SLIDES];
 
     const offerSlides: HeroSlide[] = [];
@@ -323,6 +323,8 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
 
   // Adaptive width across compact phones (360dp), modern phones (390-430dp), and tablets (460dp max)
   const cardWidth = Math.min(width - 32, 460);
+  const priceBannerWidth = Math.min(width, 393);
+  const priceBannerScale = priceBannerWidth / 393;
 
   const handleSlidePress = useCallback((s: HeroSlide | any) => {
     Haptics.selectionAsync();
@@ -403,11 +405,10 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
   // first without animation, so it never sweeps backwards across all the banners.
   const pos = useRef(0);
   const count = slides.length;
-  // Figma (measured below the 64px header): price slide area 11+137 with the slider overlapping its last 2px
-  // (slider at 210); benefits slide area 186 (slider at 250); anything else keeps 166.
+  // The hero carousel adapts its height to the active slide.
   const kind = slides[slide % count]?.kind;
-  const areaH = kind === 'price' ? 148 : kind === 'benefits' ? 186 : 166;
-  const pagerTop = kind === 'price' ? -2 : kind === 'benefits' ? 0 : 9;
+  const areaH = kind === 'price' ? 287 * priceBannerScale : kind === 'benefits' ? 186 : 166;
+  const pagerTop = kind === 'price' ? 0 : kind === 'benefits' ? 0 : 9;
   useEffect(() => {
     if (count <= 1) return;
     let reset: ReturnType<typeof setTimeout> | undefined;
@@ -477,33 +478,44 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
         }}
       >
         {(count > 1 ? [...slides, slides[0]] : slides).map((s, index) => (
-          <View key={`${s.id}-${index}`} style={{ width, height: areaH, alignItems: 'center', justifyContent: s.kind === 'benefits' ? 'flex-end' : s.kind === 'price' ? 'flex-start' : 'center', paddingTop: s.kind === 'price' ? 11 : 0, paddingBottom: s.kind === 'benefits' ? 9 : 0 }}>
+          <View key={`${s.id}-${index}`} style={{ width, height: areaH, alignItems: 'center', justifyContent: s.kind === 'benefits' ? 'flex-end' : 'center', paddingBottom: s.kind === 'benefits' ? 9 : 0 }}>
             {s.kind === 'benefits' ? (
               <>
                 <Text style={styles.findHeadline} numberOfLines={1} adjustsFontSizeToFit accessibilityRole="header" accessibilityLabel="Find the Perfect Ride">Find the <Text style={{ color: '#FAC64C' }}>Perfect Ride</Text></Text>
                 <BenefitCards width={Math.min(width, 492)} />
               </>
             ) : s.kind === 'price' ? (
-              <View style={styles.priceSlide} accessible accessibilityRole="header" accessibilityLabel={`Your ride, from just ${formatCurrency(fromRate || 0)}`}>
-                {/* Frame 2147226206: stacked "Your ride, / from just" beside "₹999" */}
-                <View style={styles.priceRow}>
-                  <View style={styles.priceLeadCol}>
-                    <Text style={[styles.priceLead, styles.priceLeadTop]} numberOfLines={1} allowFontScaling={false}>Your ride,</Text>
-                    <Text style={styles.priceLead} numberOfLines={1} allowFontScaling={false}>from just</Text>
+              <View
+                style={[styles.priceBanner, { transform: [{ scale: priceBannerScale }] }]}
+                accessible
+                accessibilityRole="header"
+                accessibilityLabel={`Your ride, from just ${formatCurrency(fromRate || 0)}`}
+              >
+                <LinearGradient
+                  colors={['#6152D8', '#CEC9F3']}
+                  start={{ x: 0.5, y: 0 }}
+                  end={{ x: 0.5, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+                <BannerRays style={styles.priceBannerRays} />
+                <View style={styles.priceBannerText}>
+                  <View style={styles.priceRow}>
+                    <View style={styles.priceLeadCol}>
+                      <Text style={[styles.priceLead, styles.priceLeadTop]} numberOfLines={1} allowFontScaling={false}>Your ride,</Text>
+                      <Text style={styles.priceLead} numberOfLines={1} allowFontScaling={false}>from just</Text>
+                    </View>
+                    <Text
+                      style={styles.priceAmount}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.72}
+                      allowFontScaling={false}
+                    >
+                      {formatCurrency(fromRate || 999)}
+                    </Text>
                   </View>
-                  <Text
-                    style={styles.priceAmount}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.72}
-                    allowFontScaling={false}
-                  >
-                    {formatCurrency(fromRate || 999)}
-                  </Text>
                 </View>
-
-                {/* Ellipse 13: blurred dark ellipse ground shadow beneath the 3 SUVs */}
-                <Svg width={242} height={30} style={styles.priceCarShadow} pointerEvents="none">
+                <Svg width={290} height={36} style={styles.priceCarShadow} pointerEvents="none">
                   <Defs>
                     <RadialGradient id={`heroCarShadow_${index}`} cx="50%" cy="50%" rx="50%" ry="50%" fx="50%" fy="50%">
                       <Stop offset="0" stopColor="#0E0E0E" stopOpacity={0.6} />
@@ -511,10 +523,8 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
                       <Stop offset="1" stopColor="#0E0E0E" stopOpacity={0} />
                     </RadialGradient>
                   </Defs>
-                  <Ellipse cx={121} cy={15} rx={121} ry={15} fill={`url(#heroCarShadow_${index})`} />
+                  <Ellipse cx={145} cy={18} rx={145} ry={18} fill={`url(#heroCarShadow_${index})`} />
                 </Svg>
-
-                {/* Modern SUV Trio: Creta, Nexon, Seltos (522x174 @2x -> 261x87) */}
                 <CachedImage source={require('@/assets/images/home_hero_cars.png')} style={styles.priceCars} contentFit="contain" transition={0} />
               </View>
             ) : s.kind === 'image' ? (
@@ -1330,45 +1340,46 @@ const styles = StyleSheet.create({
   walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
   walletCoin: { width: 12, height: 12 },
   walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#2F3E75' },
-  // Figma Frame 2147226207: 261×137 banner group with price header at top: 0, Ellipse 13 shadow at top: 106, cars at top: 50.
-  // Figma: 271 wide, 28/42, weight 680 (the app has 700), centred, white, shadow 0 4 6 at 25%.
+  // Figma Home price banner: 393×287 card with the price lockup and SUV trio.
   findHeadline: { width: 300, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 28, lineHeight: 42, letterSpacing: -0.56, textAlign: 'center', color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 6, marginBottom: 9 },
-  priceSlide: { width: 261, height: 137, position: 'relative', alignItems: 'center' },
-  priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 78, minWidth: 236, zIndex: 1 },
-  priceLeadCol: { minWidth: 107, height: 62, alignItems: 'center', justifyContent: 'center' },
+  priceBanner: { width: 393, height: 287, borderRadius: 12, overflow: 'hidden', position: 'relative' },
+  priceBannerRays: { position: 'absolute', left: -83.8375, top: -136.8375 },
+  priceBannerText: { position: 'absolute', left: 40.281, top: 60.5, width: 312.438, height: 164, alignItems: 'center' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2.394, height: 78, width: 312.438, zIndex: 1 },
+  priceLeadCol: { minWidth: 128.088, height: 64, alignItems: 'center', justifyContent: 'center' },
   priceLead: {
-    minWidth: 107,
-    height: 36,
+    minWidth: 128.088,
+    height: 43.1,
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 24,
-    lineHeight: 36,
+    fontSize: 28.73,
+    lineHeight: 43.1,
     textAlign: 'center',
-    letterSpacing: -0.48,
+    letterSpacing: -0.5746,
     color: '#FFFFFF',
     textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 4 },
-    textShadowRadius: 6,
+    textShadowOffset: { width: 0, height: 4.788 },
+    textShadowRadius: 7.182,
     includeFontPadding: false,
   },
-  priceLeadTop: { marginBottom: -10 },
-  // Figma: 52/78, weight 680 (700Bold), gold #FAC64C, soft shadow.
+  priceLeadTop: { marginBottom: -11.971 },
+  // Figma: 62/78, weight 680 (700Bold), gold #FAC64C, soft shadow.
   priceAmount: {
     minWidth: 127,
     maxWidth: 168,
     height: 78,
     fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 52,
+    fontSize: 62.248,
     lineHeight: 78,
     textAlign: 'center',
-    letterSpacing: -1.04,
+    letterSpacing: -1.245,
     color: '#FAC64C',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 3.2 },
-    textShadowRadius: 3.2,
+    textShadowOffset: { width: 0, height: 3.831 },
+    textShadowRadius: 3.831,
     includeFontPadding: false,
   },
-  priceCarShadow: { position: 'absolute', top: 106, left: (261 - 242) / 2 + 0.5, width: 242, height: 30, zIndex: 2 },
-  priceCars: { position: 'absolute', top: 50, left: 0, width: 261, height: 87, zIndex: 3 },
+  priceCarShadow: { position: 'absolute', top: 188.39, left: 51.65, width: 290, height: 36, zIndex: 2 },
+  priceCars: { position: 'absolute', top: 120.5, left: 10.5, width: 372, height: 124, zIndex: 3 },
   headlineBlock: { alignItems: 'center', marginTop: 12 },
   // Figma: the promises start 117 below the headline block's top, i.e. 12 up into its 128.95 height.
   subRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: -12, paddingVertical: 4, paddingHorizontal: 8, minHeight: 25, alignSelf: 'stretch' },

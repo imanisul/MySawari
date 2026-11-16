@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg';
+import Svg, { Defs, G, LinearGradient, Path, Stop, Text as SvgText, TextPath } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import FlashSaleTitle from '@/assets/images/home_flash_sale_title.svg';
@@ -36,12 +36,40 @@ export function Lettering({ text, width, size, shadow, font = 'Anton_400Regular'
   );
 }
 
+function CurvedLettering({ id, text, width, size, shadow, font, near, outline = 1, rise = 4 }: {
+  id: string; text: string; width: number; size: number; shadow: { dx: number; dy: number; color: string };
+  font: string; near?: number; outline?: number; rise?: number;
+}) {
+  const baseline = size + 1;
+  const path = `M 0 ${baseline} Q ${width / 2} ${baseline - rise * 2} ${width} ${baseline}`;
+  const nx = near !== undefined ? Math.sign(shadow.dx) * near : shadow.dx * 0.4;
+  const ny = near !== undefined ? Math.sign(shadow.dy) * near : shadow.dy * 0.4;
+  const copy = (color: string, dx: number, dy: number, key: string) => (
+    <G key={key} transform={`translate(${dx},${dy})`}>
+      <SvgText fontFamily={font} fontSize={size} fill={color} textAnchor="middle">
+        <TextPath href={`#${id}`} startOffset="50%" textAnchor="middle">{text}</TextPath>
+      </SvgText>
+    </G>
+  );
+  return (
+    <Svg width={width} height={size * 1.15} viewBox={`0 0 ${width} ${size * 1.15}`} style={{ transform: [{ scaleY: 1.15 }] }} pointerEvents="none">
+      <Defs>
+        <Path id={id} d={path} />
+      </Defs>
+      {copy(shadow.color, shadow.dx, shadow.dy, 's')}
+      {copy('#000000', nx, ny, 'sb')}
+      {NUDGE.map(([dx, dy], i) => copy('#000000', dx * outline, dy * outline, `o${i}`))}
+      {copy('#FFFFFF', 0, 0, 'text')}
+    </Svg>
+  );
+}
+
 /** Gold bolt (Figma Vector): 1.2px black outline, then a 1px black and a 3px #E58900 hard shadow down-right. */
 export function Bolt({ style, width = 13, line = 1.2, near = 1, far = 3 }: { style?: object; width?: number; line?: number; near?: number; far?: number }) {
-  const d = 'M7.5 0.5 L0.8 13 H5.6 L3.6 22.6 L11.3 9.6 H6.4 Z';
-  const u = 12.08 / width; // screen px → drawing units
+  const d = 'M8.94014 0.575406C7.05022 0.360281 5.142 0.360281 3.25209 0.575406L1.29556 0.798659C1.15518 0.814791 1.02468 0.878901 0.92611 0.980149C0.827543 1.0814 0.76696 1.21358 0.754602 1.35434L0.603722 3.04959C0.350843 5.89926 0.350843 8.76572 0.603722 11.6154L0.754602 13.3106C0.768093 13.4634 0.838288 13.6055 0.951357 13.709C1.06443 13.8125 1.21217 13.87 1.36548 13.87H3.9059V22.9498C3.90613 23.0767 3.94573 23.2004 4.01924 23.3039C4.09275 23.4074 4.19655 23.4855 4.31633 23.5275C4.43611 23.5695 4.56597 23.5733 4.68799 23.5383C4.81002 23.5034 4.91821 23.4315 4.99764 23.3325L5.47726 22.7314C8.33492 19.1541 10.6105 15.1485 12.2202 10.8622L12.4533 10.2403C12.4882 10.1475 12.5001 10.0476 12.4879 9.9492C12.4758 9.8508 12.4399 9.75681 12.3835 9.67529C12.3271 9.59377 12.2517 9.52714 12.1639 9.48113C12.0761 9.43511 11.9784 9.41107 11.8792 9.41107H8.55128L11.4033 1.6193C11.4353 1.53211 11.447 1.43879 11.4377 1.34639C11.4283 1.25399 11.3981 1.16492 11.3494 1.08589C11.3006 1.00686 11.2345 0.939948 11.1561 0.890192C11.0776 0.840436 10.9889 0.809138 10.8967 0.798659L8.94014 0.575406Z';
+  const u = 14 / width; // screen px → drawing units
   return (
-    <Svg width={width + far} height={(width * 23.15) / 12.08 + far} viewBox={`0 0 ${12.08 + far * u} ${23.15 + far * u}`} style={[{ position: 'absolute' }, style]} pointerEvents="none">
+    <Svg width={width + far} height={(width * 26) / 14 + far} viewBox={`0 0 ${14 + far * u} ${26 + far * u}`} style={[{ position: 'absolute' }, style]} pointerEvents="none">
       <Path d={d} fill="#E58900" transform={`translate(${far * u},${far * u})`} />
       <Path d={d} fill="#000000" transform={`translate(${near * u},${near * u})`} />
       <Path d={d} fill="#FBC422" stroke="#000000" strokeWidth={line * u} />
@@ -55,7 +83,7 @@ export function Bolt({ style, width = 13, line = 1.2, near = 1, far = 3 }: { sty
  * can't resolve, and it has no blend modes, so the overlay's lightening is matched with a lower opacity instead.
  */
 const RAY = 'M260.716 0.687536H299.959L285.057 280.338H275.619L260.716 0.687536Z';
-function BannerRays({ style }: { style?: object }) {
+export function BannerRays({ style }: { style?: object }) {
   return (
     <Svg width={560.68} height={560.68} viewBox="0 0 560.675 560.675" style={style} pointerEvents="none">
       <Defs>
@@ -100,10 +128,10 @@ export function FlashSaleBanner() {
   // Only offers still running right now — a remembered offer that has ended never shows as LIVE, even before the refresh.
   const isLive = offers.some((o: any) => isOfferLive(o, Date.now(), true));
   // The second line follows the real sale: live now, else the next scheduled sale's day and time (set in the Operation
-  // App), else coming soon.
+  // App), else the weekly schedule.
   // Always loaded (not only when nothing is live) so the Flash Sale page opens with it already known.
   const { data: nextSale } = useQuery(nextFlashSaleQueryOptions);
-  const subText = isLive ? 'LIVE NOW · BOOK DEALS' : saleWhen(nextSale?.startsAt) ?? 'COMING SOON';
+  const subText = isLive ? 'LIVE NOW · BOOK DEALS' : saleWhen(nextSale?.startsAt) ?? 'EVERY SUNDAY 8AM';
   // Its lettering sits at fixed spots on a 361-wide card: on narrower phones the whole banner shrinks to fit.
   const { width } = useWindowDimensions();
   const k = Math.min(1, (width - 32) / 361);
@@ -118,14 +146,18 @@ export function FlashSaleBanner() {
       >
         <BannerRays style={styles.rays} />
         <View style={styles.text}>
-          <View style={{ width: 183.21, height: 32.58, marginVertical: -3.1, alignItems: 'center', justifyContent: 'center' }}>
-            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 2.32, top: 6.27 }} />
+          <View style={{ width: 199.21, height: 32.58, marginVertical: -3.1, alignItems: 'center', justifyContent: 'center' }}>
+            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 3.32, top: 6.27 }} />
             {/* Figma: upright, 0.93 black outline, 0.78 black + 2.33 #FF008B drop shadows; 156.73 wide (size 26.6 fits it) */}
-            <Lettering text="FLASH SALE" width={156.73} size={26.6} shadow={{ dx: -2.33, dy: 2.33, color: '#FF008B' }} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
-            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 166.47, top: 6.27 }} />
+            <CurvedLettering id="flashSaleTitleArc" text="FLASH SALE" width={156.73} size={26} shadow={{ dx: -2.33, dy: 2.33, color: '#FF008B' }} near={0.78} outline={0.93} font="PlusJakartaSans_700Bold" rise={8.5} />
+            <Bolt width={12.08} line={0.42} near={0.35} far={1.04} style={{ left: 183.85, top: 6.27 }} />
           </View>
-          <View style={{ marginTop: -4 }}>
-            <Lettering text={subText} width={260} size={23} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} skew="0deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
+          <View style={styles.lettering}>
+            {subText === 'EVERY SUNDAY 8AM' ? (
+              <CurvedLettering id="flashSaleScheduleArc" text={subText} width={260} size={22} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} font="PlusJakartaSans_700Bold" rise={8.5} />
+            ) : (
+              <Lettering text={subText} width={260} size={23} shadow={{ dx: -0.78, dy: 0.78, color: '#000000' }} near={0.78} outline={0.93} skew="1deg" scaleY={1.15} font="PlusJakartaSans_700Bold" />
+            )}
           </View>
         </View>
       </Pressable>
@@ -148,4 +180,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     transform: [{ rotate: '-1deg' }],
   },
+  lettering: {
+     marginTop: -2, 
+    //  transform: [{ rotate: '-1deg' }],
+  }
 });

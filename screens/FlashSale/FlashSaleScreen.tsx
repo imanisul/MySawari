@@ -544,23 +544,23 @@ export default function FlashSaleScreen() {
           <ExclusiveOffersSection layout="list" />
         </View>
       ) : isComingSoon ? (
-        // State 1 & 2: COMING SOON / NO ACTIVE SALE
-        <View style={styles.centerComingSoon} accessible accessibilityRole="header" accessibilityLabel="Flash Sale Coming Soon">
+        // State 1 & 2: SCHEDULE ON SATURDAY / NO ACTIVE SALE
+        <View style={styles.centerComingSoon} accessible accessibilityRole="header" accessibilityLabel="Flash Sale, schedule on Saturday">
           <View style={[styles.comingSoonGroup, { transform: [{ scale: Math.min(1, (windowWidth - 12) / 378) }] }]}>
             <View style={[styles.csLine, { top: 4 }]}>
-              <Lettering text="FLASH" width={160} size={42} shadow={PINK_SHADOW} near={1.42} outline={1.7} skew="0deg" scaleY={1.15} font={FONT} />
+              <Lettering text="FLASH" width={160} size={32} shadow={PINK_SHADOW} near={1.42} outline={1.7} skew="0deg" scaleY={1.15} font={FONT} />
             </View>
-            <View style={[styles.csLine, { top: 46 }]}>
-              <Lettering text="SALE" width={190} size={66} shadow={PINK_SHADOW} near={1.42} outline={1.7} skew="0deg" scaleY={1.15} font={FONT} />
+            <View style={[styles.csLine, { top: -40 }]}>
+              <Lettering text="SALE" width={160} size={64} shadow={PINK_SHADOW} near={1.42} outline={1.7} skew="0deg" scaleY={1.15} font={FONT} />
             </View>
             <View style={[styles.csLine, { top: 132 }]}>
-              <Lettering text="COMING" width={370} size={38} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
+              <Lettering text="SCHEDULE ON" width={370} size={38} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
             </View>
             <View style={[styles.csLine, { top: 174 }]}>
-              <Lettering text="SOON" width={370} size={38} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
+              <Lettering text="SATURDAY" width={370} size={38} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
             </View>
-            <Bolt width={32} style={{ left: 52, top: 0 }} />
-            <Bolt width={32} style={{ left: 298, top: 80 }} />
+            <Bolt width={32} style={{ left: 62, top: 0 }} />
+            <Bolt width={32} style={{ left: 296, top: 78 }} />
           </View>
         </View>
       ) : (
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
   timerNum: { fontFamily: FONT_SEMI, fontSize: 16.325, lineHeight: 24.5, color: '#6152D8', textAlign: 'center', includeFontPadding: false },
   timerUnitText: { fontFamily: FONT_SEMI, fontSize: 11.872, lineHeight: 17.8, color: '#FFFFFF', textAlign: 'center' },
 
-  /* Coming Soon Screen (Images 1 & 2) */
+  /* Scheduled Sale Screen (Images 1 & 2) */
   centerComingSoon: {
     flex: 1,
     alignItems: 'center',

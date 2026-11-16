@@ -42,7 +42,7 @@ function PicIcon({ source, size }: { source: any; size: number }) {
 }
 
 export const HOME_PURPLE = '#323E71';
-// Hero gradient (Figma Home frame): 180deg, #6152D8 to #CEC9F3.
+// Hero gradient (Figma Frame 2147226276): 180deg, #332B72 0% → #6B5AED 93.85%, bottom corners 20.
 export const HERO_TOP = '#332B72';
 const HERO_BOTTOM = '#6B5AED';
 

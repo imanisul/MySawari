@@ -31,6 +31,7 @@ import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { formatTime12, getIndiaDateParts, getAvailability } from '@/utils/sawari';
 import { Bolt, Lettering } from '@/components/home/FlashSaleBanner';
+import { FlashSaleHeroTitle } from '@/components/home/FlashSaleHeroTitle';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { BACKEND_URL } from '@/services/backend/api';
 import * as Haptics from '@/utils/haptics';
@@ -544,23 +545,15 @@ export default function FlashSaleScreen() {
           <ExclusiveOffersSection layout="list" />
         </View>
       ) : isComingSoon ? (
-        // State 1 & 2: SCHEDULE ON SATURDAY / NO ACTIVE SALE
-        <View style={styles.centerComingSoon} accessible accessibilityRole="header" accessibilityLabel="Flash Sale, schedule on Saturday">
-          <View style={[styles.comingSoonGroup, { transform: [{ scale: Math.min(1, (windowWidth - 12) / 378) }] }]}>
-            <View style={[styles.csLine, { top: 4 }]}>
-              <Lettering text="FLASH" width={160} size={32} shadow={PINK_SHADOW} near={1.42} outline={1.7} skew="0deg" scaleY={1.15} font={FONT} />
-            </View>
-            <View style={[styles.csLine, { top: -40 }]}>
-              <Lettering text="SALE" width={160} size={64} shadow={PINK_SHADOW} near={1.42} outline={1.7} skew="0deg" scaleY={1.15} font={FONT} />
-            </View>
-            <View style={[styles.csLine, { top: 132 }]}>
-              <Lettering text="SCHEDULE ON" width={370} size={38} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
-            </View>
-            <View style={[styles.csLine, { top: 174 }]}>
-              <Lettering text="SATURDAY" width={370} size={38} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
-            </View>
-            <Bolt width={32} style={{ left: 62, top: 0 }} />
-            <Bolt width={32} style={{ left: 296, top: 78 }} />
+        // State 1 & 2: SCHEDULE ON SATURDAY / NO ACTIVE SALE (Figma Group 1171275692)
+        <View
+          style={styles.centerComingSoon}
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={`Flash Sale, schedule on ${scheduleInfo.weekdayTitle || 'Saturday'}`}
+        >
+          <View style={[styles.comingSoonGroup, { transform: [{ scale: Math.min(1, (windowWidth - 12) / 377.8) }] }]}>
+            <FlashSaleHeroTitle weekday={scheduleInfo.weekday} />
           </View>
         </View>
       ) : (
@@ -965,15 +958,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingBottom: 56,
   },
+  // Figma Group 1171275692: 377.8 × 222.82 at left 7 (0.6 left of centre on 393), 0.41 below centre.
   comingSoonGroup: {
-    width: 378,
-    height: 224,
-  },
-  csLine: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+    width: 377.8,
+    height: 222.82,
+    marginLeft: -1.2,
+    marginTop: 0.82,
   },
 
   /* Main Container */

@@ -207,22 +207,27 @@ export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
     </View>
   );
 
+  // Stops: the first card's left edge on the page's 16px margin and the last card's right edge on it (in line with the
+  // tiles above); any card between them centred on the screen.
+  const count = (fromRate ? 1 : 0) + 2;
+  const maxX = 32 + count * W * k + (count - 1) * 12 - winW;
+  const offsets = Array.from({ length: count }, (_, i) =>
+    i === 0 ? 0 : i === count - 1 ? maxX : 16 + i * step - (winW - W * k) / 2);
+
   useEffect(() => {
     if (!fromRate || !dealsAvailable || positionedAtDeals.current) return;
-    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ x: step, y: 0, animated: false }));
+    const frame = requestAnimationFrame(() => scrollRef.current?.scrollTo({ x: offsets[1], y: 0, animated: false }));
     positionedAtDeals.current = true;
     return () => cancelAnimationFrame(frame);
-  }, [fromRate, dealsAvailable, step]);
+  }, [fromRate, dealsAvailable, step]); // eslint-disable-line react-hooks/exhaustive-deps -- offsets follows step/winW
 
   return (
     <ScrollView
       ref={scrollRef}
       horizontal
       showsHorizontalScrollIndicator={false}
-      // Each card stops with its left edge on the page's 16px margin, in line with the tiles above, and one swipe moves
-      // exactly one card (it used to centre cards 26.5 in and could fly past a card on a quick flick).
-      snapToInterval={step}
-      snapToAlignment="start"
+      // One swipe moves exactly one card (a quick flick can't fly past one).
+      snapToOffsets={offsets}
       disableIntervalMomentum
       decelerationRate="fast"
       contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}

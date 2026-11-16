@@ -27,8 +27,8 @@ export function extractReferralCode(text: string): string | null {
   const trimmed = text.trim();
   if (!trimmed || trimmed.length < 3) return null;
 
-  // 1. URL Path format: https://mysawari.com/r/CODE, https://mysawari.in/ref/CODE, mysawari://ref/CODE, /r/CODE, /ref/CODE, /referral/CODE, /invite/CODE
-  const urlPathMatch = trimmed.match(/(?:ref|referral|invite|r)\/([A-Za-z0-9_-]{4,20})/i);
+  // 1. URL Path format: https://mysawari.com/r/CODE, https://mysawari.in/ref/CODE, mysawari://r/CODE, /r/CODE, /ref/CODE, /qr/CODE, /qr-codes/CODE, /referral/CODE, /invite/CODE
+  const urlPathMatch = trimmed.match(/(?:ref|referral|invite|qr-codes|qr|r)\/([A-Za-z0-9_-]{4,20})/i);
   if (urlPathMatch && urlPathMatch[1]) {
     const code = urlPathMatch[1].toUpperCase();
     if (!/^\d+$/.test(code)) return code;
@@ -41,8 +41,8 @@ export function extractReferralCode(text: string): string | null {
     if (!/^\d+$/.test(code)) return code;
   }
 
-  // 3. URL query parameter check (?code=... or &code=... or ?ref=...)
-  const urlParamMatch = trimmed.match(/[?&](?:code|ref|referralCode)=([A-Za-z0-9_-]{4,20})/i);
+  // 3. URL query parameter check (?code=... or &code=... or ?ref=... or ?token=...)
+  const urlParamMatch = trimmed.match(/[?&](?:code|token|ref|referralCode|r)=([A-Za-z0-9_-]{4,20})/i);
   if (urlParamMatch && urlParamMatch[1]) {
     const code = urlParamMatch[1].toUpperCase();
     if (!/^\d+$/.test(code)) return code;

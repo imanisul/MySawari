@@ -10,6 +10,8 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+// Entrance animations each time the page opens (Reanimated honours the phone's Reduce Motion setting).
+import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Ellipse, Path } from 'react-native-svg';
@@ -548,18 +550,22 @@ export default function FlashSaleScreen() {
         // State 1 & 2: SCHEDULE ON SATURDAY / NO ACTIVE SALE (Figma Group 1171275692)
         <View
           style={styles.centerComingSoon}
+          pointerEvents="none" // full-screen now: never block the back button
           accessible
           accessibilityRole="header"
           accessibilityLabel={`Flash Sale, schedule on ${scheduleInfo.weekdayTitle || 'Saturday'}`}
         >
-          <View style={[styles.comingSoonGroup, { transform: [{ scale: Math.min(1, (windowWidth - 12) / 377.8) }] }]}>
-            <FlashSaleHeroTitle weekday={scheduleInfo.weekday} />
-          </View>
+          <Reanimated.View entering={ZoomIn.springify().damping(13)}>
+            <View style={[styles.comingSoonGroup, { transform: [{ scale: Math.min(1, (windowWidth - 12) / 377.8) }] }]}>
+              <FlashSaleHeroTitle weekday={scheduleInfo.weekday} />
+            </View>
+          </Reanimated.View>
         </View>
       ) : (
         // States 3, 4, 5, 6, 7: SCHEDULED or LIVE SALE
         <View style={styles.mainContainer}>
           {/* Header: Live countdown (Images 6 & 7) vs Scheduled (Images 3, 4, 5) */}
+          <Reanimated.View entering={FadeInDown.duration(320)}>
           {isLive && !showScheduledHeader ? (
             <LiveCountdownHeader expiryMs={expiryMs} scale={fitW} />
           ) : showScheduledHeader ? (
@@ -608,8 +614,10 @@ export default function FlashSaleScreen() {
               </View>
             </View>
           ) : null}
+          </Reanimated.View>
 
-          {/* Ticket Card + Sparkles */}
+          {/* Ticket Card + Sparkles: springs up from slightly smaller, just after the header */}
+          <Reanimated.View entering={ZoomIn.delay(120).springify().damping(14)} style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <View style={[styles.ticketSection, { position: 'absolute', left: (windowWidth - 353) / 2, top: ticketTop, transform: [{ scale: ticketScale }] }]}>
             <Sparkle size={13.867} left={-8.87} top={-9} />
             <Sparkle size={6.934} left={-12} top={-14} />
@@ -867,11 +875,12 @@ export default function FlashSaleScreen() {
               </Pressable>
             )}
           </View>
+          </Reanimated.View>
 
           {/* Frame 2147226241 (312 × 86, Figma top 675): the sale's cars on a dashed arc — the shown car in the middle
               (52, white 2px ring, crown), its neighbours either side (44, ring 90%), the next ones at the ends (40,
               ring 80%). Before the sale opens they are frosted with a gold ring instead (Ellipse 17/18/19). */}
-          <View style={[styles.arcWrap, { marginBottom: Math.max(0, 91 - 16 - insets.bottom) }]}>
+          <Reanimated.View entering={FadeInUp.delay(220).duration(320)} style={[styles.arcWrap, { marginBottom: Math.max(0, 91 - 16 - insets.bottom) }]}>
             <Svg width={712} height={300} style={{ position: 'absolute', left: -200, top: 35 }} pointerEvents="none">
               <Ellipse cx={356} cy={150} rx={355.5} ry={149.5} stroke="rgba(255,255,255,0.4)" strokeWidth={1} strokeDasharray="6 6" fill="none" />
             </Svg>
@@ -898,7 +907,7 @@ export default function FlashSaleScreen() {
               );
             })}
             {displayCars.length > 0 && <PillCrown left={128} top={2} />}
-          </View>
+          </Reanimated.View>
         </View>
       )}
       <LoginBottomSheet
@@ -952,13 +961,13 @@ const styles = StyleSheet.create({
   timerUnitText: { fontFamily: FONT_SEMI, fontSize: 11.872, lineHeight: 17.8, color: '#FFFFFF', textAlign: 'center' },
 
   /* Scheduled Sale Screen (Images 1 & 2) */
+  // Centred on the whole screen (not the room under the back button): Figma's top 315 on 852 is exactly that.
   centerComingSoon: {
-    flex: 1,
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 56,
   },
-  // Figma Group 1171275692: 377.8 × 222.82 at left 7 (0.6 left of centre on 393), 0.41 below centre.
+  // Figma Frame 2147226220: 377.8 × 222.82, left 50% − 0.6, top 315 on the 852 frame (centre + 0.41).
   comingSoonGroup: {
     width: 377.8,
     height: 222.82,

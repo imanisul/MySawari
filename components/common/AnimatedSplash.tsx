@@ -79,6 +79,18 @@ const FESTIVE_HALO = 'rgba(212, 154, 61, 0.14)';
 // The launch-screen logo (app.json expo-splash-screen: MySawari_nobg.png, 470 × 480, imageWidth 160, centred).
 const LOGO_W = 160;
 const LOGO_H = (160 * 480) / 470;
+const ENTER_MS = 850;
+// Slice [a, b] of the entrance clock (0–850 ms) mapped to [from, to], eased with a small overshoot (springy settle).
+const BACK = Easing.out(Easing.back(1.6));
+// The native driver ignores `easing`, so the curve is sampled into 12 straight pieces instead.
+const seg = (v: Animated.Value, a: number, b: number, from: number, to: number, easing: (t: number) => number = BACK) => {
+  const ts = Array.from({ length: 13 }, (_, i) => i / 12);
+  return v.interpolate({
+    inputRange: ts.map((t) => (a + (b - a) * t) / ENTER_MS),
+    outputRange: ts.map((t) => from + (to - from) * easing(t)),
+    extrapolate: 'clamp',
+  });
+};
 
 export function AnimatedSplash({
   isReady,
@@ -111,10 +123,14 @@ export function AnimatedSplash({
   const brandOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.85)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
-  const titleY = useRef(new Animated.Value(12)).current;
+  const titleY = useRef(new Animated.Value(22)).current;
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const taglineY = useRef(new Animated.Value(12)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
+  // Classic splash entrance: ONE native-driven 0 → 1 clock; every piece is a slice of it. A chain of separate steps
+  // (delay, then the next) is handed over by JS, which is busy booting the app, so the tagline used to start too late
+  // and the splash was gone before it showed.
+  const enter = useRef(new Animated.Value(0)).current;
 
   // Celestial / Signature Diwali animation values
   const spinAnim = useRef(new Animated.Value(0)).current;
@@ -179,20 +195,14 @@ export function AnimatedSplash({
       useNativeDriver: true,
     }).start();
 
-    // Staggered entrance for logo, title & tagline
-    Animated.stagger(100, [
-      Animated.parallel([
-        Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(logoScale, { toValue: 1, tension: 30, friction: 6, useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(titleY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]),
-      Animated.parallel([
-        Animated.timing(taglineOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
-        Animated.timing(taglineY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]),
+    Animated.parallel([
+      Animated.timing(logoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+      Animated.spring(logoScale, { toValue: 1, tension: 30, friction: 6, useNativeDriver: true }),
+      Animated.timing(titleOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(titleY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(taglineOpacity, { toValue: 1, duration: 350, useNativeDriver: true }),
+      Animated.timing(taglineY, { toValue: 0, duration: 350, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(enter, { toValue: 1, duration: ENTER_MS, easing: Easing.linear, useNativeDriver: true }),
     ]).start();
 
     // Rotating celestial loops
@@ -268,9 +278,10 @@ export function AnimatedSplash({
   // Duration timer
   useEffect(() => {
     if (skipSplash || config?.isEnabled === false || brandDone) return;
+    // Never before the entrance has finished, so "Your Ride, Your Way" is always seen.
     const t = setTimeout(() => {
       setBrandDone(true);
-    }, durationMs);
+    }, Math.max(durationMs, ENTER_MS + 250));
     return () => clearTimeout(t);
   }, [durationMs, skipSplash, config?.isEnabled, brandDone]);
 
@@ -635,12 +646,15 @@ export function AnimatedSplash({
                 resizeMode="contain"
               />
               <View style={{ position: 'absolute', left: 0, right: 0, top: (windowHeight + LOGO_H) / 2 + 14, alignItems: 'center' }}>
-                <Animated.View style={{ opacity: titleOpacity, transform: [{ translateY: titleY }] }}>
-                  <Text style={styles.classicTitle}>{displayTitle}</Text>
+                {/* 0.05–0.5 s: the name springs up and grows into place */}
+                <Animated.View style={{ opacity: seg(enter, 50, 300, 0, 1, Easing.linear), transform: [{ translateY: seg(enter, 50, 500, 22, 0) }, { scale: seg(enter, 50, 500, 0.9, 1) }] }}>
+                  <Text allowFontScaling={false} style={styles.classicTitle}>{displayTitle}</Text>
                 </Animated.View>
-                <Animated.View style={{ opacity: taglineOpacity, transform: [{ translateY: taglineY }], marginTop: 8 }}>
-                  <Text style={styles.classicTagline}>{displayTagline}</Text>
-                </Animated.View>
+                <View style={{ flexDirection: 'row', marginTop: 8 }} accessible accessibilityLabel={displayTagline}>
+                  {/* 0.25–0.7 s "Your Ride," from the left; 0.4–0.85 s "Your Way" from the right */}
+                  <Animated.Text allowFontScaling={false} style={[styles.classicTagline, { opacity: seg(enter, 250, 450, 0, 1, Easing.linear), transform: [{ translateX: seg(enter, 250, 700, -18, 0) }] }]}>Your Ride, </Animated.Text>
+                  <Animated.Text allowFontScaling={false} style={[styles.classicTagline, { opacity: seg(enter, 400, 600, 0, 1, Easing.linear), transform: [{ translateX: seg(enter, 400, 850, 18, 0) }] }]}>Your Way</Animated.Text>
+                </View>
               </View>
             </View>
           )}

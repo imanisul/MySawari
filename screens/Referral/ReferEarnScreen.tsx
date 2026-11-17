@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions, Platform, Modal } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -52,6 +53,7 @@ export default function ReferEarnScreen() {
   const [config, setConfig] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   useEffect(() => {
     API.getAppConfig().then(setConfig).catch(() => { });
@@ -168,22 +170,33 @@ export default function ReferEarnScreen() {
             {/* ── Partner QR Sticker (if assigned) ── */}
             {partnerQRs.length > 0 && (
               <View style={[styles.partnerCard, { backgroundColor: '#EEF0F7', borderColor: '#D5D9EA' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                     <Feather name="tag" size={17} color="#323E71" />
                     <Text style={{ fontFamily: PF.bold, fontSize: 13.5, color: '#312E81' }}>Partner QR: {partnerQRs[0].token}</Text>
                   </View>
-                  <Pressable
-                    onPress={async () => {
-                      await Clipboard.setStringAsync(`https://mysawari.com/r/${partnerQRs[0].token}`);
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 1800);
-                    }}
-                    style={{ backgroundColor: '#6B5AED', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
-                  >
-                    <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#FFFFFF' }}>Copy Link</Text>
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setShowQRModal(true);
+                      }}
+                      style={{ backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                    >
+                      <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#4338CA' }}>Show QR</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(`https://mysawari.com/r/${partnerQRs[0].token}`);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1800);
+                      }}
+                      style={{ backgroundColor: '#6B5AED', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                    >
+                      <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#FFFFFF' }}>Copy Link</Text>
+                    </Pressable>
+                  </View>
                 </View>
                 <Text style={{ fontFamily: PF.regular, fontSize: 11.5, lineHeight: 16, color: '#323E71', marginTop: 6 }}>
                   Physical QR sticker assigned to your counter. Guests who scan your sticker get automatically linked to your account.
@@ -259,6 +272,41 @@ export default function ReferEarnScreen() {
         </View>
       </View>
 
+      {/* ── Partner QR Modal ── */}
+      {partnerQRs.length > 0 && (
+        <Modal
+          visible={showQRModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowQRModal(false)}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowQRModal(false)}>
+            <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.modalBrand}>MySawari</Text>
+              <Text style={styles.modalSub}>Scan with phone camera to book & get ₹100 SawariCash</Text>
+              <View style={styles.qrContainer}>
+                <QRCode
+                  value={`https://mysawari.com/r/${partnerQRs[0].token}`}
+                  size={200}
+                  color="#0F172A"
+                  backgroundColor="#FFFFFF"
+                />
+              </View>
+              <View style={styles.modalCodeBox}>
+                <Text style={styles.modalCodeLabel}>PARTNER CODE</Text>
+                <Text style={styles.modalCode}>{partnerQRs[0].token}</Text>
+              </View>
+              <Pressable
+                style={styles.modalCloseBtn}
+                onPress={() => setShowQRModal(false)}
+              >
+                <Text style={styles.modalCloseText}>Done</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
+
       <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
     </BlurHost>
   );
@@ -327,4 +375,81 @@ const styles = StyleSheet.create({
   // TODO: Match Figma CTA: 17px SemiBold label and a 50px share button (currently 18.5px Medium and 54px).
   waText: { fontFamily: PF.medium, fontSize: 18.5, color: '#FFFFFF' },
   shareBtn: { width: 54, height: 54, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalBrand: {
+    fontFamily: PF.bold,
+    fontSize: 22,
+    color: '#323E71',
+    letterSpacing: 0.5,
+  },
+  modalSub: {
+    fontFamily: PF.medium,
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+    lineHeight: 16,
+  },
+  qrContainer: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCodeBox: {
+    marginTop: 18,
+    alignItems: 'center',
+  },
+  modalCodeLabel: {
+    fontFamily: PF.medium,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: '#94A3B8',
+  },
+  modalCode: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 4,
+    color: '#323E71',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    marginTop: 20,
+    backgroundColor: '#323E71',
+    width: '100%',
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseText: {
+    fontFamily: PF.bold,
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
 });

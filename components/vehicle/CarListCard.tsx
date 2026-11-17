@@ -53,6 +53,7 @@ const PHOTO_GAP = 0;
 
 const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress, dealPrice, dealOriginal }: CarListCardProps & { onCarPress: () => void }) {
   const p = useDetailsPalette();
+  const router = useRouter();
   const { favorites, toggleFavorite } = useFavorites();
   const { membership } = useSawari();
   const { width: windowWidth } = useWindowDimensions();
@@ -211,10 +212,17 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
                 ) : null}
               </View>
               {showMember && (
-                <View style={styles.memberPill}>
+                // Tapping the member price opens the Membership page (its own tap — it doesn't open the car).
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Member price ${formatCurrency(memberPrice as number)}. View membership`}
+                  hitSlop={6}
+                  onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }}
+                  style={({ pressed }) => [styles.memberPill, pressed && { opacity: 0.75 }]}
+                >
                   <Ionicons name="lock-open" size={10} color="#FBBF0F" />
                   <Text style={styles.memberText} numberOfLines={1}>Member Price {formatCurrency(memberPrice as number)}</Text>
-                </View>
+                </Pressable>
               )}
             </View>
             {unavailable ? (

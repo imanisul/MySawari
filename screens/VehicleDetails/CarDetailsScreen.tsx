@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
-import { Animated, Dimensions, Easing, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, InteractionManager, Alert } from 'react-native';
+import { Animated, Dimensions, Easing, ScrollView, StyleSheet, View, Text, Pressable, NativeSyntheticEvent, NativeScrollEvent, ActivityIndicator, Alert } from 'react-native';
 import * as Haptics from '@/utils/haptics';
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useAfterSlideIn } from '@/hooks/useAfterSlideIn';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles, useLiveCar } from '@/hooks/useVehicles';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -300,11 +301,7 @@ export default function CarDetailsScreen() {
 
   // Everything under the section pills mounts after the screen has finished sliding in: building the whole long page
   // during the transition is what made it stutter and jump. Nothing above the fold depends on it, so no layout shifts.
-  const [showRest, setShowRest] = useState(false);
-  useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => setShowRest(true));
-    return () => task.cancel();
-  }, []);
+  const showRest = useAfterSlideIn();
   // The skeleton shows while the screen slides in; the real page then fades in over it.
   const fadeIn = useRef(new Animated.Value(0)).current;
   useEffect(() => {

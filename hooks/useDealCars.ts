@@ -58,6 +58,9 @@ export const nextIstHourMs = (ms: number) => Math.floor((ms + IST_MS) / HOUR_MS)
 /** `ms` rounded up to a whole India hour (3:00 PM stays, 3:20 PM → 4:00 PM). */
 const ceilIstHourMs = (ms: number) => Math.ceil((ms + IST_MS) / HOUR_MS) * HOUR_MS - IST_MS;
 
+/** The India calendar day of `ms` (a day number; tomorrow is today + 1). */
+const istDayNum = (ms: number) => Math.floor((ms + IST_MS) / 86400000);
+
 /** "Today 3:00 PM – Tmrw 8:00 AM" (India time), for a deal's start and end. */
 export function dealWhenLabel(startMs: number, endMs: number, nowMs: number) {
   return `${dealDayTime(startMs, nowMs)} – ${dealDayTime(endMs, nowMs)}`;
@@ -139,6 +142,9 @@ export function useDealCars(nowMs: number) {
       // Busy then? It starts when the booking(s) end, rounded up to a whole hour.
       let start = nextIstHourMs(nowMs);
       for (const b of blocks) if (b.startMs <= start && b.endMs > start) start = ceilIstHourMs(b.endMs);
+      // Today's cars only: a car busy until after midnight ("Start Tmrw 2:00 AM") is left out. The very next hour is
+      // always fine, so at 11:xx PM a free car (starting 12:00 AM) still shows.
+      if (start > nextIstHourMs(nowMs) && istDayNum(start) > istDayNum(nowMs)) return null;
 
       const vid = String(v.id || v._id);
       const offer = offerMap.get(vid);

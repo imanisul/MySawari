@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
+import { getIndiaDateParts, istDayMonth } from '@/utils/sawari';
 
 // Shared pieces of the Profile flow screens (Wallet, Referrals, Refunds, Offers, Saved Addresses…):
 // the back + title header and the status timeline used for withdrawals and referral rewards.
@@ -102,20 +103,21 @@ export function longStamp(iso?: string) {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  const day = d.getDate();
+  const p = getIndiaDateParts(d); // India time
+  const day = p.date;
   const suf = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-  const mon = d.toLocaleString('en-GB', { month: 'short' }).toLowerCase();
-  let h = d.getHours();
+  const mon = istDayMonth(d).split(' ')[1].toLowerCase();
+  let h = p.hours;
   const ap = h >= 12 ? 'pm' : 'am';
   h = h % 12 || 12;
-  return `${day}${suf} ${mon} ${String(d.getFullYear()).slice(2)}, ${h}.${String(d.getMinutes()).padStart(2, '0')} ${ap}`;
+  return `${day}${suf} ${mon} ${String(p.year).slice(2)}, ${h}.${String(p.minutes).padStart(2, '0')} ${ap}`;
 }
 
 /** "12 Oct" */
 export const shortDay = (iso?: string) => {
   if (!iso) return '';
   const d = new Date(iso);
-  return isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return isNaN(d.getTime()) ? '' : istDayMonth(d);
 };
 
 export const rupees = (n: number, decimals = false) =>

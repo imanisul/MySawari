@@ -590,7 +590,7 @@ export function DatesSheet() {
         {/* Trip summary: start on the left, end on the right, day count on the dashed arc between. */}
         <View style={[styles.summary, { backgroundColor: ui.card, borderColor: ui.cardBorder }]}>
           <View style={styles.summarySide}>
-            <Text style={[styles.summaryText, styles.summaryDate, { color: ui.text }]}>{start ? formatDateStr(start) : 'Start Date'}</Text>
+            <Text style={[styles.summaryText, styles.summaryDate, { color: ui.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{start ? formatDateStr(start) : 'Start Date'}</Text>
             <Text style={[styles.summaryText, { color: ui.text }]}>{start && tempPickupTime ? padTime(tempPickupTime) : 'Pickup Time'}</Text>
           </View>
           {/* <View style={styles.summaryMid}> */}
@@ -655,7 +655,7 @@ export function DatesSheet() {
             </Text>
           </View>
           <View style={[styles.summarySide, { alignItems: 'flex-end' }]}>
-            <Text style={[styles.summaryText, styles.summaryDate, { color: ui.text }]}>{effectiveEnd ? formatDateStr(effectiveEnd) : 'End Date'}</Text>
+            <Text style={[styles.summaryText, styles.summaryDate, { color: ui.text }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{effectiveEnd ? formatDateStr(effectiveEnd) : 'End Date'}</Text>
             <Text style={[styles.summaryText, { color: ui.text }]}>{effectiveEnd && tempReturnTime ? padTime(tempReturnTime) : 'Dropoff Time'}</Text>
           </View>
         </View>
@@ -950,7 +950,8 @@ const styles = StyleSheet.create({
   summaryDate: { fontFamily: 'PlusJakartaSans_600SemiBold' },
   summarySide: { flex: 1 },
   // Dashed arc peaks above the day count; the two navy rings sit level with it.
-  summaryMid: { width: 162, height: 34, alignItems: 'center' },
+  // 162 in the design; may give a little room on 320-wide phones so the dates either side never wrap.
+  summaryMid: { width: 162, flexShrink: 1, minWidth: 120, height: 34, alignItems: 'center' },
   summaryDays: { marginTop: 14.5 },
   // Figma: title 23 + 4 + weekday/calendar block 304 = the 331px frame.
   section: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 23 },

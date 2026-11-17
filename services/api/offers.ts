@@ -1,10 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { formatCurrency } from '@/services/backend/pricingEngine';
-import { BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch } from '@/services/backend/api';
+import { BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch, isOfflineError } from '@/services/backend/api';
 
 /** Deal / offer photos usually show a fleet vehicle, so they go through plate processing too. */
 import { Image as CachedImage } from 'expo-image';
+import { istDayMonthYear } from '@/utils/sawari';
 
 /** Downloads offer / banner pictures into the image cache as soon as the list arrives, so they draw instantly. */
 function prefetchOfferImages(list: any[]) {
@@ -75,7 +76,7 @@ export interface Offer {
 
 function formatExpiry(dateStr: string): string {
   const date = new Date(dateStr);
-  return `Valid till ${date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+  return `Valid till ${istDayMonthYear(date)}`;
 }
 
 /**
@@ -401,7 +402,7 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
       return [];
     }
   } catch (e) {
-    console.warn('[Offers] Failed to fetch exclusive offers:', e);
+    if (!isOfflineError(e)) console.warn('[Offers] Failed to fetch exclusive offers:', e); // offline is expected
   }
 
   try {

@@ -19,8 +19,8 @@ import { API } from '@/services/backend/api';
 import { isPastSearch, removeRecentSearch, RecentSearch } from '@/utils/recentSearches';
 import { useVehicles, prefetchCarGallery, VEHICLES_KEY } from '@/hooks/useVehicles';
 import { recentlyViewedQueryOptions, recentSearchesQueryOptions } from '@/hooks/useHomeData';
+import { HomeCarRowSkeleton } from '@/components/loading/HomeCarSkeleton';
 import { Reveal } from '@/components/common/Reveal';
-import { BookingSkeleton } from '@/components/loading/BookingSkeleton';
 import { CustomAlert } from '@/components/common/CustomAlert';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import {
@@ -278,16 +278,6 @@ export default function HomeScreen() {
     router.push('/search');
   }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, router]);
 
-  // A recent search for one car that is free for its dates: that car's page with the searched trip filled in.
-  const openSearchedCar = useCallback((t: RecentSearch, car: any) => {
-    setBookingSource('home');
-    selectCar(car);
-    prefetchCarGallery(car);
-    if (t.dropoff) setDropoff(t.dropoff);
-    if (t.dateRange && t.duration && t.dateRange !== 'Upcoming Trip') setDates(t.dateRange, t.duration);
-    if (t.pickupTime && t.returnTime) setTimes(t.pickupTime, t.returnTime);
-    router.push('/car-details');
-  }, [setBookingSource, selectCar, setDropoff, setDates, setTimes, router]);
 
   const openPick = useCallback((item: any) => {
     selectCar(item);
@@ -458,14 +448,11 @@ export default function HomeScreen() {
         break;
       case 'picks':
         if (!showRecent && !picks.length && vehiclesLoading) {
-          // The My Trips placeholder, returned without the fade-in so it is on screen from the first frame.
+          // Car-tile placeholders in the real row's shape, returned without the fade-in so they show from the first frame.
           return (
             <>
               <HomeSectionTitle title="Recommended Cars" />
-              <View style={{ paddingHorizontal: 16 }}>
-                <BookingSkeleton index={0} />
-                <BookingSkeleton index={1} />
-              </View>
+              <HomeCarRowSkeleton />
             </>
           );
         }
@@ -498,14 +485,11 @@ export default function HomeScreen() {
               horizontal
               keyExtractor={(t) => `trip-${t.id}`}
               renderItem={({ item: t }) => {
-                const car = t.carId ? fetchedVehicles.find((v) => String(v.id) === String(t.carId)) : undefined;
                 return (
                   <TripSearchCard
                     search={t}
-                    car={car}
                     onPress={() => openTripSearch(t)}
                     onRemove={() => removeTripSearch(t.id)}
-                    onViewDetails={car ? () => openSearchedCar(t, car) : undefined}
                   />
                 );
               }}
@@ -578,7 +562,7 @@ export default function HomeScreen() {
     if (!content) return null;
     // Figma: 16px gap between every block.
     return <Reveal delay={Math.min(index, 6) * 40}><View style={{ marginTop: 16 }}>{content}</View></Reveal>;
-  }, [p, isDarkMode, insets.top, city, dateRange, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openSearchedCar, fetchedVehicles, openPick, vehiclesLoading, showRecent, fromRate, milestone, journey, claimable, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, city, dateRange, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, fetchedVehicles, openPick, vehiclesLoading, showRecent, fromRate, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>

@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Car, cars, DriverMode, LocationResult } from '@/utils/sawari';
+import { Car, cars, DriverMode, LocationResult, istDayMonth, istDayMonthYear } from '@/utils/sawari';
 import { Offer } from '@/services/api/offers';
 import { API, invalidateWalletCache } from '@/services/backend/api';
 import { startQueryPersistence, clearQueryPersistence } from '@/hooks/queryPersistence';
@@ -213,7 +213,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'return' | 'both'>('both');
   const [returnAddress, setReturnAddress] = useState<LocationResult | null>(null);
   
-  const defaultToday = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const defaultToday = istDayMonth(Date.now()); // India date
   const [dateRange, setDateRangeState] = useState('Select Dates');
   const [selectedDate, setSelectedDateState] = useState(defaultToday);
   
@@ -544,7 +544,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
               license: userProfile.license || '',
               dob: userProfile.dob || '',
               gender: userProfile.gender || '',
-              joinedOn: userProfile.joinedOn || new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+              joinedOn: userProfile.joinedOn || istDayMonthYear(Date.now()).split(' ').slice(1).join(' '),
               referralCode: userProfile.referralCode || '',
             });
             
@@ -1062,7 +1062,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
             license: user.drivingLicenseNumber || user.license || '',
             dob: user.dob || '',
             gender: user.gender || '',
-            joinedOn: new Date().toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }),
+            joinedOn: istDayMonthYear(Date.now()).split(' ').slice(1).join(' '),
             referralCode: user.referralCode,
           };
           

@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, Ellipse, RadialGradient, Stop } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { createUnscaled } from '@/utils/scaleText';
 
 /** Figma "Set Location" popup after opening the app: six promise chips, "Your Ride, Your Way", Continue. */
 type Chip = { label: string; icon: any; iconSize: number; w: number; h?: number; left: number; top: number; rot: number };
@@ -83,7 +84,7 @@ export function WelcomeSheet({ visible, onClose }: { visible: boolean; onClose: 
                           <Image source={c.icon} style={{ width: c.iconSize, height: c.iconSize }} contentFit="contain" />
                         </View>
                         {/* Whole label always shows (never "Security Depo…"): shrinks a little instead of cutting off. */}
-                        <Text style={styles.chipText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{c.label}</Text>
+                        <Text style={chipStyles.chipText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{c.label}</Text>
                       </View>
                     ))}
                   </View>
@@ -141,10 +142,14 @@ const styles = StyleSheet.create({
     borderRadius: 52,
   },
   chipIcon: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
-  chipText: { flexShrink: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, lineHeight: 16, color: '#2B386A', includeFontPadding: false },
   textBlock: { gap: 8 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 30, lineHeight: 45, textAlign: 'center', color: '#2B386A' },
   subtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', color: '#737373' },
   cta: { height: 54, borderRadius: 12, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center', padding: 12 },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26, color: '#FFFFFF', textAlign: 'center' },
+});
+
+// The chip area scales as a whole (chipScale), so the chip text stays unscaled (no double shrink on small phones).
+const chipStyles = createUnscaled({
+  chipText: { flexShrink: 1, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13, lineHeight: 16, color: '#2B386A', includeFontPadding: false },
 });

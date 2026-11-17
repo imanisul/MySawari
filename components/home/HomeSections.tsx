@@ -29,6 +29,7 @@ import ReferHandCoinIcon from '@/assets/images/refer_hand_coin.png';
 import HomeTabCarIcon from '@/assets/images/home_tab_car.svg';
 import HomeTabBikeIcon from '@/assets/images/home_tab_bike.svg';
 import { BannerRays } from './FlashSaleBanner';
+import { createUnscaled } from '@/utils/scaleText';
 
 // Home page (Figma "Home"): purple banner, refer strip, Cars / Bikes search card, then the sections below.
 /** Icons pre-sized to 4x their display size (smooth on every phone, unlike a 512 px picture shrunk 20x at draw time). */
@@ -363,7 +364,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
     if (s.destinationType === 'offer_details') {
       if (s.code) {
         Clipboard.setStringAsync(s.code);
-        CustomAlert.alert('Code Copied! 🎟️', `Promo code "${s.code}" copied to clipboard! Paste it at checkout.`);
+        CustomAlert.alert('Code Copied!', `Promo code "${s.code}" copied to clipboard! Paste it at checkout.`);
       }
       router.push('/offers');
       return;
@@ -385,7 +386,7 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
     if (s.code) {
       Clipboard.setStringAsync(s.code);
       CustomAlert.alert(
-        'Code Copied! 🎟️',
+        'Code Copied!',
         `Promo code "${s.code}" has been copied to your clipboard. Paste it at checkout to get your discount!`,
         [{ text: 'Great!' }]
       );
@@ -501,11 +502,11 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
                 <View style={styles.priceBannerText}>
                   <View style={styles.priceRow}>
                     <View style={styles.priceLeadCol}>
-                      <Text style={[styles.priceLead, styles.priceLeadTop]} numberOfLines={1} allowFontScaling={false}>Your ride,</Text>
-                      <Text style={styles.priceLead} numberOfLines={1} allowFontScaling={false}>from just</Text>
+                      <Text style={[priceStyles.priceLead, priceStyles.priceLeadTop]} numberOfLines={1} allowFontScaling={false}>Your ride,</Text>
+                      <Text style={priceStyles.priceLead} numberOfLines={1} allowFontScaling={false}>from just</Text>
                     </View>
                     <Text
-                      style={styles.priceAmount}
+                      style={priceStyles.priceAmount}
                       numberOfLines={1}
                       adjustsFontSizeToFit
                       minimumFontScale={0.72}
@@ -746,7 +747,7 @@ export function HomePromoBanner({ position = 'middle' }: { position?: 'middle' |
     }
     if (b.code) {
       Clipboard.setStringAsync(b.code);
-      CustomAlert.alert('Code Copied! 🎟️', `Promo code "${b.code}" copied to clipboard! Paste at checkout.`);
+      CustomAlert.alert('Code Copied!', `Promo code "${b.code}" copied to clipboard! Paste at checkout.`);
     }
   };
 
@@ -876,14 +877,11 @@ export function HomeSearchCard({ vehicleType, onType, onDates }: {
   );
 }
 
-/** A trip the customer searched (where, which dates, what time), MakeMyTrip style: tap to resume or search again. */
-export function TripSearchCard({ search, car, onPress, onRemove, onViewDetails }: {
+/** A trip the customer searched: only its pickup and return date + time. Tap to search those dates again. */
+export function TripSearchCard({ search, onPress, onRemove }: {
   search: RecentSearch;
-  /** The searched car, when the search was for one car: its availability for those dates is shown. */
-  car?: Car & { availability?: any; isAvailable?: boolean };
   onPress: () => void;
   onRemove?: () => void;
-  onViewDetails?: () => void;
 }) {
   const p = useDetailsPalette();
   const [startLabel, endLabel] = search.dateRange && search.dateRange !== 'Upcoming Trip' ? splitDateRange(search.dateRange) : ['', ''];
@@ -892,8 +890,6 @@ export function TripSearchCard({ search, car, onPress, onRemove, onViewDetails }
     { label: 'Pickup', value: [startLabel, search.pickupTime].filter(Boolean).join(', ') },
     { label: 'Return', value: [endLabel || startLabel, search.returnTime].filter(Boolean).join(', ') },
   ];
-  // For a car search that is free for the searched dates and times: "View Details" (nothing when it is not).
-  const availability = car ? getAvailability(car, startLabel || undefined, endLabel || undefined, search.pickupTime, search.returnTime) : null;
 
   return (
     <Pressable
@@ -915,18 +911,6 @@ export function TripSearchCard({ search, car, onPress, onRemove, onViewDetails }
             </Text>
           </View>
         ))}
-        {availability?.available && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`View details of ${search.carName || carTitle(car!)}`}
-            hitSlop={8}
-            onPress={() => { Haptics.selectionAsync(); (onViewDetails || onPress)(); }}
-            style={({ pressed }) => [styles.tripStatus, pressed && { opacity: 0.7 }]}
-          >
-            <Text style={[styles.tripViewDetails, { color: p.muted }]}>View Details</Text>
-            <Feather name="chevron-right" size={12} color={p.muted} />
-          </Pressable>
-        )}
       </View>
       {onRemove ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Remove this search" onPress={onRemove} hitSlop={10}>
@@ -1346,37 +1330,6 @@ const styles = StyleSheet.create({
   priceBannerText: { position: 'absolute', left: 40.281, top: 60.5, width: 312.438, height: 164, alignItems: 'center' },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2.394, height: 78, width: 312.438, zIndex: 1 },
   priceLeadCol: { minWidth: 128.088, height: 64, alignItems: 'center', justifyContent: 'center' },
-  priceLead: {
-    minWidth: 128.088,
-    height: 43.1,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 28.73,
-    lineHeight: 43.1,
-    textAlign: 'center',
-    letterSpacing: -0.5746,
-    color: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.25)',
-    textShadowOffset: { width: 0, height: 4.788 },
-    textShadowRadius: 7.182,
-    includeFontPadding: false,
-  },
-  priceLeadTop: { marginBottom: -11.971 },
-  // Figma: 62/78, weight 680 (700Bold), gold #FAC64C, soft shadow.
-  priceAmount: {
-    minWidth: 127,
-    maxWidth: 168,
-    height: 78,
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 62.248,
-    lineHeight: 78,
-    textAlign: 'center',
-    letterSpacing: -1.245,
-    color: '#FAC64C',
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 3.831 },
-    textShadowRadius: 3.831,
-    includeFontPadding: false,
-  },
   priceCarShadow: { position: 'absolute', top: 188.39, left: 51.65, width: 290, height: 36, zIndex: 2 },
   priceCars: { position: 'absolute', top: 120.5, left: 10.5, width: 372, height: 124, zIndex: 3 },
   headlineBlock: { alignItems: 'center', marginTop: 12 },
@@ -1588,8 +1541,6 @@ const styles = StyleSheet.create({
   tripWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   tripLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // Recent car search: "View Details ›" when free for the searched dates.
-  tripStatus: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
-  tripViewDetails: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, textDecorationLine: 'underline' },
 
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },
@@ -1707,5 +1658,40 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+});
+
+// Home price banner text: the banner scales as a whole (priceBannerScale), so this stays unscaled (no double shrink).
+const priceStyles = createUnscaled({
+  priceLead: {
+    minWidth: 128.088,
+    height: 43.1,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 28.73,
+    lineHeight: 43.1,
+    textAlign: 'center',
+    letterSpacing: -0.5746,
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.25)',
+    textShadowOffset: { width: 0, height: 4.788 },
+    textShadowRadius: 7.182,
+    includeFontPadding: false,
+  },
+  priceLeadTop: { marginBottom: -11.971 },
+  // Figma: 62/78, weight 680 (700Bold), gold #FAC64C, soft shadow.
+  priceAmount: {
+    minWidth: 127,
+    maxWidth: 168,
+    height: 78,
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 62.248,
+    lineHeight: 78,
+    textAlign: 'center',
+    letterSpacing: -1.245,
+    color: '#FAC64C',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 3.831 },
+    textShadowRadius: 3.831,
+    includeFontPadding: false,
   },
 });

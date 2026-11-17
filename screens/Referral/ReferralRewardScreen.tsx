@@ -55,12 +55,6 @@ export default function ReferralRewardScreen() {
                   <Text style={[styles.lineText, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Car: {ref.vehicleName}</Text>
                 </View>
               )}
-              {!!ref.route && (
-                <View style={styles.line}>
-                  <Feather name="map-pin" size={16} color={p.muted} />
-                  <Text style={[styles.lineText, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{ref.route}</Text>
-                </View>
-              )}
               <View style={styles.line}>
                 <Feather name="calendar" size={16} color={p.muted} />
                 <Text style={[styles.lineText, { color: p.muted }]}>{tripLine(ref)}</Text>

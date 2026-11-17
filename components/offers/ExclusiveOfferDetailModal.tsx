@@ -24,7 +24,7 @@ import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { ExclusiveOffer, claimExclusiveOffer, recordOfferView } from '@/services/api/offers';
 import { API } from '@/services/backend/api';
-import { getAvailability, splitDateRange } from '@/utils/sawari';
+import { getAvailability, splitDateRange, istDayMonth, formatTime12, getIndiaDateParts } from '@/utils/sawari';
 
 interface ExclusiveOfferDetailModalProps {
   offer: ExclusiveOffer | null;
@@ -50,7 +50,6 @@ const SUCCESS_TINT = 'rgba(5, 150, 105, 0.12)';
 const DANGER = '#DC2626';
 const DANGER_TINT = 'rgba(220, 38, 38, 0.10)';
 
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const idOf = (v: any) => String(v?.id ?? v?._id ?? '');
 const imageOf = (v: any) => v?.image || v?.images?.[0];
@@ -85,8 +84,8 @@ function formatOfferDateTime(isoString?: string | Date | null, explicitTime?: st
   if (!isoString) return '-';
   const d = new Date(isoString);
   if (isNaN(d.getTime())) return '-';
-  const datePart = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  const timePart = explicitTime && explicitTime !== 'Immediate' ? explicitTime : d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const datePart = `${istDayMonth(d)} ${getIndiaDateParts(d).year}`;
+  const timePart = explicitTime && explicitTime !== 'Immediate' ? explicitTime : formatTime12(d);
   return `${datePart} · ${timePart}`;
 }
 
@@ -315,14 +314,14 @@ export function ExclusiveOfferDetailModal({
 
     const today = new Date();
     const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
-    const range = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
+    const range = `${istDayMonth(today)} – ${istDayMonth(tomorrow)}`;
     let tripRange = dateRange;
 
     // Staff decided rental period prefill
     if (offer.rentalStartDate && offer.rentalEndDate) {
       const sDate = new Date(offer.rentalStartDate);
       const eDate = new Date(offer.rentalEndDate);
-      const travelRange = `${sDate.getDate()} ${MONTHS_SHORT[sDate.getMonth()]} – ${eDate.getDate()} ${MONTHS_SHORT[eDate.getMonth()]}`;
+      const travelRange = `${istDayMonth(sDate)} – ${istDayMonth(eDate)}`;
       const daysCount = offer.rentalDays || Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / 86400000));
       setDates(travelRange, `${daysCount} ${daysCount === 1 ? 'Day' : 'Days'}`);
       setTimes(offer.rentalStartTime || pickupTime, offer.rentalEndTime || returnTime);
@@ -330,7 +329,7 @@ export function ExclusiveOfferDetailModal({
     } else if (offer.rentalDays && offer.rentalDays > 1) {
       const daysCount = offer.rentalDays;
       const endD = new Date(today.getTime() + daysCount * 24 * 3600 * 1000);
-      const travelRange = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${endD.getDate()} ${MONTHS_SHORT[endD.getMonth()]}`;
+      const travelRange = `${istDayMonth(today)} – ${istDayMonth(endD)}`;
       setDates(travelRange, `${daysCount} Days`);
       setTimes(offer.rentalStartTime || pickupTime, offer.rentalEndTime || returnTime);
       tripRange = travelRange;
@@ -464,10 +463,10 @@ export function ExclusiveOfferDetailModal({
                   )}
                   <Text style={styles.heroTagText}>
                     {isOvernight
-                      ? '🌙 Overnight (8 PM – 8 AM)'
+                      ? 'Overnight (8 PM – 8 AM)'
                       : offer.allVehicles
-                      ? '🚗 All Fleet Cars Eligible'
-                      : '⚡ Flash sale'}
+                      ? 'All Fleet Cars Eligible'
+                      : 'Flash sale'}
                   </Text>
                 </View>
               </View>
@@ -567,8 +566,8 @@ export function ExclusiveOfferDetailModal({
                           if (offer.rentalStartDate && offer.rentalEndDate) {
                             const rs = new Date(offer.rentalStartDate);
                             const re = new Date(offer.rentalEndDate);
-                            const rsStr = rs.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-                            const reStr = re.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+                            const rsStr = istDayMonth(rs);
+                            const reStr = istDayMonth(re);
                             const tStart = offer.rentalStartTime || offer.pickupTime || '09:00 AM';
                             const tEnd = offer.rentalEndTime || offer.returnTime || '09:00 AM';
                             const dDays = offer.rentalDays || Math.max(1, Math.round((re.getTime() - rs.getTime()) / 86400000));

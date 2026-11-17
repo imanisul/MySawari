@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   PanResponder,
@@ -11,7 +10,10 @@ import {
   View,
 } from 'react-native';
 // Entrance animations each time the page opens (Reanimated honours the phone's Reduce Motion setting).
-import Reanimated, { FadeInDown, FadeInUp, ZoomIn } from 'react-native-reanimated';
+import Reanimated, { FadeIn } from 'react-native-reanimated';
+
+// One soft fade for everything on open — no zoom, slide or delay, so nothing moves or bounces while the page arrives.
+const APPEAR = FadeIn.duration(220);
 import { Image } from 'expo-image';
 import { BlurView } from 'expo-blur';
 import Svg, { Ellipse, Path } from 'react-native-svg';
@@ -31,7 +33,7 @@ import {
 } from '@/services/api/offers';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
-import { formatTime12, getIndiaDateParts, getAvailability } from '@/utils/sawari';
+import { formatTime12, getIndiaDateParts, getAvailability, istDayMonth } from '@/utils/sawari';
 import { FlashSaleHeroTitle } from '@/components/home/FlashSaleHeroTitle';
 import { FlashSaleScheduledHeader, SCHEDULED_HEADER_VIEW } from '@/components/home/FlashSaleScheduledHeader';
 import { FlashSaleSwipeCoach, hasSeenSwipeCoach, markSwipeCoachSeen } from '@/components/home/FlashSaleSwipeCoach';
@@ -51,7 +53,9 @@ import FsStarGlow from '@/assets/images/flash_sale/fs_star_glow.svg';
 import FsStarSmall from '@/assets/images/flash_sale/fs_star_small.svg';
 import FsStarSmallGlow from '@/assets/images/flash_sale/fs_star_small_glow.svg';
 import { CustomAlert } from '@/components/common/CustomAlert';
+import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
 import { ExclusiveOffersSection } from '@/components/home/ExclusiveOffersSection';
+import { createUnscaled } from '@/utils/scaleText';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const BG = '#3E2DC8';
@@ -107,7 +111,7 @@ function TicketShape({ fill = 'none', stroke }: { fill?: string; stroke?: string
  * today → tomorrow; times from the offer. Used to fill the booking and to tell whether a car is free for it.
  */
 function offerTrip(offer: any) {
-  const label = (d: Date) => `${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+  const label = (d: Date) => istDayMonth(d); // India date
   const today = new Date();
   const overnight = Boolean(offer?.isOvernight || (offer?.pickupTime?.includes('PM') && offer?.returnTime?.includes('AM')));
   const pickupT = offer?.rentalStartTime || offer?.pickupTime || (overnight ? '08:00 PM' : '08:00 AM');
@@ -130,6 +134,9 @@ function indiaDayOrdinal(ms: number): number {
 }
 
 /** Arc slots (Figma Frame 2147226241, 312 wide): offset from the shown car → place, size and white ring strength. */
+// Skeleton blocks on the purple page: soft see-through white instead of the light-grey used on white pages.
+const GHOST = { backgroundColor: 'rgba(255,255,255,0.14)' } as const;
+
 const ARC_SLOTS = [
   { offset: 0, left: 130, top: 12, size: 52, ring: '#FFFFFF' },
   { offset: 1, left: 208, top: 20, size: 44, ring: 'rgba(255,255,255,0.9)' },
@@ -215,10 +222,13 @@ export default function FlashSaleScreen() {
   // between the header and the photo row, centred in that room (on a 393 × 852 phone that is the Figma spot).
   const fitW = Math.min(1, (windowWidth - 24) / 361);
   const headerBottom = insets.top + 44 - 17 + 92.42 * fitW;
-  const arcTop = windowHeight - 16 - Math.max(0, 75 - insets.bottom) - 86;
+  // The page's real height, measured (Android's window height can include/exclude the bars and change just after the
+  // page opens, which moved the ticket). Content waits for this measurement, so it is laid out once, in place.
+  const [screenH, setScreenH] = useState(0);
+  const arcTop = (screenH || windowHeight) - 16 - Math.max(0, 75 - insets.bottom) - 86;
   const ticketScale = Math.max(0.6, Math.min(fitW, (arcTop - headerBottom - 16) / 417));
   const ticketTop = (headerBottom + arcTop) / 2 - 208.5 - (insets.top + 44);
-  const { data: fleetVehicles = [] } = useVehicles();
+  const { data: fleetVehicles = [], isLoading: fleetLoading } = useVehicles();
 
   // Queries
   // Real time: every time the page opens it asks the server again and waits for that answer, instead of first showing
@@ -238,7 +248,9 @@ export default function FlashSaleScreen() {
   });
   const nextReady = nextFresh || nextFailed || (nextAt > 0 && Date.now() - nextAt < 60 * 1000);
   // Nothing is decided until the server has answered (both questions when there is no live sale).
-  const ready = offersReady && (isLive || nextReady);
+  // Also wait for the fleet on first load: a live offer names its cars by id, so without the fleet the page showed the
+  // plain offers list for a moment and then jumped to the ticket (replaying its zoom-in).
+  const ready = offersReady && (isLive || nextReady) && !fleetLoading;
 
   const [nowMs, setNowMs] = useState(Date.now());
   useEffect(() => {
@@ -278,11 +290,15 @@ export default function FlashSaleScreen() {
 
   const todayOrdinal = indiaDayOrdinal(nowMs);
   const saleOrdinal = scheduledStartsMs ? indiaDayOrdinal(scheduledStartsMs) : 0;
-  const todayWeekday = new Date(todayOrdinal * 86400000).getUTCDay();
-  const saleWeekday = saleOrdinal ? new Date(saleOrdinal * 86400000).getUTCDay() : -1;
-  const isSaturdayPreview = isScheduled && todayWeekday === 6 && saleWeekday === 0 && saleOrdinal - todayOrdinal === 1;
-  const isSundayNonMemberPreview = isScheduled && !isMember && todayWeekday === 0 && saleOrdinal === todayOrdinal;
-  const isScheduledPreview = isSaturdayPreview || isSundayNonMemberPreview;
+  // Any weekday (it used to work only for a Sunday sale): the cars are revealed the day before the sale, and on the sale
+  // day non-members still see them (under the members' frost) until it opens. A Tuesday sale is previewed on Monday.
+  const daysToSale = saleOrdinal ? saleOrdinal - todayOrdinal : Infinity;
+  const isRevealDayPreview = isScheduled && daysToSale === 1;
+  const isSaleDayNonMemberPreview = isScheduled && !isMember && daysToSale === 0;
+  const isScheduledPreview = isRevealDayPreview || isSaleDayNonMemberPreview;
+  // From the reveal day on, the header says "STARTS <DAY> <TIME>"; before that, "Schedule on <reveal day>". (On a
+  // Tuesday sale day it used to say "Schedule on Monday" — yesterday.)
+  const revealPassed = isScheduled && daysToSale <= 1;
 
   // Only show vehicles supplied by the live or upcoming offer; never invent vehicle data for a preview.
   const displayCars = useMemo(() => {
@@ -330,12 +346,27 @@ export default function FlashSaleScreen() {
   }, [offers, isLive, isScheduled, nextSale, fleetVehicles]);
 
   const [selectedCarIndex, setSelectedCarIndex] = useState(0);
+  // Keep the same car on screen when the list re-sorts (free first, booked last — "booked" is re-checked on every fleet
+  // refresh): follow the car's id, not its position, so the ticket doesn't jump to a different car by itself.
+  const selectedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const id = selectedIdRef.current;
+    if (!id) return;
+    const idx = displayCars.findIndex((c: any) => String(c.id) === id);
+    if (idx >= 0 && idx !== selectedCarIndex) setSelectedCarIndex(idx);
+  }, [displayCars]); // eslint-disable-line react-hooks/exhaustive-deps -- only when the list itself changes
   const slideX = useRef(new Animated.Value(0)).current; // the ticket's sideways slide while swiping between cars
   const activeCar: any = displayCars[selectedCarIndex] || displayCars[0] || {};
+  // Remember the shown car after each change (runs after the re-sort check above, so that check sees the old car).
+  useEffect(() => { selectedIdRef.current = activeCar.id != null ? String(activeCar.id) : null; }, [selectedCarIndex, displayCars]); // eslint-disable-line react-hooks/exhaustive-deps
   const activeOffer: any = activeCar.offer || liveOffer || (isScheduled ? nextSale?.offer : null) || null;
 
   // Can the customer book this car now? (its own offer's early-access lock and members-only rule)
   const canBook = isLive && !activeCar.booked && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
+  // Who may open a car's page: the sale is live and this customer is past the members' lock (members during early
+  // access, everyone after it). Non-members still SEE every car and price, swipe through them, and are sent to buy a
+  // membership if they try to open one.
+  const hasAccess = isLive && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
 
   // Scheduled preview days show the offer under the membership frost; other upcoming sales stay fully locked.
   const membersOnlyNow = (
@@ -477,6 +508,12 @@ export default function FlashSaleScreen() {
     Haptics.selectionAsync();
     const car = fleetVehicles.find((fv: any) => String(fv.id || fv._id) === String(activeCar.id || activeCar._id)) || activeCar;
     if (!car || String(car.id).startsWith('hidden-')) return;
+    if (!hasAccess) {
+      if (!isMember) { router.push('/membership'); return; } // "Buy membership to get access"
+      const at = opensMs > Date.now() ? opensMs - (isLive ? 0 : earlyAccessMinutes * 60000) : 0;
+      CustomAlert.alert('Not open yet', at ? `Your early access opens at ${formatTime12(at)}.` : 'This deal isn’t open yet.');
+      return;
+    }
     selectCar(car);
     // The deal's trip, so the car page shows its dates and price (and "Need more time?" to add days).
     if (activeOffer) {
@@ -485,7 +522,7 @@ export default function FlashSaleScreen() {
       setTimes(trip.pickupT, trip.returnT);
     }
     router.push({ pathname: '/car-details', params: { id: String(car.id || car._id), allowExtend: 'true' } });
-  }, [activeCar, activeOffer, fleetVehicles, router, selectCar, setDates, setTimes]);
+  }, [activeCar, activeOffer, fleetVehicles, router, selectCar, setDates, setTimes, hasAccess, isMember, opensMs, isLive, earlyAccessMinutes]);
 
   // Schedule text calculations
   const scheduleInfo = useMemo(() => {
@@ -511,13 +548,16 @@ export default function FlashSaleScreen() {
     if (liveOffer?.expiryDate) {
       return new Date(liveOffer.expiryDate).getTime();
     }
-    const end = new Date();
-    end.setHours(23, 59, 59, 999);
-    return end.getTime();
+    // Tonight 11:59:59 PM India time (not the phone's timezone).
+    const p = getIndiaDateParts(Date.now());
+    return Date.UTC(p.year, p.month, p.date + 1) - 330 * 60000 - 1;
   }, [liveOffer]);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View
+      style={[styles.screen, { paddingTop: insets.top }]}
+      onLayout={(e) => { const h = Math.round(e.nativeEvent.layout.height); if (Math.abs(h - screenH) > 1) setScreenH(h); }}
+    >
       <StatusBar style="light" />
       <View pointerEvents="none" style={StyleSheet.absoluteFill}>
         <Image
@@ -541,11 +581,66 @@ export default function FlashSaleScreen() {
       </View>
 
       {/* Content depending on state */}
-      {!ready ? (
-        // Waiting for the server's current answer
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 56 }}>
-          <ActivityIndicator color="#FFFFFF" />
-        </View>
+      {!ready || !screenH ? (
+        // Waiting for the server: the real page's own pieces in place — the header row (title + ENDS IN timer), the cream
+        // ticket with its bites, gold outline and dashed divider, the photo and details boxes, the button and the car arc
+        // — with shimmer blocks where the text and photo go. The real content then fades in over the same spots.
+        <SkeletonGroup>
+          <View style={styles.mainContainer} accessibilityLabel="Loading Flash Sale">
+            <View style={[styles.liveHeaderWrap, fitW < 1 && { transform: [{ translateX: -8.4 }, { scale: fitW }], marginBottom: -92.42 * (1 - fitW) }]}>
+              <Skeleton width={174} height={52} borderRadius={10} style={GHOST} />
+              <View style={{ alignItems: 'center', gap: 6 }}>
+                <Skeleton width={64} height={12} borderRadius={4} style={GHOST} delay={40} />
+                <View style={{ flexDirection: 'row', gap: 6 }}>
+                  {[0, 1, 2].map((i) => <Skeleton key={i} width={38} height={38} borderRadius={8} style={GHOST} delay={60 + i * 30} />)}
+                </View>
+              </View>
+            </View>
+            <View style={[styles.ticketSection, { position: 'absolute', left: (windowWidth - 353) / 2, top: ticketTop, transform: [{ scale: ticketScale }] }]}>
+              <View style={styles.ticketCard}>
+                <TicketShape fill="#FEFDF0" />
+                <FsDash width={320} height={1} style={styles.dashedDivider} />
+                <View style={[styles.photoContainer, { backgroundColor: 'transparent' }]}>
+                  <Skeleton width="100%" height={212} borderRadius={8} delay={80} />
+                </View>
+                <View style={styles.detailsContainer}>
+                  <View style={styles.detailsRow1}>
+                    <View style={{ flex: 1, gap: 8 }}>
+                      <Skeleton width="62%" height={18} borderRadius={6} delay={140} />
+                      <Skeleton width="78%" height={12} borderRadius={5} delay={170} />
+                    </View>
+                    <View style={styles.ratingCol}>
+                      <Skeleton width={56} height={28} borderRadius={20} delay={190} />
+                    </View>
+                  </View>
+                  <View style={styles.detailsRow3}>
+                    <Skeleton width={92} height={20} borderRadius={6} delay={210} />
+                    <Skeleton width={84} height={13} borderRadius={5} delay={230} />
+                  </View>
+                </View>
+                <TicketShape stroke={GOLD} />
+              </View>
+              <View style={[styles.mainCtaBtn, { backgroundColor: '#F4F6FA' }]}>
+                <Skeleton width={150} height={18} borderRadius={6} delay={250} />
+              </View>
+            </View>
+            <View style={[styles.arcWrap, { marginBottom: Math.max(0, 91 - 16 - insets.bottom) }]}>
+              <Svg width={712} height={300} style={{ position: 'absolute', left: -200, top: 35 }} pointerEvents="none">
+                <Ellipse cx={356} cy={150} rx={355.5} ry={149.5} stroke="rgba(255,255,255,0.4)" strokeWidth={1} strokeDasharray="6 6" fill="none" />
+              </Svg>
+              {ARC_SLOTS.map((slot, i) => (
+                <Skeleton
+                  key={slot.offset}
+                  width={slot.size}
+                  height={slot.size}
+                  borderRadius={slot.size / 2}
+                  delay={300 + i * 40}
+                  style={{ ...GHOST, position: 'absolute', left: slot.left, top: slot.top, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' }}
+                />
+              ))}
+            </View>
+          </View>
+        </SkeletonGroup>
       ) : isLive && displayCars.length === 0 ? (
         // Live offers that name no car (all cars / a category): the offers themselves.
         <View style={{ flex: 1, paddingBottom: insets.bottom }}>
@@ -559,12 +654,12 @@ export default function FlashSaleScreen() {
           pointerEvents="none" // full-screen: never block the back button
           accessible
           accessibilityRole="header"
-          accessibilityLabel={isComingSoon ? 'Flash Sale, coming soon' : `Flash Sale, schedule on ${scheduleInfo.revealWeekday.toLowerCase()}`}
+          accessibilityLabel={isComingSoon ? 'Flash Sale, coming soon' : `Flash Sale, schedule on ${(revealPassed ? scheduleInfo.weekday : scheduleInfo.revealWeekday).toLowerCase()}`}
         >
-          <Reanimated.View entering={ZoomIn.springify().damping(13)}>
+          <Reanimated.View entering={APPEAR}>
             <FlashSaleHeroTitle
               variant={isComingSoon ? 'comingSoon' : 'schedule'}
-              weekday={scheduleInfo.revealWeekday}
+              weekday={revealPassed ? scheduleInfo.weekday : scheduleInfo.revealWeekday}
               width={Math.min(393, windowWidth)}
             />
           </Reanimated.View>
@@ -573,7 +668,7 @@ export default function FlashSaleScreen() {
         // States 3, 4, 5, 6, 7: SCHEDULED or LIVE SALE
         <View style={styles.mainContainer}>
           {/* Header: Live countdown (Images 6 & 7) vs Scheduled (Images 3, 4, 5) */}
-          <Reanimated.View entering={FadeInDown.duration(320)}>
+          <Reanimated.View entering={APPEAR}>
           {isLive ? (
             <LiveCountdownHeader expiryMs={expiryMs} scale={fitW} />
           ) : showScheduledHeader ? (
@@ -582,12 +677,12 @@ export default function FlashSaleScreen() {
             <View
               accessible
               accessibilityRole="header"
-              accessibilityLabel={ticketLocked ? `Flash Sale, schedule on ${scheduleInfo.revealWeekday.toLowerCase()}` : `Flash Sale, ${scheduleInfo.fullLabel.toLowerCase()}`}
+              accessibilityLabel={ticketLocked && !revealPassed ? `Flash Sale, schedule on ${scheduleInfo.revealWeekday.toLowerCase()}` : `Flash Sale, ${scheduleInfo.fullLabel.toLowerCase()}`}
               style={{ alignSelf: 'center' }}
             >
               <FlashSaleScheduledHeader
-                line={ticketLocked ? 'scheduleOn' : 'starts'}
-                day={ticketLocked ? scheduleInfo.revealWeekday : scheduleInfo.weekday}
+                line={ticketLocked && !revealPassed ? 'scheduleOn' : 'starts'}
+                day={ticketLocked && !revealPassed ? scheduleInfo.revealWeekday : scheduleInfo.weekday}
                 time={scheduleInfo.timeStr}
                 width={Math.min(SCHEDULED_HEADER_VIEW.w, windowWidth)}
               />
@@ -596,7 +691,7 @@ export default function FlashSaleScreen() {
           </Reanimated.View>
 
           {/* Ticket Card + Sparkles: springs up from slightly smaller, just after the header */}
-          <Reanimated.View entering={ZoomIn.delay(120).springify().damping(14)} style={StyleSheet.absoluteFill} pointerEvents="box-none">
+          <Reanimated.View entering={APPEAR} style={StyleSheet.absoluteFill} pointerEvents="box-none">
           <View style={[styles.ticketSection, { position: 'absolute', left: (windowWidth - 353) / 2, top: ticketTop, transform: [{ scale: ticketScale }] }]}>
             <Sparkle size={13.867} left={-8.87} top={-9} />
             <Sparkle size={6.934} left={-12} top={-14} />
@@ -720,7 +815,7 @@ export default function FlashSaleScreen() {
                         <Text style={styles.struckPriceText}>{formatCurrency(originalPrice)}</Text>
                       )}
                     </View>
-                    <Pressable hitSlop={10} onPress={handleViewDetails} style={({ pressed }) => [styles.viewDetailsRow, pressed && { opacity: 0.7 }]}>
+                    <Pressable hitSlop={10} onPress={handleViewDetails} accessibilityRole="button" accessibilityLabel={hasAccess ? 'View details' : 'Members only. Buy membership to get access'} style={({ pressed }) => [styles.viewDetailsRow, pressed && { opacity: 0.7 }]}>
                       <Text style={styles.viewDetailsText}>View Details</Text>
                       <FsChevron width={13} height={13} />
                     </Pressable>
@@ -739,7 +834,7 @@ export default function FlashSaleScreen() {
                     <View style={styles.earlyAccessOverlayPill}>
                       <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(251, 196, 34, 0.06)' }]} />
-                      <Text style={styles.earlyAccessWhiteText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                      <Text style={styles.earlyAccessWhiteText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} allowFontScaling={false}>
                         Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
                       </Text>
                     </View>
@@ -747,7 +842,7 @@ export default function FlashSaleScreen() {
                     <PillCrown />
                   </View>
                   {/* 4 below the pill: how early, from the offer */}
-                  <Text style={styles.earlyAccessSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                  <Text style={styles.earlyAccessSub} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} allowFontScaling={false}>
                     Unlock this offer {earlyAccessMinutes} minutes early with Membership.
                   </Text>
                 </View>
@@ -756,7 +851,7 @@ export default function FlashSaleScreen() {
 
             {/* Main CTA Button */}
             {isScheduled ? (
-              isSundayNonMemberPreview ? (
+              isSaleDayNonMemberPreview ? (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }}
@@ -846,7 +941,7 @@ export default function FlashSaleScreen() {
           {/* Frame 2147226241 (312 × 86, Figma top 675): the sale's cars on a dashed arc — the shown car in the middle
               (52, white 2px ring, crown), its neighbours either side (44, ring 90%), the next ones at the ends (40,
               ring 80%). Before the sale opens they are frosted with a gold ring instead (Ellipse 17/18/19). */}
-          <Reanimated.View entering={FadeInUp.delay(220).duration(320)} style={[styles.arcWrap, { marginBottom: Math.max(0, 91 - 16 - insets.bottom) }]}>
+          <Reanimated.View entering={APPEAR} style={[styles.arcWrap, { marginBottom: Math.max(0, 91 - 16 - insets.bottom) }]}>
             <Svg width={712} height={300} style={{ position: 'absolute', left: -200, top: 35 }} pointerEvents="none">
               <Ellipse cx={356} cy={150} rx={355.5} ry={149.5} stroke="rgba(255,255,255,0.4)" strokeWidth={1} strokeDasharray="6 6" fill="none" />
             </Svg>
@@ -893,7 +988,8 @@ export default function FlashSaleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+// Unscaled: this block shrinks as a whole to fit the screen, so its text must not be shrunk a second time.
+const styles = createUnscaled({
   screen: { flex: 1, backgroundColor: BG },
   topSpacer: { height: 44, position: 'relative' },
   backBtn: {
@@ -985,7 +1081,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    paddingVertical: 12,
+    // No vertical padding: 12 + 12 left the text 15 pt of height, so shrink-to-fit drew the 17 pt design text at
+    // ~14.5 pt. Centred in the 39 pill instead (Plus Jakarta Bold 17 is 215 pt wide; 218 fits inside the 16 sides).
     paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: GOLD,

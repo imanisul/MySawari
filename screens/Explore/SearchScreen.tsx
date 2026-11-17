@@ -3,7 +3,9 @@ import { safeBack } from '@/utils/navigation';
 import { useTrackTripProgress } from '@/hooks/useTrackTripProgress';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useAfterSlideIn } from '@/hooks/useAfterSlideIn';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated from 'react-native-reanimated';
@@ -185,11 +187,19 @@ export default function SearchResultsScreen() {
   const emptyKind: EmptyKind = isError && !fetchedCars?.length ? 'error' : (activeFilterCount > 0 || !!debouncedQuery) && freeCars.length > 0 ? 'filters' : 'dates';
   const plural = `${vehicleWord[0].toUpperCase()}${vehicleWord.slice(1)}${count === 1 ? '' : 's'}`;
 
+  // Car cards (photo swipers) mount after the page has slid in, so the slide never stutters.
+  const slidIn = useAfterSlideIn();
+
   const header = (
     <View style={{ gap: 12, paddingBottom: 4 }}>
       {/* Zero Security Deposit */}
       <View style={[styles.strip, { backgroundColor: p.greenBg, borderColor: p.greenBorder }]}>
-        <Text style={[styles.stripText, { color: p.green }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>👌 Zero Security Deposit</Text>
+        {/* Figma: 11×11 hand picture, 2 apart, "Zero Security Deposit" in #00603E. A picture, not the 👌 emoji —
+            iOS showed "?" for the emoji. */}
+        <View style={styles.stripRow} accessible accessibilityLabel="Zero Security Deposit">
+          <Image source={require('@/assets/images/ok_hand.png')} style={styles.stripIcon} contentFit="contain" transition={0} />
+          <Text style={[styles.stripText, { color: p.page === '#FFFFFF' ? '#00603E' : p.green }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Zero Security Deposit</Text>
+        </View>
       </View>
 
       {/* Search + sort */}
@@ -286,10 +296,10 @@ export default function SearchResultsScreen() {
       </View> 
 
       <FlatList
-        data={isLoading ? [] : filteredCars}
+        data={isLoading || !slidIn ? [] : filteredCars}
         keyExtractor={(c: Car) => c.id}
         renderItem={renderCar}
-        ListEmptyComponent={isLoading ? (
+        ListEmptyComponent={isLoading || !slidIn ? (
           <View>
             {[0, 1, 2].map((i) => <CarCardSkeleton key={i} index={i} />)}
           </View>
@@ -350,6 +360,8 @@ const styles = StyleSheet.create({
   dateDivider: { width: 1, alignSelf: 'stretch', marginVertical: 2 },
   strip: { borderWidth: 1, borderRadius: 8, height: 39, alignItems: 'center', justifyContent: 'center' },
   stripText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 },
+  stripRow: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: '100%', paddingHorizontal: 8 },
+  stripIcon: { width: 11, height: 11 },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   search: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9, height: 39, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
   searchText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, paddingVertical: 0 },

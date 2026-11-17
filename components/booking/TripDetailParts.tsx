@@ -228,15 +228,14 @@ export function Timeline({ steps }: { steps: TimelineStep[] }) {
   );
 }
 
-/** Pickup → Destination → Drop-off, with "- Completed" once the ops team has handed over / taken back the car. */
+/** Pickup → Drop-off (no destination: trips no longer ask for one), with "- Completed" once the ops team has handed over / taken back the car. */
 export function TripTimeline({ booking }: { booking: BookingSnapshot }) {
   const c = useTripColors();
   const pickedUp = booking.status === 'ONGOING' || booking.status === 'COMPLETED';
   const dropped = booking.status === 'COMPLETED';
-  // Figma: filled 11px dots (navy once done, green destination, grey while waiting) on one dashed line.
+  // Figma: filled 11px dots (navy once done, grey while waiting) on one dashed line.
   const stops = [
     { title: pickedUp ? 'Pickup - Completed' : 'Pickup', date: shortDate(booking.pickupDate), time: booking.pickupTime || '10:00 AM', place: placeName(booking.pickupLocationName), color: pickedUp ? c.navy : IDLE },
-    ...(booking.destination ? [{ title: 'Destination', date: '', time: '', place: booking.destination, color: pickedUp ? '#008758' : IDLE }] : []),
     { title: dropped ? 'Drop-off - Completed' : 'Drop-off', date: shortDate(booking.returnDate), time: booking.dropTime || '10:00 AM', place: placeName(booking.dropLocationName || booking.dropoffLocationName), color: dropped ? c.navy : IDLE },
   ];
   return (

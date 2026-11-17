@@ -9,6 +9,14 @@ import { Dimensions, StyleSheet } from 'react-native';
 // Sizes set inline (not via StyleSheet.create) are not scaled.
 const k = Math.min(Math.max(Dimensions.get('window').width / 393, 0.82), 1);
 
+/**
+ * StyleSheet.create WITHOUT the narrow-screen font scaling, for blocks that already scale as a whole to fit the
+ * screen (Flash Sale ticket/header, Home cards row, Home price banner): with the global scaling too, their text was
+ * shrunk twice (0.82 × 0.6 ≈ half size on a 320-wide phone).
+ */
+const originalCreate = StyleSheet.create.bind(StyleSheet);
+export const createUnscaled: typeof StyleSheet.create = ((styles: any) => originalCreate(styles)) as any;
+
 if (Math.abs(k - 1) > 0.01) {
   const create = StyleSheet.create as any;
   (StyleSheet as any).create = (styles: Record<string, any>) => {

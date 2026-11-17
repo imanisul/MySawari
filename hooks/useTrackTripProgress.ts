@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSawari } from '@/context/SawariContext';
 import { markSearchProgress, SearchStage } from '@/utils/recentSearches';
-import { LocationResult } from '@/utils/sawari';
+import { LocationResult, istDayMonth } from '@/utils/sawari';
 
 /**
  * Tells "Recent searches" that the current trip (destination + dates) has reached this page, so a tap on
@@ -55,10 +55,8 @@ export function useTrackTripProgress(stage: SearchStage) {
 
     let targetRange = dateRange;
     if (!targetRange || targetRange.includes('Select')) {
-      const now = new Date();
-      const later = new Date(Date.now() + 2 * 86400000);
-      const startStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-      const endStr = later.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+      const startStr = istDayMonth(Date.now());
+      const endStr = istDayMonth(Date.now() + 2 * 86400000);
       targetRange = `${startStr} – ${endStr}`;
     }
     

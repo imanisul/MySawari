@@ -11,6 +11,7 @@ import { useRideJourney, PendingCard } from '@/hooks/useRideJourney';
 import { RewardScratchModal } from '@/components/rewards/RewardScratchModal';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { Skeleton, SkeletonGroup } from '@/components/common/Skeleton';
+import { istDayMonthYear } from '@/utils/sawari';
 
 const F = {
   regular: 'PlusJakartaSans_400Regular',
@@ -192,7 +193,7 @@ export default function RewardsScreen() {
                 <View key={r.label + i} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: p.segBorder }]}>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.rowTitle, { color: p.fg }]}>{r.label}</Text>
-                    <Text style={[styles.rowSub, { color: p.muted }]}>{r.earnedAt ? new Date(r.earnedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</Text>
+                    <Text style={[styles.rowSub, { color: p.muted }]}>{r.earnedAt ? istDayMonthYear(r.earnedAt) : ''}</Text>
                   </View>
                   <Text style={[styles.amount, { color: p.green }]}>+{formatCurrency(r.amount)}</Text>
                 </View>

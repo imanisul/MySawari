@@ -5,6 +5,7 @@ import Animated, { FadeIn } from 'react-native-reanimated';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getIndiaDateParts } from '@/utils/sawari';
 import * as Haptics from '@/utils/haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
@@ -198,7 +199,7 @@ export default function BookingDetailScreen() {
   const startsIn = (() => {
     const at = pickupMoment(s);
     if (!at) return 'Your trip is coming up';
-    const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    const day = (d: Date) => { const p = getIndiaDateParts(d); return Date.UTC(p.year, p.month, p.date); }; // India days
     const n = Math.round((day(at) - day(new Date())) / 86400000);
     if (n <= 0) return 'Your trip starts today';
     if (n === 1) return 'Your trip starts tomorrow';
@@ -257,8 +258,9 @@ export default function BookingDetailScreen() {
 
             if (isVerified) {
               return (
-                <View style={styles.otpVerifiedBadge}>
-                  <Text style={styles.otpVerifiedBadgeText}>✔  OTP Verified</Text>
+                <View style={[styles.otpVerifiedBadge, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                  <Feather name="check" size={11} color="#FFFFFF" />
+                  <Text style={styles.otpVerifiedBadgeText}>OTP Verified</Text>
                 </View>
               );
             }
@@ -462,7 +464,7 @@ export default function BookingDetailScreen() {
           </Animated.View>
 
       {!!bottomBar && (
-        <View style={[styles.bottomBar, { backgroundColor: c.background, borderTopColor: '#E7EAF4', paddingBottom: insets.bottom + 8 }]}>
+        <View style={[styles.bottomBar, { backgroundColor: c.background, borderTopColor: '#E7EAF4', paddingBottom: Math.max(insets.bottom, 8) + 8 }]}>
           {bottomBar}
         </View>
       )}

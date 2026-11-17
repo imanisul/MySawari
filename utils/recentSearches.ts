@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LocationResult, parseDayLabel, splitDateRange, todayDayNum } from '@/utils/sawari';
+import { LocationResult, parseDayLabel, splitDateRange, todayDayNum, getIndiaDateParts } from '@/utils/sawari';
 
 /**
  * The trips someone searched for, newest first, so Home can offer them again with one tap instead of
@@ -122,10 +122,10 @@ export function isPastSearch(s: RecentSearch): boolean {
   }
   const [start] = splitDateRange(s.dateRange);
   if (!start) return false;
-  const saved = new Date(s.savedAt || Date.now());
-  const savedDay = Math.floor(Date.UTC(saved.getFullYear(), saved.getMonth(), saved.getDate()) / 86400000);
-  const sameYear = parseDayLabel(`${start} ${saved.getFullYear()}`);
+  const saved = getIndiaDateParts(s.savedAt || Date.now()); // India date
+  const savedDay = Math.floor(Date.UTC(saved.year, saved.month, saved.date) / 86400000);
+  const sameYear = parseDayLabel(`${start} ${saved.year}`);
   if (sameYear === null) return false;
-  const day = sameYear >= savedDay ? sameYear : parseDayLabel(`${start} ${saved.getFullYear() + 1}`);
+  const day = sameYear >= savedDay ? sameYear : parseDayLabel(`${start} ${saved.year + 1}`);
   return day !== null && day < todayDayNum();
 }

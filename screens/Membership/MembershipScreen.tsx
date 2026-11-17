@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { safeBack } from '@/utils/navigation';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
 import { View, Text, StyleSheet, ScrollView, Pressable, Animated, ActivityIndicator, Modal, Image, ImageSourcePropType, RefreshControl, useWindowDimensions } from 'react-native';
@@ -112,7 +112,8 @@ export default function MembershipScreen() {
   const params = useLocalSearchParams<{ plan?: string }>();
 
   const { membership: knownMembership, fetchWallet, isAuthenticated, isAuthLoading, customer } = useSawari();
-  const known = activeOnly(knownMembership);
+  // Memoised: activeOnly returns a new object each call, which re-ran the sync effect below forever.
+  const known = useMemo(() => activeOnly(knownMembership), [knownMembership]);
 
   // If a member's plan is already known, show it immediately.
   // For non-members, plans are static catalog items, so render immediately without blocking on network.
@@ -343,6 +344,8 @@ export default function MembershipScreen() {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={lightHeader ? '#737373' : '#FFFFFF'} progressViewOffset={insets.top} />}
       >
+        {/* Pulling the page down (iOS bounce) shows more of the header colour instead of a white gap above it. */}
+        <View pointerEvents="none" style={{ position: 'absolute', top: -1200, left: 0, right: 0, height: 1200, backgroundColor: headerTop }} />
         {/* ── Header ── */}
         <LinearGradient colors={[headerTop, headerBottom]} style={{ paddingTop: insets.top + 9, paddingBottom: 24 + (activePlan ? 9 : 32) }}>
           <Pressable

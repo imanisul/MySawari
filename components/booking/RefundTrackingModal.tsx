@@ -18,6 +18,7 @@ import { API, BookingSnapshot } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import * as Clipboard from 'expo-clipboard';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { istDayMonthYear, formatTime12 } from '@/utils/sawari';
 
 interface RefundTrackingModalProps {
   visible: boolean;
@@ -76,13 +77,7 @@ export function RefundTrackingModal({
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return dateStr;
-      return d.toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
+      return `${istDayMonthYear(d)}, ${formatTime12(d)}`; // India time
     } catch {
       return dateStr;
     }

@@ -61,8 +61,8 @@ export default function MyReferralsScreen() {
     if (r.stage === 'not_joined') return 'Not joined yet';
     const joined = r.joinedAt ? `Joined ${shortDay(r.joinedAt)}` : 'Joined MySawari';
     const parts: string[] = [];
-    if (r.vehicleName) parts.push(`🚗 ${r.vehicleName}`);
-    if (r.route) parts.push(r.route);
+    // No 🚗 emoji (iOS showed "?") and no destination (trips no longer ask for one).
+    if (r.vehicleName) parts.push(r.vehicleName);
     parts.push(joined);
     return parts.join('  •  ');
   };

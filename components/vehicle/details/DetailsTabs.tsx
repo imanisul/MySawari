@@ -521,7 +521,10 @@ export function ReviewsSection({ car }: { car: Car }) {
               const pct = total > 0 ? (val / total) * 100 : 0;
               return (
                 <View key={stars} style={styles.distRow}>
-                  <Text style={[styles.distStars, { color: colors.mutedForeground }]}>{stars} ★</Text>
+                  <View style={{ width: 24, flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                    <Text style={[styles.distStars, { color: colors.mutedForeground, width: undefined }]}>{stars}</Text>
+                    <Ionicons name="star" size={10} color={colors.mutedForeground} />
+                  </View>
                   <View style={[styles.distBarWrap, { backgroundColor: colors.surfaceSoft }]}>
                     <View style={[styles.distBarFill, { backgroundColor: colors.primary, width: `${pct}%` }]} />
                   </View>

@@ -81,9 +81,16 @@ export function StickyBookingBar({
                   </View>
                   <View style={styles.metaRow}>
                     {!!(price.planName || price.buyingPlan) && (
-                      <View style={[styles.chip, { backgroundColor: p.chipBg, borderColor: p.memberBorder }]}>
+                      // The membership on this price: tap to see the plans on the Membership page.
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${price.planName || price.buyingPlan} membership price. View membership`}
+                        hitSlop={8}
+                        onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }}
+                        style={({ pressed }) => [styles.chip, { backgroundColor: p.chipBg, borderColor: p.memberBorder }, pressed && { opacity: 0.75 }]}
+                      >
                         <Text style={[styles.chipText, { color: p.navy }]}>{price.planName || price.buyingPlan}</Text>
-                      </View>
+                      </Pressable>
                     )}
                     <Text style={[styles.meta, { color: p.muted }]}>For {price.days} day{price.days === 1 ? '' : 's'}</Text>
                     <View style={[styles.dot, { backgroundColor: p.muted }]} />

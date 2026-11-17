@@ -165,12 +165,7 @@ export interface Review {
   images?: string[];
 }
 
-const today = new Date();
-export const getDynamicDate = (offset: number) => {
-  const d = new Date(today);
-  d.setDate(today.getDate() + offset);
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-};
+export const getDynamicDate = (offset: number) => istDayMonth(Date.now() + offset * 86400000);
 
 export const categories: Category[] = ['All', 'SUV', 'Sedan', 'Hatchback', 'MUV', 'Luxury', 'Bike'];
 
@@ -552,6 +547,15 @@ export function parseTimeToMinutes(timeStr?: string | null): number | null {
 }
 
 /** Formats a Date object, timestamp, or date string into 12-hour format strictly in Indian Standard Time e.g. "8:10 AM" or "12:00 PM". */
+/** "17 Nov 2026" in India time. */
+export const istDayMonthYear = (x: Date | number | string) => `${istDayMonth(x)} ${getIndiaDateParts(x).year}`;
+
+/** "17 Nov" in India time (never the phone's or UTC's date). */
+export function istDayMonth(dateOrMsOrStr: Date | number | string): string {
+  const p = getIndiaDateParts(dateOrMsOrStr);
+  return `${p.date} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][p.month]}`;
+}
+
 export function formatTime12(dateOrMsOrStr: Date | number | string): string {
   const p = getIndiaDateParts(dateOrMsOrStr);
   let hours = p.hours;
@@ -752,8 +756,8 @@ export function buildBlocks(car: Car, today: number): Block[] {
   if (car.availabilityDate && car.availabilityDate.toLowerCase() !== 'available now') {
     const availStartMs = parseDateAndTimeToMs(car.availabilityDate, '08:00 AM');
     if (availStartMs !== null && availStartMs > Date.now()) {
-      const d = new Date(availStartMs);
-      const availStartDay = toDayNum(d.getFullYear(), d.getMonth(), d.getDate());
+      const d = getIndiaDateParts(availStartMs);
+      const availStartDay = toDayNum(d.year, d.month, d.date);
       blocks.push({
         start: today,
         end: availStartDay,
@@ -767,8 +771,8 @@ export function buildBlocks(car: Car, today: number): Block[] {
   if (car.availableToDate) {
     const availEndMs = parseDateAndTimeToMs(car.availableToDate, '08:00 PM');
     if (availEndMs !== null && isFinite(availEndMs)) {
-      const d = new Date(availEndMs);
-      const availEndDay = toDayNum(d.getFullYear(), d.getMonth(), d.getDate());
+      const d = getIndiaDateParts(availEndMs);
+      const availEndDay = toDayNum(d.year, d.month, d.date);
       blocks.push({
         start: availEndDay,
         end: Infinity,

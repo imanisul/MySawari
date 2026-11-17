@@ -10,6 +10,7 @@ import { formatCurrency } from '@/services/backend/pricingEngine';
 import { useDealCars, dealPricing, dealWhenLabel, nextIstHourMs } from '@/hooks/useDealCars';
 import HomeCardSunburst from '@/assets/images/home_card_sunburst.svg';
 import HomeDealsTitle from '@/assets/images/home_deals_title.svg';
+import { createUnscaled } from '@/utils/scaleText';
 
 /** Figma Frame 2147226269: a row of 340 × 248 purple cards (price, Today's Deals, "Find the Perfect Ride"), gap 12. */
 const W = 340;
@@ -274,7 +275,8 @@ export function HomeCardsRow({ fromRate }: { fromRate?: number }) {
 }
 
 const F700 = 'PlusJakartaSans_700Bold';
-const styles = StyleSheet.create({
+// Unscaled: this block shrinks as a whole to fit the screen, so its text must not be shrunk a second time.
+const styles = createUnscaled({
   card: { width: W, height: H, borderRadius: 12, overflow: 'hidden' },
   cardSunburst: { position: 'absolute', left: -110.5, top: -156.5, opacity: 0.18 },
   // price card (see PriceCard). The price's line box (93 high) puts its baseline at y 113, centred on x 235.06.

@@ -154,6 +154,7 @@ import { bikeTransmissionFor } from '../../utils/bikeModels';
 import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { hasGoogleMaps, googleSearchPlaces, googleReverseLocation } from '../maps/google';
+import { istDayMonthYear } from '@/utils/sawari';
 
 // The backend is a separate project, deployed on Render. EXPO_PUBLIC_API_BASE_URL overrides it
 // (e.g. http://<your-computer's-LAN-IP>:5001 to test against a local backend on a real phone).
@@ -470,6 +471,11 @@ export async function withSubmissionGuard<T>(
   }
 }
 
+/** No connection: RN's "Network request failed" or Expo fetch's "fetch failed … offline / could not connect". */
+export const isOfflineError = (error: any) =>
+  (error?.name === 'TypeError' && error?.message === 'Network request failed') ||
+  /fetch failed|offline|could not connect|network connection was lost/i.test(String(error?.message || ''));
+
 export async function fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
   const method = (options.method || 'GET').toUpperCase();
   const isGet = method === 'GET';
@@ -493,7 +499,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
     try {
       response = await timedFetch(url, { ...options, headers });
     } catch (error: any) {
-      if (error.name === 'TypeError' && error.message === 'Network request failed') {
+      if (isOfflineError(error)) {
         throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
       }
       throw error;
@@ -587,7 +593,7 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
       try {
         response = await timedFetch(url, { ...options, headers });
       } catch (error: any) {
-        if (error.name === 'TypeError' && error.message === 'Network request failed') {
+        if (isOfflineError(error)) {
           throw new Error('Unable to connect to the server. Please check your internet connection and try again.');
         }
         throw error;
@@ -605,9 +611,10 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}): Pro
   if (isGet && dedupeKey) {
     const promise = runRequest();
     inFlightGetRequests.set(dedupeKey, promise);
-    promise.finally(() => {
-      inFlightGetRequests.delete(dedupeKey);
-    });
+    // then(done, done), not finally(): finally() makes a second promise that re-throws a failed request with nobody
+    // listening ("Uncaught (in promise)" for every failed GET, e.g. offline). The caller still gets the failure below.
+    const done = () => { inFlightGetRequests.delete(dedupeKey); };
+    promise.then(done, done);
     return promise.then((r) => r.clone());
   }
 
@@ -2192,7 +2199,7 @@ export const API = {
       }
       return Array.isArray(data.data) ? data.data : [];
     } catch (e: any) {
-      if (__DEV__) console.warn('getReferrals error:', e?.message);
+      if (__DEV__ && !isOfflineError(e)) console.warn('getReferrals error:', e?.message); // offline is expected, not news
       throw e; // the screen shows a retry; an empty list would look like "you referred nobody"
     }
   },
@@ -2460,7 +2467,7 @@ export const API = {
           userName: r.userName,
           rating: r.rating,
           text: r.text,
-          date: new Date(r.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+          date: istDayMonthYear(r.date),
           isVerified: r.isVerified,
           placeVisited: r.placeVisited || undefined,
           // Guest trip photos often show the car too — they go through plate processing like fleet photos.

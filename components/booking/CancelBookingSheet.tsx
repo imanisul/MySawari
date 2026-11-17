@@ -229,7 +229,7 @@ export function CancelBookingSheet({
         </ScrollView>
 
         {/* Policy + CTA */}
-        <View style={[styles.bottom, { paddingBottom: insets.bottom + 8, backgroundColor: c.background }]}>
+        <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 8) + 8, backgroundColor: c.background }]}>
           <Pressable onPress={() => setAgreed(!agreed)} style={styles.agreeRow} accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
             <View style={[styles.check, { borderColor: agreed ? c.navy : '#BFC3D4', backgroundColor: agreed ? c.navy : 'transparent' }]}>
               {agreed && <Feather name="check" size={12} color="#FFFFFF" />}

@@ -22,6 +22,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
+import { useAfterSlideIn } from '@/hooks/useAfterSlideIn';
 import { useSawari } from '@/context/SawariContext';
 import { useDealCars, dealPricing, useOpenTopDeal, dealDayTime, nextIstHourMs } from '@/hooks/useDealCars';
 import { VEHICLES_KEY } from '@/hooks/useVehicles';
@@ -452,6 +453,7 @@ export default function TopDealsScreen() {
   }, []);
 
   const { dealCars, targetEndMs, isOpen, isLoading, refetch } = useDealCars(nowMs);
+  const slidIn = useAfterSlideIn(); // deal cards mount after the slide, so it stays smooth
   // Top Deals exist only 2 PM → 8 AM: outside that (opened from a link / notification, or still open at 8 AM) the page
   // closes itself.
   useEffect(() => {
@@ -734,10 +736,10 @@ export default function TopDealsScreen() {
         </View>
 
         <View style={styles.vehicleFeed}>
-          {isLoading && !dealCars.length ? (
+          {(isLoading && !dealCars.length) || !slidIn ? (
             // First load: card-shaped placeholders where the deals will appear
             <View style={{ width: '100%', maxWidth: 361, gap: 12 }}>
-              {[0, 1, 2].map((i) => <CarCardSkeleton key={i} index={i} />)}
+              {[0, 1, 2].map((i) => <CarCardSkeleton key={i} index={i} variant="deal" />)}
             </View>
           ) : filteredCars.length === 0 ? (
             <View style={styles.emptyBox}>

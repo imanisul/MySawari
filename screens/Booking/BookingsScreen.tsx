@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, RefreshControl, Animated, Easing, PanResponder } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View, RefreshControl, Animated, Easing, PanResponder } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
+import { safeBack } from '@/utils/navigation';
+import { getIndiaDateParts } from '@/utils/sawari';
 import * as Haptics from '@/utils/haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -184,7 +186,15 @@ export default function BookingsScreen() {
   if (isAuthenticated === null) {
     return (
       <View style={[styles.screen, { backgroundColor: p.page }]}>
-        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>My Trips</Text>
+        <View style={[styles.titleRow, { paddingTop: insets.top + 4 }]}>
+          {/* iPhone only: Android has its own back button / gesture. */}
+          {Platform.OS === 'ios' && (
+            <Pressable onPress={() => { Haptics.selectionAsync(); safeBack(router); }} style={[styles.back, { backgroundColor: p.iconBg }]} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+              <Feather name="chevron-left" size={20} color={p.sub} />
+            </Pressable>
+          )}
+          <Text style={[styles.title, { color: p.fg, paddingHorizontal: 0 }]}>My Trips</Text>
+        </View>
         <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
           <BookingSkeleton index={0} />
           <BookingSkeleton index={1} />
@@ -198,7 +208,15 @@ export default function BookingsScreen() {
   if (!isAuthenticated) {
     return (
       <View style={[styles.screen, { backgroundColor: p.page }]}>
-        <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>My Trips</Text>
+        <View style={[styles.titleRow, { paddingTop: insets.top + 4 }]}>
+          {/* iPhone only: Android has its own back button / gesture. */}
+          {Platform.OS === 'ios' && (
+            <Pressable onPress={() => { Haptics.selectionAsync(); safeBack(router); }} style={[styles.back, { backgroundColor: p.iconBg }]} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+              <Feather name="chevron-left" size={20} color={p.sub} />
+            </Pressable>
+          )}
+          <Text style={[styles.title, { color: p.fg, paddingHorizontal: 0 }]}>My Trips</Text>
+        </View>
         <View style={styles.signedOut}>
           <View style={[styles.emptyCircle, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>
             <Feather name="calendar" size={24} color={p.fg} />
@@ -230,7 +248,15 @@ export default function BookingsScreen() {
   return (
     <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
      <BlurTarget style={{ flex: 1 }}>
-      <Text style={[styles.title, { color: p.fg, paddingTop: insets.top + 4 }]}>My Trips</Text>
+      <View style={[styles.titleRow, { paddingTop: insets.top + 4 }]}>
+          {/* iPhone only: Android has its own back button / gesture. */}
+          {Platform.OS === 'ios' && (
+            <Pressable onPress={() => { Haptics.selectionAsync(); safeBack(router); }} style={[styles.back, { backgroundColor: p.iconBg }]} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+              <Feather name="chevron-left" size={20} color={p.sub} />
+            </Pressable>
+          )}
+          <Text style={[styles.title, { color: p.fg, paddingHorizontal: 0 }]}>My Trips</Text>
+        </View>
 
       {/* Underlined tabs with sliding navy bar */}
       <View style={[styles.tabBarWrap, { borderBottomColor: p.divider }]}>
@@ -338,7 +364,7 @@ const kindOf = (b: BookingSnapshot): Kind => {
 function endsIn(b: BookingSnapshot) {
   if (!b.rawEndDate) return 'Trip in progress';
   const end = new Date(b.rawEndDate);
-  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = (d: Date) => { const p = getIndiaDateParts(d); return Date.UTC(p.year, p.month, p.date); }; // today in India
   const n = Math.round((Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()) - day(new Date())) / 86400000);
   if (n <= 0) return 'Trip ends today';
   if (n === 1) return 'Trip ends tomorrow';
@@ -459,6 +485,8 @@ function Empty({ p, icon, title, copy, action, onAction }: { p: DetailsPalette; 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   title: { fontFamily: FONT.semibold, fontSize: 24, lineHeight: 36, paddingHorizontal: 16 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
+  back: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   tabBarWrap: { borderBottomWidth: StyleSheet.hairlineWidth },
   tabs: { flexGrow: 1 },
   // Figma 393×38: padding 8/16/10 -> 38px total height with clean separation above the 4px bottom-anchored slider.

@@ -15,6 +15,7 @@ import { PaymentsSkeleton } from '@/components/loading/ScreenSkeletons';
 import { API } from '@/services/backend/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { istDayMonthYear, formatTime12 } from '@/utils/sawari';
 
 type PaymentMethodItem = { id: string; title: string; subtitle?: string; icon: string };
 
@@ -258,8 +259,8 @@ export default function PaymentsScreen() {
                 {bookingPayments.map((p: any, index: number) => {
                   const vehicleName = p.vehicle?.vehicleName || 'Trip Booking';
                   const dateStr = p.paymentDate || p.createdAt;
-                  const dateLabel = dateStr ? new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
-                  const timeLabel = p.paymentTime || (dateStr ? new Date(dateStr).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '');
+                  const dateLabel = dateStr ? istDayMonthYear(dateStr) : '';
+                  const timeLabel = p.paymentTime || (dateStr ? formatTime12(dateStr) : '');
 
                   return (
                     <View
@@ -345,7 +346,7 @@ export default function PaymentsScreen() {
                   <View style={{ flex: 1, paddingRight: 16 }}>
                     <Text style={[styles.methodTitle, { color: colors.foreground }]}>{tx.description}</Text>
                     <Text style={[styles.methodSubtitle, { color: colors.mutedForeground }]}>
-                      {new Date(tx.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {istDayMonthYear(tx.date)}
                     </Text>
                   </View>
                   <Text style={{

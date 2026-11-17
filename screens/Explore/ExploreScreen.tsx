@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, ScrollView, Pressable, StyleSheet, Text, View, TextInput } from 'react-native';
+import { FlatList, Platform, ScrollView, Pressable, StyleSheet, Text, View, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated, { FadeIn } from 'react-native-reanimated';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { safeBack } from '@/utils/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { Car, getAvailability, isInService, splitDateRange } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
@@ -32,6 +33,7 @@ const EMPTY_ROW: Row = { id: '__empty', kind: 'empty' };
 
 export default function ExploreScreen() {
   const p = useDetailsPalette();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const bottomNavHeight = useBottomNavHeight();
   const scrollHandlers = useHideSupportWhileScrolling();
@@ -278,7 +280,21 @@ export default function ExploreScreen() {
     <Page bottomNav scroll={false}>
       {/* Fixed: title, search box and filters stay put however far the list is scrolled. */}
       <View style={{ paddingTop: insets.top + 8, backgroundColor: p.page }}>
-        <Text style={[styles.title, { color: p.fg, paddingHorizontal: 16 }]}>Explore</Text>
+        {/* Back to Home, iPhone only: Android has its own back button / gesture. */}
+        <View style={styles.exploreTitleRow}>
+          {Platform.OS === 'ios' && (
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); safeBack(router); }}
+              style={[styles.back, { backgroundColor: p.iconBg }]}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+              hitSlop={8}
+            >
+              <Feather name="chevron-left" size={20} color={p.sub} />
+            </Pressable>
+          )}
+          <Text style={[styles.title, { color: p.fg }]}>Explore</Text>
+        </View>
         {bar}
       </View>
       <FlatList
@@ -323,6 +339,8 @@ const styles = StyleSheet.create({
   toggleText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 24, lineHeight: 32 },
+  exploreTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
+  back: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   seg: { flexDirection: 'row', borderWidth: 1, borderRadius: 8, padding: 2 },
   segItem: { height: 28, paddingHorizontal: 12, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   segText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5 },

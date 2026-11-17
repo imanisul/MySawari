@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { istDayMonth, formatTime12 } from '@/utils/sawari';
 import { Image as CachedImage } from 'expo-image';
 import {
   View,
@@ -26,7 +27,6 @@ import { ExclusiveOfferDetailModal } from '@/components/offers/ExclusiveOfferDet
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_WIDTH = 246; // same width as the Top Picks cards
-const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /** layout 'row': the Home row (title, LIVE tag, sideways cards). 'list': full-width cards stacked, for the Flash Sale page. */
 export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'list' } = {}) {
@@ -129,19 +129,19 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
 
     const today = new Date();
     const tomorrow = new Date(today.getTime() + 24 * 3600 * 1000);
-    const range = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${tomorrow.getDate()} ${MONTHS_SHORT[tomorrow.getMonth()]}`;
+    const range = `${istDayMonth(today)} – ${istDayMonth(tomorrow)}`;
 
     if (offer.rentalStartDate && offer.rentalEndDate) {
       const sDate = new Date(offer.rentalStartDate);
       const eDate = new Date(offer.rentalEndDate);
-      const travelRange = `${sDate.getDate()} ${MONTHS_SHORT[sDate.getMonth()]} – ${eDate.getDate()} ${MONTHS_SHORT[eDate.getMonth()]}`;
+      const travelRange = `${istDayMonth(sDate)} – ${istDayMonth(eDate)}`;
       const daysCount = offer.rentalDays || Math.max(1, Math.round((eDate.getTime() - sDate.getTime()) / 86400000));
       setDates(travelRange, `${daysCount} ${daysCount === 1 ? 'Day' : 'Days'}`);
       setTimes(offer.rentalStartTime || pickupT, offer.rentalEndTime || returnT);
     } else if (offer.rentalDays && offer.rentalDays > 1) {
       const daysCount = offer.rentalDays;
       const endD = new Date(today.getTime() + daysCount * 24 * 3600 * 1000);
-      const travelRange = `${today.getDate()} ${MONTHS_SHORT[today.getMonth()]} – ${endD.getDate()} ${MONTHS_SHORT[endD.getMonth()]}`;
+      const travelRange = `${istDayMonth(today)} – ${istDayMonth(endD)}`;
       setDates(travelRange, `${daysCount} Days`);
       setTimes(offer.rentalStartTime || pickupT, offer.rentalEndTime || returnT);
     } else if (isOvernight || (offer.pickupTime && offer.returnTime)) {
@@ -254,18 +254,18 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
 
     if (startDateObj && !isNaN(startDateObj.getTime()) && startDateObj.getTime() > nowTime) {
       isUpcoming = true;
-      const sDateStr = startDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const sDateStr = istDayMonth(startDateObj);
       const sTimeStr = item.startTime && item.startTime !== 'Immediate'
         ? item.startTime
-        : startDateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        : formatTime12(startDateObj);
       validityBadgeText = `Starts ${sDateStr}, ${sTimeStr}`;
     } else if (expiryDateObj && !isNaN(expiryDateObj.getTime())) {
       const msLeft = expiryDateObj.getTime() - nowTime;
       const hoursLeft = Math.floor(msLeft / 3600000);
-      const eDateStr = expiryDateObj.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+      const eDateStr = istDayMonth(expiryDateObj);
       const eTimeStr = item.endTime
         ? item.endTime
-        : expiryDateObj.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+        : formatTime12(expiryDateObj);
       if (hoursLeft < 24 && hoursLeft >= 0) {
         validityBadgeText = `Ends today ${eTimeStr}`;
       } else if (hoursLeft < 48 && hoursLeft >= 24) {

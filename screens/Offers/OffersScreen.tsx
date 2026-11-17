@@ -13,6 +13,7 @@ import { API } from '@/services/backend/api';
 import { calculateCouponDiscount, type Coupon } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, Dashes, PF } from '@/components/profile/ProfileParts';
+import { getIndiaDateParts, istDayMonth, formatTime12 } from '@/utils/sawari';
 
 /**
  * Design wording, built from the coupon's own rules: "100 Rupees off on your first trip on selected
@@ -31,10 +32,11 @@ function until(iso: string) {
   if (!iso) return '';
   const d = new Date(iso);
   if (isNaN(d.getTime())) return '';
-  const day = d.getDate();
+  const p = getIndiaDateParts(d); // India time
+  const day = p.date;
   const suf = day % 10 === 1 && day !== 11 ? 'st' : day % 10 === 2 && day !== 12 ? 'nd' : day % 10 === 3 && day !== 13 ? 'rd' : 'th';
-  const dateStr = `${day}${suf} ${d.toLocaleString('en-GB', { month: 'short' }).toLowerCase()}’${String(d.getFullYear()).slice(2)}`;
-  const timeStr = d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+  const dateStr = `${day}${suf} ${istDayMonth(d).split(' ')[1].toLowerCase()}’${String(p.year).slice(2)}`;
+  const timeStr = formatTime12(d);
   return `${dateStr} · ${timeStr}`;
 }
 
@@ -62,7 +64,7 @@ export default function OffersScreen() {
   const copyCode = (code: string) => {
     Clipboard.setStringAsync(code);
     Haptics.selectionAsync();
-    setToastMsg(`Code ${code} Copied! 🎟️`);
+    setToastMsg(`Code ${code} Copied!`);
     setToast(true);
     setTimeout(() => setToast(false), 1200);
   };

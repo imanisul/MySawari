@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
 import type { Step } from '@/components/profile/ProfileParts';
+import { istDayMonth } from '@/utils/sawari';
 
 /**
  * Referral records from GET /auth/my-referrals, turned into the stages the design shows. The server is known
@@ -20,7 +21,6 @@ export type Referral = {
   amount: number;
   joinedAt?: string;
   tripDate?: string;
-  route?: string;
   vehicleName?: string;
 };
 
@@ -48,13 +48,6 @@ function stageOf(r: any): RefStage {
   return 'not_joined';
 }
 
-function routeOf(r: any): string | undefined {
-  if (typeof r?.route === 'string' && r.route.trim()) return r.route.trim();
-  const from = r?.fromCity || r?.from || r?.pickupCity || r?.trip?.from;
-  const to = r?.toCity || r?.to || r?.destination || r?.trip?.to;
-  return from && to ? `${from} → ${to}` : to || undefined;
-}
-
 export function normalizeReferral(r: any, i: number): Referral {
   return {
     id: String(r?.id || r?._id || r?.mobileNumber || i),
@@ -64,7 +57,6 @@ export function normalizeReferral(r: any, i: number): Referral {
     amount: Math.max(0, Number(r?.commissionAmount ?? r?.rewardAmount ?? r?.estimatedCommission) || 0),
     joinedAt: r?.joinedAt || r?.registeredAt || (r?.status && String(r.status).toUpperCase() !== 'INVITED' ? r?.signupAt : undefined),
     tripDate: r?.tripDate || r?.bookingDate || r?.completedAt || r?.tripCompletedAt,
-    route: routeOf(r),
     vehicleName: typeof r?.vehicleName === 'string' && r.vehicleName.trim() ? r.vehicleName.trim() : undefined,
   };
 }
@@ -166,6 +158,6 @@ export function tripLine(ref: Referral): string {
   }[ref.stage];
   const d = ref.tripDate ? new Date(ref.tripDate) : null;
   return d && !isNaN(d.getTime()) && !['not_joined', 'registered'].includes(ref.stage)
-    ? `${label}  •  ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`
+    ? `${label}  •  ${istDayMonth(d)}`
     : label;
 }

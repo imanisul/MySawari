@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LogBox, View, Linking } from 'react-native';
+import { LogBox, View, Linking, Platform } from 'react-native';
+
+const PAGE_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'default';
 
 LogBox.ignoreLogs([
   'ProgressBarAndroid has been extracted from react-native core',
@@ -7,6 +9,9 @@ LogBox.ignoreLogs([
   'Clipboard has been extracted from react-native core',
   'PushNotificationIOS has been extracted from react-native core',
   'Unknown child element passed to Stack',
+  // Dev-only and harmless: a finger lifted that React Native never saw land (two fingers at once, or a touch that
+  // began inside a native gesture area like the deals swipe). The tap/swipe itself still works.
+  'Cannot record touch end without a touch start',
 ]);
 
 import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
@@ -129,14 +134,16 @@ function RootLayoutNav() {
           screenOptions={{
             headerBackTitle: 'Back',
             headerShown: false,
-            animation: 'flip',
-            presentation: 'modal',
+            // The smoothest slide on each: iOS's own system push (parallax, shadow, interactive swipe back) and on
+            // Android 'ios_from_right' (~200 ms, eased; 'slide_from_right' was ~400 ms at a flat speed). Heavy pages
+            // draw their skeleton during the slide (useAfterSlideIn), so the slide has no work to wait on.
+            animation: PAGE_ANIMATION,
+            presentation: 'card',
             contentStyle: { backgroundColor: colors.background },
           }}
         >
-          {/* Native stack reverses the flip automatically on back. */}
           {/* A tall page rotating in 3D looked broken (photo and text tilted up, then dropped): slide it in flat. */}
-          <Stack.Screen name="car-details" options={{ animation: 'slide_from_right', presentation: 'card' }} />
+          <Stack.Screen name="car-details" options={{ animation: PAGE_ANIMATION, presentation: 'card' }} />
           <Stack.Screen name="planner" />
           <Stack.Screen name="location" />
           <Stack.Screen name="return-location" />

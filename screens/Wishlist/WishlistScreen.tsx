@@ -100,7 +100,7 @@ export default function WishlistScreen() {
         showsVerticalScrollIndicator={false}
         ListEmptyComponent={
           isAuthenticated === null || waitingForFleet ? (
-            <View style={{ paddingHorizontal: 16 }}>{[0, 1].map((i) => <CarCardSkeleton key={i} index={i} />)}</View>
+            <View>{[0, 1].map((i) => <CarCardSkeleton key={i} index={i} />)}</View>
           ) : (
             <State
               icon={<Ionicons name="heart-outline" size={24} color={p.fg} />}

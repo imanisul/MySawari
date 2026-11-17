@@ -175,7 +175,7 @@ export function enforceHttpsUrl(url: string): string {
   return url;
 }
 
-const BASE_URL = enforceHttpsUrl(rawBase);
+export const BASE_URL = enforceHttpsUrl(rawBase);
 export const BACKEND_URL = `${BASE_URL}/api`;
 
 
@@ -1936,7 +1936,7 @@ export const API = {
           referralDiscountType: 'FLAT',
           referralShareUrl: res.data.shareBaseUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
           playStoreUrl: res.data.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
-          appStoreUrl: res.data.appStoreUrl || 'https://apps.apple.com/app/id6829408836',
+          appStoreUrl: res.data.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836',
         };
       }
     } catch {
@@ -1949,7 +1949,7 @@ export const API = {
       referralDiscountType: 'FLAT',
       referralShareUrl: 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
       playStoreUrl: 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
-      appStoreUrl: 'https://apps.apple.com/app/id6829408836',
+      appStoreUrl: 'https://apps.apple.com/in/app/mysawari/id6829408836',
     };
   },
 

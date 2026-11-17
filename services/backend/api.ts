@@ -2208,14 +2208,11 @@ export const API = {
    * GET /api/auth/my-partner-qrs — fetch assigned physical QR stickers for this partner
    */
   async getPartnerQRs() {
-    try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-partner-qrs`);
-      const data = await response.json();
-      if (!response.ok) return [];
-      return data.data || [];
-    } catch {
-      return [];
-    }
+    // Throws on failure so a network blip keeps the saved QRs instead of replacing them with none.
+    const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-partner-qrs`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.message || 'Could not load partner QRs');
+    return Array.isArray(data.data) ? data.data : [];
   },
 
   /**

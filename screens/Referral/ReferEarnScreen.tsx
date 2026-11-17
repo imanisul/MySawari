@@ -49,14 +49,13 @@ export default function ReferEarnScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const { customer, isAuthenticated, updateCustomer } = useSawari();
-  const { data: partnerQRs = [] } = usePartnerQRs();
+  const { data: partnerQRs = [] } = usePartnerQRs(true);
   const [selectedQRIndex, setSelectedQRIndex] = useState(0);
   const activeQR = partnerQRs[selectedQRIndex] || partnerQRs[0];
   const [config, setConfig] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
-  const [qrPlatform, setQrPlatform] = useState<'android' | 'ios'>(Platform.OS === 'ios' ? 'ios' : 'android');
 
   useEffect(() => {
     API.getAppConfig().then(setConfig).catch(() => { });
@@ -81,15 +80,7 @@ export default function ReferEarnScreen() {
     [code, playStore],
   );
 
-  // Direct native store links for 100% smooth, instant scanning with NO Render link:
-  const androidStoreLink = useMemo(
-    () => (activeCode ? `${playStore}${playStore.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref_code=${activeCode}`)}` : playStore),
-    [activeCode, playStore],
-  );
-  const iosStoreLink = appStore;
-  const currentQRValue = qrPlatform === 'ios' ? iosStoreLink : androidStoreLink;
-
-  // Single smart universal link as secondary fallback
+  // One QR for both platforms: the backend /r/:code redirects to App Store or Play (with referrer) by device
   const smartLink = useMemo(
     () => (activeCode ? `${backendBase}/r/${activeCode}` : ''),
     [activeCode, backendBase],
@@ -251,9 +242,6 @@ export default function ReferEarnScreen() {
                     ))}
                   </View>
                 )}
-                <Text style={{ fontFamily: PF.regular, fontSize: 11.5, lineHeight: 16, color: '#323E71', marginTop: 6 }}>
-                  Physical QR sticker assigned to your counter. Guests who scan your sticker get automatically linked to your account.
-                </Text>
               </View>
             )}
 
@@ -378,65 +366,21 @@ export default function ReferEarnScreen() {
                 </View>
               )}
 
-              {/* Store Platform Toggle: 100% Native, Direct, Zero Render URL */}
-              <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 3, marginBottom: 14, width: '100%' }}>
-                <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setQrPlatform('android');
-                  }}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    backgroundColor: qrPlatform === 'android' ? '#323E71' : 'transparent',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                  }}
-                >
-                  <MaterialCommunityIcons name="google-play" size={16} color={qrPlatform === 'android' ? '#FFFFFF' : '#475569'} />
-                  <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: qrPlatform === 'android' ? '#FFFFFF' : '#475569' }}>
-                    Google Play
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    setQrPlatform('ios');
-                  }}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    backgroundColor: qrPlatform === 'ios' ? '#323E71' : 'transparent',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexDirection: 'row',
-                    gap: 6,
-                  }}
-                >
-                  <MaterialCommunityIcons name="apple" size={16} color={qrPlatform === 'ios' ? '#FFFFFF' : '#475569'} />
-                  <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: qrPlatform === 'ios' ? '#FFFFFF' : '#475569' }}>
-                    App Store
-                  </Text>
-                </Pressable>
-              </View>
-
               <View style={styles.qrContainer}>
                 <QRCode
-                  value={currentQRValue}
+                  value={smartLink}
                   size={200}
                   color="#0F172A"
                   backgroundColor="#FFFFFF"
+                  // 'H' error correction (30%) keeps the code scannable with the logo covering the centre
+                  ecl="H"
+                  logo={require('@/assets/images/MySawari.png')}
+                  logoSize={44}
+                  logoBackgroundColor="#FFFFFF"
+                  logoMargin={3}
+                  logoBorderRadius={8}
                 />
               </View>
-              <Text style={{ fontFamily: PF.medium, fontSize: 11, color: '#64748B', marginTop: 10, textAlign: 'center' }}>
-                {qrPlatform === 'android'
-                  ? '⚡ Scans directly into Google Play Store with referral auto-applied'
-                  : '⚡ Scans directly into Apple App Store'}
-              </Text>
               <View style={styles.modalCodeBox}>
                 <Text style={styles.modalCodeLabel}>{activeQR?.token ? 'PARTNER CODE' : 'REFERRAL CODE'}</Text>
                 <Text style={styles.modalCode}>{activeQR?.token || code}</Text>
@@ -454,7 +398,7 @@ export default function ReferEarnScreen() {
                     justifyContent: 'center',
                   }}
                   onPress={async () => {
-                    await Clipboard.setStringAsync(currentQRValue);
+                    await Clipboard.setStringAsync(smartLink);
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1800);

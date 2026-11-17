@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { API } from '@/services/backend/api';
@@ -96,24 +97,48 @@ export function useReferrals() {
 }
 
 /**
- * Hook to fetch physical QR stickers assigned to the partner by operations executives.
+ * QR stickers assigned to the partner by operations executives. Kept on the phone like the referrals,
+ * so Refer & Earn shows the partner QR at once and the fresh list replaces it when it arrives.
  */
-export function usePartnerQRs() {
+export function usePartnerQRs(live = false) {
   const { customer, isAuthenticated } = useSawari();
+  const qc = useQueryClient();
+  const [focused, setFocused] = useState(false);
+  // QRs are assigned from the Operation dashboard, which can't tell this app, so the screens showing them
+  // re-check on open and every 15s while open (paused in background by focusManager).
+  useFocusEffect(useCallback(() => {
+    if (!live) return;
+    setFocused(true);
+    qc.invalidateQueries({ queryKey: ['partner-qrs', customer?.id] });
+    return () => setFocused(false);
+  }, [live, customer?.id])); // eslint-disable-line react-hooks/exhaustive-deps
+  const key = ['partner-qrs', customer?.id];
+  const storeKey = `@partner_qrs_${customer?.id}`;
+
+  useEffect(() => {
+    if (!customer?.id) return;
+    AsyncStorage.getItem(storeKey).then((saved) => {
+      if (saved && !qc.getQueryData(key)) qc.setQueryData(key, JSON.parse(saved), { updatedAt: 0 });
+    }).catch(() => {});
+  }, [customer?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return useQuery({
-    queryKey: ['partner-qrs', customer?.id],
+    queryKey: key,
     queryFn: async () => {
-      const qrs = await API.getPartnerQRs();
-      return (qrs || []) as PartnerQR[];
+      const qrs = ((await API.getPartnerQRs()) || []) as PartnerQR[];
+      AsyncStorage.setItem(storeKey, JSON.stringify(qrs)).catch(() => {});
+      return qrs;
     },
     enabled: isAuthenticated === true && !!customer?.id,
-    staleTime: 60 * 1000,
+    staleTime: 15 * 1000,
+    refetchInterval: live && focused ? 15 * 1000 : false,
   });
 }
 
 /** Starts loading the referrals in the background (Profile calls it), so My Referrals opens already filled. */
 export function usePrefetchReferrals() {
   useReferrals();
+  usePartnerQRs();
 }
 
 const ORDER: RefStage[] = ['registered', 'booked', 'ongoing', 'processing', 'credited'];

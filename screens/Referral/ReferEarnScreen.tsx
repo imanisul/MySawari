@@ -50,6 +50,8 @@ export default function ReferEarnScreen() {
   const { width } = useWindowDimensions();
   const { customer, isAuthenticated, updateCustomer } = useSawari();
   const { data: partnerQRs = [] } = usePartnerQRs();
+  const [selectedQRIndex, setSelectedQRIndex] = useState(0);
+  const activeQR = partnerQRs[selectedQRIndex] || partnerQRs[0];
   const [config, setConfig] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -168,12 +170,12 @@ export default function ReferEarnScreen() {
 
           <View style={styles.body}>
             {/* ── Partner QR Sticker (if assigned) ── */}
-            {partnerQRs.length > 0 && (
+            {partnerQRs.length > 0 && activeQR && (
               <View style={[styles.partnerCard, { backgroundColor: '#EEF0F7', borderColor: '#D5D9EA' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                     <Feather name="tag" size={17} color="#323E71" />
-                    <Text style={{ fontFamily: PF.bold, fontSize: 13.5, color: '#312E81' }}>Partner QR: {partnerQRs[0].token}</Text>
+                    <Text style={{ fontFamily: PF.bold, fontSize: 13.5, color: '#312E81' }}>Partner QR: {activeQR.token}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Pressable
@@ -187,7 +189,7 @@ export default function ReferEarnScreen() {
                     </Pressable>
                     <Pressable
                       onPress={async () => {
-                        await Clipboard.setStringAsync(`https://mysawari.com/r/${partnerQRs[0].token}`);
+                        await Clipboard.setStringAsync(`https://mysawari.com/r/${activeQR.token}`);
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         setCopied(true);
                         setTimeout(() => setCopied(false), 1800);
@@ -198,6 +200,28 @@ export default function ReferEarnScreen() {
                     </Pressable>
                   </View>
                 </View>
+                {partnerQRs.length > 1 && (
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                    {partnerQRs.map((q, idx) => (
+                      <Pressable
+                        key={q.token}
+                        onPress={() => setSelectedQRIndex(idx)}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 6,
+                          backgroundColor: idx === selectedQRIndex ? '#323E71' : '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: idx === selectedQRIndex ? '#323E71' : '#CBD5E1',
+                        }}
+                      >
+                        <Text style={{ fontFamily: PF.medium, fontSize: 11, color: idx === selectedQRIndex ? '#FFFFFF' : '#475569' }}>
+                          #{idx + 1} {q.token}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
                 <Text style={{ fontFamily: PF.regular, fontSize: 11.5, lineHeight: 16, color: '#323E71', marginTop: 6 }}>
                   Physical QR sticker assigned to your counter. Guests who scan your sticker get automatically linked to your account.
                 </Text>
@@ -273,7 +297,7 @@ export default function ReferEarnScreen() {
       </View>
 
       {/* ── Partner QR Modal ── */}
-      {partnerQRs.length > 0 && (
+      {partnerQRs.length > 0 && activeQR && (
         <Modal
           visible={showQRModal}
           transparent
@@ -284,9 +308,33 @@ export default function ReferEarnScreen() {
             <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
               <Text style={styles.modalBrand}>MySawari</Text>
               <Text style={styles.modalSub}>Scan with phone camera to book & get ₹100 SawariCash</Text>
+
+              {partnerQRs.length > 1 && (
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                  {partnerQRs.map((q, idx) => (
+                    <Pressable
+                      key={q.token}
+                      onPress={() => setSelectedQRIndex(idx)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 6,
+                        backgroundColor: idx === selectedQRIndex ? '#323E71' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: idx === selectedQRIndex ? '#323E71' : '#CBD5E1',
+                      }}
+                    >
+                      <Text style={{ fontFamily: PF.medium, fontSize: 11, color: idx === selectedQRIndex ? '#FFFFFF' : '#475569' }}>
+                        #{idx + 1} {q.token}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
               <View style={styles.qrContainer}>
                 <QRCode
-                  value={`https://mysawari.com/r/${partnerQRs[0].token}`}
+                  value={`https://mysawari.com/r/${activeQR.token}`}
                   size={200}
                   color="#0F172A"
                   backgroundColor="#FFFFFF"
@@ -294,14 +342,38 @@ export default function ReferEarnScreen() {
               </View>
               <View style={styles.modalCodeBox}>
                 <Text style={styles.modalCodeLabel}>PARTNER CODE</Text>
-                <Text style={styles.modalCode}>{partnerQRs[0].token}</Text>
+                <Text style={styles.modalCode}>{activeQR.token}</Text>
               </View>
-              <Pressable
-                style={styles.modalCloseBtn}
-                onPress={() => setShowQRModal(false)}
-              >
-                <Text style={styles.modalCloseText}>Done</Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 18, width: '100%' }}>
+                <Pressable
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#EEF2FF',
+                    borderWidth: 1,
+                    borderColor: '#C7D2FE',
+                    height: 44,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(`https://mysawari.com/r/${activeQR.token}`);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1800);
+                  }}
+                >
+                  <Text style={{ fontFamily: PF.semibold, fontSize: 13, color: '#4338CA' }}>
+                    {copied ? 'Copied!' : 'Copy Link'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalCloseBtn, { flex: 1, marginTop: 0 }]}
+                  onPress={() => setShowQRModal(false)}
+                >
+                  <Text style={styles.modalCloseText}>Done</Text>
+                </Pressable>
+              </View>
             </Pressable>
           </Pressable>
         </Modal>

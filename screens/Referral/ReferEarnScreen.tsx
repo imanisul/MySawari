@@ -72,7 +72,7 @@ export default function ReferEarnScreen() {
   // The store links, fetched from the server's referral settings (Operation App), with the app's own as fallback. The
   // Play link carries the invite code as the install referrer, so it can be picked up on Android after install.
   const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-  const appStore = config?.appStoreUrl || 'https://apps.apple.com/app/id6829408836';
+  const appStore = config?.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836';
   const link = useMemo(
     () => (code ? `${playStore}${playStore.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref_code=${code}`)}` : ''),
     [code, playStore],

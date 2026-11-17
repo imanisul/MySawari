@@ -343,6 +343,14 @@ export interface ExclusiveOffer {
 
 const EXCLUSIVE_OFFERS_CACHE_KEY = '@exclusive_offers_cache_v1';
 
+function stripActiveClaims(offers: any[]) {
+  return offers.map((offer) => {
+    const cachedOffer = { ...offer };
+    delete cachedOffer.activeClaim;
+    return cachedOffer;
+  });
+}
+
 export const exclusiveOffersQueryOptions = {
   queryKey: ['exclusive-offers'] as const,
   queryFn: async () => {
@@ -391,7 +399,7 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
             id: o._id,
             image: plateSafeOfferImage(o.image, o.updatedAt),
           }));
-        AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(live)).catch(() => {});
+        AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(stripActiveClaims(live))).catch(() => {});
         prefetchOfferImages(live);
         return live;
       }
@@ -409,7 +417,7 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
     const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
     if (saved) {
       const list = JSON.parse(saved);
-      if (Array.isArray(list)) return list.filter((o: any) => o && isOfferLive(o, Date.now(), true));
+      if (Array.isArray(list)) return stripActiveClaims(list.filter((o: any) => o && isOfferLive(o, Date.now(), true)));
     }
   } catch {}
 
@@ -420,7 +428,7 @@ export async function hydrateExclusiveOffers(queryClient: { getQueryData: (k: re
   try {
     const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
     if (!saved || queryClient.getQueryData(exclusiveOffersQueryOptions.queryKey)) return;
-    const list = (JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o, Date.now(), true));
+    const list = stripActiveClaims((JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o, Date.now(), true)));
     queryClient.setQueryData(exclusiveOffersQueryOptions.queryKey, list, { updatedAt: 0 });
   } catch {}
 }

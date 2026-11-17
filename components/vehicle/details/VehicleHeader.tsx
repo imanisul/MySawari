@@ -35,12 +35,13 @@ export function VehicleHeader({
     try {
       const price = selectedCar.perDay ? ` from ${formatCurrency(selectedCar.perDay)}/day` : '';
 
-      // Only the store links (fetched from the server's settings, with the app's own as fallback) — no server link.
+      // Only the store link (fetched from the server's settings, with the app's own as fallback) — adapts to platform.
       const config = await API.getAppConfig().catch(() => null);
       const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-      const appStore = config?.appStoreUrl || 'https://apps.apple.com/app/id6829408836';
+      const appStore = config?.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836';
+      const storeUrl = Platform.OS === 'ios' ? appStore : playStore;
 
-      const message = `Check out the ${title} on MySawari${price}!\n\n📲 Download the MySawari App:\nAndroid: ${playStore}\niPhone: ${appStore}`;
+      const message = `Check out the ${title} on MySawari${price}!\n\n📲 Download the MySawari App:\n${storeUrl}`;
 
       await Share.share({ message, title: `Rent ${title} on MySawari` });
     } catch (error: any) {

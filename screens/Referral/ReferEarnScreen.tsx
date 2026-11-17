@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions, Platform, Modal } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,7 +13,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoginBottomSheet } from '@/components';
 import { useSawari } from '@/context/SawariContext';
-import { API, BACKEND_URL } from '@/services/backend/api';
+import { API, BACKEND_URL, BASE_URL } from '@/services/backend/api';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { FaqList } from '@/components/vehicle/details/CarDetailsSections';
 import { PF } from '@/components/profile/ProfileParts';
@@ -49,9 +50,13 @@ export default function ReferEarnScreen() {
   const { width } = useWindowDimensions();
   const { customer, isAuthenticated, updateCustomer } = useSawari();
   const { data: partnerQRs = [] } = usePartnerQRs();
+  const [selectedQRIndex, setSelectedQRIndex] = useState(0);
+  const activeQR = partnerQRs[selectedQRIndex] || partnerQRs[0];
   const [config, setConfig] = useState<any>(null);
   const [copied, setCopied] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrPlatform, setQrPlatform] = useState<'android' | 'ios'>(Platform.OS === 'ios' ? 'ios' : 'android');
 
   useEffect(() => {
     API.getAppConfig().then(setConfig).catch(() => { });
@@ -64,20 +69,40 @@ export default function ReferEarnScreen() {
   }, [isAuthenticated, customer.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const code = customer.referralCode || '';
+  const activeCode = activeQR?.token || code;
+  const backendBase = (BASE_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'https://mysawari-customer-backend-1.onrender.com').replace(/\/+$/, '');
 
   // The store links, fetched from the server's referral settings (Operation App), with the app's own as fallback. The
   // Play link carries the invite code as the install referrer, so it can be picked up on Android after install.
   const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-  const appStore = config?.appStoreUrl || 'https://apps.apple.com/app/id6829408836';
+  const appStore = config?.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836';
   const link = useMemo(
     () => (code ? `${playStore}${playStore.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref_code=${code}`)}` : ''),
     [code, playStore],
   );
 
-  const shortLink = link.replace(/^https?:\/\//, '');
+  // Direct native store links for 100% smooth, instant scanning with NO Render link:
+  const androidStoreLink = useMemo(
+    () => (activeCode ? `${playStore}${playStore.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref_code=${activeCode}`)}` : playStore),
+    [activeCode, playStore],
+  );
+  const iosStoreLink = appStore;
+  const currentQRValue = qrPlatform === 'ios' ? iosStoreLink : androidStoreLink;
+
+  // Single smart universal link as secondary fallback
+  const smartLink = useMemo(
+    () => (activeCode ? `${backendBase}/r/${activeCode}` : ''),
+    [activeCode, backendBase],
+  );
+
+  // Adapts dynamically to platform: iPhone gets App Store link, Android gets Play Store link with referrer code
+  const isIos = Platform.OS === 'ios';
+  const platformStoreLink = isIos ? appStore : link;
+  const shortLink = (platformStoreLink || link).replace(/^https?:\/\//, '');
   const pct = config?.referralRewardType === 'PERCENTAGE' && config?.referralRewardAmount ? `${config.referralRewardAmount}%` : '10%';
   const friendGets = '100 SawariCash';
-  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\n📲 Download the app:\nAndroid: ${link}\niPhone: ${appStore}\n\n(Referral code: *${code}*)`;
+
+  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\n📲 Download MySawari:\n${platformStoreLink}\n\n(Referral code: *${code}*)`;
 
   const faqs = useMemo(() => [
     { q: 'How does the Refer & Earn program work?', a: `Share your personal invite link or code. When your friend signs up and completes their trip, you earn ${pct} commission of their total trip amount directly in your wallet.` },
@@ -97,6 +122,14 @@ export default function ReferEarnScreen() {
   const copy = async () => {
     if (needLogin()) return;
     await Clipboard.setStringAsync(message);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  const copyLinkOnly = async () => {
+    if (needLogin()) return;
+    await Clipboard.setStringAsync(smartLink || platformStoreLink);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
@@ -166,25 +199,58 @@ export default function ReferEarnScreen() {
 
           <View style={styles.body}>
             {/* ── Partner QR Sticker (if assigned) ── */}
-            {partnerQRs.length > 0 && (
+            {partnerQRs.length > 0 && activeQR && (
               <View style={[styles.partnerCard, { backgroundColor: '#EEF0F7', borderColor: '#D5D9EA' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
                     <Feather name="tag" size={17} color="#323E71" />
-                    <Text style={{ fontFamily: PF.bold, fontSize: 13.5, color: '#312E81' }}>Partner QR: {partnerQRs[0].token}</Text>
+                    <Text style={{ fontFamily: PF.bold, fontSize: 13.5, color: '#312E81' }}>Partner QR: {activeQR.token}</Text>
                   </View>
-                  <Pressable
-                    onPress={async () => {
-                      await Clipboard.setStringAsync(`https://mysawari.com/r/${partnerQRs[0].token}`);
-                      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 1800);
-                    }}
-                    style={{ backgroundColor: '#6B5AED', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
-                  >
-                    <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#FFFFFF' }}>Copy Link</Text>
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Pressable
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setShowQRModal(true);
+                      }}
+                      style={{ backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                    >
+                      <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#4338CA' }}>Show QR</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={async () => {
+                        await Clipboard.setStringAsync(platformStoreLink);
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1800);
+                      }}
+                      style={{ backgroundColor: '#6B5AED', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                    >
+                      <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#FFFFFF' }}>Copy Link</Text>
+                    </Pressable>
+                  </View>
                 </View>
+                {partnerQRs.length > 1 && (
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
+                    {partnerQRs.map((q, idx) => (
+                      <Pressable
+                        key={q.token}
+                        onPress={() => setSelectedQRIndex(idx)}
+                        style={{
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 6,
+                          backgroundColor: idx === selectedQRIndex ? '#323E71' : '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: idx === selectedQRIndex ? '#323E71' : '#CBD5E1',
+                        }}
+                      >
+                        <Text style={{ fontFamily: PF.medium, fontSize: 11, color: idx === selectedQRIndex ? '#FFFFFF' : '#475569' }}>
+                          #{idx + 1} {q.token}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
                 <Text style={{ fontFamily: PF.regular, fontSize: 11.5, lineHeight: 16, color: '#323E71', marginTop: 6 }}>
                   Physical QR sticker assigned to your counter. Guests who scan your sticker get automatically linked to your account.
                 </Text>
@@ -232,7 +298,7 @@ export default function ReferEarnScreen() {
       <View style={[styles.footer, { backgroundColor: p.page, borderTopColor: p.divider, paddingBottom: Math.max(insets.bottom, 12) }]}>
         <BottomBlur height={56} fadeTo={p.page} style={{ top: -56, bottom: undefined }} />
         {isAuthenticated && !!code && (
-          <Pressable accessibilityRole="button" accessibilityLabel={`Copy invite link ${shortLink}`} onPress={copy} style={styles.linkRow} hitSlop={6}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Copy invite link ${shortLink}`} onPress={copyLinkOnly} style={styles.linkRow} hitSlop={6}>
             <Text style={[styles.linkLabel, { color: p.muted }]} numberOfLines={1}>Invite Link :</Text>
             <Text style={[styles.link, { color: p.muted }]} numberOfLines={1} ellipsizeMode="tail">{shortLink}</Text>
             <Feather name={copied ? 'check' : 'copy'} size={14} color={copied ? p.green : p.navy} />
@@ -252,12 +318,163 @@ export default function ReferEarnScreen() {
             )}
           </Pressable>
           {isAuthenticated && (
-            <Pressable accessibilityRole="button" accessibilityLabel="Share" onPress={shareAny} style={({ pressed }) => [styles.shareBtn, { backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.8 }]}>
-              <Feather name="share" size={21} color={p.navy} />
-            </Pressable>
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Show QR Code"
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setShowQRModal(true);
+                }}
+                style={({ pressed }) => [
+                  styles.shareBtn,
+                  { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Feather name="maximize" size={20} color="#4338CA" />
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Share" onPress={shareAny} style={({ pressed }) => [styles.shareBtn, { backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.8 }]}>
+                <Feather name="share" size={21} color={p.navy} />
+              </Pressable>
+            </>
           )}
         </View>
       </View>
+
+      {/* ── Referral / Partner QR Modal ── */}
+      {Boolean(activeQR?.token || code) && (
+        <Modal
+          visible={showQRModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowQRModal(false)}
+        >
+          <Pressable style={styles.modalBackdrop} onPress={() => setShowQRModal(false)}>
+            <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+              <Text style={styles.modalBrand}>MySawari</Text>
+              <Text style={styles.modalSub}>Scan with phone camera to book & get ₹100 SawariCash</Text>
+
+              {partnerQRs.length > 1 && (
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14 }}>
+                  {partnerQRs.map((q, idx) => (
+                    <Pressable
+                      key={q.token}
+                      onPress={() => setSelectedQRIndex(idx)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 6,
+                        backgroundColor: idx === selectedQRIndex ? '#323E71' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: idx === selectedQRIndex ? '#323E71' : '#CBD5E1',
+                      }}
+                    >
+                      <Text style={{ fontFamily: PF.medium, fontSize: 11, color: idx === selectedQRIndex ? '#FFFFFF' : '#475569' }}>
+                        #{idx + 1} {q.token}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              {/* Store Platform Toggle: 100% Native, Direct, Zero Render URL */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 3, marginBottom: 14, width: '100%' }}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setQrPlatform('android');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    backgroundColor: qrPlatform === 'android' ? '#323E71' : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                  }}
+                >
+                  <MaterialCommunityIcons name="google-play" size={16} color={qrPlatform === 'android' ? '#FFFFFF' : '#475569'} />
+                  <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: qrPlatform === 'android' ? '#FFFFFF' : '#475569' }}>
+                    Google Play
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setQrPlatform('ios');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    backgroundColor: qrPlatform === 'ios' ? '#323E71' : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                  }}
+                >
+                  <MaterialCommunityIcons name="apple" size={16} color={qrPlatform === 'ios' ? '#FFFFFF' : '#475569'} />
+                  <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: qrPlatform === 'ios' ? '#FFFFFF' : '#475569' }}>
+                    App Store
+                  </Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.qrContainer}>
+                <QRCode
+                  value={currentQRValue}
+                  size={200}
+                  color="#0F172A"
+                  backgroundColor="#FFFFFF"
+                />
+              </View>
+              <Text style={{ fontFamily: PF.medium, fontSize: 11, color: '#64748B', marginTop: 10, textAlign: 'center' }}>
+                {qrPlatform === 'android'
+                  ? '⚡ Scans directly into Google Play Store with referral auto-applied'
+                  : '⚡ Scans directly into Apple App Store'}
+              </Text>
+              <View style={styles.modalCodeBox}>
+                <Text style={styles.modalCodeLabel}>{activeQR?.token ? 'PARTNER CODE' : 'REFERRAL CODE'}</Text>
+                <Text style={styles.modalCode}>{activeQR?.token || code}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 18, width: '100%' }}>
+                <Pressable
+                  style={{
+                    flex: 1,
+                    backgroundColor: '#EEF2FF',
+                    borderWidth: 1,
+                    borderColor: '#C7D2FE',
+                    height: 44,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={async () => {
+                    await Clipboard.setStringAsync(currentQRValue);
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1800);
+                  }}
+                >
+                  <Text style={{ fontFamily: PF.semibold, fontSize: 13, color: '#4338CA' }}>
+                    {copied ? 'Copied!' : 'Copy Link'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.modalCloseBtn, { flex: 1, marginTop: 0 }]}
+                  onPress={() => setShowQRModal(false)}
+                >
+                  <Text style={styles.modalCloseText}>Done</Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
 
       <LoginBottomSheet visible={showLogin} onClose={() => setShowLogin(false)} />
     </BlurHost>
@@ -327,4 +544,81 @@ const styles = StyleSheet.create({
   // TODO: Match Figma CTA: 17px SemiBold label and a 50px share button (currently 18.5px Medium and 54px).
   waText: { fontFamily: PF.medium, fontSize: 18.5, color: '#FFFFFF' },
   shareBtn: { width: 54, height: 54, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalBrand: {
+    fontFamily: PF.bold,
+    fontSize: 22,
+    color: '#323E71',
+    letterSpacing: 0.5,
+  },
+  modalSub: {
+    fontFamily: PF.medium,
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 20,
+    lineHeight: 16,
+  },
+  qrContainer: {
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCodeBox: {
+    marginTop: 18,
+    alignItems: 'center',
+  },
+  modalCodeLabel: {
+    fontFamily: PF.medium,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: '#94A3B8',
+  },
+  modalCode: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 4,
+    color: '#323E71',
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    marginTop: 20,
+    backgroundColor: '#323E71',
+    width: '100%',
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseText: {
+    fontFamily: PF.bold,
+    fontSize: 14,
+    color: '#FFFFFF',
+  },
 });

@@ -34,17 +34,24 @@ export function extractReferralCode(text: string): string | null {
     if (!/^\d+$/.test(code)) return code;
   }
 
-  // 2. Google Play Store referrer format: referrer=code%3DCODE or referrer=CODE
-  const playReferrerMatch = trimmed.match(/referrer=(?:code(?:%3D|=))?([A-Za-z0-9_-]{4,20})/i);
+  // 2. Google Play Store referrer format: referrer=ref_code%3DCODE or referrer=code%3DCODE or referrer=CODE
+  const playReferrerMatch = trimmed.match(/referrer=(?:(?:ref_code|referral_code|code|ref)(?:%3D|=))?([A-Za-z0-9_-]{4,20})/i);
   if (playReferrerMatch && playReferrerMatch[1]) {
     const code = playReferrerMatch[1].toUpperCase();
     if (!/^\d+$/.test(code)) return code;
   }
 
-  // 3. URL query parameter check (?code=... or &code=... or ?ref=... or ?token=...)
-  const urlParamMatch = trimmed.match(/[?&](?:code|token|ref|referralCode|r)=([A-Za-z0-9_-]{4,20})/i);
+  // 3. URL query parameter check (?ref_code=... or &code=... or ?ref=... or ?token=...)
+  const urlParamMatch = trimmed.match(/[?&](?:ref_code|referral_code|referralCode|code|token|ref|r)=([A-Za-z0-9_-]{4,20})/i);
   if (urlParamMatch && urlParamMatch[1]) {
     const code = urlParamMatch[1].toUpperCase();
+    if (!/^\d+$/.test(code)) return code;
+  }
+
+  // 3b. Standalone query assignment (e.g. decoded referrer "ref_code=CODE" or "code=CODE")
+  const keyValMatch = trimmed.match(/(?:^|[&;])(?:ref_code|referral_code|referralCode|code)=([A-Za-z0-9_-]{4,20})/i);
+  if (keyValMatch && keyValMatch[1]) {
+    const code = keyValMatch[1].toUpperCase();
     if (!/^\d+$/.test(code)) return code;
   }
 
@@ -188,17 +195,29 @@ export async function detectReferralFromClipboard(): Promise<PendingReferral | n
     await AsyncStorage.setItem(LAST_CHECKED_CLIPBOARD_HASH_KEY, clean).catch(() => {});
 
     const code = extractReferralCode(clean);
-    if (!code) return null;
+    if (code) {
+      // Validate with backend
+      const validated = await API.validateReferralCode(code);
+      if (validated && validated.valid) {
+        return await savePendingReferral({
+          code: validated.referralCode || code,
+          referrerName: validated.referrerName,
+          rewardText: validated.rewardText,
+          bonusSawariCash: validated.bonusSawariCash,
+          isPartnerQr: (validated as any).isPartnerQr,
+        });
+      }
+    }
 
-    // Validate with backend
-    const validated = await API.validateReferralCode(code);
-    if (validated && validated.valid) {
+    // Check deferred referral from recent IP scan (covers iOS App Store install & network scans)
+    const deferred = await API.getDeferredReferral();
+    if (deferred && deferred.valid) {
       return await savePendingReferral({
-        code: validated.referralCode || code,
-        referrerName: validated.referrerName,
-        rewardText: validated.rewardText,
-        bonusSawariCash: validated.bonusSawariCash,
-        isPartnerQr: (validated as any).isPartnerQr,
+        code: deferred.referralCode,
+        referrerName: deferred.referrerName,
+        rewardText: deferred.rewardText,
+        bonusSawariCash: deferred.bonusSawariCash,
+        isPartnerQr: (deferred as any).isPartnerQr,
       });
     }
   } catch (err) {

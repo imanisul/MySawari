@@ -56,6 +56,7 @@ export default function ReferEarnScreen() {
   const [copied, setCopied] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const [qrPlatform, setQrPlatform] = useState<'android' | 'ios'>(Platform.OS === 'ios' ? 'ios' : 'android');
 
   useEffect(() => {
     API.getAppConfig().then(setConfig).catch(() => { });
@@ -80,19 +81,27 @@ export default function ReferEarnScreen() {
     [code, playStore],
   );
 
-  // Single smart universal link: auto-routes to App Store on iPhone, Google Play on Android, and logs deferred IP referral
+  // Direct native store links for 100% smooth, instant scanning with NO Render link:
+  const androidStoreLink = useMemo(
+    () => (activeCode ? `${playStore}${playStore.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref_code=${activeCode}`)}` : playStore),
+    [activeCode, playStore],
+  );
+  const iosStoreLink = appStore;
+  const currentQRValue = qrPlatform === 'ios' ? iosStoreLink : androidStoreLink;
+
+  // Single smart universal link as secondary fallback
   const smartLink = useMemo(
     () => (activeCode ? `${backendBase}/r/${activeCode}` : ''),
     [activeCode, backendBase],
   );
 
-  const shortLink = (smartLink || link).replace(/^https?:\/\//, '');
-  const pct = config?.referralRewardType === 'PERCENTAGE' && config?.referralRewardAmount ? `${config.referralRewardAmount}%` : '10%';
-  const friendGets = '100 SawariCash';
-
   // Adapts dynamically to platform: iPhone gets App Store link, Android gets Play Store link with referrer code
   const isIos = Platform.OS === 'ios';
   const platformStoreLink = isIos ? appStore : link;
+  const shortLink = (platformStoreLink || link).replace(/^https?:\/\//, '');
+  const pct = config?.referralRewardType === 'PERCENTAGE' && config?.referralRewardAmount ? `${config.referralRewardAmount}%` : '10%';
+  const friendGets = '100 SawariCash';
+
   const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\n📲 Download MySawari:\n${platformStoreLink}\n\n(Referral code: *${code}*)`;
 
   const faqs = useMemo(() => [
@@ -209,7 +218,7 @@ export default function ReferEarnScreen() {
                     </Pressable>
                     <Pressable
                       onPress={async () => {
-                        await Clipboard.setStringAsync(`${backendBase}/r/${activeQR.token}`);
+                        await Clipboard.setStringAsync(platformStoreLink);
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         setCopied(true);
                         setTimeout(() => setCopied(false), 1800);
@@ -369,14 +378,65 @@ export default function ReferEarnScreen() {
                 </View>
               )}
 
+              {/* Store Platform Toggle: 100% Native, Direct, Zero Render URL */}
+              <View style={{ flexDirection: 'row', backgroundColor: '#F1F5F9', borderRadius: 10, padding: 3, marginBottom: 14, width: '100%' }}>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setQrPlatform('android');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    backgroundColor: qrPlatform === 'android' ? '#323E71' : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                  }}
+                >
+                  <MaterialCommunityIcons name="google-play" size={16} color={qrPlatform === 'android' ? '#FFFFFF' : '#475569'} />
+                  <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: qrPlatform === 'android' ? '#FFFFFF' : '#475569' }}>
+                    Google Play
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setQrPlatform('ios');
+                  }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    backgroundColor: qrPlatform === 'ios' ? '#323E71' : 'transparent',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'row',
+                    gap: 6,
+                  }}
+                >
+                  <MaterialCommunityIcons name="apple" size={16} color={qrPlatform === 'ios' ? '#FFFFFF' : '#475569'} />
+                  <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: qrPlatform === 'ios' ? '#FFFFFF' : '#475569' }}>
+                    App Store
+                  </Text>
+                </Pressable>
+              </View>
+
               <View style={styles.qrContainer}>
                 <QRCode
-                  value={smartLink || `${backendBase}/r/${activeCode}`}
+                  value={currentQRValue}
                   size={200}
                   color="#0F172A"
                   backgroundColor="#FFFFFF"
                 />
               </View>
+              <Text style={{ fontFamily: PF.medium, fontSize: 11, color: '#64748B', marginTop: 10, textAlign: 'center' }}>
+                {qrPlatform === 'android'
+                  ? '⚡ Scans directly into Google Play Store with referral auto-applied'
+                  : '⚡ Scans directly into Apple App Store'}
+              </Text>
               <View style={styles.modalCodeBox}>
                 <Text style={styles.modalCodeLabel}>{activeQR?.token ? 'PARTNER CODE' : 'REFERRAL CODE'}</Text>
                 <Text style={styles.modalCode}>{activeQR?.token || code}</Text>
@@ -394,7 +454,7 @@ export default function ReferEarnScreen() {
                     justifyContent: 'center',
                   }}
                   onPress={async () => {
-                    await Clipboard.setStringAsync(smartLink || `${backendBase}/r/${activeCode}`);
+                    await Clipboard.setStringAsync(currentQRValue);
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1800);

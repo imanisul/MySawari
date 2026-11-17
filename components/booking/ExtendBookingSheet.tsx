@@ -213,11 +213,11 @@ export function ExtendBookingSheet({ visible, onClose, booking, onSuccess }: { v
               </View>
 
               <TouchableOpacity 
-                style={[styles.primaryBtn, { backgroundColor: colors.primary }]} 
+                style={[styles.primaryBtn, { backgroundColor: colors.button }]} 
                 onPress={handleRequestExtension}
                 disabled={loading || checking}
               >
-                <Text style={[styles.primaryBtnText, { color: colors.primaryForeground }]}>
+                <Text style={[styles.primaryBtnText, { color: '#FFFFFF' }]}>
                   Request Extension
                 </Text>
               </TouchableOpacity>

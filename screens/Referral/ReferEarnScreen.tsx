@@ -180,7 +180,7 @@ export default function ReferEarnScreen() {
                       setCopied(true);
                       setTimeout(() => setCopied(false), 1800);
                     }}
-                    style={{ backgroundColor: '#323E71', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
+                    style={{ backgroundColor: '#6B5AED', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}
                   >
                     <Text style={{ fontFamily: PF.semibold, fontSize: 12, color: '#FFFFFF' }}>Copy Link</Text>
                   </Pressable>
@@ -239,7 +239,7 @@ export default function ReferEarnScreen() {
           </Pressable>
         )}
         <View style={styles.footerBtns}>
-          <Pressable accessibilityRole="button" onPress={shareWhatsApp} style={({ pressed }) => [styles.wa, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+          <Pressable accessibilityRole="button" onPress={shareWhatsApp} style={({ pressed }) => [styles.wa, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
             {isAuthenticated ? (
               <>
                 <View style={styles.waLogo}>

@@ -68,7 +68,7 @@ export default function SavedAddressesScreen() {
           <Pressable
             accessibilityRole="button"
             onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}
-            style={({ pressed }) => [{ backgroundColor: p.navy, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24, marginTop: 18 }, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [{ backgroundColor: p.button, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24, marginTop: 18 }, pressed && { opacity: 0.85 }]}
           >
             <Text style={{ color: '#FFFFFF', fontFamily: PF.semibold, fontSize: 14 }}>Log In</Text>
           </Pressable>
@@ -256,7 +256,7 @@ function PhoneSheet({ address, onClose, onSave }: { address: SavedAddress | null
             <Text style={{ color: p.navy }} onPress={() => { onClose(); router.push('/terms'); }}>Terms & Conditions</Text>
             {' '}and Privacy Policy.
           </Text>
-          <Pressable accessibilityRole="button" onPress={save} style={({ pressed }) => [styles.primary, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+          <Pressable accessibilityRole="button" onPress={save} style={({ pressed }) => [styles.primary, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
             <Text style={styles.primaryText}>Save Number</Text>
           </Pressable>
         </View>

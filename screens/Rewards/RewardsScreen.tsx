@@ -161,7 +161,7 @@ export default function RewardsScreen() {
                         }
                         style={({ pressed }) => [
                           styles.claimBtn,
-                          { backgroundColor: p.navy },
+                          { backgroundColor: p.button },
                           pressed && { opacity: 0.8 },
                         ]}
                       >

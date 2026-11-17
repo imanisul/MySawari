@@ -34,7 +34,7 @@ export default function BookingsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { isAuthenticated, selectCar } = useSawari();
+  const { isAuthenticated, selectCar, setDates, setTimes, applyCoupon } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const [tab, setTab] = useState<BookingTab>('All');
   const [initialTabSet, setInitialTabSet] = useState(false);
@@ -170,8 +170,14 @@ export default function BookingsScreen() {
   const bookAgain = (b: BookingSnapshot) => {
     Haptics.selectionAsync();
     const car = vehicleMap.get(b.vehicleId);
-    if (car) { selectCar(car); router.push('/car-details'); }
-    else router.push('/explore');
+    if (!car) { router.push('/explore'); return; }
+    // Book Again: the car with fresh dates — straight to its calendar (the old trip's dates and deal code are dropped).
+    selectCar(car);
+    applyCoupon(null);
+    setDates('Select Dates', '1 Day');
+    setTimes('08:00 AM', '08:00 AM');
+    router.push('/car-details');
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
 
   // Still checking the saved session: the header and placeholders, never a flash of "Log in".
@@ -204,7 +210,7 @@ export default function BookingsScreen() {
           <Pressable
             accessibilityRole="button"
             onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}
-            style={({ pressed }) => [styles.loginBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.loginBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}
           >
             <Text style={[styles.loginBtnText, { color: p.onNavy }]}>Log In</Text>
           </Pressable>
@@ -442,7 +448,7 @@ function Empty({ p, icon, title, copy, action, onAction }: { p: DetailsPalette; 
       <Text style={[styles.emptyTitle, { color: p.fg }]}>{title}</Text>
       <Text style={[styles.emptyCopy, { color: p.sub }]}>{copy}</Text>
       {!!action && (
-        <Pressable onPress={onAction} style={[styles.emptyBtn, { backgroundColor: p.navy }]}>
+        <Pressable onPress={onAction} style={[styles.emptyBtn, { backgroundColor: p.button }]}>
           <Text style={{ color: p.onNavy, fontFamily: FONT.semibold }}>{action}</Text>
         </Pressable>
       )}

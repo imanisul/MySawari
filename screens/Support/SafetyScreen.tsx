@@ -84,7 +84,7 @@ export default function SafetyScreen() {
               }}
               style={{
                 marginTop: 12,
-                backgroundColor: colors.primary,
+                backgroundColor: colors.button,
                 paddingHorizontal: 24,
                 paddingVertical: 14,
                 borderRadius: 12,
@@ -93,8 +93,8 @@ export default function SafetyScreen() {
                 gap: 8
               }}
             >
-              <Feather name="phone-call" size={18} color={colors.primaryForeground} />
-              <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground, fontSize: 15 }}>
+              <Feather name="phone-call" size={18} color={'#FFFFFF'} />
+              <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', fontSize: 15 }}>
                 Call Emergency Support
               </Text>
             </Pressable>

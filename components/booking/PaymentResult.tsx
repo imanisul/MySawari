@@ -81,7 +81,7 @@ export function PaymentFailed({ title = 'Payment Failed', message = 'Your bookin
 
       <LinearGradient pointerEvents="none" colors={['rgba(229,231,240,0)', 'rgba(229,231,240,0.55)']} style={styles.fade} />
       <View style={[styles.footer, { backgroundColor: p.page, borderTopColor: p.deliveryBorder, paddingBottom: Math.max(insets.bottom, 12) + 4 }]}>
-        <Pressable accessibilityRole="button" onPress={onButton} style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+        <Pressable accessibilityRole="button" onPress={onButton} style={({ pressed }) => [styles.cta, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
           <Text style={styles.ctaText}>{buttonLabel}</Text>
         </Pressable>
       </View>

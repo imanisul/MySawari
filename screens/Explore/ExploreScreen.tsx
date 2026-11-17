@@ -244,7 +244,7 @@ export default function ExploreScreen() {
       <Feather name="wifi-off" size={26} color={p.red} />
       <Text style={[styles.emptyTitle, { color: p.fg }]}>Couldn't load vehicles</Text>
       <Text style={[styles.emptyCopy, { color: p.sub }]}>Check your connection and try again.</Text>
-      <Pressable style={[styles.emptyBtn, { backgroundColor: p.navy }]} onPress={() => fetchVehicles()}>
+      <Pressable style={[styles.emptyBtn, { backgroundColor: p.button }]} onPress={() => fetchVehicles()}>
         <Text style={[styles.emptyBtnText, { color: p.onNavy }]}>Retry</Text>
       </Pressable>
     </View>
@@ -256,7 +256,7 @@ export default function ExploreScreen() {
         {debouncedQuery ? `Nothing matches "${debouncedQuery}". Try another search.` : 'Nothing matches these filters right now.'}
       </Text>
       {(!!debouncedQuery || activeFilterCount > 0) && (
-        <Pressable style={[styles.emptyBtn, { backgroundColor: p.navy }]} onPress={clearAll}>
+        <Pressable style={[styles.emptyBtn, { backgroundColor: p.button }]} onPress={clearAll}>
           <Text style={[styles.emptyBtnText, { color: p.onNavy }]}>Clear all filters</Text>
         </Pressable>
       )}

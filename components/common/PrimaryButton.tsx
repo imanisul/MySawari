@@ -34,7 +34,7 @@ export function PrimaryButton({
         style={[
           styles.primaryButton,
           { 
-            backgroundColor: isDisabled ? colors.disabledBg : colors.primary,
+            backgroundColor: isDisabled ? colors.disabledBg : colors.button,
             transform: [{ scale: scaleAnim }],
             opacity: opacityAnim,
           },
@@ -46,7 +46,7 @@ export function PrimaryButton({
         <Text 
           style={[
             styles.primaryButtonText, 
-            { color: isDisabled ? colors.disabledText : colors.primaryForeground }
+            { color: isDisabled ? colors.disabledText : '#FFFFFF' }
           ]}
         >
           {label}
@@ -55,7 +55,7 @@ export function PrimaryButton({
           <Feather 
             name={icon} 
             size={18} 
-            color={isDisabled ? colors.disabledText : colors.primaryForeground} 
+            color={isDisabled ? colors.disabledText : '#FFFFFF'} 
           />
         )}
       </Animated.View>

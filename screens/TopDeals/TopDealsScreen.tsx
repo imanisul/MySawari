@@ -11,6 +11,8 @@ import {
   TextInput,
   RefreshControl,
   ActivityIndicator,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
 import { Image as CachedImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,7 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
 import { useSawari } from '@/context/SawariContext';
-import { useDealCars, dealPricing, useOpenTopDeal } from '@/hooks/useDealCars';
+import { useDealCars, dealPricing, useOpenTopDeal, dealDayTime, nextIstHourMs } from '@/hooks/useDealCars';
 import { VEHICLES_KEY } from '@/hooks/useVehicles';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
@@ -135,6 +137,9 @@ interface VehicleCardProps {
   onPressExtend?: () => void;
 }
 
+const PHOTO_PEEK = 0; // full photo per swipe (no peek of the next one)
+const PHOTO_GAP = 0;
+
 /** Vehicle Card matching Figma Frame 2147226289 design */
 function VehicleCard({
   car,
@@ -219,14 +224,22 @@ function VehicleCard({
   const reviewCount = car.reviewCount ? car.reviewCount + dbReviews.length : reviews.length;
   const tag = bestFor(car) || 'Comfort';
 
-  const currentSource = imageSources[photoIndex] || imageSources[0];
-
-  const handleNextPhoto = () => {
-    if (imageSources.length > 1) {
-      Haptics.selectionAsync();
-      setPhotoIndex((prev) => (prev + 1) % imageSources.length);
-    }
+  // Swipeable photos (same as the car cards): the next one peeks in at the edge and each swipe moves exactly one.
+  const photos = imageSources.slice(0, 5);
+  const many = photos.length > 1;
+  const [boxW, setBoxW] = useState(0);
+  const photoRef = useRef<ScrollView>(null);
+  const itemW = many ? boxW - PHOTO_PEEK : boxW;
+  const step = itemW + PHOTO_GAP;
+  const maxX = Math.max(0, photos.length * step - PHOTO_GAP - boxW);
+  const offsets = photos.map((_, i) => Math.min(i * step, maxX));
+  const onPhotoScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    if (!step) return;
+    const x = e.nativeEvent.contentOffset.x;
+    const next = x >= maxX - 1 ? photos.length - 1 : Math.min(photos.length - 1, Math.max(0, Math.round(x / step)));
+    if (next !== photoIndex) setPhotoIndex(next);
   };
+  const goToPhoto = (i: number) => photoRef.current?.scrollTo({ x: offsets[i] ?? 0, animated: true });
 
   // The "Need more time?" bar only when the car is also free after the deal ends (the next day), Figma 2147226289:
   // then the card sits in a white 16-radius frame with the bar under it; otherwise just the card.
@@ -236,16 +249,35 @@ function VehicleCard({
       {/* Vehicle Card (Frame 2147226289 -> Vehicle Card) */}
       <Pressable onPress={onPress} style={styles.vehicleCard}>
         {/* Frame 20: Photo Container */}
-        <View style={styles.photoBox}>
-          {currentSource ? (
-            <LoadingImage
-              source={currentSource}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              recyclingKey={`${car.id}-${photoIndex}`}
-              transition={150}
-            />
-          ) : (
+        <View style={styles.photoBox} onLayout={(e) => setBoxW(e.nativeEvent.layout.width)}>
+          {photos.length && boxW > 0 ? (
+            <ScrollView
+              ref={photoRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              onScroll={onPhotoScroll}
+              onMomentumScrollEnd={onPhotoScroll}
+              scrollEventThrottle={16}
+              scrollEnabled={many}
+              nestedScrollEnabled
+              directionalLockEnabled
+              snapToOffsets={offsets}
+              snapToEnd={false}
+              disableIntervalMomentum
+              decelerationRate="fast"
+              contentContainerStyle={{ gap: PHOTO_GAP }}
+            >
+              {photos.map((src, i) => (
+                <Pressable key={i} onPress={onPress} style={[{ width: itemW, height: '100%' }, many && { borderRadius: 8, overflow: 'hidden' }]}>
+                  {i === 0 || Math.abs(photoIndex - i) <= 1 ? (
+                    <LoadingImage source={src} style={StyleSheet.absoluteFill} contentFit="cover" recyclingKey={`${car.id}-${i}`} transition={150} />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, styles.placeholderPhoto]} />
+                  )}
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : photos.length ? null : (
             <View style={[StyleSheet.absoluteFill, styles.placeholderPhoto]}>
               <Ionicons name="car-outline" size={54} color="#94A3B8" />
             </View>
@@ -273,26 +305,16 @@ function VehicleCard({
             </Pressable>
           </View>
 
-          {/* Photo tap area to cycle photos */}
-          {imageSources.length > 1 && (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation();
-                handleNextPhoto();
-              }}
-              style={styles.photoTapOverlay}
-            />
-          )}
-
           {/* Bottom Pagination Dots (Frame 25) */}
-          {imageSources.length > 1 && (
+          {many && (
             <View style={styles.dotsRow}>
-              {imageSources.slice(0, 5).map((_: unknown, idx: number) => (
+              {photos.map((_: unknown, idx: number) => (
                 <Pressable
                   key={idx}
                   onPress={(e) => {
                     e.stopPropagation();
-                    setPhotoIndex(idx);
+                    Haptics.selectionAsync();
+                    goToPhoto(idx);
                   }}
                   style={[
                     styles.dot,
@@ -338,12 +360,24 @@ function VehicleCard({
             )}
           </View>
 
+          {/* When the deal runs (India time), as a trip: Start · Today 3:00 PM → End · Tmrw 8:00 AM */}
+          <View style={styles.whenRow} accessible accessibilityLabel={`Starts ${dealDayTime(startMs, nowMs)}, ends ${dealDayTime(endMs, nowMs)}`}>
+            <View style={styles.whenCol}>
+              <Text style={styles.whenLbl}>Start</Text>
+              <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(startMs, nowMs)}</Text>
+            </View>
+            <Feather name="arrow-right" size={14} color="#6152D8" />
+            <View style={[styles.whenCol, { alignItems: 'flex-end' }]}>
+              <Text style={styles.whenLbl}>End</Text>
+              <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(endMs, nowMs)}</Text>
+            </View>
+          </View>
+
           {/* Row 2: Frame 2147225762 */}
           <View style={styles.priceActionRow}>
             {/* Left: Frame 2147225771 (Price + for X hours) */}
             <View style={styles.priceGroup}>
               <Text style={styles.dealPriceText}>{formatCurrency(dealPrice)}</Text>
-              <Text style={styles.hoursText}>for {hoursRemaining} {hoursRemaining === 1 ? 'hour' : 'hours'}</Text>
             </View>
 
             {/* Right: Frame 51 View Details */}
@@ -417,14 +451,20 @@ export default function TopDealsScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const { dealCars, targetEndMs, isLoading, refetch } = useDealCars(nowMs);
+  const { dealCars, targetEndMs, isOpen, isLoading, refetch } = useDealCars(nowMs);
+  // Top Deals exist only 2 PM → 8 AM: outside that (opened from a link / notification, or still open at 8 AM) the page
+  // closes itself.
+  useEffect(() => {
+    if (!isOpen) safeBack(router);
+  }, [isOpen, router]);
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
     setRefreshing(true);
     try { await refetch(); } finally { setRefreshing(false); }
   };
   // Live countdown timer calculations for Frame 2147226222
-  const msRemaining = Math.max(0, targetEndMs - nowMs);
+  // This hour's prices end at the next whole hour (then every deal is an hour shorter and cheaper): at most 1 hour.
+  const msRemaining = Math.max(0, Math.min(targetEndMs, nextIstHourMs(nowMs)) - nowMs);
   const timerHrs = Math.floor(msRemaining / 3600000);
   const timerMins = Math.floor((msRemaining % 3600000) / 60000);
   const timerSecs = Math.floor((msRemaining % 60000) / 1000);
@@ -912,8 +952,8 @@ const styles = StyleSheet.create({
     borderColor: '#EAECF1',
   },
   quickFilterChipActive: {
-    backgroundColor: '#323E71',
-    borderColor: '#323E71',
+    backgroundColor: '#6B5AED',
+    borderColor: '#6B5AED',
   },
   quickFilterText: {
     fontFamily: 'PlusJakartaSans_500Medium',
@@ -1118,13 +1158,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  photoTapOverlay: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    right: 0,
-    bottom: 24,
-  },
   dotsRow: {
     position: 'absolute',
     bottom: 6,
@@ -1231,6 +1264,10 @@ const styles = StyleSheet.create({
   },
 
   // ── Price & Action Row (Frame 2147225762) ──
+  whenRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#DEDAFB', backgroundColor: '#FBFAFE' },
+  whenCol: { flex: 1, minWidth: 0 },
+  whenLbl: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 14, color: '#737373' },
+  whenVal: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 18, color: '#2F3E75' },
   priceActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1335,7 +1372,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: '#2F3E75',
+    backgroundColor: '#6B5AED',
   },
   exploreBtnText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',

@@ -31,6 +31,7 @@ const colors = {
     surfaceSoft: '#FFFFFF',
     darkText: '#000000',
     navy: '#111A2B',
+    button: '#6B5AED', // every filled button
     blue: '#3F58C4',
     lightBlue: '#EDF1FF',
     lime: '#B7F52E',
@@ -79,6 +80,7 @@ const colors = {
     surfaceSoft: '#17233B',
     darkText: '#F3F6FB',
     navy: '#17263F', // navy card surface (was identical to the page background in dark mode)
+    button: '#6B5AED',
     blue: '#7C93F5',
     lightBlue: '#1A2740',
     lime: '#B7F52E',

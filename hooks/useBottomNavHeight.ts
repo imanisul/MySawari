@@ -1,7 +1,7 @@
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /** Height of the floating bottom tab pill (and the round Help button), without the space beneath it. */
-export const BOTTOM_NAV_CONTENT_HEIGHT = 56;
+export const BOTTOM_NAV_CONTENT_HEIGHT = 64;
 
 /** Corner radius shared by the tab pill and the round Help button beside it. */
 export const BOTTOM_NAV_RADIUS = 50;

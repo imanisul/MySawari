@@ -109,7 +109,7 @@ export function AddressPickerSheet({ visible, kind, saved, onClose, onPick, onAd
         <Pressable
           accessibilityRole="button"
           onPress={() => { Haptics.selectionAsync(); onAddAddress(); }}
-          style={({ pressed }) => [styles.button, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.button, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}
         >
           <Text style={[styles.buttonText, { color: p.onNavy }]}>Add Address</Text>
         </Pressable>

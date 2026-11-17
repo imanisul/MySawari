@@ -133,7 +133,7 @@ export default function MyWalletScreen() {
             )}
           </View>
           {!!wallet && wallet.withdrawable > 0 && (
-            <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowWithdraw(true); }} style={({ pressed }) => [styles.withdrawBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+            <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowWithdraw(true); }} style={({ pressed }) => [styles.withdrawBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
               <Text style={styles.withdrawText}>Withdraw</Text>
             </Pressable>
           )}
@@ -324,7 +324,7 @@ function WithdrawSheet({ visible, max, onClose, onDone }: { visible: boolean; ma
             </>
           )}
           {!!error && <Text style={[styles.error, { color: p.red }]}>{error}</Text>}
-          <Pressable accessibilityRole="button" onPress={submit} disabled={busy} style={({ pressed }) => [styles.submit, { backgroundColor: p.navy }, (pressed || busy) && { opacity: 0.85 }]}>
+          <Pressable accessibilityRole="button" onPress={submit} disabled={busy} style={({ pressed }) => [styles.submit, { backgroundColor: p.button }, (pressed || busy) && { opacity: 0.85 }]}>
             {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitText}>Request withdrawal</Text>}
           </Pressable>
           </ScrollView>

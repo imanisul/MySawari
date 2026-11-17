@@ -149,6 +149,8 @@ export default function ProfileScreen() {
         onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
         refreshControl={isAuthenticated ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FFFFFF" progressViewOffset={insets.top} /> : undefined}
       >
+        {/* Pulling the page down (iOS bounce) shows more of the header's purple instead of white above it. */}
+        <View pointerEvents="none" style={{ position: 'absolute', top: -1200, left: 0, right: 0, height: 1200, backgroundColor: HEADER[0] }} />
         {/* ── Header ── */}
         <LinearGradient colors={HEADER} locations={headerStops} style={[styles.header, { paddingTop: insets.top + 4 }]}>
           {isAuthenticated ? (
@@ -285,9 +287,12 @@ export default function ProfileScreen() {
           battery and notification icons (white) never sit on top of the white page content. */}
       <Animated.View
         pointerEvents="none"
-        style={[styles.stickyBar, { height: insets.top + 52, paddingTop: insets.top, opacity: scrollY.interpolate({ inputRange: [70, 120], outputRange: [0, 1], extrapolate: 'clamp' }) }]}
+        style={[styles.stickyBar, { height: insets.top + 52, opacity: scrollY.interpolate({ inputRange: [70, 120], outputRange: [0, 1], extrapolate: 'clamp' }) }]}
       >
-        <Text style={styles.stickyTitle}>My Profile</Text>
+        {/* Solid #6B5AED while scrolling (the app's button purple). */}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#6B5AED', paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={styles.stickyTitle}>My Profile</Text>
+        </View>
       </Animated.View>
       {/* ⋮ pinned top-right, on top of the purple "My Profile" bar, so it is always there however far you scroll. */}
       {isAuthenticated && (
@@ -408,7 +413,7 @@ const styles = StyleSheet.create({
   planName: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
   offChip: { height: 20, paddingHorizontal: 8, borderRadius: 24, justifyContent: 'center' },
   offChipText: { fontFamily: FONT.bold, fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
-  upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#323E71', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#6B5AED', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   upgradeText: { fontFamily: FONT.bold, fontSize: 11, lineHeight: 17, color: '#FFFFFF' },
   memberTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
   memberSub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 16.5 },
@@ -429,7 +434,7 @@ const styles = StyleSheet.create({
   dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3, marginHorizontal: 0 },
   dash: { width: 4, height: 1 },
 
-  stickyBar: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  stickyBar: { position: 'absolute', top: 0, left: 0, right: 0 },
   stickyTitle: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 24, color: '#FFFFFF' },
   guestLogin: { alignSelf: 'flex-start', marginTop: 14, paddingHorizontal: 18, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   guestLoginText: { fontFamily: FONT.semibold, fontSize: 13, color: PURPLE },

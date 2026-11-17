@@ -150,7 +150,7 @@ export function StickyBookingBar({
           accessibilityHint={isBook && !agreed ? 'Tick the policy agreement first' : undefined}
           onPress={onPress}
           disabled={disabled}
-          style={({ pressed }) => [styles.button, { backgroundColor: p.navy }, pressed && styles.pressed, disabled && { opacity: 0.5 }]}
+          style={({ pressed }) => [styles.button, { backgroundColor: p.button }, pressed && styles.pressed, disabled && { opacity: 0.5 }]}
         >
           <Text style={[styles.buttonText, { color: p.onNavy }]}>{label}</Text>
         </Pressable>

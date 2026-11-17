@@ -229,9 +229,9 @@ export default function PaymentsScreen() {
                   <View style={[
                     styles.radio, 
                     { borderColor: paymentMethod === method.id ? colors.primary : colors.border },
-                    paymentMethod === method.id && { backgroundColor: colors.primary }
+                    paymentMethod === method.id && { backgroundColor: colors.button }
                   ]}>
-                    {paymentMethod === method.id && <Feather name="check" size={14} color={colors.primaryForeground} />}
+                    {paymentMethod === method.id && <Feather name="check" size={14} color={'#FFFFFF'} />}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -320,8 +320,8 @@ export default function PaymentsScreen() {
               <Feather name="wifi-off" size={32} color={colors.mutedForeground} style={{ marginBottom: 12 }} />
               <Text style={[styles.emptyTitle, { color: colors.foreground }]}>Couldn't load your history</Text>
               <Text style={[styles.emptySubtitle, { color: colors.mutedForeground }]}>Check your internet connection and try again.</Text>
-              <TouchableOpacity onPress={() => refetchWallet()} disabled={isFetchingWallet} style={{ marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary, opacity: isFetchingWallet ? 0.6 : 1 }}>
-                <Text style={{ fontFamily: 'Inter_600SemiBold', color: colors.primaryForeground }}>{isFetchingWallet ? 'Loading…' : 'Retry'}</Text>
+              <TouchableOpacity onPress={() => refetchWallet()} disabled={isFetchingWallet} style={{ marginTop: 14, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.button, opacity: isFetchingWallet ? 0.6 : 1 }}>
+                <Text style={{ fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' }}>{isFetchingWallet ? 'Loading…' : 'Retry'}</Text>
               </TouchableOpacity>
             </View>
           ) : transactions.length === 0 ? (
@@ -362,7 +362,7 @@ export default function PaymentsScreen() {
           )}
 
           <TouchableOpacity 
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            style={[styles.addButton, { backgroundColor: colors.button }]}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               setShowAddModal(true);
@@ -372,8 +372,8 @@ export default function PaymentsScreen() {
                colors={[colors.primary, colors.primary + 'dd']}
                style={[StyleSheet.absoluteFill, { borderRadius: 16 }]}
             />
-            <Feather name="plus-circle" size={20} color={colors.primaryForeground} style={{ zIndex: 1 }} />
-            <Text style={[styles.addButtonText, { color: colors.primaryForeground, zIndex: 1 }]}>Add New Payment Method</Text>
+            <Feather name="plus-circle" size={20} color={'#FFFFFF'} style={{ zIndex: 1 }} />
+            <Text style={[styles.addButtonText, { color: '#FFFFFF', zIndex: 1 }]}>Add New Payment Method</Text>
           </TouchableOpacity>
         </ScrollView>
       </SafeAreaView>
@@ -395,16 +395,16 @@ export default function PaymentsScreen() {
 
             <View style={styles.typeSelector}>
               <TouchableOpacity 
-                style={[styles.typeBtn, newMethodType === 'upi' ? { backgroundColor: colors.primary } : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
+                style={[styles.typeBtn, newMethodType === 'upi' ? { backgroundColor: colors.button } : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
                 onPress={() => setNewMethodType('upi')}
               >
-                <Text style={[styles.typeBtnText, { color: newMethodType === 'upi' ? colors.primaryForeground : colors.foreground }]}>UPI</Text>
+                <Text style={[styles.typeBtnText, { color: newMethodType === 'upi' ? '#FFFFFF' : colors.foreground }]}>UPI</Text>
               </TouchableOpacity>
               <TouchableOpacity 
-                style={[styles.typeBtn, newMethodType === 'card' ? { backgroundColor: colors.primary } : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
+                style={[styles.typeBtn, newMethodType === 'card' ? { backgroundColor: colors.button } : { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
                 onPress={() => setNewMethodType('card')}
               >
-                <Text style={[styles.typeBtnText, { color: newMethodType === 'card' ? colors.primaryForeground : colors.foreground }]}>Card</Text>
+                <Text style={[styles.typeBtnText, { color: newMethodType === 'card' ? '#FFFFFF' : colors.foreground }]}>Card</Text>
               </TouchableOpacity>
             </View>
 
@@ -476,12 +476,12 @@ export default function PaymentsScreen() {
             )}
 
             <TouchableOpacity
-              style={[styles.saveBtn, { backgroundColor: colors.primary, opacity: isSaving ? 0.7 : 1 }]}
+              style={[styles.saveBtn, { backgroundColor: colors.button, opacity: isSaving ? 0.7 : 1 }]}
               onPress={handleAddMethod}
               disabled={isSaving}
             >
               {isSaving ? (
-                <ActivityIndicator color={colors.primaryForeground} />
+                <ActivityIndicator color={'#FFFFFF'} />
               ) : (
                 <Text style={styles.saveBtnText}>Save Securely</Text>
               )}
@@ -531,5 +531,5 @@ const styles = StyleSheet.create({
   inputBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, height: 56, marginBottom: 16 },
   input: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 16, height: '100%' },
   saveBtn: { height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  saveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#101B2E' }
+  saveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#FFFFFF' }
 });

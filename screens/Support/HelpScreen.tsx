@@ -101,7 +101,7 @@ export default function HelpScreen() {
               Our support agents are available 24/7 to resolve your issues.
             </Text>
             <TouchableOpacity 
-              style={[styles.chatButton, { backgroundColor: colors.primary }]}
+              style={[styles.chatButton, { backgroundColor: colors.button }]}
               onPress={() => {
                 import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('contact_support', 'HelpScreen', { method: 'whatsapp' }));
                 Linking.openURL(SUPPORT_WHATSAPP_URL).catch(() => {});
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatButtonText: {
-    color: '#101B2E',
+    color: '#FFFFFF',
     fontFamily: 'Inter_600SemiBold',
     fontSize: 15,
   }

@@ -130,7 +130,7 @@ export default function EditProfileScreen() {
                 accessibilityRole="button"
                 onPress={update}
                 disabled={saving}
-                style={({ pressed }) => [styles.btn, { backgroundColor: p.navy }, (pressed || saving) && { opacity: 0.85 }]}
+                style={({ pressed }) => [styles.btn, { backgroundColor: p.button }, (pressed || saving) && { opacity: 0.85 }]}
               >
                 {saving ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={[styles.btnText, { color: '#FFFFFF' }]}>Update</Text>}
               </Pressable>

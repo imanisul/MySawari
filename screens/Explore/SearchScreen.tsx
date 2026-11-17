@@ -270,13 +270,13 @@ export default function SearchResultsScreen() {
         </View>
         <Pressable onPress={openDates} style={[styles.dates, { backgroundColor: p.summary }]} accessibilityRole="button" accessibilityLabel={`Trip ${startLabel || ''} ${pickupTime} to ${endLabel || ''} ${returnTime}. Change dates`}>
           <View style={styles.dateCol}>
-            <Text style={[styles.dateDay, { color: p.fg }]}>{startLabel || 'Start'}</Text>
-            <Text style={[styles.dateTime, { color: p.sub }]}>{startLabel ? shortTime(pickupTime) : 'Pick'}</Text>
+            <Text style={[styles.dateDay, { color: p.fg }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{startLabel || 'Start'}</Text>
+            <Text style={[styles.dateTime, { color: p.sub }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{startLabel ? shortTime(pickupTime) : 'Pick'}</Text>
           </View>
           <View style={[styles.dateDivider, { backgroundColor: p.border }]} />
           <View style={styles.dateCol}>
-            <Text style={[styles.dateDay, { color: p.fg }]}>{(hasRange ? endLabel : startLabel) || 'End'}</Text>
-            <Text style={[styles.dateTime, { color: p.sub }]}>{startLabel ? shortTime(returnTime) : 'Pick'}</Text>
+            <Text style={[styles.dateDay, { color: p.fg }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{(hasRange ? endLabel : startLabel) || 'End'}</Text>
+            <Text style={[styles.dateTime, { color: p.sub }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{startLabel ? shortTime(returnTime) : 'Pick'}</Text>
           </View>
         </Pressable>
       </View>
@@ -342,8 +342,9 @@ const styles = StyleSheet.create({
   countRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   spinSlot: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
   count: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16 },
-  dates: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4 },
-  dateCol: { alignItems: 'center', paddingHorizontal: 4 },
+  // Never squeezed by a long place name (that cut off the end date on narrow phones): the name shrinks instead.
+  dates: { flexShrink: 0, flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 4 },
+  dateCol: { flexShrink: 0, alignItems: 'center', paddingHorizontal: 4 },
   dateDay: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 15 },
   dateTime: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, lineHeight: 14 },
   dateDivider: { width: 1, alignSelf: 'stretch', marginVertical: 2 },

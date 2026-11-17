@@ -42,7 +42,7 @@ export default function WishlistScreen() {
       <View style={[styles.stateIcon, { backgroundColor: p.summary, borderColor: p.deliveryBorder }]}>{icon}</View>
       <Text style={[styles.stateTitle, { color: p.fg }]}>{title}</Text>
       <Text style={[styles.stateBody, { color: p.sub }]}>{body}</Text>
-      <Pressable accessibilityRole="button" onPress={onPrimary} style={({ pressed }) => [styles.primary, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+      <Pressable accessibilityRole="button" onPress={onPrimary} style={({ pressed }) => [styles.primary, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
         <Text style={styles.primaryText}>{primary}</Text>
       </Pressable>
       {!!secondary && (
@@ -82,7 +82,7 @@ export default function WishlistScreen() {
         <Text style={[styles.bannerTitle, { color: p.fg }]}>Log in to keep your favourites</Text>
         <Text style={[styles.bannerSub, { color: p.sub }]}>They're saved on this phone only. Log in to keep them on your account.</Text>
       </View>
-      <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }} style={({ pressed }) => [styles.bannerBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+      <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }} style={({ pressed }) => [styles.bannerBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
         <Text style={styles.bannerBtnText}>Log In</Text>
       </Pressable>
     </View>

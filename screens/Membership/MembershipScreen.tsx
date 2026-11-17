@@ -296,7 +296,7 @@ export default function MembershipScreen() {
           <Pressable
             accessibilityRole="button"
             onPress={() => { setLoading(true); fetchMembership(); }}
-            style={({ pressed }) => [styles.retry, { backgroundColor: p.navy }, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [styles.retry, { backgroundColor: p.button }, pressed && { opacity: 0.8 }]}
           >
             <Text style={styles.retryText}>Retry</Text>
           </Pressable>
@@ -411,7 +411,7 @@ export default function MembershipScreen() {
               accessibilityLabel={target ? `${ctaLabel}, ${formatCurrency(target.price)} a year` : 'Subscribe, choose a plan first'}
               disabled={!!activating}
               onPress={onCta}
-              style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, (pressed || !!activating) && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.cta, { backgroundColor: p.button }, (pressed || !!activating) && { opacity: 0.85 }]}
             >
               {activating ? <ActivityIndicator color="#FFFFFF" /> : <Text maxFontSizeMultiplier={1.2} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={styles.ctaText}>{ctaLabel}</Text>}
             </Pressable>
@@ -453,7 +453,7 @@ export default function MembershipScreen() {
                 const should = await shouldPromptMembershipRating(customer?.id);
                 if (should) setShowRatingModal(true);
               }}
-              style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}
             >
               <Text style={styles.popupBtnText}>Awesome</Text>
             </Pressable>
@@ -478,7 +478,7 @@ export default function MembershipScreen() {
             </View>
             <Text style={[styles.popupTitle, { color: p.fg }]}>Payment not completed</Text>
             <Text style={[styles.popupBody, { color: p.muted }]}>{errorMsg}</Text>
-            <Pressable onPress={() => setShowErrorModal(false)} style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+            <Pressable onPress={() => setShowErrorModal(false)} style={({ pressed }) => [styles.popupBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
               <Text style={styles.popupBtnText}>Okay</Text>
             </Pressable>
           </View>

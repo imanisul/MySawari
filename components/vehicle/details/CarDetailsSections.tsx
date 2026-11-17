@@ -196,7 +196,7 @@ export function MileageLimits({ onAddDay, tripDays }: { onAddDay?: () => void; t
             onPress={() => { Haptics.selectionAsync(); onAddDay(); }}
             accessibilityRole="button"
             accessibilityLabel="Add more days"
-            style={({ pressed }) => [styles.addDayBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [styles.addDayBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}
           >
             <Feather name="plus" size={16} color={p.onNavy} />
             <Text style={[styles.addDayBtnText, { color: p.onNavy }]}>Add more days</Text>
@@ -964,7 +964,7 @@ export function HelpCard() {
           accessibilityRole="button"
           accessibilityLabel="Call MySawari"
           onPress={() => { Haptics.selectionAsync(); Linking.openURL(`tel:${SUPPORT_PHONE}`); }}
-          style={({ pressed }) => [styles.helpBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.helpBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}
         >
           <Ionicons name="call" size={17} color="#FFFFFF" />
         </Pressable>

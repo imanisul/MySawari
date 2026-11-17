@@ -533,7 +533,7 @@ export default function AddressConfirmScreen() {
           accessibilityRole="button"
           onPress={confirm}
           disabled={resolving || moving}
-          style={({ pressed }) => [styles.button, { backgroundColor: p.navy }, (pressed || resolving || moving) && { opacity: 0.85 }]}
+          style={({ pressed }) => [styles.button, { backgroundColor: p.button }, (pressed || resolving || moving) && { opacity: 0.85 }]}
         >
           <Text style={[styles.buttonText, { color: p.onNavy }]}>{isSaveOnly ? 'Save Address' : isReturn ? 'Confirm Drop-off' : 'Confirm Pick-up'}</Text>
         </Pressable>

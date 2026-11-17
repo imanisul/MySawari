@@ -182,8 +182,8 @@ export function WriteReviewBottomSheet({
               ? 'Your review and trip photos are published. The photos now appear in this vehicle\'s gallery.'
               : 'Your review has been published and is now visible on this page.'}
           </Text>
-          <Pressable style={[styles.submitBtn, { backgroundColor: colors.primary, width: '100%', marginTop: 24 }]} onPress={onClose}>
-            <Text style={[styles.submitText, { color: colors.primaryForeground }]}>Done</Text>
+          <Pressable style={[styles.submitBtn, { backgroundColor: colors.button, width: '100%', marginTop: 24 }]} onPress={onClose}>
+            <Text style={[styles.submitText, { color: '#FFFFFF' }]}>Done</Text>
           </Pressable>
         </View>
       </View>
@@ -314,7 +314,7 @@ export function WriteReviewBottomSheet({
         <Pressable
           style={({ pressed }) => [
             styles.submitBtn,
-            { backgroundColor: colors.primary },
+            { backgroundColor: colors.button },
             pressed && { opacity: 0.8 },
             loading && { opacity: 0.5 }
           ]}
@@ -323,11 +323,11 @@ export function WriteReviewBottomSheet({
         >
           {loading ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <ActivityIndicator color={colors.primaryForeground} />
-              {!!progress && <Text style={[styles.submitText, { color: colors.primaryForeground, fontSize: 14 }]}>{progress}</Text>}
+              <ActivityIndicator color={'#FFFFFF'} />
+              {!!progress && <Text style={[styles.submitText, { color: '#FFFFFF', fontSize: 14 }]}>{progress}</Text>}
             </View>
           ) : (
-            <Text style={[styles.submitText, { color: colors.primaryForeground }]}>Submit Review</Text>
+            <Text style={[styles.submitText, { color: '#FFFFFF' }]}>Submit Review</Text>
           )}
         </Pressable>
       </View>

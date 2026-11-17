@@ -32,8 +32,9 @@ import {
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { formatTime12, getIndiaDateParts, getAvailability } from '@/utils/sawari';
-import { Bolt, Lettering } from '@/components/home/FlashSaleBanner';
 import { FlashSaleHeroTitle } from '@/components/home/FlashSaleHeroTitle';
+import { FlashSaleScheduledHeader, SCHEDULED_HEADER_VIEW } from '@/components/home/FlashSaleScheduledHeader';
+import { FlashSaleSwipeCoach, hasSeenSwipeCoach, markSwipeCoachSeen } from '@/components/home/FlashSaleSwipeCoach';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import { BACKEND_URL } from '@/services/backend/api';
 import * as Haptics from '@/utils/haptics';
@@ -59,9 +60,6 @@ const FONT_SEMI = 'PlusJakartaSans_600SemiBold';
 const FONT_MED = 'PlusJakartaSans_500Medium';
 const GOLD = '#FBC422';
 const GOLD_AMBER = '#F5BD47';
-const PINK_SHADOW = { dx: -3.44, dy: 3.44, color: '#FF008B' };
-const BLACK_SHADOW = { dx: -1.15, dy: 1.15, color: '#000000' };
-const FROST_OVERLAY = 'rgba(28, 28, 30, 0.45)';
 const STAR_PATH = 'M12 0 C13 8 16 11 24 12 C16 13 13 16 12 24 C11 16 8 13 0 12 C8 11 11 8 12 0Z';
 const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -152,17 +150,6 @@ function Sparkle({ size, left, top }: { size: number; left: number; top: number 
     <View style={{ position: 'absolute', left, top, width: box, height: box }} pointerEvents="none">
       <Glow width={glow} height={glow} style={{ position: 'absolute', left: (box - glow) / 2, top: (box - glow) / 2 }} />
       <Star width={star} height={star} style={{ position: 'absolute', left: (box - star) / 2, top: (box - star) / 2 }} />
-    </View>
-  );
-}
-
-/** 3-layer drop underline (white top, black middle shadow, pink bottom shadow) */
-function TripleUnderline({ width = 160 }: { width?: number }) {
-  return (
-    <View style={{ width, height: 6, alignSelf: 'center', marginTop: 4 }}>
-      <View style={{ position: 'absolute', left: 0, right: 0, top: 4, height: 2.3, backgroundColor: '#FF008B', borderRadius: 2 }} />
-      <View style={{ position: 'absolute', left: 0, right: 0, top: 2, height: 2.3, backgroundColor: '#000000', borderRadius: 2 }} />
-      <View style={{ position: 'absolute', left: 0, right: 0, top: 0, height: 2.3, backgroundColor: '#FFFFFF', borderRadius: 2 }} />
     </View>
   );
 }
@@ -360,7 +347,23 @@ export default function FlashSaleScreen() {
   const opensMs = isScheduled
     ? scheduledStartsMs
     : (activeOffer?.earlyAccessEndsAt ? new Date(activeOffer.earlyAccessEndsAt).getTime() : earlyAccessEndsMs);
-  const showScheduledHeader = isScheduled || (membersOnlyNow && opensMs > nowMs);
+  // Before the sale: the scheduled header. Once a sale is live (members' window included): the live countdown.
+  const showScheduledHeader = isScheduled;
+  // A sale is planned but has no cars to show yet → the big "SCHEDULE ON <day>" lettering instead of a ticket.
+  const showScheduleHero = isScheduled && displayCars.length === 0;
+
+  // One-time swipe hint (Figma 1717:15289) over the first ticket that has more than one car to swipe through.
+  const [coachVisible, setCoachVisible] = useState(false);
+  const coachEligible = ready && !showScheduleHero && !isComingSoon && displayCars.length > 1;
+  useEffect(() => {
+    if (!coachEligible) return;
+    let alive = true;
+    hasSeenSwipeCoach().then((seen) => { if (alive && !seen) setCoachVisible(true); });
+    return () => { alive = false; };
+  }, [coachEligible]);
+  const dismissCoach = useCallback(() => { setCoachVisible(false); markSwipeCoachSeen(); }, []);
+  // Swiping (or tapping another car) is the hint done.
+  useEffect(() => { if (selectedCarIndex !== 0 && coachVisible) dismissCoach(); }, [selectedCarIndex, coachVisible, dismissCoach]);
 
   // The car's own photo as an image source. The fleet gives full links, or the app's built-in picture of that model
   // when the car has no uploaded photo; a car straight from the offer gives {url} objects, maybe server-relative.
@@ -487,7 +490,7 @@ export default function FlashSaleScreen() {
   // Schedule text calculations
   const scheduleInfo = useMemo(() => {
     const timeMs = opensMs || scheduledStartsMs;
-    if (!timeMs) return { weekday: 'SUNDAY', weekdayTitle: 'Sunday', timeStr: '8 AM', fullLabel: 'STARTS SUNDAY 8 AM' };
+    if (!timeMs) return { weekday: 'SUNDAY', weekdayTitle: 'Sunday', timeStr: '8 AM', fullLabel: 'STARTS SUNDAY 8 AM', revealWeekday: 'SATURDAY' };
     const p = getIndiaDateParts(timeMs);
     const day = WEEKDAYS[new Date(Date.UTC(p.year, p.month, p.date)).getUTCDay()];
     const hour12 = p.hours % 12 === 0 ? 12 : p.hours % 12;
@@ -498,6 +501,8 @@ export default function FlashSaleScreen() {
       weekdayTitle: day.charAt(0) + day.slice(1).toLowerCase(),
       timeStr,
       fullLabel: `STARTS ${day} ${timeStr}`,
+      // The cars are revealed the day before the sale (Saturday for a Sunday sale).
+      revealWeekday: WEEKDAYS[(WEEKDAYS.indexOf(day) + 6) % 7],
     };
   }, [opensMs, scheduledStartsMs]);
 
@@ -546,19 +551,22 @@ export default function FlashSaleScreen() {
         <View style={{ flex: 1, paddingBottom: insets.bottom }}>
           <ExclusiveOffersSection layout="list" />
         </View>
-      ) : isComingSoon ? (
-        // State 1 & 2: SCHEDULE ON SATURDAY / NO ACTIVE SALE (Figma Group 1171275692)
+      ) : isComingSoon || showScheduleHero ? (
+        // Figma 1717:15399 COMING SOON (nothing planned) / 1717:15415 SCHEDULE ON <day> (planned, cars not out yet).
+        // Centred on the whole screen, as in the 852 frame; shrinks on narrow phones, never grows.
         <View
           style={styles.centerComingSoon}
-          pointerEvents="none" // full-screen now: never block the back button
+          pointerEvents="none" // full-screen: never block the back button
           accessible
           accessibilityRole="header"
-          accessibilityLabel={`Flash Sale, schedule on ${scheduleInfo.weekdayTitle || 'Saturday'}`}
+          accessibilityLabel={isComingSoon ? 'Flash Sale, coming soon' : `Flash Sale, schedule on ${scheduleInfo.revealWeekday.toLowerCase()}`}
         >
           <Reanimated.View entering={ZoomIn.springify().damping(13)}>
-            <View style={[styles.comingSoonGroup, { transform: [{ scale: Math.min(1, (windowWidth - 12) / 377.8) }] }]}>
-              <FlashSaleHeroTitle weekday={scheduleInfo.weekday} />
-            </View>
+            <FlashSaleHeroTitle
+              variant={isComingSoon ? 'comingSoon' : 'schedule'}
+              weekday={scheduleInfo.revealWeekday}
+              width={Math.min(393, windowWidth)}
+            />
           </Reanimated.View>
         </View>
       ) : (
@@ -566,52 +574,23 @@ export default function FlashSaleScreen() {
         <View style={styles.mainContainer}>
           {/* Header: Live countdown (Images 6 & 7) vs Scheduled (Images 3, 4, 5) */}
           <Reanimated.View entering={FadeInDown.duration(320)}>
-          {isLive && !showScheduledHeader ? (
+          {isLive ? (
             <LiveCountdownHeader expiryMs={expiryMs} scale={fitW} />
           ) : showScheduledHeader ? (
-            <View style={styles.scheduledHeaderWrap}>
-              <View style={styles.scheduledTitleRow}>
-                <Bolt width={18} line={0.61} near={0.51} far={1.53} style={{ position: 'relative' }} />
-                <Lettering text="FLASH SALE" size={32} shadow={PINK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
-                <Bolt width={18} line={0.61} near={0.51} far={1.53} style={{ position: 'relative' }} />
-              </View>
-
-              <View style={styles.scheduledSubRow}>
-                {isScheduled && !isScheduledPreview ? (
-                  <View style={styles.scheduleOnRow}>
-                    <Lettering
-                      text="Schedule on "
-                      width={windowWidth - 32 - Math.min(scheduleInfo.weekdayTitle.length * 18, windowWidth - 32 - 190)}
-                      size={30}
-                      shadow={BLACK_SHADOW}
-                      near={1.15}
-                      outline={1.37}
-                      skew="0deg"
-                      scaleY={1.15}
-                      font={FONT}
-                    />
-                    <View>
-                      <Lettering
-                        text={scheduleInfo.weekdayTitle}
-                        width={Math.min(scheduleInfo.weekdayTitle.length * 18, windowWidth - 32 - 190)}
-                        size={30}
-                        shadow={BLACK_SHADOW}
-                        near={1.15}
-                        outline={1.37}
-                        skew="0deg"
-                        scaleY={1.15}
-                        font={FONT}
-                      />
-                      <TripleUnderline width={Math.min(scheduleInfo.weekdayTitle.length * 18, windowWidth - 32 - 190)} />
-                    </View>
-                  </View>
-                ) : (
-                  <View style={styles.scheduledStartLine}>
-                    <Lettering text={scheduleInfo.fullLabel} width={windowWidth - 32} size={30} shadow={BLACK_SHADOW} near={1.15} outline={1.37} skew="0deg" scaleY={1.15} font={FONT} />
-                    <TripleUnderline width={220} />
-                  </View>
-                )}
-              </View>
+            // Figma 1717:15185 "Schedule on <reveal day>" while the cars are hidden; "STARTS <DAY> <TIME>" on preview
+            // day. The viewBox starts at Figma y 44, right under the 44-pt top bar.
+            <View
+              accessible
+              accessibilityRole="header"
+              accessibilityLabel={ticketLocked ? `Flash Sale, schedule on ${scheduleInfo.revealWeekday.toLowerCase()}` : `Flash Sale, ${scheduleInfo.fullLabel.toLowerCase()}`}
+              style={{ alignSelf: 'center' }}
+            >
+              <FlashSaleScheduledHeader
+                line={ticketLocked ? 'scheduleOn' : 'starts'}
+                day={ticketLocked ? scheduleInfo.revealWeekday : scheduleInfo.weekday}
+                time={scheduleInfo.timeStr}
+                width={Math.min(SCHEDULED_HEADER_VIEW.w, windowWidth)}
+              />
             </View>
           ) : null}
           </Reanimated.View>
@@ -638,7 +617,6 @@ export default function FlashSaleScreen() {
                   source={getCarImage(activeCar, selectedCarIndex)}
                   style={StyleSheet.absoluteFill}
                   contentFit="cover"
-                  blurRadius={ticketLocked ? 24 : 0}
                   transition={200}
                 />
                 {/* Sold out (Figma 1844:16201): red ribbon across the photo's top-right corner, rotated 39.76° */}
@@ -652,37 +630,29 @@ export default function FlashSaleScreen() {
                   </View>
                 )}
 
-                {/* If locked preview: frosted overlay + members access card */}
-                {ticketLocked ? (
-                  <View style={[StyleSheet.absoluteFill, { backgroundColor: FROST_OVERLAY, alignItems: 'center', justifyContent: 'center' }]}>
-                    <View style={styles.lockedCardOverlay}>
-                      <Text style={styles.lockedCardTitle}>
-                        Members Get {earlyAccessMinutes} Minutes.{'\n'}
-                        <Text style={{ color: '#3E2DC8' }}>Exclusive Access.</Text>
-                      </Text>
-                    </View>
-                    <Text style={styles.swipeToSeeMoreText}>Swipe to see more cars</Text>
+                {/* Top-left Amber Duration Badge */}
+                {!!durationLabel && (
+                  <View style={styles.durationBadge}>
+                    <Text style={styles.durationBadgeText}>{durationLabel}</Text>
                   </View>
-                ) : (
-                  // Revealed mode photo contents (Images 5, 6, 7)
-                  <>
-                    {/* Top-left Amber Duration Badge */}
-                    {!!durationLabel && (
-                      <View style={styles.durationBadge}>
-                        <Text style={styles.durationBadgeText}>{durationLabel}</Text>
-                      </View>
-                    )}
-
-                    {/* Frame 25: one dot per car in the sale (only when there is more than one), the shown car as a bar */}
-                    {displayCars.length > 1 && (
-                      <View style={styles.dotsRow}>
-                        {displayCars.map((c, dotIdx) => (
-                          <View key={String(c.id)} style={[styles.dot, dotIdx === selectedCarIndex && styles.dotActive]} />
-                        ))}
-                      </View>
-                    )}
-                  </>
                 )}
+
+                {ticketLocked ? (
+                  // Figma 1717:15185: the car stays visible; a white card (329 × 77, 1px #FBC422 52%) closes the photo.
+                  <View style={styles.lockedMembersCard}>
+                    <Text style={styles.lockedMembersText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                      Members Get {earlyAccessMinutes} Minutes.
+                    </Text>
+                    <Text style={[styles.lockedMembersText, { color: BG }]} numberOfLines={1}>Exclusive Access.</Text>
+                  </View>
+                ) : displayCars.length > 1 ? (
+                  // Frame 25: one dot per car in the sale (only when there is more than one), the shown car as a bar
+                  <View style={styles.dotsRow}>
+                    {displayCars.map((c, dotIdx) => (
+                      <View key={String(c.id)} style={[styles.dot, dotIdx === selectedCarIndex && styles.dotActive]} />
+                    ))}
+                  </View>
+                ) : null}
               </View>
 
               {/* Bottom Details Section */}
@@ -823,14 +793,12 @@ export default function FlashSaleScreen() {
                       router.push('/membership');
                     }
                   }}
-                  style={({ pressed }) => [styles.mainCtaBtn, pressed && { opacity: 0.9 }]}
+                  style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
                 >
-                  <View style={styles.ctaLockRow}>
-                    <Text style={styles.lockEmoji}>🔒</Text>
-                    <Text style={styles.mainCtaText}>
-                      Unlocks {scheduleInfo.weekday.charAt(0) + scheduleInfo.weekday.slice(1).toLowerCase()} at {scheduleInfo.timeStr}
-                    </Text>
-                  </View>
+                  <FsLock width={20} height={20} />
+                  <Text style={styles.mainCtaText}>
+                    Unlocks {scheduleInfo.weekdayTitle} at {scheduleInfo.timeStr}
+                  </Text>
                 </Pressable>
               )
             ) : isLive && activeCar.booked ? (
@@ -856,13 +824,11 @@ export default function FlashSaleScreen() {
                   Haptics.selectionAsync();
                   router.push('/membership');
                 }}
-                style={({ pressed }) => [styles.mainCtaBtn, pressed && { opacity: 0.9 }]}
+                style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
               >
-                <View style={styles.ctaLockRow}>
-                  <Text style={styles.mainCtaText}>Buy Membership to </Text>
-                  <Text style={styles.lockEmoji}>🔒</Text>
-                  <Text style={styles.mainCtaText}> Unlock</Text>
-                </View>
+                <Text style={styles.mainCtaText}>Buy Membership to</Text>
+                <FsLock width={20} height={20} />
+                <Text style={styles.mainCtaText}>Unlock</Text>
               </Pressable>
             ) : (
               // Live Open to Member / Everyone -> BOOK NOW (Image 7)
@@ -909,6 +875,14 @@ export default function FlashSaleScreen() {
             {displayCars.length > 0 && <PillCrown left={128} top={2} />}
           </Reanimated.View>
         </View>
+      )}
+      {coachVisible && coachEligible && (
+        <FlashSaleSwipeCoach
+          ticketLeft={(windowWidth - 353) / 2}
+          ticketTop={insets.top + 44 + ticketTop}
+          ticketScale={ticketScale}
+          onDismiss={dismissCoach}
+        />
       )}
       <LoginBottomSheet
         visible={showLogin}
@@ -960,19 +934,12 @@ const styles = StyleSheet.create({
   timerNum: { fontFamily: FONT_SEMI, fontSize: 16.325, lineHeight: 24.5, color: '#6152D8', textAlign: 'center', includeFontPadding: false },
   timerUnitText: { fontFamily: FONT_SEMI, fontSize: 11.872, lineHeight: 17.8, color: '#FFFFFF', textAlign: 'center' },
 
-  /* Scheduled Sale Screen (Images 1 & 2) */
-  // Centred on the whole screen (not the room under the back button): Figma's top 315 on 852 is exactly that.
+  /* COMING SOON / SCHEDULE ON hero */
+  // Centred on the whole screen (not the room under the back button): the hero's band is centred on Figma's 852.
   centerComingSoon: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  // Figma Frame 2147226220: 377.8 × 222.82, left 50% − 0.6, top 315 on the 852 frame (centre + 0.41).
-  comingSoonGroup: {
-    width: 377.8,
-    height: 222.82,
-    marginLeft: -1.2,
-    marginTop: 0.82,
   },
 
   /* Main Container */
@@ -981,21 +948,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 16,
   },
-
-  /* Scheduled Header (Images 3, 4, 5) */
-  scheduledHeaderWrap: {
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 4,
-  },
-  scheduledTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  scheduledSubRow: { alignItems: 'center' },
-  scheduleOnRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'center' },
-  scheduledStartLine: { alignItems: 'center' },
 
   /* Ticket Section */
   ticketSection: {
@@ -1064,27 +1016,6 @@ const styles = StyleSheet.create({
   dotActive: { width: 16, height: 4, borderRadius: 20, backgroundColor: '#FFFFFF' },
 
   /* Locked overlay card (Images 3 & 4) */
-  lockedCardOverlay: {
-    width: 290,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(251,196,34,0.6)',
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-  },
-  lockedCardTitle: {
-    fontFamily: FONT,
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#262626',
-    textAlign: 'center',
-  },
   previewToggleBtn: {
     marginTop: 8,
     paddingVertical: 4,
@@ -1095,27 +1026,34 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#3E2DC8',
   },
-  swipeToSeeMoreText: {
-    fontFamily: FONT_MED,
-    fontSize: 12,
-    color: '#FFFFFF',
-    marginTop: 8,
-    textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
 
   /* Locked times row (Images 3 & 4) */
+  // Figma 1717:15185 members card: the bottom 77 of the photo, white, radius 8, two 17.3 semibold lines 26 apart.
+  lockedMembersCard: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 77,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(251,196,34,0.52)',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  lockedMembersText: { fontFamily: FONT_SEMI, fontSize: 17.33, lineHeight: 26, color: '#262626', textAlign: 'center', includeFontPadding: false },
+  // Figma: 329 × 93 at (12, 256) of the ticket, radius 10, 1px #FBC422 52%; the two boxes 155.5 × 77, 8 in, 2 apart.
   lockedTimesRow: {
     position: 'absolute',
     left: 12,
-    bottom: 12,
+    top: 256,
     width: 329,
-    height: 90,
+    height: 93,
     flexDirection: 'row',
-    gap: 6,
-    padding: 8,
+    gap: 2,
+    padding: 7,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: 'rgba(251,196,34,0.52)',
@@ -1170,17 +1108,10 @@ const styles = StyleSheet.create({
   viewDetailsText: { fontFamily: FONT_SEMI, fontSize: 11, lineHeight: 16.5, color: '#737373', textDecorationLine: 'underline' },
 
   /* Main CTA Button */
-  mainCtaBtn: { width: 353, height: 46, borderRadius: 12, backgroundColor: '#F4F6FA', borderWidth: 1, borderColor: GOLD, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 12, padding: 8 },
+  // Figma: 352 × 43 with a 1px outline = 353 × 44, radius 12, 14 under the ticket.
+  mainCtaBtn: { width: 353, height: 44, borderRadius: 12, backgroundColor: '#F4F6FA', borderWidth: 1, borderColor: GOLD, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginTop: 14, padding: 8 },
   mainCtaText: { fontFamily: FONT, fontSize: 17, lineHeight: 25.5, color: '#3E2DC8', textAlign: 'center' },
   bookNowText: {},
-  ctaLockRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lockEmoji: {
-    fontSize: 16,
-    marginRight: 6,
-  },
 
   /* Bottom Arc with 5 Circular Thumbnails */
   arcThumb: { position: 'absolute', overflow: 'hidden', backgroundColor: '#FFFFFF' },

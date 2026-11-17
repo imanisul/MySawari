@@ -818,7 +818,7 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       <View style={{ flex: 1 }}>
         <View style={styles.referTop}>
           <Text style={[styles.referTitle, { color: '#262626' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Refer & Earn up to {earnText}</Text>
-          <View style={[styles.referBtn, { backgroundColor: p.navy }]}>
+          <View style={[styles.referBtn, { backgroundColor: p.button }]}>
             <Text style={styles.referBtnText}>Refer</Text>
             <Feather name="arrow-right" size={8} color="#FFFFFF" />
           </View>
@@ -886,15 +886,19 @@ export function TripSearchCard({ search, car, onPress, onRemove, onViewDetails }
   onViewDetails?: () => void;
 }) {
   const p = useDetailsPalette();
-  const time = search.pickupTime && search.returnTime ? `${search.pickupTime} – ${search.returnTime}` : '';
+  const [startLabel, endLabel] = search.dateRange && search.dateRange !== 'Upcoming Trip' ? splitDateRange(search.dateRange) : ['', ''];
+  // Full pickup and return moments, e.g. "Pickup  17 Nov, 10:00 AM".
+  const when = [
+    { label: 'Pickup', value: [startLabel, search.pickupTime].filter(Boolean).join(', ') },
+    { label: 'Return', value: [endLabel || startLabel, search.returnTime].filter(Boolean).join(', ') },
+  ];
   // For a car search that is free for the searched dates and times: "View Details" (nothing when it is not).
-  const [startLabel, endLabel] = car && search.dateRange && search.dateRange !== 'Upcoming Trip' ? splitDateRange(search.dateRange) : ['', ''];
   const availability = car ? getAvailability(car, startLabel || undefined, endLabel || undefined, search.pickupTime, search.returnTime) : null;
 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Search in ${search.dropoff.name}, ${search.dateRange}`}
+      accessibilityLabel={`Recent search: ${when.map((w) => `${w.label} ${w.value}`).join(', ')}`}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={({ pressed }) => [
         styles.tripCard,
@@ -902,20 +906,15 @@ export function TripSearchCard({ search, car, onPress, onRemove, onViewDetails }
         pressed && { opacity: 0.85 },
       ]}
     >
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.tripWhere, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
-          {car ? (search.carName || carTitle(car)) : search.dropoff.name}
-        </Text>
-        <View style={styles.tripLine}>
-          <Feather name="calendar" size={11} color={p.muted} />
-          <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{search.dateRange}</Text>
-        </View>
-        {!!time && (
-          <View style={styles.tripLine}>
-            <Feather name="clock" size={11} color={p.muted} />
-            <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{time}</Text>
+      <View style={{ flex: 1, gap: 2 }}>
+        {when.map((w) => (
+          <View key={w.label} style={styles.tripLine}>
+            <Feather name={w.label === 'Pickup' ? 'calendar' : 'clock'} size={11} color={p.muted} />
+            <Text style={[styles.tripWhen, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              {w.label}  <Text style={{ color: p.fg }}>{w.value}</Text>
+            </Text>
           </View>
-        )}
+        ))}
         {availability?.available && (
           <Pressable
             accessibilityRole="button"
@@ -1586,7 +1585,6 @@ const styles = StyleSheet.create({
   panelSectionTitle: { marginBottom: 6 },
 
   tripCard: { width: 246, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12 },
-  tripWhere: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   tripWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   tripLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   // Recent car search: "View Details ›" when free for the searched dates.
@@ -1691,7 +1689,7 @@ const styles = StyleSheet.create({
   promoBannerBadgeText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 12, color: '#1E2547' },
   promoBannerTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
   promoBannerSubtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, color: 'rgba(255, 255, 255, 0.85)' },
-  promoBannerCtaBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 8, backgroundColor: '#323E71', paddingHorizontal: 12, minHeight: 28, borderRadius: 20 },
+  promoBannerCtaBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, marginTop: 8, backgroundColor: '#6B5AED', paddingHorizontal: 12, minHeight: 28, borderRadius: 20 },
   promoBannerCtaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16, color: '#FFFFFF' },
   bannerCtaPill: {
     position: 'absolute',

@@ -311,7 +311,7 @@ function Radio({ on, p, square }: { on: boolean; p: DetailsPalette; square?: boo
 
 function Cta({ label, onPress, p }: { label: string; onPress: () => void; p: DetailsPalette }) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, { backgroundColor: p.navy, opacity: pressed ? 0.88 : 1 }]} accessibilityRole="button">
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, { backgroundColor: p.button, opacity: pressed ? 0.88 : 1 }]} accessibilityRole="button">
       <Text style={[styles.ctaText, { color: p.onNavy }]}>{label}</Text>
     </Pressable>
   );

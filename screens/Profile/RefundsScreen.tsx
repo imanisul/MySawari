@@ -60,7 +60,7 @@ export default function RefundsScreen() {
           <Pressable
             accessibilityRole="button"
             onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }}
-            style={({ pressed }) => [{ backgroundColor: p.navy, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24, marginTop: 18 }, pressed && { opacity: 0.85 }]}
+            style={({ pressed }) => [{ backgroundColor: p.button, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24, marginTop: 18 }, pressed && { opacity: 0.85 }]}
           >
             <Text style={{ color: '#FFFFFF', fontFamily: PF.semibold, fontSize: 14 }}>Log In</Text>
           </Pressable>

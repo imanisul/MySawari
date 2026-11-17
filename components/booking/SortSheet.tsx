@@ -115,6 +115,6 @@ const styles = StyleSheet.create({
   radioOn: { backgroundColor: '#FFFFFF', borderColor: '#2F3E75' },
   radioOff: { backgroundColor: '#FFFFFF', borderColor: '#BFC3D4' },
   radioDot: { backgroundColor: '#2F3E75', borderRadius: 2, height: 4, width: 4 },
-  cta: { alignItems: 'center', backgroundColor: '#2F3E75', borderRadius: 12, height: 54, justifyContent: 'center' },
+  cta: { alignItems: 'center', backgroundColor: '#6B5AED', borderRadius: 12, height: 54, justifyContent: 'center' },
   ctaText: { color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
 });

@@ -200,18 +200,20 @@ export default function CarDetailsScreen() {
   // "Want to keep it longer?" floats above the bar once the in-page "Need more time on the road?" card has scrolled
   // up out of view, and goes away again at the Policy Agreement (and when scrolling back up to that card).
   const [floatAddDay, setFloatAddDay] = useState(false);
+  const [floatClosed, setFloatClosed] = useState(false); // ✕ hides it for the rest of this visit
+  const floatShown = floatAddDay && !floatClosed;
   const policyTop = useRef(0);
   const mileageEnd = useRef(0);
   const floatFade = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     // Rises 16px while it fades in, sinks while it fades out — one smooth native-driven motion.
     Animated.timing(floatFade, {
-      toValue: floatAddDay ? 1 : 0,
-      duration: floatAddDay ? 260 : 200,
-      easing: floatAddDay ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
+      toValue: floatShown ? 1 : 0,
+      duration: floatShown ? 260 : 200,
+      easing: floatShown ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [floatAddDay, floatFade]);
+  }, [floatShown, floatFade]);
 
   const openDates = () => {
     if (isDatesLocked) {
@@ -388,7 +390,7 @@ export default function CarDetailsScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: p.page, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: p.fg, fontFamily: 'PlusJakartaSans_500Medium' }}>Car not found</Text>
-        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={{ marginTop: 20, padding: 12, backgroundColor: p.navy, borderRadius: 8 }}>
+        <Pressable onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} style={{ marginTop: 20, padding: 12, backgroundColor: p.button, borderRadius: 8 }}>
           <Text style={{ color: p.onNavy }}>Go Back</Text>
         </Pressable>
       </View>
@@ -476,7 +478,7 @@ export default function CarDetailsScreen() {
 
       {/* Figma "Add 1 more day": 297 × 45 floating card above the bottom bar */}
       {canAddDay && (
-        <Animated.View pointerEvents={floatAddDay ? 'box-none' : 'none'} style={[styles.floatWrap, { bottom: barHeight + 8, opacity: floatFade, transform: [{ translateY: floatFade.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
+        <Animated.View pointerEvents={floatShown ? 'box-none' : 'none'} style={[styles.floatWrap, { bottom: barHeight + 8, opacity: floatFade, transform: [{ translateY: floatFade.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }] }]}>
           <View style={[styles.floatCard, { borderColor: p.deliveryBorder }]}>
             <View style={{ flex: 1 }}>
               <Text style={[styles.floatTitle, { color: p.fg }]} numberOfLines={1}>Want to keep it longer?</Text>
@@ -486,9 +488,17 @@ export default function CarDetailsScreen() {
               onPress={addMoreDays}
               accessibilityRole="button"
               accessibilityLabel="Add more days"
-              style={({ pressed }) => [styles.floatBtn, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}
+              style={({ pressed }) => [styles.floatBtn, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}
             >
-              <Text style={[styles.floatBtnText, { color: p.onNavy }]}>Add more days</Text>
+              <Text style={[styles.floatBtnText, { color: p.onNavy }]} numberOfLines={1} allowFontScaling={false}>Add more days</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); setFloatClosed(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+              hitSlop={10}
+            >
+              <Feather name="x" size={16} color={p.muted} />
             </Pressable>
           </View>
         </Animated.View>
@@ -528,10 +538,10 @@ export default function CarDetailsScreen() {
 
 const styles = StyleSheet.create({
   floatWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 16 },
-  floatCard: { width: 297, maxWidth: '100%', height: 45, flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 6, paddingBottom: 6, paddingRight: 8, paddingLeft: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 10, shadowColor: '#2F3E75', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  floatCard: { width: 325, maxWidth: '100%', height: 45, flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 6, paddingRight: 8, paddingLeft: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 10, shadowColor: '#2F3E75', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   floatTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, includeFontPadding: false },
   floatSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 9, lineHeight: 14, includeFontPadding: false },
-  floatBtn: { width: 96, height: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },
+  floatBtn: { flexShrink: 0, minWidth: 96, height: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },
   floatBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, includeFontPadding: false },
   screen: { flex: 1 },
 });

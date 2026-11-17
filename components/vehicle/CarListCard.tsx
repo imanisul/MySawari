@@ -48,6 +48,9 @@ export const longAvail = (label?: string) => {
 
 
 
+const PHOTO_PEEK = 0; // full photo per swipe (no peek of the next one)
+const PHOTO_GAP = 0;
+
 const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress, dealPrice, dealOriginal }: CarListCardProps & { onCarPress: () => void }) {
   const p = useDetailsPalette();
   const { favorites, toggleFavorite } = useFavorites();
@@ -56,7 +59,9 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
   // Photo width known synchronously: screen − 16 margin − 1 border − 4 card padding, each side (= 42). The photo
   // list snaps to its own width, so a page even 1–2 px wider than that left a growing gap at the start of each image.
   // Calculated once on render without onLayout state jumps so scrolling never stutters.
-  const width = Math.max(0, windowWidth - 42);
+  // The real photo width replaces that estimate once laid out, so pages never stop half-way on any screen.
+  const [measuredW, setMeasuredW] = useState(0);
+  const width = measuredW || Math.max(0, windowWidth - 42);
   const [slide, setSlide] = useState(0);
 
   const availability = car.availability ?? getAvailability(car);
@@ -90,9 +95,18 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
   const memberPrice = dealPrice === undefined && car.perDay > 0 ? memberPriceFor(activePlan, car.perDay, car.perDay) : null;
   const showMember = memberPrice !== null && memberPrice < car.perDay;
 
+  // Next photo peeks in at the edge; every photo snaps one at a time (the last one lines up with the right edge).
+  const many = images.length > 1;
+  const itemW = many ? width - PHOTO_PEEK : width;
+  const step = itemW + PHOTO_GAP;
+  const maxX = Math.max(0, images.length * step - PHOTO_GAP - width);
+  const offsets = images.map((_, i) => Math.min(i * step, maxX));
+  // Tracked while the finger moves (not only when it stops), so the photos either side are already loading.
   const onSwipe = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    if (!width) return;
-    setSlide(Math.round(e.nativeEvent.contentOffset.x / width));
+    if (!step) return;
+    const x = e.nativeEvent.contentOffset.x;
+    const next = x >= maxX - 1 ? images.length - 1 : Math.min(images.length - 1, Math.max(0, Math.round(x / step)));
+    if (next !== slide) setSlide(next);
   };
 
   return (
@@ -105,23 +119,30 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
         style={({ pressed }) => [styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder, opacity: pressed ? 0.92 : 1 }]}
       >
         {/* Photos */}
-        <View style={[styles.photo, { backgroundColor: p.iconBg }]}>
+        <View
+          style={[styles.photo, { backgroundColor: p.iconBg }]}
+          onLayout={(e) => { const w = Math.round(e.nativeEvent.layout.width); if (w && Math.abs(w - width) > 0.5) setMeasuredW(w); }}
+        >
           {width > 0 && (
             <ScrollView
               horizontal
-              pagingEnabled
               showsHorizontalScrollIndicator={false}
+              onScroll={onSwipe}
               onMomentumScrollEnd={onSwipe}
-              scrollEnabled={images.length > 1}
+              scrollEnabled={many}
               nestedScrollEnabled={true}
               directionalLockEnabled={true}
               scrollEventThrottle={16}
+              snapToOffsets={offsets}
+              snapToEnd={false}
+              disableIntervalMomentum
               decelerationRate="fast"
+              contentContainerStyle={{ gap: PHOTO_GAP }}
             >
               {images.map((img, i) => {
                 const shouldRender = i === 0 || Math.abs(slide - i) <= 1;
                 return (
-                  <Pressable key={i} onPress={onCarPress} style={{ width, height: '100%' }}>
+                  <Pressable key={i} onPress={onCarPress} style={[{ width: itemW, height: '100%' }, many && { borderRadius: 8, overflow: 'hidden' }]}>
                     {shouldRender ? (
                       <LoadingImage source={img} contentFit="cover" transition={150} recyclingKey={`${car.id}-${i}`} style={StyleSheet.absoluteFill} />
                     ) : (

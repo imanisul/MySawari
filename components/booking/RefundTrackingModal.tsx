@@ -466,7 +466,7 @@ export function RefundTrackingModal({
                     <TouchableOpacity
                       style={[
                         styles.typeBtn,
-                        editType === 'original_payment' && { backgroundColor: '#323E71', borderColor: '#323E71' },
+                        editType === 'original_payment' && { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
                       ]}
                       onPress={() => setEditType('original_payment')}
                     >
@@ -483,7 +483,7 @@ export function RefundTrackingModal({
                     <TouchableOpacity
                       style={[
                         styles.typeBtn,
-                        editType === 'upi' && { backgroundColor: '#323E71', borderColor: '#323E71' },
+                        editType === 'upi' && { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
                       ]}
                       onPress={() => setEditType('upi')}
                     >
@@ -500,7 +500,7 @@ export function RefundTrackingModal({
                     <TouchableOpacity
                       style={[
                         styles.typeBtn,
-                        editType === 'bank_account' && { backgroundColor: '#323E71', borderColor: '#323E71' },
+                        editType === 'bank_account' && { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
                       ]}
                       onPress={() => setEditType('bank_account')}
                     >
@@ -609,7 +609,7 @@ export function RefundTrackingModal({
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                      style={[styles.saveBtn, { backgroundColor: colors.button }]}
                       onPress={handleSavePayoutDetails}
                       disabled={submitting}
                     >

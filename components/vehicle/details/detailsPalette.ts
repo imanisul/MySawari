@@ -11,6 +11,7 @@ const light = {
   muted: '#737373',
   navy: '#2F3E75',
   onNavy: '#FFFFFF',
+  button: '#6B5AED', // every filled button (text on it: onNavy, white)
   green: '#008758',
   red: '#DC2626',
   amber: '#B58703',
@@ -55,6 +56,7 @@ const dark: typeof light = {
   muted: '#A7B2C6',
   navy: '#3E509A',
   onNavy: '#FFFFFF',
+  button: '#6B5AED',
   green: '#34D399',
   red: '#F87171',
   amber: '#FBBF24',

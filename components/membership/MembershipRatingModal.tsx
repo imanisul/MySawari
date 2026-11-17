@@ -94,7 +94,7 @@ export function MembershipRatingModal({
               disabled={submitting}
               style={({ pressed }) => [
                 styles.primaryBtn,
-                { backgroundColor: p.navy },
+                { backgroundColor: p.button },
                 pressed && { opacity: 0.88 },
               ]}
               accessibilityRole="button"

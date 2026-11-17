@@ -413,7 +413,7 @@ export function HelpCard({ onWhatsApp, compact }: { onWhatsApp: () => void; /** 
         <Text style={[styles.stepLine, { color: c.mutedForeground }]}>Have a question? We’re here to help</Text>
       </View>
       <View style={styles.helpBtns}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Call support" onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {})} hitSlop={4} style={[styles.round, { backgroundColor: c.navy }]}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Call support" onPress={() => Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {})} hitSlop={4} style={[styles.round, { backgroundColor: c.button }]}>
           <FontAwesome name="phone" size={16} color="#FFFFFF" />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel="WhatsApp support" onPress={onWhatsApp} hitSlop={4} style={[styles.round, { backgroundColor: '#25D366' }]}>

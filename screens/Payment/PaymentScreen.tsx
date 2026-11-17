@@ -105,8 +105,8 @@ export default function PaymentScreen() {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ color: colors.destructive, fontFamily: 'Inter_600SemiBold' }}>{quoteError}</Text>
-        <Pressable onPress={() => refreshQuote()} style={{ marginTop: 20, padding: 12, backgroundColor: colors.primary, borderRadius: 8 }}>
-          <Text style={{ color: colors.primaryForeground }}>Retry</Text>
+        <Pressable onPress={() => refreshQuote()} style={{ marginTop: 20, padding: 12, backgroundColor: colors.button, borderRadius: 8 }}>
+          <Text style={{ color: '#FFFFFF' }}>Retry</Text>
         </Pressable>
       </View>
     );
@@ -262,8 +262,8 @@ export default function PaymentScreen() {
                     onChangeText={(t) => { setCouponInput(t); setCouponError(null); }}
                     autoCapitalize="characters"
                   />
-                  <Pressable onPress={() => handleApplyCoupon(couponInput)} style={[styles.applyBtn, { backgroundColor: colors.foreground }]}>
-                    <Text style={{ color: colors.background, fontFamily: 'Inter_600SemiBold' }}>Apply</Text>
+                  <Pressable onPress={() => handleApplyCoupon(couponInput)} style={[styles.applyBtn, { backgroundColor: colors.button }]}>
+                    <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' }}>Apply</Text>
                   </Pressable>
                 </View>
                 {!!couponError && (
@@ -283,8 +283,8 @@ export default function PaymentScreen() {
                           </Text>
                           <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>Min booking ₹{c.minimumBooking}</Text>
                         </View>
-                        <Pressable onPress={() => handleApplyCoupon(c.code)} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.foreground, borderRadius: 6 }}>
-                          <Text style={{ color: colors.background, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Apply</Text>
+                        <Pressable onPress={() => handleApplyCoupon(c.code)} style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.button, borderRadius: 6 }}>
+                          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Apply</Text>
                         </Pressable>
                       </View>
                     ))}
@@ -434,12 +434,12 @@ export default function PaymentScreen() {
               router.push('/payment-processing');
               setTimeout(() => setIsSubmitting(false), 2000);
             }}
-            style={[styles.payButton, { flex: 1, backgroundColor: isQuoteLoading || isTripIncomplete || !pricingQuote || isSubmitting ? colors.muted : colors.primary }]}
+            style={[styles.payButton, { flex: 1, backgroundColor: isQuoteLoading || isTripIncomplete || !pricingQuote || isSubmitting ? colors.muted : colors.button }]}
           >
             {isQuoteLoading || isSubmitting ? (
-              <ActivityIndicator color={colors.primaryForeground} />
+              <ActivityIndicator color={'#FFFFFF'} />
             ) : (
-              <Text style={{ color: colors.primaryForeground, fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
+              <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold', fontSize: 18 }}>
                 Pay {formatCurrency(pricingQuote?.onlinePayableNow || 0)}
               </Text>
             )}

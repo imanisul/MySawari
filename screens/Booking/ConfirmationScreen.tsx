@@ -166,7 +166,7 @@ export default function ConfirmationScreen() {
       <View pointerEvents="box-none" style={styles.footerWrap}>
         <View pointerEvents="none" style={styles.fade}><BottomBlur height={64} fadeTo={p.page} /></View>
         <View style={[styles.footer, { backgroundColor: p.page, borderTopColor: p.deliveryBorder, paddingBottom: Math.max(insets.bottom, 12) + 4 }]}>
-          <Pressable accessibilityRole="button" onPress={openBooking} style={({ pressed }) => [styles.cta, { backgroundColor: p.navy }, pressed && { opacity: 0.85 }]}>
+          <Pressable accessibilityRole="button" onPress={openBooking} style={({ pressed }) => [styles.cta, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
             <Text style={styles.ctaText}>View my booking</Text>
           </Pressable>
         </View>

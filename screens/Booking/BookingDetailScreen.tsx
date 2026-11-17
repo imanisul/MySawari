@@ -57,7 +57,7 @@ export default function BookingDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { selectCar, isAuthenticated, lastBooking } = useSawari();
+  const { selectCar, isAuthenticated, lastBooking, setDates, setTimes, applyCoupon } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const { id, fromConfirmation } = useLocalSearchParams<{ id?: string; fromConfirmation?: string }>();
 
@@ -141,8 +141,8 @@ export default function BookingDetailScreen() {
           <Feather name="lock" size={36} color={c.mutedForeground} />
           <Text style={[styles.centerTitle, { color: c.foreground }]}>Log in to see this trip</Text>
           <Text style={[styles.body, { color: c.mutedForeground, textAlign: 'center' }]}>Your trip details, pickup steps and payments are kept in your account.</Text>
-          <Pressable onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }} style={[styles.smallCta, { backgroundColor: c.primary }]} accessibilityRole="button">
-            <Text style={{ color: c.primaryForeground, fontFamily: FONT.semibold }}>Log In</Text>
+          <Pressable onPress={() => { Haptics.selectionAsync(); setShowLogin(true); }} style={[styles.smallCta, { backgroundColor: c.button }]} accessibilityRole="button">
+            <Text style={{ color: '#FFFFFF', fontFamily: FONT.semibold }}>Log In</Text>
           </Pressable>
         </View>
         <LoginBottomSheet visible={showLogin} showSkip={false} onClose={() => setShowLogin(false)} onLoginSuccess={() => setShowLogin(false)} />
@@ -158,8 +158,8 @@ export default function BookingDetailScreen() {
           <Feather name={listFailed ? 'wifi-off' : 'inbox'} size={40} color={c.mutedForeground} />
           <Text style={[styles.centerTitle, { color: c.foreground }]}>{listFailed ? "Couldn't load this trip" : 'Booking not found'}</Text>
           {listFailed && <Text style={[styles.body, { color: c.mutedForeground, textAlign: 'center' }]}>Check your internet connection and try again.</Text>}
-          <Pressable onPress={() => (listFailed ? refetchBookings() : handleBack())} style={[styles.smallCta, { backgroundColor: c.primary }]}>
-            <Text style={{ color: c.primaryForeground, fontFamily: FONT.semibold }}>{listFailed ? 'Retry' : 'Go back'}</Text>
+          <Pressable onPress={() => (listFailed ? refetchBookings() : handleBack())} style={[styles.smallCta, { backgroundColor: c.button }]}>
+            <Text style={{ color: '#FFFFFF', fontFamily: FONT.semibold }}>{listFailed ? 'Retry' : 'Go back'}</Text>
           </Pressable>
         </View>
       </View>
@@ -184,8 +184,14 @@ export default function BookingDetailScreen() {
       .catch(() => Linking.openURL(`tel:${SUPPORT_PHONE}`).catch(() => {}));
 
   const bookAgain = () => {
-    if (matchedCar) { selectCar(matchedCar); router.push('/car-details'); }
-    else router.push('/explore');
+    if (!matchedCar) { router.push('/explore'); return; }
+    // Book Again: the car with fresh dates — straight to its calendar (the old trip's dates and deal code are dropped).
+    selectCar(matchedCar);
+    applyCoupon(null);
+    setDates('Select Dates', '1 Day');
+    setTimes('08:00 AM', '08:00 AM');
+    router.push('/car-details');
+    router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true' } });
   };
 
   // "Your trip starts in 2 days"
@@ -307,7 +313,7 @@ export default function BookingDetailScreen() {
                 <Text style={[styles.rowTitle, { color: c.foreground }]}>Need more time?</Text>
                 <Text style={[styles.body, { color: c.mutedForeground }]}>Request an extension for your trip.</Text>
               </View>
-              <Pressable onPress={() => setShowExtend(true)} style={[styles.pillBtn, { backgroundColor: c.navy }]}>
+              <Pressable onPress={() => setShowExtend(true)} style={[styles.pillBtn, { backgroundColor: c.button }]}>
                 <Text style={styles.pillBtnText}>Request Extension</Text>
               </Pressable>
             </View>
@@ -502,8 +508,8 @@ function Banner({ tone, title, body }: { tone: 'info' | 'active' | 'pending' | '
 function Cta({ label, onPress }: { label: string; onPress: () => void }) {
   const c = useTripColors();
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, { backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 }]}>
-      <Text style={[styles.ctaText, { color: c.primaryForeground }]}>{label}</Text>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.cta, { backgroundColor: c.button, opacity: pressed ? 0.85 : 1 }]}>
+      <Text style={[styles.ctaText, { color: '#FFFFFF' }]}>{label}</Text>
     </Pressable>
   );
 }

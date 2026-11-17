@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
@@ -46,6 +46,31 @@ export function dealPricing(car: any, hours: number) {
   return { perDay, rate, price: Math.min(perDay || Infinity, rate * hours) };
 }
 
+/** Top Deals run every day 2 PM → 8 AM next morning (India time). The server enforces the same window. */
+export const TOP_DEAL_START_HOUR = 14;
+export const TOP_DEAL_END_HOUR = 8;
+
+// India is UTC+5:30, so a whole India hour is not a whole UTC hour (plain ms rounding lands on :30).
+const IST_MS = 330 * 60000;
+const HOUR_MS = 3600000;
+/** The next whole hour in India time, strictly after `ms` (2:00 PM and 2:40 PM → 3:00 PM). */
+export const nextIstHourMs = (ms: number) => Math.floor((ms + IST_MS) / HOUR_MS) * HOUR_MS + HOUR_MS - IST_MS;
+/** `ms` rounded up to a whole India hour (3:00 PM stays, 3:20 PM → 4:00 PM). */
+const ceilIstHourMs = (ms: number) => Math.ceil((ms + IST_MS) / HOUR_MS) * HOUR_MS - IST_MS;
+
+/** "Today 3:00 PM – Tmrw 8:00 AM" (India time), for a deal's start and end. */
+export function dealWhenLabel(startMs: number, endMs: number, nowMs: number) {
+  return `${dealDayTime(startMs, nowMs)} – ${dealDayTime(endMs, nowMs)}`;
+}
+
+/** One moment as "Today 3:00 PM" / "Tmrw 8:00 AM" / "19 Nov 8:00 AM" (India time). */
+export function dealDayTime(ms: number, nowMs: number) {
+  const dayNum = (t: number) => { const p = getIndiaDateParts(t); return toDayNum(p.year, p.month, p.date); };
+  const d = dayNum(ms);
+  const today = dayNum(nowMs);
+  return `${d === today ? 'Today' : d === today + 1 ? 'Tmrw' : dayNumToLabel(d)} ${formatTime12(ms)}`;
+}
+
 /** Cars and bikes free from now (or when their current booking ends) until 8 AM: the Today's Deals list. */
 export function useDealCars(nowMs: number) {
   const { data: vehicles = [], isLoading: vehiclesLoading, refetch: refetchVehicles } = useVehicles();
@@ -69,10 +94,21 @@ export function useDealCars(nowMs: number) {
       return dayNumAndTimeToMs(today + 1, '08:00 AM', 480);
     }
   }, [Math.floor(nowMs / 60000)]);
+  // Open 2 PM → 8 AM; between 8 AM and 2 PM there are no deals at all (nothing shown anywhere).
+  const istHour = getIndiaDateParts(nowMs).hours;
+  // The last deal is 7 AM → 8 AM (booked from 6 AM), so from 7 AM nothing is left to book: closed until 2 PM.
+  const isOpen = istHour >= TOP_DEAL_START_HOUR || istHour < TOP_DEAL_END_HOUR - 1;
+  // The moment deals open (2 PM, while the app is open) fetch the cars and offers fresh, so the list appears by itself
+  // with current bookings — no pull-to-refresh. (Both also poll every 15–20 s.)
+  const wasOpen = useRef(isOpen);
+  useEffect(() => {
+    if (isOpen && !wasOpen.current) refetch();
+    wasOpen.current = isOpen;
+  }, [isOpen, refetch]);
 
   // Cars free for the whole deal window (now → 8 AM tomorrow)
   const dealCars = useMemo(() => {
-    if (!vehicles || vehicles.length === 0) return [];
+    if (!isOpen || !vehicles || vehicles.length === 0) return [];
 
     // Map offers configured from Operation App
     // The lowest positive hourly rate a live top-deal offer sets for a car — the server picks the same one.
@@ -99,10 +135,10 @@ export function useDealCars(nowMs: number) {
       const withPickup = { ...v, bookedRanges: (v.bookedRanges || []).map((r: any) => (r.pickupTime ? r : { ...r, pickupTime: '8:00 AM' })) };
       const blocks = buildBlocks(withPickup, todayDayNum()).filter((b) => Number.isFinite(b.startMs)).sort((a, b) => a.startMs - b.startMs);
 
-      // Busy now? The deal starts when the current booking(s) end, rounded up to the next whole hour.
-      let start = Math.floor(nowMs / 60000) * 60000;
-      for (const b of blocks) if (b.startMs <= start && b.endMs > start) start = b.endMs;
-      if (start > nowMs) start = Math.ceil(start / 3600000) * 3600000;
+      // A deal starts at the next whole India hour (2 PM → booking from 3 PM), so its hours and price step down every hour.
+      // Busy then? It starts when the booking(s) end, rounded up to a whole hour.
+      let start = nextIstHourMs(nowMs);
+      for (const b of blocks) if (b.startMs <= start && b.endMs > start) start = ceilIstHourMs(b.endMs);
 
       const vid = String(v.id || v._id);
       const offer = offerMap.get(vid);
@@ -190,9 +226,9 @@ export function useDealCars(nowMs: number) {
         offer,
       };
     });
-  }, [vehicles, offers, targetEndMs, isMember, Math.floor(nowMs / 60000)]);
+  }, [isOpen, vehicles, offers, targetEndMs, isMember, Math.floor(nowMs / 60000)]);
 
-  return { dealCars, targetEndMs, isLoading, isMember, refetch };
+  return { dealCars, targetEndMs, isOpen, isLoading, isMember, refetch };
 }
 
 /**

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, BackHandler, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Feather, FontAwesome } from '@expo/vector-icons';
 import { BottomBlur } from '@/components/common/BottomBlur';
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 import * as Haptics from '@/utils/haptics';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,133 +12,90 @@ import { useSawari } from '@/context/SawariContext';
 import { useRegisterNavHelp } from '@/hooks/useSupportFab';
 import { shadows } from '@/constants/shadows';
 import { SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
-import { FlashSaleButton } from '@/components/common/FlashSaleButton';
 
 type IconProps = { color: string; fill: string; active: boolean };
 type Route = '/' | '/explore' | '/flash-sale' | '/bookings' | '/profile';
 
-// Exact rounded solid lightning bolt matching the Figma & Flash Sale specification
-const BOLT_PATH =
-  'M17.5 0.5C18.8 0.5 19.8 1.5 19.4 2.8L18.2 13.0L26.5 13.8C27.8 14.0 28.5 15.6 27.6 16.7L19.5 26.8C19.0 27.4 18.2 27.8 17.5 27.8L9.8 27.8C8.8 27.8 8.1 26.8 8.5 25.9L10.5 21.2L2.0 20.8C0.6 20.7 -0.2 19.1 0.6 18.0L15.8 1.2C16.2 0.7 16.8 0.5 17.5 0.5Z';
+/*
+ * Tab icons, exactly as in the Figma bar (exports 1730:26940 active / 1730:26976 inactive). Each tab icon is a
+ * 20 × 20 frame with a 1px line; the selected one is filled. The paths are Figma's own, in the bar's coordinates,
+ * so each icon's viewBox is its 20 × 20 frame in that space (top at y 95).
+ */
+const ICON = 20;
+const LINE = 1;
 
-function TopDealsIcon({ color, active }: IconProps) {
-  return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 29 28" fill="none">
-      <Path
-        d={BOLT_PATH}
-        fill={active ? color : '#6B5AED'}
-      />
-    </Svg>
-  );
-}
-
-// Icons render at 24pt (design, 1pt strokes): 24-unit icons use STROKE, 18-unit icons are scaled up by 4/3 and use STROKE_18.
-const ICON = 24;
-const STROKE = 1;
-const STROKE_18 = 0.75;
-
-// Exact Figma path (18px frame, 1px stroke); the door is a notch in the outline.
-const HOME_PATH =
-  'M11.25 9.75V15.75H14.25C14.648 15.75 15.029 15.592 15.311 15.311C15.592 15.029 15.75 14.648 15.75 14.25V7.5C15.75 7.282 15.703 7.066 15.611 6.868C15.519 6.67 15.385 6.495 15.218 6.354L9.968 1.854C9.697 1.625 9.355 1.5 9 1.5C8.645 1.5 8.303 1.625 8.032 1.854L2.782 6.354C2.615 6.495 2.481 6.67 2.389 6.868C2.297 7.066 2.25 7.282 2.25 7.5V14.25C2.25 14.648 2.408 15.029 2.689 15.311C2.971 15.592 3.352 15.75 3.75 15.75H6.75V9.75C6.75 9.551 6.829 9.36 6.97 9.22C7.11 9.079 7.301 9 7.5 9H10.5C10.699 9 10.89 9.079 11.03 9.22C11.171 9.36 11.25 9.551 11.25 9.75Z';
-
+const HOME_PATH = 'M61.3984 112.502V105.835C61.3984 105.614 61.3106 105.402 61.1544 105.246C60.9981 105.089 60.7861 105.002 60.5651 105.002H57.2318C57.0108 105.002 56.7988 105.089 56.6425 105.246C56.4862 105.402 56.3984 105.614 56.3984 105.835V112.502H53.0651C52.6231 112.502 52.1992 112.326 51.8866 112.014C51.574 111.701 51.3984 111.277 51.3984 110.835V103.335C51.3984 103.093 51.4512 102.853 51.5533 102.633C51.6553 102.413 51.8041 102.218 51.9893 102.062L57.8226 97.0617C58.1234 96.8075 58.5046 96.668 58.8984 96.668C59.2923 96.668 59.6734 96.8075 59.9743 97.0617L65.8076 102.062C65.9928 102.218 66.1416 102.413 66.2436 102.633C66.3457 102.853 66.3985 103.093 66.3984 103.335V110.835C66.3984 111.277 66.2228 111.701 65.9103 112.014C65.5977 112.326 65.1738 112.502 64.7318 112.502H61.3984Z';
 function HomeIcon({ color, active }: IconProps) {
   return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 18 18" fill="none">
-      <Path d={HOME_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={ICON} height={ICON} viewBox="48.898 95 20 20" fill="none">
+      <Path d={HOME_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
-// function ExploreIcon({ color, fill, active }: IconProps) {
-//   return (
-//     <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
-//       <Circle cx={12} cy={12} r={10} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
-//       <Path
-//         d="m16.24 7.76-1.8 5.41a2 2 0 0 1-1.27 1.27L7.76 16.24l1.8-5.41a2 2 0 0 1 1.27-1.27z"
-//         stroke={active ? fill : color}
-//         strokeWidth={STROKE}
-//         strokeLinejoin="round"
-//       />
-//     </Svg>
-//   );
-// }
+const BOLT_PATH = 'M117.959 98.334C118.054 98.0668 118.054 97.7755 117.961 97.5078C117.868 97.2401 117.687 97.012 117.448 96.8608C117.208 96.7096 116.924 96.6443 116.642 96.6756C116.361 96.7069 116.098 96.833 115.898 97.0331L108.398 104.533C108.223 104.708 108.104 104.931 108.055 105.173C108.007 105.416 108.032 105.667 108.126 105.895C108.221 106.124 108.381 106.319 108.587 106.456C108.792 106.594 109.034 106.667 109.281 106.667H112.616C112.683 106.667 112.748 106.683 112.807 106.714C112.866 106.745 112.917 106.789 112.956 106.843C112.994 106.898 113.019 106.96 113.028 107.026C113.037 107.092 113.031 107.159 113.008 107.222L111.436 111.667C111.342 111.935 111.341 112.226 111.434 112.494C111.527 112.761 111.708 112.99 111.948 113.141C112.188 113.292 112.472 113.357 112.754 113.326C113.035 113.294 113.298 113.168 113.498 112.967L120.998 105.467C121.173 105.292 121.292 105.07 121.34 104.827C121.388 104.585 121.363 104.334 121.269 104.105C121.174 103.877 121.014 103.682 120.809 103.545C120.603 103.407 120.361 103.334 120.114 103.334H116.783C116.717 103.334 116.651 103.318 116.592 103.287C116.532 103.257 116.481 103.212 116.443 103.158C116.404 103.103 116.379 103.041 116.37 102.974C116.361 102.908 116.368 102.841 116.39 102.778L117.959 98.334Z';
+function SaleIcon({ color, active }: IconProps) {
+  return (
+    <Svg width={ICON} height={ICON} viewBox="104.695 95 20 20" fill="none">
+      <Path d={BOLT_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={0.833} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
 
-// "Search" tab: a magnifier (solid lens when selected) with a thick handle.
+// "Search": the lens fills when selected; the handle stays 1px in both states (Figma).
+const SEARCH_LENS = 'M176.333 104.167C176.333 107.849 173.349 110.833 169.667 110.833C165.985 110.833 163 107.849 163 104.167C163 100.485 165.985 97.5 169.667 97.5C173.349 97.5 176.333 100.485 176.333 104.167Z';
+const SEARCH_HANDLE = 'M177.999 112.499L174.383 108.883';
 function SearchIcon({ color, active }: IconProps) {
   return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
-      <Circle cx={10.5} cy={10.5} r={7.5} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} />
-      <Path d="M16.5 16.5L21.5 21.5" stroke={color} strokeWidth={active ? 2 : 1.2} strokeLinecap="round" />
+    <Svg width={ICON} height={ICON} viewBox="160.5 95 20 20" fill="none">
+      <Path d={SEARCH_LENS} fill={active ? color : 'none'} stroke={color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={SEARCH_HANDLE} stroke={color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
-function ExploreIcon({ color, fill, active }: IconProps) {
+// "My Trips": the road; when selected it fills and its centre dashes turn the bar's colour.
+const ROAD_PATH = 'M218.029 110.374C217.958 110.622 217.946 110.884 217.993 111.137C218.04 111.391 218.145 111.63 218.301 111.837C218.456 112.043 218.657 112.21 218.888 112.325C219.119 112.44 219.374 112.5 219.632 112.5H232.965C233.223 112.5 233.478 112.44 233.709 112.325C233.94 112.21 234.141 112.043 234.297 111.837C234.452 111.631 234.557 111.392 234.605 111.138C234.652 110.884 234.639 110.623 234.569 110.375L231.235 98.7083C231.136 98.36 230.925 98.0537 230.636 97.8357C230.347 97.6176 229.994 97.4998 229.632 97.5H222.965C222.603 97.4998 222.25 97.6176 221.961 97.8357C221.672 98.0537 221.461 98.36 221.362 98.7083L218.029 110.374Z';
+const ROAD_DASHES = 'M226.297 109.168V112.501 M226.297 99.1667V97.5 M226.297 102.5V105';
+function TripsIcon({ color, fill, active }: IconProps) {
   return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
-      <Circle
-        cx={12}
-        cy={12}
-        r={10}
-        fill={active ? color : 'none'}
-        stroke={color}
-        strokeWidth={STROKE}
-      />
-
-      <Path
-        d="m16.24 7.76-1.8 5.41a2 2 0 0 1-1.27 1.27L7.76 16.24l1.8-5.41a2 2 0 0 1 1.27-1.27z"
-        fill={active ? fill : 'none'}
-        stroke={active ? fill : color}
-        strokeWidth={STROKE}
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-// Exact Figma "road" (24px frame, 1px stroke): the road outline, then the three centre dashes.
-const ROAD_PATH =
-  'M2.0774 18.449C1.99207 18.7467 1.97706 19.0602 2.03355 19.3648C2.09004 19.6693 2.21649 19.9566 2.40293 20.2039C2.58938 20.4512 2.83072 20.6519 3.10794 20.79C3.38515 20.9282 3.69067 21.0001 4.0004 21H20.0004C20.3101 21.0002 20.6156 20.9284 20.8929 20.7904C21.1701 20.6524 21.4115 20.4518 21.598 20.2046C21.7846 19.9574 21.9112 19.6702 21.9678 19.3657C22.0244 19.0612 22.0096 18.7478 21.9244 18.45L17.9244 4.45C17.8049 4.03205 17.5524 3.66443 17.2052 3.40279C16.8581 3.14116 16.4351 2.99976 16.0004 3H8.0004C7.56569 2.99976 7.14273 3.14116 6.79557 3.40279C6.44841 3.66443 6.19594 4.03205 6.0764 4.45L2.0774 18.449Z';
-
-function ActivityIcon({ color, fill, active }: IconProps) {
-  const line = active ? fill : color;
-  return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 24 24" fill="none">
-      <Path d={ROAD_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M12 17V21M12 5V3M12 9V12" stroke={line} strokeWidth={STROKE} strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={ICON} height={ICON} viewBox="216.297 95 20 20" fill="none">
+      <Path d={ROAD_PATH} fill={active ? color : 'none'} stroke={color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={ROAD_DASHES} stroke={active ? fill : color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
 
-// Exact Figma paths (18px frame, 1px stroke): head, then shoulders.
-const PROFILE_PATHS = [
-  'M9 9.75C11.071 9.75 12.75 8.071 12.75 6C12.75 3.929 11.071 2.25 9 2.25C6.929 2.25 5.25 3.929 5.25 6C5.25 8.071 6.929 9.75 9 9.75Z',
-  'M13.242 11.507C14.368 12.633 15.625 14.5 15 15.75C14.375 17 3.375 17 3 15.75C2.625 14.5 3.632 12.633 4.757 11.507C5.882 10.382 7.408 9.75 9 9.75C10.591 9.75 12.117 10.382 13.242 11.507Z',
-];
-
+const PROFILE_PATHS = ['M286.263 101.667C286.263 103.968 284.398 105.833 282.096 105.833C279.795 105.833 277.93 103.968 277.93 101.667C277.93 99.3655 279.795 97.5 282.096 97.5C284.398 97.5 286.263 99.3655 286.263 101.667Z', 'M288.766 112.499C289.46 111.11 288.063 109.035 286.813 107.785C285.563 106.534 283.867 105.832 282.099 105.832C280.331 105.832 278.635 106.534 277.385 107.785C276.135 109.035 275.016 111.11 275.433 112.499C275.849 113.888 288.071 113.888 288.766 112.499Z'];
 function ProfileIcon({ color, active }: IconProps) {
   return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 18 18" fill="none">
-      {PROFILE_PATHS.map((d) => (
-        <Path key={d} d={d} fill={active ? color : 'none'} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={ICON} height={ICON} viewBox="272.096 95 20 20" fill="none">
+      {PROFILE_PATHS.map((p) => (
+        <Path key={p} d={p} fill={active ? color : 'none'} stroke={color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
       ))}
     </Svg>
   );
 }
 
-// Exact Figma paths (18px frame, 1px stroke). The fill path goes over the headband and straight back,
-// so only the ear cups are solid; the outline path draws the band, and the tail is the mic.
-const HEADSET_FILL =
-  'M2.25 8.25H4.5C4.898 8.25 5.279 8.408 5.561 8.689C5.842 8.971 6 9.352 6 9.75V12C6 12.398 5.842 12.779 5.561 13.061C5.279 13.342 4.898 13.5 4.5 13.5H3.75C3.352 13.5 2.971 13.342 2.689 13.061C2.408 12.779 2.25 12.398 2.25 12V8.25C2.25 7.364 2.425 6.486 2.764 5.667C3.103 4.848 3.6 4.104 4.227 3.477C4.854 2.85 5.598 2.353 6.417 2.014C7.236 1.675 8.114 1.5 9 1.5C9.886 1.5 10.764 1.675 11.583 2.014C12.402 2.353 13.146 2.85 13.773 3.477C14.4 4.104 14.897 4.848 15.236 5.667C15.575 6.486 15.75 7.364 15.75 8.25V12C15.75 12.398 15.592 12.779 15.311 13.061C15.029 13.342 14.648 13.5 14.25 13.5H13.5C13.102 13.5 12.721 13.342 12.439 13.061C12.158 12.779 12 12.398 12 12V9.75C12 9.352 12.158 8.971 12.439 8.689C12.721 8.408 13.102 8.25 13.5 8.25H15.75C15.75 7.364 15.575 6.486 15.236 5.667C14.897 4.848 14.4 4.104 13.773 3.477C13.146 2.85 12.402 2.353 11.583 2.014C10.764 1.675 9.886 1.5 9 1.5C8.114 1.5 7.236 1.675 6.417 2.014C5.598 2.353 4.854 2.85 4.227 3.477C3.6 4.104 3.103 4.848 2.764 5.667C2.425 6.486 2.25 7.364 2.25 8.25Z';
-const HEADSET_OUTLINE =
-  'M2.25 8.25H4.5C4.898 8.25 5.279 8.408 5.561 8.689C5.842 8.971 6 9.352 6 9.75V12C6 12.398 5.842 12.779 5.561 13.061C5.279 13.342 4.898 13.5 4.5 13.5H3.75C3.352 13.5 2.971 13.342 2.689 13.061C2.408 12.779 2.25 12.398 2.25 12V8.25ZM2.25 8.25C2.25 7.364 2.425 6.486 2.764 5.667C3.103 4.848 3.6 4.104 4.227 3.477C4.854 2.85 5.598 2.353 6.417 2.014C7.236 1.675 8.114 1.5 9 1.5C9.886 1.5 10.764 1.675 11.583 2.014C12.402 2.353 13.146 2.85 13.773 3.477C14.4 4.104 14.897 4.848 15.236 5.667C15.575 6.486 15.75 7.364 15.75 8.25M15.75 8.25V12C15.75 12.398 15.592 12.779 15.311 13.061C15.029 13.342 14.648 13.5 14.25 13.5H13.5C13.102 13.5 12.721 13.342 12.439 13.061C12.158 12.779 12 12.398 12 12V9.75C12 9.352 12.158 8.971 12.439 8.689C12.721 8.408 13.102 8.25 13.5 8.25H15.75Z';
-const HEADSET_MIC = 'M15.75 12V13.5C15.75 14.296 15.434 15.059 14.871 15.621C14.309 16.184 13.546 16.5 12.75 16.5H9';
+// "Flash" tag under the bolt: 17 × 8, radius 4, Figma's own lettering; pink when Sale is selected, purple otherwise.
+const FLASH_TEXT = 'M108.623 116V112.275H111.048V112.8H109.213V113.92H110.848V114.445H109.213V116H108.623ZM111.488 116V112.215H112.053V116H111.488ZM113.523 116.06C113.34 116.06 113.178 116.028 113.038 115.965C112.902 115.898 112.795 115.808 112.718 115.695C112.642 115.578 112.603 115.442 112.603 115.285C112.603 115.138 112.635 115.007 112.698 114.89C112.765 114.773 112.867 114.675 113.003 114.595C113.14 114.515 113.312 114.458 113.518 114.425L114.458 114.27V114.715L113.628 114.86C113.478 114.887 113.368 114.935 113.298 115.005C113.228 115.072 113.193 115.158 113.193 115.265C113.193 115.368 113.232 115.453 113.308 115.52C113.388 115.583 113.49 115.615 113.613 115.615C113.767 115.615 113.9 115.582 114.013 115.515C114.13 115.448 114.22 115.36 114.283 115.25C114.347 115.137 114.378 115.012 114.378 114.875V114.18C114.378 114.047 114.328 113.938 114.228 113.855C114.132 113.768 114.002 113.725 113.838 113.725C113.688 113.725 113.557 113.765 113.443 113.845C113.333 113.922 113.252 114.022 113.198 114.145L112.728 113.91C112.778 113.777 112.86 113.66 112.973 113.56C113.087 113.457 113.218 113.377 113.368 113.32C113.522 113.263 113.683 113.235 113.853 113.235C114.067 113.235 114.255 113.275 114.418 113.355C114.585 113.435 114.713 113.547 114.803 113.69C114.897 113.83 114.943 113.993 114.943 114.18V116H114.403V115.51L114.518 115.525C114.455 115.635 114.373 115.73 114.273 115.81C114.177 115.89 114.065 115.952 113.938 115.995C113.815 116.038 113.677 116.06 113.523 116.06ZM116.604 116.06C116.327 116.06 116.084 115.992 115.874 115.855C115.667 115.718 115.522 115.535 115.439 115.305L115.874 115.1C115.947 115.253 116.047 115.375 116.174 115.465C116.304 115.555 116.447 115.6 116.604 115.6C116.737 115.6 116.846 115.57 116.929 115.51C117.012 115.45 117.054 115.368 117.054 115.265C117.054 115.198 117.036 115.145 116.999 115.105C116.962 115.062 116.916 115.027 116.859 115C116.806 114.973 116.751 114.953 116.694 114.94L116.269 114.82C116.036 114.753 115.861 114.653 115.744 114.52C115.631 114.383 115.574 114.225 115.574 114.045C115.574 113.882 115.616 113.74 115.699 113.62C115.782 113.497 115.897 113.402 116.044 113.335C116.191 113.268 116.356 113.235 116.539 113.235C116.786 113.235 117.006 113.297 117.199 113.42C117.392 113.54 117.529 113.708 117.609 113.925L117.174 114.13C117.121 114 117.036 113.897 116.919 113.82C116.806 113.743 116.677 113.705 116.534 113.705C116.411 113.705 116.312 113.735 116.239 113.795C116.166 113.852 116.129 113.927 116.129 114.02C116.129 114.083 116.146 114.137 116.179 114.18C116.212 114.22 116.256 114.253 116.309 114.28C116.362 114.303 116.417 114.323 116.474 114.34L116.914 114.47C117.137 114.533 117.309 114.633 117.429 114.77C117.549 114.903 117.609 115.063 117.609 115.25C117.609 115.41 117.566 115.552 117.479 115.675C117.396 115.795 117.279 115.89 117.129 115.96C116.979 116.027 116.804 116.06 116.604 116.06ZM118.163 116V112.215H118.728V113.825L118.638 113.755C118.704 113.585 118.811 113.457 118.958 113.37C119.104 113.28 119.274 113.235 119.468 113.235C119.668 113.235 119.844 113.278 119.998 113.365C120.151 113.452 120.271 113.572 120.358 113.725C120.444 113.878 120.488 114.053 120.488 114.25V116H119.928V114.405C119.928 114.268 119.901 114.153 119.848 114.06C119.798 113.963 119.728 113.89 119.638 113.84C119.548 113.787 119.444 113.76 119.328 113.76C119.214 113.76 119.111 113.787 119.018 113.84C118.928 113.89 118.856 113.963 118.803 114.06C118.753 114.157 118.728 114.272 118.728 114.405V116H118.163Z';
+function FlashBadge({ active }: { active: boolean }) {
+  return (
+    <Svg width={17} height={8} viewBox="106 110 17 8" style={styles.badge} pointerEvents="none">
+      <Rect x={106} y={110} width={17} height={8} rx={4} fill={active ? '#FF008B' : '#6B5AED'} />
+      <Path d={FLASH_TEXT} fill="#FFFFFF" />
+    </Svg>
+  );
+}
 
+// Help headset: a 24 × 24 frame (the only icon at 24), cups solid, band and mic as 1px lines.
+const HEADSET_PATH = 'M348 105H351C351.53 105 352.039 105.211 352.414 105.586C352.789 105.961 353 106.47 353 107V110C353 110.53 352.789 111.039 352.414 111.414C352.039 111.789 351.53 112 351 112H350C349.47 112 348.961 111.789 348.586 111.414C348.211 111.039 348 110.53 348 110V105C348 103.818 348.233 102.648 348.685 101.556C349.137 100.464 349.8 99.4718 350.636 98.636C351.472 97.8003 352.464 97.1374 353.556 96.6851C354.648 96.2328 355.818 96 357 96C358.182 96 359.352 96.2328 360.444 96.6851C361.536 97.1374 362.528 97.8003 363.364 98.636C364.2 99.4718 364.863 100.464 365.315 101.556C365.767 102.648 366 103.818 366 105V110C366 110.53 365.789 111.039 365.414 111.414C365.039 111.789 364.53 112 364 112H363C362.47 112 361.961 111.789 361.586 111.414C361.211 111.039 361 110.53 361 110V107C361 106.47 361.211 105.961 361.586 105.586C361.961 105.211 362.47 105 363 105H366C366 103.818 365.767 102.648 365.315 101.556C364.863 100.464 364.2 99.4718 363.364 98.636C362.528 97.8003 361.536 97.1374 360.444 96.6851C359.352 96.2328 358.182 96 357 96C355.818 96 354.648 96.2328 353.556 96.6851C352.464 97.1374 351.472 97.8003 350.636 98.636C349.8 99.4718 349.137 100.464 348.685 101.556C348.233 102.648 348 103.818 348 105Z';
+const HEADSET_MIC = 'M366 110V112C366 113.061 365.579 114.078 364.828 114.828C364.078 115.579 363.061 116 362 116H357';
 function HeadsetIcon({ color }: { color: string }) {
   return (
-    <Svg width={ICON} height={ICON} viewBox="0 0 18 18" fill="none">
-      <Path d={HEADSET_FILL} fill={color} />
-      <Path d={HEADSET_OUTLINE} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d={HEADSET_MIC} stroke={color} strokeWidth={STROKE_18} strokeLinecap="round" strokeLinejoin="round" />
+    <Svg width={24} height={24} viewBox="345 94 24 24" fill="none">
+      <Path d={HEADSET_PATH} fill={color} stroke={color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={HEADSET_MIC} stroke={color} strokeWidth={LINE} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -232,7 +189,7 @@ function HelpButton() {
         style={({ pressed }) => [styles.help, isDarkMode && { backgroundColor: colors.card, borderColor: colors.border }, pressed && { opacity: 0.85 }]}
       >
         <HeadsetIcon color={helpColor} />
-        <Text style={[styles.navLabel, { color: helpColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} allowFontScaling={false}>Help</Text>
+        <Text style={[styles.navLabel, styles.helpLabel, { color: helpColor }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} allowFontScaling={false}>Help</Text>
       </Pressable>
     </View>
   );
@@ -247,9 +204,9 @@ const ALL_ITEMS: {
   badge?: string;
 }[] = [
   { id: 'home', label: 'Home', route: '/', Icon: HomeIcon },
-  { id: 'flash-sale', label: 'Sale', route: '/flash-sale', Icon: TopDealsIcon, badge: 'Flash' },
+  { id: 'flash-sale', label: 'Sale', route: '/flash-sale', Icon: SaleIcon, badge: 'Flash' },
   { id: 'explore', label: 'Search', route: '/explore', Icon: SearchIcon },
-  { id: 'bookings', label: 'My Trips', route: '/bookings', Icon: ActivityIcon },
+  { id: 'bookings', label: 'My Trips', route: '/bookings', Icon: TripsIcon },
   { id: 'profile', label: 'Profile', route: '/profile', Icon: ProfileIcon },
 ];
 
@@ -276,31 +233,12 @@ export function BottomNavigation() {
           {ALL_ITEMS.map(({ id, label, route, Icon, badge }) => {
             const active = route === '/' ? pathname === '/' : pathname.startsWith(route);
 
-            if (id === 'flash-sale') {
-              return (
-                <FlashSaleButton
-                  key={id}
-                  size="tab"
-                  active={active}
-                  isDarkMode={isDarkMode}
-                  onPress={() => {
-                    if (active) return;
-                    Haptics.selectionAsync();
-                    if (pathname === '/') router.push(route);
-                    else router.replace(route);
-                  }}
-                  style={styles.navItem}
-                  testID={`tab-${id}`}
-                />
-              );
-            }
-
             const color = active ? activeInk : inactiveInk;
             return (
               <Pressable
                 key={id}
                 accessibilityRole="tab"
-                accessibilityLabel={label}
+                accessibilityLabel={badge ? `${label}, ${badge}` : label}
                 accessibilityState={{ selected: active }}
                 testID={`tab-${id}`}
                 onPress={() => {
@@ -309,6 +247,7 @@ export function BottomNavigation() {
                   // Home stays mounted at the bottom of the stack so coming back to it is instant
                   // (replacing it would rebuild the whole screen); the other tabs swap on top of it.
                   if (route === '/') router.dismissTo('/');
+                  // The Sale tab opens from Home on top of it, like the other tabs.
                   else if (pathname === '/') router.push(route);
                   else router.replace(route);
                 }}
@@ -317,14 +256,10 @@ export function BottomNavigation() {
               >
                 <View style={styles.iconWrapper}>
                   <Icon color={color} fill={isDarkMode ? colors.card : '#FFFFFF'} active={active} />
-                  {!!badge && (
-                    <View pointerEvents="none" style={[styles.badge, { backgroundColor: active ? '#FF008B' : '#6B5AED' }]}>
-                      <Text style={styles.badgeText} allowFontScaling={false}>{badge}</Text>
-                    </View>
-                  )}
+                  {!!badge && <FlashBadge active={active} />}
                 </View>
                 <Text
-                  style={[styles.navLabel, active && styles.navLabelActive, { color }]}
+                  style={[styles.navLabel, { color }]}
                   numberOfLines={1}
                   // Fixed size like the "Sale" tab: the tab is exactly 42 high (2 + icon 24 + 2 + label 12 + 2), so any
                   // system-font enlargement grew the 12pt line and cut the label off at the bottom. On narrow phones
@@ -358,7 +293,9 @@ const styles = StyleSheet.create({
   container: { bottom: 0, left: 0, paddingHorizontal: 16, position: 'absolute', right: 0 },
   fade: { bottom: 0, left: 0, position: 'absolute', right: 0 },
   // flex-end: opening the Help menu grows the Help column upward without lifting the tab pill.
-  row: { alignItems: 'flex-end', flexDirection: 'row', gap: BOTTOM_NAV_GAP },
+  // Figma bar: 361 wide on a 393 phone (pill flex + 12 + Help 56). Tablets / wide screens: kept at a phone-like width,
+  // centred, so the tabs don't spread out across the whole screen.
+  row: { alignItems: 'flex-end', flexDirection: 'row', gap: BOTTOM_NAV_GAP, width: '100%', maxWidth: 480, alignSelf: 'center' },
   // Figma Frame 2147225836: 293×56 pill (fluid width flex: 1), 1px #F0EFFD border, padding 6px 8px, gap 4px, soft upward glow.
   pill: {
     flex: 1,
@@ -381,13 +318,14 @@ const styles = StyleSheet.create({
   },
   helpCol: { alignItems: 'center' },
   // Design: 56×56 circle, Green/green-50 fill, #DCEFE8 border, 8px padding, 2 between icon and label.
+  // Headset 24 at y 94–118 and the label's baseline at 127 (Figma), so no gap between them.
   help: {
     alignItems: 'center',
     backgroundColor: '#E6F3EE',
     borderColor: '#DCEFE8',
-    borderRadius: 28,
+    borderRadius: BOTTOM_NAV_CONTENT_HEIGHT / 2,
     borderWidth: 1,
-    gap: 2,
+    gap: 0,
     padding: 8,
     height: BOTTOM_NAV_CONTENT_HEIGHT,
     justifyContent: 'center',
@@ -400,15 +338,14 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   helpMenu: { alignItems: 'center', gap: 12, marginBottom: 12 },
-  helpOption: { alignItems: 'center', borderRadius: 24, height: 48, justifyContent: 'center', width: 48 },
-  // Figma tab (Frame 2147225810 / 2147225814 / 2147226154 / 2147226157 / 2147225815):
-  // 42 high, padding 2/0, gap 2, equal widths (51.8 on a 393 screen): 2 + icon 24 + 2 + label 12 + 2.
+  helpOption: { alignItems: 'center', borderRadius: BOTTOM_NAV_CONTENT_HEIGHT / 2, height: BOTTOM_NAV_CONTENT_HEIGHT, justifyContent: 'center', width: BOTTOM_NAV_CONTENT_HEIGHT },
+  // Figma tab: 42 high, equal widths (52.2 on a 393 phone): icon 20 at y 95–115, label baseline at 126.
   navItem: {
     alignItems: 'center',
     flexBasis: 0,
     flexGrow: 1,
     minWidth: 0,
-    gap: 2,
+    gap: 1.75,
     height: 42,
     paddingVertical: 2,
     paddingHorizontal: 0,
@@ -421,33 +358,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  // Design: Plus Jakarta Sans 600, 8.5px / 12px, in every state.
+  // Figma: Plus Jakarta Sans 600, 8 / 12, in every state (measured: "Home" 22.4 wide, "Search" 26.3).
   navLabel: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
-    fontSize: 8.5,
+    fontSize: 8,
     lineHeight: 12,
     textAlign: 'center',
-  },
-  navLabelActive: {},
-  // "Flash" tag on the Sale tab: exact Figma 17 × 8.5 pill centered over the bolt's lower foot.
-  badge: {
-    position: 'absolute',
-    bottom: -2.5,
-    alignSelf: 'center',
-    height: 9,
-    minWidth: 17,
-    paddingHorizontal: 3.5,
-    borderRadius: 5,
-    backgroundColor: '#FF008B',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 2,
-  },
-  badgeText: {
-    fontFamily: 'PlusJakartaSans_700Bold',
-    fontSize: 6.2,
-    lineHeight: 8.5,
-    color: '#FFFFFF',
     includeFontPadding: false,
   },
+  helpLabel: { marginTop: -0.25 },
+  // "Flash" tag: Figma rect (106, 110) on the bolt's frame (104.7, 95) → 1.3 in, 15 down (3 below the icon).
+  badge: { position: 'absolute', left: 1.305, top: 15 },
 });

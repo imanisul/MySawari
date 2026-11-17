@@ -17,7 +17,9 @@ export const recentlyViewedQueryOptions = (userId?: string | null) => ({
 export const recentSearchesQueryOptions = (userId?: string | null) => ({
   queryKey: ['recentSearches', userId || 'guest'] as const,
   queryFn: () => getRecentSearches(userId),
-  staleTime: 5 * 60 * 1000,
+  staleTime: 0,
+  // Re-read every 15 s so a trip whose start passes drops off while Home stays open.
+  refetchInterval: 15 * 1000,
 });
 
 /** The signed-in customer's bookings (Home's "Your next trip" card). Shared with HomeScreen. */

@@ -62,9 +62,9 @@ export function ManageBookingSheet({
 
             <Pressable
               onPress={onCancelBooking}
-              style={({ pressed }) => [styles.cta, { backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 }]}
+              style={({ pressed }) => [styles.cta, { backgroundColor: c.button, opacity: pressed ? 0.85 : 1 }]}
             >
-              <Text style={[styles.ctaText, { color: c.primaryForeground }]}>Next</Text>
+              <Text style={[styles.ctaText, { color: '#FFFFFF' }]}>Next</Text>
             </Pressable>
           </View>
         </View>

@@ -9,7 +9,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAvailability, splitDateRange, parseDayLabel, todayDayNum, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
+import { getAvailability, splitDateRange, isRealDate, parseDayLabel, todayDayNum, Car, byAvailability, cars, LocationResult, isInService } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { Page, LoginBottomSheet, onSplashGone } from '@/components';
 import { FlashSaleBanner } from '@/components/home/FlashSaleBanner';
@@ -256,11 +256,14 @@ export default function HomeScreen() {
   }, [fetchedVehicles, typeName, withAvail]);
 
   // Recent Searches: the trips this customer searched (where, dates, time), newest first; past dates are dropped.
-  const { data: savedSearches = [] } = useQuery(recentSearchesQueryOptions(recentKey));
+  const { data: savedSearches = [], dataUpdatedAt: searchesAt } = useQuery(recentSearchesQueryOptions(recentKey));
   useFocusEffect(useCallback(() => {
     queryClient.invalidateQueries({ queryKey: ['recentSearches', recentKey || 'guest'] });
   }, [queryClient, recentKey]));
-  const tripSearches = useMemo(() => savedSearches.filter((t) => !isPastSearch(t)).slice(0, 4), [savedSearches]);
+  // Only searches with real dates and both times; past ones are dropped.
+  const tripSearches = useMemo(() => savedSearches
+    .filter((t) => isRealDate(splitDateRange(t.dateRange)[0]) && !!t.pickupTime && !!t.returnTime && !isPastSearch(t))
+    .slice(0, 4), [savedSearches, searchesAt]); // searchesAt: re-filter on each refetch as the clock moves
   const removeTripSearch = useCallback((id: string) => {
     removeRecentSearch(recentKey, id).then((next) => queryClient.setQueryData(['recentSearches', recentKey || 'guest'], next));
   }, [recentKey, queryClient]);
@@ -385,9 +388,9 @@ export default function HomeScreen() {
   // One cars row under the categories: Top Picks for a first-time visitor, which becomes Recently Viewed
   // as soon as the customer has opened a vehicle.
   const showRecent = recent.length > 0;
-  // Real lowest day rate in the fleet, for the "Your ride, from just ₹X" card.
+  // Real lowest car day rate, for the "Your ride, from just ₹X" card (cars only: the card shows cars, bikes are cheaper).
   const fromRate = useMemo(() => {
-    const rates = fetchedVehicles.filter((v) => !isInService(v)).map((v) => Number(v.perDay)).filter((n) => n > 0);
+    const rates = fetchedVehicles.filter((v) => v.type === 'Car' && !isInService(v)).map((v) => Number(v.perDay)).filter((n) => n > 0);
     return rates.length ? Math.min(...rates) : undefined;
   }, [fetchedVehicles]);
   // Same order as the Figma Home (iPhone 16 - 77). Flash Sale is exclusively in the Flash Sale tab.

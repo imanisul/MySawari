@@ -2261,6 +2261,31 @@ export const API = {
   },
 
   /**
+   * GET /api/auth/referral/deferred
+   * Checks if an invite/QR was recently scanned from this client's IP address (e.g. on iOS after downloading from App Store).
+   */
+  async getDeferredReferral(): Promise<{
+    valid: boolean;
+    referralCode: string;
+    referrerName: string;
+    rewardText: string;
+    bonusSawariCash?: number;
+    isPartnerQr?: boolean;
+  } | null> {
+    try {
+      const response = await timedFetch(`${BACKEND_URL}/auth/referral/deferred`, {
+        method: 'GET',
+        headers: await withInstallId({ 'Content-Type': 'application/json' }),
+      });
+      const data = await response.json();
+      if (response.ok && data?.success && data?.data?.valid) {
+        return data.data;
+      }
+    } catch {}
+    return null;
+  },
+
+  /**
    * Place search for every location box (destination, pickup / delivery address): Google Places, with
    * OpenStreetMap (Photon → Nominatim) as a backup. Same result shape either way.
    */

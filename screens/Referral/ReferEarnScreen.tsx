@@ -289,15 +289,32 @@ export default function ReferEarnScreen() {
             )}
           </Pressable>
           {isAuthenticated && (
-            <Pressable accessibilityRole="button" accessibilityLabel="Share" onPress={shareAny} style={({ pressed }) => [styles.shareBtn, { backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.8 }]}>
-              <Feather name="share" size={21} color={p.navy} />
-            </Pressable>
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Show QR Code"
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  setShowQRModal(true);
+                }}
+                style={({ pressed }) => [
+                  styles.shareBtn,
+                  { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' },
+                  pressed && { opacity: 0.8 },
+                ]}
+              >
+                <Feather name="maximize" size={20} color="#4338CA" />
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Share" onPress={shareAny} style={({ pressed }) => [styles.shareBtn, { backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.8 }]}>
+                <Feather name="share" size={21} color={p.navy} />
+              </Pressable>
+            </>
           )}
         </View>
       </View>
 
-      {/* ── Partner QR Modal ── */}
-      {partnerQRs.length > 0 && activeQR && (
+      {/* ── Referral / Partner QR Modal ── */}
+      {Boolean(activeQR?.token || code) && (
         <Modal
           visible={showQRModal}
           transparent
@@ -334,15 +351,15 @@ export default function ReferEarnScreen() {
 
               <View style={styles.qrContainer}>
                 <QRCode
-                  value={`https://mysawari.com/r/${activeQR.token}`}
+                  value={`https://mysawari.com/r/${activeQR?.token || code}`}
                   size={200}
                   color="#0F172A"
                   backgroundColor="#FFFFFF"
                 />
               </View>
               <View style={styles.modalCodeBox}>
-                <Text style={styles.modalCodeLabel}>PARTNER CODE</Text>
-                <Text style={styles.modalCode}>{activeQR.token}</Text>
+                <Text style={styles.modalCodeLabel}>{activeQR?.token ? 'PARTNER CODE' : 'REFERRAL CODE'}</Text>
+                <Text style={styles.modalCode}>{activeQR?.token || code}</Text>
               </View>
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 18, width: '100%' }}>
                 <Pressable
@@ -357,7 +374,7 @@ export default function ReferEarnScreen() {
                     justifyContent: 'center',
                   }}
                   onPress={async () => {
-                    await Clipboard.setStringAsync(`https://mysawari.com/r/${activeQR.token}`);
+                    await Clipboard.setStringAsync(`https://mysawari.com/r/${activeQR?.token || code}`);
                     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                     setCopied(true);
                     setTimeout(() => setCopied(false), 1800);

@@ -677,7 +677,7 @@ export function AnimatedSplash({
                   onPress={onRetry}
                   style={styles.actionBtn}
                 >
-                  <Feather name="refresh-cw" size={13} color="#323E71" />
+                  <Feather name="refresh-cw" size={13} color="#6B5AED" />
                   <Text style={styles.actionBtnText}>Retry</Text>
                 </Pressable>
               )}
@@ -690,7 +690,7 @@ export function AnimatedSplash({
                 style={styles.actionBtn}
               >
                 <Text style={styles.actionBtnText}>Continue</Text>
-                <Feather name="arrow-right" size={13} color="#323E71" />
+                <Feather name="arrow-right" size={13} color="#6B5AED" />
               </Pressable>
             </View>
           )}
@@ -858,6 +858,6 @@ const styles = StyleSheet.create({
   actionBtnText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#323E71',
+    color: '#6B5AED',
   },
 });

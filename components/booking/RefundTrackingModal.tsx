@@ -157,7 +157,7 @@ export function RefundTrackingModal({
   const badgeColor = isRefunded
     ? '#10B981'
     : isApproved
-    ? '#323E71'
+    ? '#6B5AED'
     : isRejected
     ? '#EF4444'
     : '#F59E0B';
@@ -344,7 +344,7 @@ export function RefundTrackingModal({
                   <MaterialCommunityIcons
                     name={refund?.refundType === 'bank_account' ? 'bank' : 'cellphone-wireless'}
                     size={20}
-                    color="#323E71"
+                    color="#6B5AED"
                     style={{ marginRight: 8 }}
                   />
                   <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>
@@ -358,7 +358,7 @@ export function RefundTrackingModal({
                     style={styles.editBtn}
                     hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                   >
-                    <Feather name="edit-2" size={13} color="#323E71" />
+                    <Feather name="edit-2" size={13} color="#6B5AED" />
                     <Text style={styles.editBtnText}>Edit</Text>
                   </TouchableOpacity>
                 )}
@@ -443,7 +443,7 @@ export function RefundTrackingModal({
                   ) : (
                     <View style={{ paddingVertical: 4, gap: 4 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Feather name="refresh-cw" size={14} color="#323E71" />
+                        <Feather name="refresh-cw" size={14} color="#6B5AED" />
                         <Text style={[styles.payoutVal, { color: colors.foreground, fontFamily: 'Outfit-SemiBold' }]}>
                           Original Payment Method
                         </Text>
@@ -621,7 +621,7 @@ export function RefundTrackingModal({
 
             {/* Note */}
             <View style={[styles.noteBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="info" size={15} color="#323E71" style={{ marginTop: 2, marginRight: 8 }} />
+              <Feather name="info" size={15} color="#6B5AED" style={{ marginTop: 2, marginRight: 8 }} />
               <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
                 Refunds are processed to the specified payout method within 24–48 business hours after approval by Mysawari.
               </Text>
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF0F7',
     gap: 4,
   },
-  editBtnText: { color: '#323E71', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  editBtnText: { color: '#6B5AED', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   payoutDetailsBox: {
     backgroundColor: 'rgba(150,150,150,0.05)',
     borderRadius: 10,

@@ -145,7 +145,7 @@ export default function ConfirmationScreen() {
                 {NEXT.map((t) => (
                   <View key={t} style={styles.nextRow}>
                     <View style={[styles.tick, { backgroundColor: p.green }]}>
-                      <Feather name="check" size={8} color="#FFFFFF" />
+                      <Feather name="check" size={10} color="#FFFFFF" />
                     </View>
                     <Text style={[styles.nextText, { color: p.sub }]}>{t}</Text>
                   </View>
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   dashes: { flexDirection: 'row', gap: 3, overflow: 'hidden', marginTop: 10, marginBottom: 14 },
   dash: { width: 4, height: 1 },
   nextRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  tick: { width: 10, height: 10, borderRadius: 5, alignItems: 'center', justifyContent: 'center', marginTop: 3.5 },
+  tick: { width: 14, height: 14, borderRadius: 7, alignItems: 'center', justifyContent: 'center', marginTop: 1.5, paddingLeft: 1 },
   nextText: { flex: 1, fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
   section: { fontFamily: FONT.medium, fontSize: 16, lineHeight: 22, marginTop: 24, marginBottom: 10 },
   footerWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },

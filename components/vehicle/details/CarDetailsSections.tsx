@@ -704,7 +704,7 @@ export function WhyRent() {
           >
             {why.map((w) => (
               <View key={w.title} style={styles.whyRow}>
-                <View style={[styles.whyCheck, { backgroundColor: whyLight ? '#323E71' : p.purpleCheck }]}>
+                <View style={[styles.whyCheck, { backgroundColor: whyLight ? '#6B5AED' : p.purpleCheck }]}>
                   <Feather name="check" size={11} color="#FFFFFF" />
                 </View>
                 <View style={{ flex: 1 }}>
@@ -1050,7 +1050,7 @@ const styles = StyleSheet.create({
   radioOn: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, borderColor: '#FFFFFF', backgroundColor: '#FFFFFF' },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8.5, flexWrap: 'wrap' },
   planName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15 },
-  planOn: { shadowColor: '#323E71', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
+  planOn: { shadowColor: '#6B5AED', shadowOpacity: 0.18, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 3 },
   planRadio: { width: 15, height: 15, borderRadius: 7.5, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   planRadioDot: { width: 5.5, height: 5.5, borderRadius: 3 },
   addedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 },

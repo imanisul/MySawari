@@ -112,9 +112,9 @@ const styles = StyleSheet.create({
   rowLabel: { color: '#262626', fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
   dash: { borderColor: '#EAECF1', borderStyle: 'dashed', borderTopWidth: 1, height: 0 },
   radio: { alignItems: 'center', borderRadius: 8, borderWidth: 1, height: 16, justifyContent: 'center', width: 16 },
-  radioOn: { backgroundColor: '#FFFFFF', borderColor: '#2F3E75' },
+  radioOn: { backgroundColor: '#FFFFFF', borderColor: '#6B5AED' },
   radioOff: { backgroundColor: '#FFFFFF', borderColor: '#BFC3D4' },
-  radioDot: { backgroundColor: '#2F3E75', borderRadius: 2, height: 4, width: 4 },
+  radioDot: { backgroundColor: '#6B5AED', borderRadius: 2, height: 4, width: 4 },
   cta: { alignItems: 'center', backgroundColor: '#6B5AED', borderRadius: 12, height: 54, justifyContent: 'center' },
   ctaText: { color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
 });

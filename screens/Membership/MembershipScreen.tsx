@@ -55,19 +55,19 @@ const PLANS: PlanDef[] = [
     key: 'starter', name: 'Starter', price: 999, pctLabel: '5%', perTripCap: 499, annualCap: 10000,
     icon: require('@/assets/images/plan_starter.png'), iconSize: 16,
     art: require('@/assets/images/membership_art_starter.png'), headerTop: '#332B72', headerBottom: '#6B5AED', lightHeader: false,
-    accent: '#323E71', innerBorder: '#D9DDEC',
+    accent: '#6B5AED', innerBorder: '#D9DDEC',
   },
   {
     key: 'plus', name: 'Plus', price: 1999, pctLabel: '10%', perTripCap: 799, annualCap: 15000,
     icon: require('@/assets/images/plan_plus.png'), iconSize: 17,
     art: require('@/assets/images/membership_art_plus.png'), headerTop: '#332B72', headerBottom: '#6B5AED', lightHeader: false,
-    accent: '#323E71', innerBorder: '#D9DDEC',
+    accent: '#6B5AED', innerBorder: '#D9DDEC',
   },
   {
     key: 'pro', name: 'Pro', price: 2999, pctLabel: '12.5%', perTripCap: 999, annualCap: 20000,
     icon: require('@/assets/images/plan_pro.png'), iconSize: 16,
     art: require('@/assets/images/membership_art_pro.png'), headerTop: '#332B72', headerBottom: '#6B5AED', lightHeader: false,
-    accent: '#323E71', innerBorder: '#D9DDEC',
+    accent: '#6B5AED', innerBorder: '#D9DDEC',
   },
 ];
 
@@ -90,7 +90,7 @@ function activeOnly(raw: any): ActiveMembership | null {
 }
 const tierIndex = (key?: string | null) => PLANS.findIndex((p) => p.key === key);
 
-const PURPLE = '#323E71';
+const PURPLE = '#6B5AED';
 const GREEN = '#008758';
 // Header art files are 786 × 520 (393 × 260 at 2x); the white card inside them is placed by these fractions.
 const ART_RATIO = 520 / 786;

@@ -151,7 +151,7 @@ export async function fetchOffers(): Promise<Offer[]> {
                 discount: offer.discount || '',
                 displayFormat,
                 lines: Array.isArray(offer.lines) && offer.lines.length >= 2 ? [offer.lines[0], offer.lines[1]] : undefined,
-                gradientColors: offer.gradientColors || ['#323E71', '#4B5A9E'],
+                gradientColors: offer.gradientColors || ['#6B5AED', '#4B5A9E'],
                 icon: offer.icon || 'tag',
                 image: plateSafeOfferImage(offer.image, offer.updatedAt),
                 expiry: offer.expiryDate ? formatExpiry(offer.expiryDate) : '',

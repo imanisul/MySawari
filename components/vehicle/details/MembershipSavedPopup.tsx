@@ -46,8 +46,8 @@ const PRO_LAYOUT: Layout = { ...OTHER_LAYOUT, crown: require('@/assets/images/me
 
 type Theme = { art: any; layout: Layout; innerBorder: string; dash: string; applied: string; confetti: string[] };
 const THEMES: Record<string, Theme> = {
-  Starter: { art: require('@/assets/images/membership_frame_starter.png'), layout: STARTER_LAYOUT, innerBorder: '#D9DDEC', dash: '#D5D9EA', applied: '#2F3E75', confetti: ['#2F3E75', '#323E71', '#FBBC04', '#D5D9EA', '#FFFFFF'] },
-  Plus: { art: require('@/assets/images/membership_frame_plus.png'), layout: OTHER_LAYOUT, innerBorder: '#FFFFFF', dash: '#D5D9EA', applied: '#323E71', confetti: ['#323E71', '#F59E0B', '#FBBC04', '#D5D9EA', '#FFFFFF'] },
+  Starter: { art: require('@/assets/images/membership_frame_starter.png'), layout: STARTER_LAYOUT, innerBorder: '#D9DDEC', dash: '#D5D9EA', applied: '#6B5AED', confetti: ['#6B5AED', '#6B5AED', '#FBBC04', '#D5D9EA', '#FFFFFF'] },
+  Plus: { art: require('@/assets/images/membership_frame_plus.png'), layout: OTHER_LAYOUT, innerBorder: '#FFFFFF', dash: '#D5D9EA', applied: '#6B5AED', confetti: ['#6B5AED', '#F59E0B', '#FBBC04', '#D5D9EA', '#FFFFFF'] },
   Pro: { art: require('@/assets/images/membership_frame_pro.png'), layout: PRO_LAYOUT, innerBorder: '#D9DDEC', dash: '#D5D9EA', applied: '#4FA82A', confetti: ['#4FA82A', '#64B403', '#008758', '#FBBC04', '#FFFFFF'] },
 };
 

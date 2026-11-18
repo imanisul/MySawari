@@ -220,7 +220,7 @@ export function DatesSheet() {
   // Figma palette in light mode; dark mode keeps the theme tokens.
   const ui = isDarkMode
     ? { page: colors.background, text: colors.foreground, muted: colors.mutedForeground, border: colors.border, card: colors.card, cardBorder: colors.border, calendar: colors.card, month: colors.mutedForeground, band: colors.tintLight, navy: colors.primary, sel: colors.primary, onNavy: colors.primaryForeground, past: colors.mutedForeground, chipText: colors.primaryText, dash: colors.mutedForeground }
-    : { page: '#FFFFFF', text: '#262626', muted: '#737373', border: '#D4D4D4', card: '#F4F6FA', cardBorder: '#E7EAF4', calendar: '#F9F9FB', month: '#525252', band: '#E9EAF1', navy: '#2F3E75', sel: '#6B5AED', onNavy: '#FFFFFF', past: '#A3A3A3', chipText: '#2F3E75', dash: '#A3A8C3' };
+    : { page: '#FFFFFF', text: '#262626', muted: '#737373', border: '#D4D4D4', card: '#F4F6FA', cardBorder: '#E7EAF4', calendar: '#F9F9FB', month: '#525252', band: '#E9EAF1', navy: '#6B5AED', sel: '#6B5AED', onNavy: '#FFFFFF', past: '#A3A3A3', chipText: '#6B5AED', dash: '#A3A8C3' };
 
   const istTodayParts = getIndiaDateParts();
   const today = new Date(istTodayParts.year, istTodayParts.month, istTodayParts.date);

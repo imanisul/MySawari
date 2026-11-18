@@ -65,7 +65,7 @@ export default function ReferralRewardScreen() {
           {!!note && <Text style={[styles.note, { color: note.green ? p.green : p.muted }]}>{note.text}</Text>}
 
           <Text style={[styles.section, { color: p.fg }]}>Referral Status</Text>
-          <StatusTimeline steps={referralSteps(ref)} doneColor="#2F3E75" errorColor="#DC2626" />
+          <StatusTimeline steps={referralSteps(ref)} doneColor="#6B5AED" errorColor="#DC2626" />
         </ScrollView>
       )}
     </SafeAreaView>

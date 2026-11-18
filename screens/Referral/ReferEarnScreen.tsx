@@ -19,7 +19,7 @@ import { FaqList } from '@/components/vehicle/details/CarDetailsSections';
 import { PF } from '@/components/profile/ProfileParts';
 import { usePartnerQRs } from '@/utils/referrals';
 
-const PURPLE = '#323E71';
+const PURPLE = '#6B5AED';
 
 /** Light rays fanning out from below the avatars (design hero). */
 function Rays({ width, height, cy }: { width: number; height: number; cy: number }) {
@@ -194,7 +194,7 @@ export default function ReferEarnScreen() {
               <View style={[styles.partnerCard, { backgroundColor: '#EEF0F7', borderColor: '#D5D9EA' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                    <Feather name="tag" size={17} color="#323E71" />
+                    <Feather name="tag" size={17} color="#6B5AED" />
                     <Text style={{ fontFamily: PF.bold, fontSize: 13.5, color: '#312E81' }}>Partner QR: {activeQR.token}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -230,9 +230,9 @@ export default function ReferEarnScreen() {
                           paddingHorizontal: 8,
                           paddingVertical: 3,
                           borderRadius: 6,
-                          backgroundColor: idx === selectedQRIndex ? '#323E71' : '#FFFFFF',
+                          backgroundColor: idx === selectedQRIndex ? '#6B5AED' : '#FFFFFF',
                           borderWidth: 1,
-                          borderColor: idx === selectedQRIndex ? '#323E71' : '#CBD5E1',
+                          borderColor: idx === selectedQRIndex ? '#6B5AED' : '#CBD5E1',
                         }}
                       >
                         <Text style={{ fontFamily: PF.medium, fontSize: 11, color: idx === selectedQRIndex ? '#FFFFFF' : '#475569' }}>
@@ -353,9 +353,9 @@ export default function ReferEarnScreen() {
                         paddingHorizontal: 10,
                         paddingVertical: 4,
                         borderRadius: 6,
-                        backgroundColor: idx === selectedQRIndex ? '#323E71' : '#F1F5F9',
+                        backgroundColor: idx === selectedQRIndex ? '#6B5AED' : '#F1F5F9',
                         borderWidth: 1,
-                        borderColor: idx === selectedQRIndex ? '#323E71' : '#CBD5E1',
+                        borderColor: idx === selectedQRIndex ? '#6B5AED' : '#CBD5E1',
                       }}
                     >
                       <Text style={{ fontFamily: PF.medium, fontSize: 11, color: idx === selectedQRIndex ? '#FFFFFF' : '#475569' }}>
@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   modalBrand: {
     fontFamily: PF.bold,
     fontSize: 22,
-    color: '#323E71',
+    color: '#6B5AED',
     letterSpacing: 0.5,
   },
   modalSub: {
@@ -548,12 +548,12 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: 4,
-    color: '#323E71',
+    color: '#6B5AED',
     marginTop: 2,
   },
   modalCloseBtn: {
     marginTop: 20,
-    backgroundColor: '#323E71',
+    backgroundColor: '#6B5AED',
     width: '100%',
     height: 44,
     borderRadius: 12,

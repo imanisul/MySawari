@@ -70,7 +70,7 @@ export type Step = { title: string; sub: string; state: StepState };
  * Vertical status list (design: "Withdrawal Request", "Referral Status"): a filled 11px dot per step, centred on its
  * text and joined by one dashed line — blue-400 when done, grey while still to come, red when it failed, green once finished.
  */
-export function StatusTimeline({ steps, doneColor = '#596591', errorColor = '#EF4444' }: { steps: Step[]; /** Dot colours: finished (withdrawals blue-400, referrals blue-500) and failed (withdrawals red-500, referrals red-600). */ doneColor?: string; errorColor?: string }) {
+export function StatusTimeline({ steps, doneColor = '#6B5AED', errorColor = '#EF4444' }: { steps: Step[]; /** Dot colours: finished (withdrawals blue-400, referrals blue-500) and failed (withdrawals red-500, referrals red-600). */ doneColor?: string; errorColor?: string }) {
   const p = useDetailsPalette();
   const dot = (s: StepState) => (s === 'done' ? doneColor : s === 'error' ? errorColor : s === 'success' ? p.green : '#D4D4D4');
   return (

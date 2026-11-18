@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   whyTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
   whyRow: { flexDirection: 'row', gap: 8 },
   whyTickBox: { width: 24, paddingTop: 4 },
-  whyTick: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#323E71', alignItems: 'center', justifyContent: 'center' },
+  whyTick: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center' },
   whyItem: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
   whyBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
 

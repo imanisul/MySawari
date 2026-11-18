@@ -24,7 +24,7 @@ import { ModalBlur } from '@/components/common/ModalBlur';
 const FONT = { regular: 'PlusJakartaSans_400Regular', medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
 // Page background: the Home header's purple (#332B72 → #6B5AED by y=170), flat from there down.
 const HEADER = ['#332B72', '#6B5AED', '#6B5AED'] as const; // same purple as the Home header
-const PURPLE = '#323E71';
+const PURPLE = '#6B5AED';
 
 type PlanKey = 'starter' | 'plus' | 'pro';
 const PLANS: Record<PlanKey, { name: string; pct: string; yearly: string; icon: any; next?: PlanKey }> = {

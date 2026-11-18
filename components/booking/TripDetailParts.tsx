@@ -282,7 +282,7 @@ export function refundStage(b: BookingSnapshot): 'none' | 'received' | 'approved
 /** Request received → Refund approved → Refund completed (design), driven by the refund record from the server. */
 export function RefundTimeline({ booking }: { booking: BookingSnapshot }) {
   const stage = refundStage(booking);
-  const RECEIVED = '#596591';
+  const RECEIVED = '#6B5AED';
   // Cancelled with nothing to refund (less than 24 hours before pickup): no refund steps to wait for.
   if (stage === 'none') {
     return (

@@ -43,7 +43,7 @@ type VehicleOption = {
 };
 
 // Brand tokens (work on both light and dark palettes)
-const ACCENT = '#323E71';
+const ACCENT = '#6B5AED';
 const ACCENT_TINT = 'rgba(97, 82, 216, 0.12)';
 const SUCCESS = '#059669';
 const SUCCESS_TINT = 'rgba(5, 150, 105, 0.12)';
@@ -496,7 +496,7 @@ export function ExclusiveOfferDetailModal({
                     <Text style={[styles.validityCardTitle, { color: p.fg }]}>Flash Sale Schedule</Text>
                   </View>
                   <View style={[styles.statusPill, { backgroundColor: isEnded ? '#FEE2E2' : isUpcoming ? '#EDE9FE' : '#DCFCE7' }]}>
-                    <Text style={[styles.statusPillText, { color: isEnded ? '#DC2626' : isUpcoming ? '#323E71' : '#059669' }]}>
+                    <Text style={[styles.statusPillText, { color: isEnded ? '#DC2626' : isUpcoming ? '#6B5AED' : '#059669' }]}>
                       {isEnded ? 'EXPIRED' : isUpcoming ? 'UPCOMING' : 'ACTIVE NOW'}
                     </Text>
                   </View>
@@ -520,8 +520,8 @@ export function ExclusiveOfferDetailModal({
 
                 {timeLeft && !isEnded ? (
                   <View style={[styles.timeLeftRow, { backgroundColor: timeLeft.urgent ? '#FEF2F2' : '#F8FAFC' }]}>
-                    <Feather name="clock" size={12} color={timeLeft.urgent ? '#DC2626' : '#323E71'} />
-                    <Text style={[styles.timeLeftRowText, { color: timeLeft.urgent ? '#DC2626' : '#323E71' }]}>
+                    <Feather name="clock" size={12} color={timeLeft.urgent ? '#DC2626' : '#6B5AED'} />
+                    <Text style={[styles.timeLeftRowText, { color: timeLeft.urgent ? '#DC2626' : '#6B5AED' }]}>
                       {isUpcoming ? 'Offer activates soon' : timeLeft.text}
                     </Text>
                   </View>
@@ -558,7 +558,7 @@ export function ExclusiveOfferDetailModal({
                   {/* Rental Handover Timing */}
                   <View style={styles.dealSpecItem}>
                     <View style={[styles.specIconBox, { backgroundColor: '#E8EBF4' }]}>
-                      <Feather name="clock" size={14} color="#323E71" />
+                      <Feather name="clock" size={14} color="#6B5AED" />
                     </View>
                     <View style={styles.specContent}>
                       <Text style={[styles.specTitle, { color: p.fg }]}>
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
   codePillText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#323E71',
+    color: '#6B5AED',
     letterSpacing: 0.5,
   },
 

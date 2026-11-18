@@ -11,7 +11,7 @@ import type { PendingCard } from '@/hooks/useRideJourney';
 import { ScratchCard } from './ScratchCard';
 
 const F = { medium: 'PlusJakartaSans_500Medium', semibold: 'PlusJakartaSans_600SemiBold', bold: 'PlusJakartaSans_700Bold' };
-const CONFETTI = ['#2F3E75', '#323E71', '#FBBC04', '#D5D9EA', '#FFFFFF'];
+const CONFETTI = ['#6B5AED', '#6B5AED', '#FBBC04', '#D5D9EA', '#FFFFFF'];
 
 /**
  * The scratch-card popup (welcome gift, ride milestones). The prize is credited as SawariCash only once the card is
@@ -82,7 +82,7 @@ export function RewardScratchModal({ card, onClose }: { card: PendingCard | null
                 <Text style={styles.link}>Can’t scratch? Tap to reveal</Text>
               </Pressable>
             )}
-            {state === 'saving' && <ActivityIndicator color="#2F3E75" />}
+            {state === 'saving' && <ActivityIndicator color="#6B5AED" />}
             {state === 'done' && <Text style={styles.ok}>{formatCurrency(wonAmount)} has been added to your wallet.</Text>}
             {state === 'error' && (
               <>
@@ -112,17 +112,17 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   sheet: { width: 288, backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E7EAF4', padding: 16, alignItems: 'center', gap: 10 },
   kicker: { fontFamily: F.medium, fontSize: 12, color: '#747EA3' },
-  title: { fontFamily: F.semibold, fontSize: 19, color: '#2F3E75', textAlign: 'center' },
+  title: { fontFamily: F.semibold, fontSize: 19, color: '#6B5AED', textAlign: 'center' },
   cardWrap: { marginVertical: 6 },
   prizeLabel: { fontFamily: F.medium, fontSize: 12, color: '#747EA3' },
-  prize: { fontFamily: F.bold, fontSize: 34, color: '#2F3E75', lineHeight: 42 },
+  prize: { fontFamily: F.bold, fontSize: 34, color: '#6B5AED', lineHeight: 42 },
   prizeSub: { fontFamily: F.semibold, fontSize: 13, color: '#008758' },
-  link: { fontFamily: F.medium, fontSize: 12, color: '#323E71', textDecorationLine: 'underline' },
+  link: { fontFamily: F.medium, fontSize: 12, color: '#6B5AED', textDecorationLine: 'underline' },
   ok: { fontFamily: F.medium, fontSize: 13, color: '#008758', textAlign: 'center' },
   err: { fontFamily: F.medium, fontSize: 12, color: '#C62828', textAlign: 'center' },
   btn: { alignSelf: 'stretch', height: 46, borderRadius: 12, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: F.semibold, fontSize: 15, color: '#FFFFFF' },
   btnGhost: { backgroundColor: '#F4F6FA' },
-  btnGhostText: { color: '#2F3E75' },
+  btnGhostText: { color: '#6B5AED' },
   foot: { fontFamily: F.medium, fontSize: 11, color: '#747EA3' },
 });

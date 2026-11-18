@@ -937,7 +937,7 @@ const styles = StyleSheet.create({
     borderColor: '#EAECF1',
   },
   filterChipActive: {
-    borderColor: '#323E71',
+    borderColor: '#6B5AED',
   },
   filterChipText: {
     fontFamily: 'PlusJakartaSans_500Medium',
@@ -1138,7 +1138,7 @@ const styles = StyleSheet.create({
   comfortPill: {
     height: 28,
     paddingHorizontal: 10,
-    backgroundColor: '#2F3E75',
+    backgroundColor: '#6B5AED',
     borderRadius: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1241,7 +1241,7 @@ const styles = StyleSheet.create({
     height: 28,
     paddingLeft: 10,
     paddingRight: 9,
-    backgroundColor: '#2F3E75',
+    backgroundColor: '#6B5AED',
     borderRadius: 20,
   },
   ratingStar: {
@@ -1270,7 +1270,7 @@ const styles = StyleSheet.create({
   whenRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#DEDAFB', backgroundColor: '#FBFAFE' },
   whenCol: { flex: 1, minWidth: 0 },
   whenLbl: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 14, color: '#737373' },
-  whenVal: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 18, color: '#2F3E75' },
+  whenVal: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 18, color: '#6B5AED' },
   priceActionRow: {
     flexDirection: 'row',
     alignItems: 'center',

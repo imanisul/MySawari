@@ -327,7 +327,7 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
             />
           ) : (
             <View style={[styles.thumbnailPlaceholder, { backgroundColor: '#E8EBF4' }]}>
-              <Feather name="gift" size={32} color="#323E71" />
+              <Feather name="gift" size={32} color="#6B5AED" />
             </View>
           )}
 
@@ -369,7 +369,7 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
         <View style={styles.cardInfo}>
           {/* Prominently Mentioned Vehicle Name */}
           <View style={styles.vehicleNameRow}>
-            <Ionicons name="car-sport" size={13} color="#323E71" />
+            <Ionicons name="car-sport" size={13} color="#6B5AED" />
             <Text style={[styles.vehicleNameText, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               {resolvedVehicleName}
             </Text>
@@ -383,7 +383,7 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
               {item.subtitle}
             </Text>
           ) : isOvernight ? (
-            <Text style={[styles.cardSubtitle, { color: '#323E71' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+            <Text style={[styles.cardSubtitle, { color: '#6B5AED' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
               Tonight 8 PM to 8 AM
             </Text>
           ) : isAllCars ? (
@@ -405,8 +405,8 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
           {/* Decided Rental Period Badge */}
           {item.rentalPeriodLabel ? (
             <View style={[styles.validityRow, { backgroundColor: '#F1F5F9', marginTop: 3 }]}>
-              <Feather name="navigation" size={10} color="#323E71" />
-              <Text style={[styles.validityText, { color: '#323E71', fontWeight: '600' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+              <Feather name="navigation" size={10} color="#6B5AED" />
+              <Text style={[styles.validityText, { color: '#6B5AED', fontWeight: '600' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                 Trip: {item.rentalPeriodLabel.replace(/\s*(→|->|➔|➜)\s*/g, ' to ')}
               </Text>
             </View>
@@ -421,7 +421,7 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
               ) : null}
             </View>
             <View style={styles.claimArrowBtn}>
-              <Feather name="arrow-right" size={13} color="#323E71" />
+              <Feather name="arrow-right" size={13} color="#6B5AED" />
             </View>
           </View>
         </View>
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#E11D48' },
   liveTagText: { fontFamily: F.semi, fontSize: 10, color: '#E11D48', letterSpacing: 0.5 },
   verifiedBadge: { backgroundColor: '#F3F4FA', paddingHorizontal: 8, minHeight: 20, justifyContent: 'center', borderRadius: 20, borderWidth: 1, borderColor: '#D5D9EA' },
-  verifiedBadgeText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#323E71' },
+  verifiedBadgeText: { fontFamily: F.semi, fontSize: 9, lineHeight: 12, color: '#6B5AED' },
   listContainer: { paddingHorizontal: 16, gap: 8 },
   card: { width: CARD_WIDTH, borderRadius: 12, borderWidth: 1, padding: 2, overflow: 'hidden' },
   thumbnailContainer: { width: '100%', height: 144, borderRadius: 8, overflow: 'hidden' },

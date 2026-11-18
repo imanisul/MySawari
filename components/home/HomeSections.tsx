@@ -42,7 +42,7 @@ function PicIcon({ source, size }: { source: any; size: number }) {
   return <CachedImage source={source} style={{ width: size, height: size }} contentFit="contain" transition={0} accessible={false} />;
 }
 
-export const HOME_PURPLE = '#323E71';
+export const HOME_PURPLE = '#6B5AED';
 // Hero gradient (Figma Frame 2147226276): 180deg, #332B72 0% → #6B5AED 93.85%, bottom corners 20.
 export const HERO_TOP = '#332B72';
 const HERO_BOTTOM = '#6B5AED';
@@ -542,9 +542,9 @@ export function HomeHero({ topInset, city, onCityPress, sawariCash, onWallet, fr
                 <CachedImage source={{ uri: s.imageUrl }} style={styles.imageSlidePhoto} contentFit="cover" cachePolicy="memory-disk" transition={0} />
                 {!!s.code && (
                   <View style={styles.bannerCodePill}>
-                    <Feather name="scissors" size={10} color="#323E71" />
+                    <Feather name="scissors" size={10} color="#6B5AED" />
                     <Text style={styles.bannerCodeText}>CODE: {s.code}</Text>
-                    <Feather name="copy" size={9} color="#323E71" />
+                    <Feather name="copy" size={9} color="#6B5AED" />
                   </View>
                 )}
                 {!!s.discount && (
@@ -1338,7 +1338,7 @@ const styles = StyleSheet.create({
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
   walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
   walletCoin: { width: 12, height: 12 },
-  walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#2F3E75' },
+  walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#6B5AED' },
   // Figma Home price banner: 393×287 card with the price lockup and SUV trio.
   findHeadline: { width: 300, fontFamily: 'PlusJakartaSans_700Bold', fontSize: 28, lineHeight: 42, letterSpacing: -0.56, textAlign: 'center', color: '#FFFFFF', textShadowColor: 'rgba(0,0,0,0.25)', textShadowOffset: { width: 0, height: 4 }, textShadowRadius: 6, marginBottom: 9 },
   priceBanner: { width: 393, height: 287, borderRadius: 12, overflow: 'hidden', position: 'relative' },
@@ -1401,7 +1401,7 @@ const styles = StyleSheet.create({
     fontFamily: 'PlusJakartaSans_700Bold',
     fontSize: 10,
     lineHeight: 14,
-    color: '#323E71',
+    color: '#6B5AED',
     letterSpacing: 0.5,
   },
   bannerDiscountBadge: {
@@ -1520,7 +1520,7 @@ const styles = StyleSheet.create({
 
   // Search
   // Figma: 361px card, 6 padding, 8 between the tabs and the destination box, shadow 0 2 15 4 rgba(47,62,117,.08).
-  searchCard: { marginHorizontal: 16, padding: 6, borderWidth: 1, borderRadius: 16, shadowColor: '#2F3E75', shadowOpacity: 0.08, shadowRadius: 15, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
+  searchCard: { marginHorizontal: 16, padding: 6, borderWidth: 1, borderRadius: 16, shadowColor: '#6B5AED', shadowOpacity: 0.08, shadowRadius: 15, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   // Figma: 56 high frame, 4 padding, 12 gap, 1px #E7EAF4 border, 12 radius, 20%-opaque fill; the tabs fill what is left inside.
   tabs: { flexDirection: 'row', gap: 12, height: 56, padding: 4, borderWidth: 1, borderColor: '#E7EAF4', borderRadius: 12, backgroundColor: 'rgba(244,246,250,0.2)' },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderRadius: 10, borderWidth: 1, borderColor: 'transparent' },

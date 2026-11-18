@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#EEF0F7',
     borderColor: '#D5D9EA',
   },
-  cashText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: '#2F3E75' },
+  cashText: { fontFamily: 'Inter_500Medium', fontSize: 15, color: '#6B5AED' },
   bellButton: {
     alignItems: 'center',
     justifyContent: 'center',

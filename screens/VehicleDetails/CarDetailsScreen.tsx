@@ -554,7 +554,7 @@ export default function CarDetailsScreen() {
 
 const styles = StyleSheet.create({
   floatWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 16 },
-  floatCard: { width: 325, maxWidth: '100%', height: 45, flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 6, paddingRight: 8, paddingLeft: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 10, shadowColor: '#2F3E75', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  floatCard: { width: 325, maxWidth: '100%', height: 45, flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 6, paddingRight: 8, paddingLeft: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 10, shadowColor: '#6B5AED', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   floatTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, includeFontPadding: false },
   floatSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 9, lineHeight: 14, includeFontPadding: false },
   floatBtn: { flexShrink: 0, minWidth: 96, height: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },

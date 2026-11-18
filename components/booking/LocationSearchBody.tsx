@@ -107,7 +107,7 @@ export function LocationSearchBody({
   // Figma neutrals in light mode; dark mode keeps the theme's own tokens.
   const ui = isDarkMode
     ? { border: colors.border, muted: colors.mutedForeground, title: colors.foreground, iconBg: colors.secondary, pin: colors.mutedForeground, hole: colors.secondary, active: colors.mutedForeground, topHit: colors.tintLight, accent: '#A5B6FF', focusBorder: '#A5B6FF', cardBg: colors.secondary, cardBorder: colors.border, accentIcon: '#101B2E' }
-    : { border: '#D4D4D4', muted: '#737373', title: '#262626', iconBg: '#F5F5F5', pin: '#A3A3A3', hole: '#FFFFFF', active: '#A3A3A3', topHit: '#FAFAFA', accent: '#2F3E75', focusBorder: '#9FA6C0', cardBg: '#F4F6FA', cardBorder: '#E7EAF4', accentIcon: '#FFFFFF' };
+    : { border: '#D4D4D4', muted: '#737373', title: '#262626', iconBg: '#F5F5F5', pin: '#A3A3A3', hole: '#FFFFFF', active: '#A3A3A3', topHit: '#FAFAFA', accent: '#6B5AED', focusBorder: '#9FA6C0', cardBg: '#F4F6FA', cardBorder: '#E7EAF4', accentIcon: '#FFFFFF' };
 
   const [searchQuery, setSearchQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);

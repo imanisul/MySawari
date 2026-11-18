@@ -9,7 +9,7 @@ const light = {
   body: '#404040',
   sub: '#525252',
   muted: '#737373',
-  navy: '#2F3E75',
+  navy: '#6B5AED',
   onNavy: '#FFFFFF',
   button: '#6B5AED', // every filled button (text on it: onNavy, white)
   green: '#008758',
@@ -27,8 +27,8 @@ const light = {
   // Gold/Bg = rgba(251,188,4,0.1); its border is the same wash at 0.21 alpha.
   demandBg: 'rgba(251, 188, 4, 0.1)', // Figma "Gold/Bg" (urgency message, benefit circles)
   demandBorder: 'rgba(251, 188, 4, 0.21)',
-  purple: '#323E71',
-  purpleCheck: '#323E71',
+  purple: '#6B5AED',
+  purpleCheck: '#6B5AED',
   purpleBg: '#EEF0F7',
   purpleBgEnd: '#E3E6F1',
   purpleGlow: '#4B5A9E', // Figma "Ellipse 4" on the Why card

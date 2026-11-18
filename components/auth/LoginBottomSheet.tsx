@@ -96,7 +96,7 @@ const LIGHT = {
   fieldBorder: '#EAECF1',
   field2: '#E5E5E5', // name and email boxes use Neutral/200
   fieldFocus: '#A3A3A3',
-  navy: '#2F3E75',
+  navy: '#6B5AED',
   onNavy: '#FFFFFF',
   disabledBg: '#EAECF1',
   disabledText: '#A3A3A3',
@@ -664,14 +664,14 @@ export function LoginBottomSheet({
               {!!pendingReferral && (
                 <View style={[styles.naviBanner, { backgroundColor: isDarkMode ? '#1F2747' : '#EEF0F7', borderColor: isDarkMode ? '#262F57' : '#D5D9EA' }]}>
                   <View style={styles.naviBannerLeft}>
-                    <View style={[styles.naviIconCircle, { backgroundColor: '#323E71' }]}>
+                    <View style={[styles.naviIconCircle, { backgroundColor: '#6B5AED' }]}>
                       <Feather name="gift" size={13} color="#FFFFFF" />
                     </View>
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={[styles.naviBannerTitle, { color: isDarkMode ? '#E3E6F1' : '#1F2747' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                         Referred by <Text style={{ fontFamily: 'PlusJakartaSans_700Bold' }}>{pendingReferral.referrerName}</Text>
                       </Text>
-                      <Text style={[styles.naviBannerSub, { color: isDarkMode ? '#A5B4FC' : '#323E71' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                      <Text style={[styles.naviBannerSub, { color: isDarkMode ? '#A5B4FC' : '#6B5AED' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
                         {pendingReferral.rewardText || '100 SawariCash on signup'} • Applied
                       </Text>
                     </View>

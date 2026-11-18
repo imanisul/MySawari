@@ -73,7 +73,7 @@ export default function MyReferralsScreen() {
         <View style={styles.partnerBanner}>
           <View style={styles.partnerBannerRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-              <Feather name="tag" size={16} color="#323E71" />
+              <Feather name="tag" size={16} color="#6B5AED" />
               <Text style={styles.partnerTitle}>Partner QR Sticker</Text>
             </View>
             <View style={styles.partnerPill}>
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     color: '#312E81',
   },
   partnerPill: {
-    backgroundColor: '#323E71',
+    backgroundColor: '#6B5AED',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 6,

@@ -405,7 +405,7 @@ const s = StyleSheet.create({
     minWidth: 72, height: 42, paddingHorizontal: 12, borderRadius: 40,
     backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9',
   },
-  cashText: { fontFamily: F.semi, fontSize: 13, color: '#2F3E75' },
+  cashText: { fontFamily: F.semi, fontSize: 13, color: '#6B5AED' },
   headerArtwork: { position: 'absolute' },
   // Frame 2147226253: Cars / Bikes & Scooters tab switch
   tabsFrame: {

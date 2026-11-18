@@ -1350,7 +1350,7 @@ const styles = createUnscaled({
   detailsRow1: { height: 50, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4 },
   carTitle: { fontFamily: FONT_SEMI, fontSize: 17, lineHeight: 25.5, color: '#262626', includeFontPadding: false },
   ratingCol: { width: 67, alignItems: 'center', gap: 4 },
-  ratingBadge: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 4, paddingBottom: 4, paddingLeft: 10, paddingRight: 9, borderRadius: 20, backgroundColor: '#2F3E75' },
+  ratingBadge: { height: 28, flexDirection: 'row', alignItems: 'center', gap: 2, paddingTop: 4, paddingBottom: 4, paddingLeft: 10, paddingRight: 9, borderRadius: 20, backgroundColor: '#6B5AED' },
   ratingNum: { fontFamily: FONT_SEMI, fontSize: 13, lineHeight: 19.5, color: '#FFFFFF', includeFontPadding: false },
   ratingStar: {
     fontFamily: FONT,

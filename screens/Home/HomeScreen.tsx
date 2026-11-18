@@ -343,7 +343,7 @@ export default function HomeScreen() {
   }, [cards]);
 
   // Refer & Earn: 10% of a friend's first booking — at least 10% of the lowest day rate in the fleet.
-  const referEarn = '₹50K'; // fixed headline reward on the strip
+  const referEarn = '₹50+'; // fixed headline reward on the strip
 
   const isMember = !!membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date());
 
@@ -559,7 +559,7 @@ export default function HomeScreen() {
       case 'benefits':
         content = (
           <>
-            <HomeSectionTitle title="Benefits" />
+            <HomeSectionTitle title="Why Choose MySawari?" />
             <BenefitsGrid />
           </>
         );

@@ -34,14 +34,10 @@ export function VehicleHeader({
     Haptics.selectionAsync();
     try {
       const price = selectedCar.perDay ? ` from ${formatCurrency(selectedCar.perDay)}/day` : '';
+      const appLinkBase = (process.env.EXPO_PUBLIC_APP_LINK_URL || 'https://app.mysawari.in').replace(/\/+$/, '');
+      const shareUrl = selectedCar.id ? `${appLinkBase}/share/car/${selectedCar.id}` : appLinkBase;
 
-      // Only the store link (fetched from the server's settings, with the app's own as fallback) — adapts to platform.
-      const config = await API.getAppConfig().catch(() => null);
-      const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-      const appStore = config?.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836';
-      const storeUrl = Platform.OS === 'ios' ? appStore : playStore;
-
-      const message = `Check out the ${title} on MySawari${price}!\n\n📲 Download the MySawari App:\n${storeUrl}`;
+      const message = `Check out the ${title} on MySawari${price}!\n\n📲 View & Book on MySawari:\n${shareUrl}`;
 
       await Share.share({ message, title: `Rent ${title} on MySawari` });
     } catch (error: any) {

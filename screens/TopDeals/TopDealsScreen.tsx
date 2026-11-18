@@ -367,7 +367,7 @@ function VehicleCard({
               <Text style={styles.whenLbl}>Start</Text>
               <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(startMs, nowMs)}</Text>
             </View>
-            <Feather name="arrow-right" size={14} color="#6152D8" />
+            <Feather name="arrow-right" size={12} color="#6152D8" />
             <View style={[styles.whenCol, { alignItems: 'flex-end' }]}>
               <Text style={styles.whenLbl}>End</Text>
               <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(endMs, nowMs)}</Text>
@@ -550,14 +550,11 @@ export default function TopDealsScreen() {
   const handleShare = async () => {
     Haptics.selectionAsync();
     try {
-      // Store link from the server's settings (with the app's own as fallback) — adapts to platform.
-      const config = await API.getAppConfig().catch(() => null);
-      const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-      const appStore = config?.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836';
-      const storeUrl = Platform.OS === 'ios' ? appStore : playStore;
+      // Branded smart link: auto-redirects iPhone -> App Store & Android -> Play Store
+      const appLinkBase = (process.env.EXPO_PUBLIC_APP_LINK_URL || 'https://app.mysawari.in').replace(/\/+$/, '');
       await Share.share({
         title: `MySawari Today's Deals`,
-        message: `Book top self-drive cars in Today's Deals on MySawari starting at discounted hourly rates!\n\n📲 Download the MySawari App:\n${storeUrl}`,
+        message: `Book top self-drive cars in Today's Deals on MySawari starting at discounted hourly rates!\n\n📲 Download the MySawari App:\n${appLinkBase}`,
       });
     } catch {
       // dismissed
@@ -1267,7 +1264,7 @@ const styles = StyleSheet.create({
   },
 
   // ── Price & Action Row (Frame 2147225762) ──
-  whenRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: '#DEDAFB', backgroundColor: '#FBFAFE' },
+  whenRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: '#DEDAFB', backgroundColor: '#FBFAFE' },
   whenCol: { flex: 1, minWidth: 0 },
   whenLbl: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 14, color: '#737373' },
   whenVal: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 18, color: '#6B5AED' },

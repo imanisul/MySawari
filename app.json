@@ -24,6 +24,10 @@
       "backgroundColor": "#FFFFFF",
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
+      "associatedDomains": [
+        "applinks:app.mysawari.in",
+        "applinks:mysawari.in"
+      ],
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -69,6 +73,26 @@
           "action": "VIEW",
           "autoVerify": true,
           "data": [
+            {
+              "scheme": "https",
+              "host": "app.mysawari.in",
+              "pathPrefix": "/r"
+            },
+            {
+              "scheme": "https",
+              "host": "app.mysawari.in",
+              "pathPrefix": "/ref"
+            },
+            {
+              "scheme": "https",
+              "host": "app.mysawari.in",
+              "pathPrefix": "/qr"
+            },
+            {
+              "scheme": "https",
+              "host": "app.mysawari.in",
+              "pathPrefix": "/share"
+            },
             {
               "scheme": "https",
               "host": "mysawari.com",

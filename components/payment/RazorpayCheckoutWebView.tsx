@@ -20,6 +20,8 @@ interface RazorpayCheckoutWebViewProps {
   };
   themeColor?: string;
   razorpayKey?: string;
+  /** Optional header bar (e.g. 2-minute car lock countdown timer) pinned cleanly above the checkout sheet. */
+  topBanner?: React.ReactNode;
   onSuccess: (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => void;
   onFailure: (error: any) => void;
   onClose: () => void;
@@ -36,6 +38,7 @@ export function RazorpayCheckoutWebView({
   prefill,
   themeColor = '#111A2B',
   razorpayKey,
+  topBanner,
   onSuccess,
   onFailure,
   onClose
@@ -215,6 +218,7 @@ export function RazorpayCheckoutWebView({
       ]}
       pointerEvents={visible === false ? 'none' : 'auto'}
     >
+      {visible !== false && topBanner}
       <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'android' ? 'padding' : undefined}>
         <WebView
           ref={webRef}

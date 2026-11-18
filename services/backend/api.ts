@@ -68,6 +68,10 @@ export type BookingSnapshot = {
   // Missing properties from UI
   pickupCharge?: number;
   dropCharge?: number;
+  // 2-minute checkout lock metadata (returned by POST /api/bookings/hold)
+  lockedUntil?: string;
+  lockDurationSec?: number;
+  lockExpiresAtMs?: number;
   dropDistanceKm?: number;
   dropLocationName?: string;
   membershipDiscount?: number;
@@ -1525,10 +1529,30 @@ export const API = {
     });
     const saved = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(saved.message || 'Failed to secure vehicle reservation');
+      const err: any = new Error(saved.message || 'Failed to secure vehicle reservation');
+      err.status = response.status;
+      err.code = saved.code;
+      const retryAfterHeader = response.headers?.get?.('Retry-After');
+      if (retryAfterHeader) {
+        const sec = parseInt(retryAfterHeader, 10);
+        if (!isNaN(sec) && sec > 0) err.retryAfterSec = sec;
+      }
+      throw err;
     }
     snapshot.id = saved.data?._id || snapshot.id;
     snapshot.bookingCode = saved.data?.bookingCode || snapshot.bookingCode;
+    const lockedUntilRaw = saved.data?.lockedUntil || saved.data?.holdExpiresAt;
+    const serverNowMs = saved.data?.serverNow ? new Date(saved.data.serverNow).getTime() : NaN;
+    const serverLockUntilMs = lockedUntilRaw ? new Date(lockedUntilRaw).getTime() : NaN;
+    const lockDurationSec = typeof saved.data?.lockDurationSec === 'number' && saved.data.lockDurationSec > 0
+      ? saved.data.lockDurationSec
+      : (!isNaN(serverLockUntilMs) && !isNaN(serverNowMs)
+          ? Math.max(10, Math.round((serverLockUntilMs - serverNowMs) / 1000))
+          : 120);
+    snapshot.lockedUntil = lockedUntilRaw ? new Date(lockedUntilRaw).toISOString() : new Date(Date.now() + lockDurationSec * 1000).toISOString();
+    snapshot.lockDurationSec = lockDurationSec;
+    // Skew-free local deadline derived from server duration (handles phones with wrong clocks)
+    snapshot.lockExpiresAtMs = Date.now() + lockDurationSec * 1000;
     invalidateWalletCache(); // SawariCash intent
 
     return snapshot;

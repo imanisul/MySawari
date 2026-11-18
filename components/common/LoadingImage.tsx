@@ -6,9 +6,9 @@ import { useSawari } from '@/context/SawariContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image, ImageProps } from 'expo-image';
 
-// A photo that fails (server busy processing it, a network blip) is retried a few times on its own
+// A photo that fails (server busy processing it, a network blip) is retried quickly on its own
 // before the "unavailable" placeholder is shown, instead of staying broken for the rest of the session.
-const RETRY_DELAYS_MS = [2000, 5000, 12000];
+const RETRY_DELAYS_MS = [600, 1800, 4500];
 
 // Keep track of URIs that loaded successfully in this session so cached images render immediately
 // on scroll without flashing a placeholder or triggering layout updates.
@@ -227,10 +227,11 @@ export function LoadingImage({ onLoad, onError, recyclingKey, ...props }: ImageP
         {...props}
         recyclingKey={recyclingKey} // Let expo-image optimize recycling natively
         source={optimizedSource}
+        priority={props.priority ?? 'high'}
         cachePolicy="memory-disk"
         allowDownscaling={true}
-        // a photo already on the phone appears instantly; only a first-time download fades in
-        transition={isAlreadyLoaded ? 0 : (props.transition ?? 250)}
+        // a photo already on the phone appears instantly; first-time downloads snap in crisply
+        transition={isAlreadyLoaded ? 0 : (props.transition ?? 80)}
         onLoad={(e) => {
           if (srcKey) loadedUris.add(srcKey);
           setReady(true);

@@ -516,8 +516,8 @@ const styles = StyleSheet.create({
   name: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
   meta: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 18 },
   linksRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 },
-  rateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, height: 24 },
-  rateText: { fontFamily: FONT.medium, fontSize: 12 },
+  rateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 99, paddingHorizontal: 8, height: 24 },
+  rateText: { fontFamily: FONT.medium, fontSize: 12 , alignSelf: 'center', marginBottom: 2 },
   viewRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   viewText: { fontFamily: FONT.semibold, fontSize: 8, textDecorationLine: 'underline' },
 

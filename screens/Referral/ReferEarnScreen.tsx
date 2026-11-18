@@ -102,6 +102,7 @@ export default function ReferEarnScreen() {
     { q: 'Who is eligible for the referral offer?', a: 'Anyone new to MySawari who signs up with your code or link. Existing customers and your own numbers do not count.' },
     { q: 'What if my friend books without using my referral link?', a: 'The referral is only linked when your friend signs up with your code or link, so the reward cannot be added afterwards.' },
     { q: 'Where can I check my referral status?', a: 'Open "See your referral history" on this page, or Profile → Referral Tracking, to follow each friend from sign-up to reward.' },
+    { q: 'Are all the referrals eligible for referral bonus?', a: 'All referrals except if the referred person is our existing customer or enquired with us directly before you referred.'}
   ], [pct]);
 
   const needLogin = () => {
@@ -486,7 +487,7 @@ const styles = StyleSheet.create({
   wa: { flex: 1, height: 54, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   waLogo: { width: 25, height: 25, borderRadius: 12.5, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
   // TODO: Match Figma CTA: 17px SemiBold label and a 50px share button (currently 18.5px Medium and 54px).
-  waText: { fontFamily: PF.medium, fontSize: 18.5, color: '#FFFFFF' },
+  waText: { fontFamily: PF.medium, fontSize: 14, color: '#FFFFFF' },
   shareBtn: { width: 54, height: 54, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
 
   modalBackdrop: {

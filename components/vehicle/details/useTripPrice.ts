@@ -77,7 +77,15 @@ export function useTripPrice(hasTrip: boolean): TripPrice {
   const planKey = (membership?.plan || '').toLowerCase().trim();
   const isMembershipActive = !!planKey && (!membership?.expiresAt || new Date(membership.expiresAt) > new Date());
   let membershipDiscount = q.subscriptionDiscount || 0;
-  if (membershipDiscount === 0 && isMembershipActive && planKey && PLAN_RATES[planKey]) {
+  // Never override membershipDiscount back to non-zero when the applied coupon/Flash Sale blocks membership stacking
+  if (
+    membershipDiscount === 0 &&
+    !q.membershipStackingBlocked &&
+    !(q.couponDiscount > 0) &&
+    isMembershipActive &&
+    planKey &&
+    PLAN_RATES[planKey]
+  ) {
     const { rate, tripCap, annualCap } = PLAN_RATES[planKey];
     const remaining = Math.max(0, annualCap - (membership?.totalSaved || 0));
     membershipDiscount = Math.min(

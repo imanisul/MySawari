@@ -72,6 +72,8 @@ export type BookingSnapshot = {
   lockedUntil?: string;
   lockDurationSec?: number;
   lockExpiresAtMs?: number;
+  /** Exact total online Razorpay charge expected by the server hold (booking advance + optional membership fee). */
+  serverExpectedOnline?: number;
   dropDistanceKm?: number;
   dropLocationName?: string;
   membershipDiscount?: number;
@@ -153,7 +155,7 @@ function placeLabel(place: any): string | undefined {
   return undefined;
 }
 
-import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, upsertCouponInCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
+import { calculateBookingPrice, buildQuoteFingerprint, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, upsertCouponInCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
 import { bikeTransmissionFor } from '../../utils/bikeModels';
 import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -993,8 +995,8 @@ export const API = {
     });
   },
 
-  /** GET /api/vehicles/:id/availability: this car's bookings and status read live (the list above can be a minute or more old). */
-  async getVehicleAvailability(vehicleId: string): Promise<{ status: string; maintenanceUntil: string | null; bookedRanges: Array<{ start: string; end: string; status?: string }> } | null> {
+  /** GET /api/vehicles/:id/availability: this car's bookings, live price and status read live (the list above can be a minute or more old). */
+  async getVehicleAvailability(vehicleId: string): Promise<{ status: string; pricePerDay?: number; maintenanceUntil: string | null; bookedRanges: Array<{ start: string; end: string; status?: string }> } | null> {
     try {
       const res = await timedFetch(`${BACKEND_URL}/vehicles/${encodeURIComponent(vehicleId)}/availability`);
       if (!res.ok) return null;
@@ -1060,7 +1062,10 @@ export const API = {
                 ? (resolvedDiscountType === 'PERCENTAGE' ? 'percentage_discount' : 'fixed_discount')
                 : o.pricingType,
               promotionalPrice: isStandardCoupon ? undefined : o.promotionalPrice,
+              dealPrice: isStandardCoupon ? undefined : o.dealPrice,
+              vehiclePrices: Array.isArray(o.vehiclePrices) ? o.vehiclePrices : undefined,
               pricingUnit: o.pricingUnit,
+              allowMembershipStacking: Boolean(o.allowMembershipStacking),
               customerEligibility: o.customerEligibility || 'all',
               firstNCustomers: o.firstNCustomers ?? null,
               remainingCustomerSlots: o.remainingCustomerSlots ?? null,
@@ -1090,8 +1095,9 @@ export const API = {
   async validateCoupon(
     code: string,
     bookingAmount: number,
-    vehicleId?: string
-  ): Promise<{ valid: boolean; discount: number; reason?: string; coupon?: Coupon; offline?: boolean }> {
+    vehicleId?: string,
+    days?: number
+  ): Promise<{ valid: boolean; discount: number; reason?: string; coupon?: Coupon; allowMembershipStacking?: boolean; offline?: boolean }> {
     const clean = String(code || '').trim().toUpperCase();
     if (!clean) return { valid: false, discount: 0, reason: 'Please enter a coupon code.' };
     try {
@@ -1102,18 +1108,24 @@ export const API = {
           code: clean,
           bookingAmount: Math.max(0, Number(bookingAmount) || 0),
           vehicleId: vehicleId || undefined,
+          days: days || 1,
         }),
       });
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
         if (json.data.valid && json.data.coupon) {
-          upsertCouponInCatalog(json.data.coupon);
+          upsertCouponInCatalog({
+            ...json.data.coupon,
+            allowMembershipStacking:
+              json.data.allowMembershipStacking ?? json.data.coupon.allowMembershipStacking ?? false,
+          });
         }
         return {
           valid: Boolean(json.data.valid),
           discount: Number(json.data.discount) || 0,
           reason: json.data.reason,
           coupon: json.data.coupon,
+          allowMembershipStacking: Boolean(json.data.allowMembershipStacking),
         };
       }
       return {
@@ -1207,7 +1219,8 @@ export const API = {
     const membershipFee = buyPlan ? MEMBERSHIP_PRICES[buyPlan] : 0;
     quote.membershipPlanToBuy = buyPlan;
     quote.membershipFee = membershipFee;
-    quote.onlinePayableNow = (quote.onlinePayableNow || 0) + membershipFee;
+    quote.onlinePayableNow = Math.round((quote.onlinePayableNow || 0) + membershipFee);
+    quote._fingerprint = buildQuoteFingerprint(params);
 
     if (quote.error) {
       throw new Error(quote.error);
@@ -1244,14 +1257,21 @@ export const API = {
    */
   async createRazorpayOrder(params: any, idempotencyKey?: string): Promise<{ orderId: string, amountPaise: number, keyId: string }> {
     try {
-      const amountToPay = params.onlinePayableNow || params.rentalAmount || 0;
+      const amountToPay = Math.round(Number(params.onlinePayableNow || params.rentalAmount || 0));
       if (amountToPay <= 0) {
         throw new Error('No Razorpay order required for zero amount');
       }
 
-      // If already preloaded and matching amount within 2 minutes, return in sub-milliseconds
-      if (preloadedOrderCache && preloadedOrderCache.amount === amountToPay && (Date.now() - preloadedOrderCache.timestamp < 120000)) {
-        return await preloadedOrderCache.promise;
+      const consumeCache = params?.consume === true;
+      const bypassCache = params?.forceFresh === true;
+
+      // If already preloaded and matching amount within 2 minutes, return in sub-milliseconds.
+      // When consumed for an actual checkout (`consume: true`), immediately clear the cache so a
+      // paid/redeemed Razorpay order is NEVER accidentally reused by a second booking!
+      if (!bypassCache && preloadedOrderCache && preloadedOrderCache.amount === amountToPay && (Date.now() - preloadedOrderCache.timestamp < 120000)) {
+        const hit = preloadedOrderCache.promise;
+        if (consumeCache) preloadedOrderCache = null;
+        return await hit;
       }
 
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -1271,12 +1291,16 @@ export const API = {
         return { orderId: data.data.id, amountPaise: data.data.amount, keyId: data.data.keyId };
       })();
 
-      preloadedOrderCache = {
-        amount: amountToPay,
-        receiptKey: key,
-        promise: orderPromise,
-        timestamp: Date.now(),
-      };
+      if (!consumeCache && !bypassCache) {
+        preloadedOrderCache = {
+          amount: amountToPay,
+          receiptKey: key,
+          promise: orderPromise,
+          timestamp: Date.now(),
+        };
+      } else {
+        preloadedOrderCache = null;
+      }
 
       return await orderPromise;
     } catch (e: any) {
@@ -1340,8 +1364,15 @@ export const API = {
     idempotencyKey?: string,
     existingQuote?: any
   ): Promise<BookingSnapshot> {
-    // Reuse existing client-side quote if valid, eliminating a redundant 500-1500ms round-trip to the quote endpoint
-    const quote = existingQuote && existingQuote.rentalAmount ? existingQuote : (await this.quoteBooking(params));
+    // Reuse existing client-side quote ONLY if it matches the exact current params (fingerprint check);
+    // otherwise recompute fresh so a stale car/date/coupon/driver/SawariCash quote is NEVER sent to /bookings/hold.
+    const expectedFp = buildQuoteFingerprint(params);
+    const canReuseQuote = Boolean(
+      existingQuote &&
+      existingQuote.rentalAmount > 0 &&
+      existingQuote._fingerprint === expectedFp
+    );
+    const quote = canReuseQuote ? existingQuote : (await this.quoteBooking(params));
     // A plan bought together with this booking: its price is part of the one payment, but not of the booking.
     const membershipFee = quote.membershipFee || 0;
     const bookingPaidNow = Math.max(0, quote.onlinePayableNow - membershipFee);
@@ -1553,6 +1584,12 @@ export const API = {
     snapshot.lockDurationSec = lockDurationSec;
     // Skew-free local deadline derived from server duration (handles phones with wrong clocks)
     snapshot.lockExpiresAtMs = Date.now() + lockDurationSec * 1000;
+    const serverPaidOnline = saved.data?.payment?.bookingAmountPaid ?? bookingPaidNow;
+    const serverPlanFee = saved.data?.membershipPurchase?.price ?? membershipFee;
+    snapshot.serverExpectedOnline =
+      typeof saved.data?.paymentBreakdown?.razorpay === 'number'
+        ? saved.data.paymentBreakdown.razorpay
+        : (Number(serverPaidOnline) || 0) + (Number(serverPlanFee) || 0);
     invalidateWalletCache(); // SawariCash intent
 
     return snapshot;
@@ -1577,6 +1614,8 @@ export const API = {
   },
 
   async confirmBookingPayment(bookingId: string, razorpayOrderId?: string, razorpayPaymentId?: string, idempotencyKey?: string, razorpaySignature?: string): Promise<any> {
+    // Clear any cached preloaded order once a confirmation starts so it can never be reused
+    preloadedOrderCache = null;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (idempotencyKey) {
       headers['Idempotency-Key'] = `${idempotencyKey}-confirm`;

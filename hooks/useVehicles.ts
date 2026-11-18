@@ -123,15 +123,17 @@ export function useLiveCar<T extends { id: string } | null | undefined>(car: T):
     refetchInterval: 10 * 1000,
   });
 
-  // Sync this vehicle's live availability back into the global vehicles list
+  // Sync this vehicle's live availability and price back into the global vehicles list
   useEffect(() => {
     if (data && id) {
       queryClient.setQueryData<any[]>(VEHICLES_KEY, (old) => {
         if (!Array.isArray(old)) return old;
         return old.map((v) => {
           if (String(v.id) === id || (v as any)._id === id) {
+            const livePrice = typeof data.pricePerDay === 'number' && data.pricePerDay > 0 ? data.pricePerDay : null;
             return {
               ...v,
+              ...(livePrice ? { perDay: livePrice, price: `₹${livePrice}` } : {}),
               bookedRanges: data.bookedRanges,
               dbStatus: data.status || (v as any).dbStatus,
               maintenanceUntil: data.maintenanceUntil,
@@ -144,7 +146,14 @@ export function useLiveCar<T extends { id: string } | null | undefined>(car: T):
   }, [data, id, queryClient]);
 
   if (!car || !data) return car;
-  return { ...car, bookedRanges: data.bookedRanges, dbStatus: data.status || (car as any).dbStatus, maintenanceUntil: data.maintenanceUntil } as T;
+  const livePrice = typeof data.pricePerDay === 'number' && data.pricePerDay > 0 ? data.pricePerDay : null;
+  return {
+    ...car,
+    ...(livePrice ? { perDay: livePrice, price: `₹${livePrice}` } : {}),
+    bookedRanges: data.bookedRanges,
+    dbStatus: data.status || (car as any).dbStatus,
+    maintenanceUntil: data.maintenanceUntil,
+  } as T;
 }
 
 /**

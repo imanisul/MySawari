@@ -1,6 +1,7 @@
 import React from 'react';
 import { Animated, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { FontAwesome, Ionicons } from '@expo/vector-icons';
+import { Feather, FontAwesome, Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SUPPORT_EMAIL, SUPPORT_PHONE, SUPPORT_WHATSAPP_URL } from '@/constants/support';
@@ -22,6 +23,9 @@ export function PaymentFailed({ title = 'Payment Failed', message = 'Your bookin
 }) {
   const p = useDetailsPalette();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  // iPhone has no system back button and checkout turns the swipe-back off, so the page needs its own ways out.
+  const goHome = () => router.dismissTo('/');
 
   // The badge pops in with a small shake, then the help card rises in.
   const pop = React.useRef(new Animated.Value(0)).current;
@@ -37,6 +41,15 @@ export function PaymentFailed({ title = 'Payment Failed', message = 'Your bookin
 
   return (
     <View style={[styles.screen, { backgroundColor: p.page }]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        hitSlop={10}
+        onPress={onButton}
+        style={({ pressed }) => [styles.back, { top: insets.top + 8, backgroundColor: p.iconBg }, pressed && { opacity: 0.7 }]}
+      >
+        <Feather name="chevron-left" size={20} color={p.fg} />
+      </Pressable>
       <View style={[styles.body, { paddingTop: insets.top + 128 }]}>
         <Animated.View
           style={[styles.badge, { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] }) }, { translateX: shake }] }]}
@@ -84,6 +97,10 @@ export function PaymentFailed({ title = 'Payment Failed', message = 'Your bookin
         <Pressable accessibilityRole="button" onPress={onButton} style={({ pressed }) => [styles.cta, { backgroundColor: p.button }, pressed && { opacity: 0.85 }]}>
           <Text style={styles.ctaText}>{buttonLabel}</Text>
         </Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back to Home" hitSlop={8} onPress={goHome} style={({ pressed }) => [styles.homeLink, pressed && { opacity: 0.6 }]}>
+          <Feather name="home" size={15} color={p.navy} />
+          <Text style={[styles.homeText, { color: p.navy }]}>Back to Home</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -108,5 +125,8 @@ const styles = StyleSheet.create({
   fade: { height: 64 },
   footer: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth, boxShadow: '0px -6px 18px rgba(47, 62, 117, 0.07)' },
   cta: { height: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  back: { position: 'absolute', left: 16, zIndex: 2, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  homeLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 40, marginTop: 6 },
+  homeText: { fontFamily: FONT.semibold, fontSize: 14 },
   ctaText: { fontFamily: FONT.medium, fontSize: 16, color: '#FFFFFF' },
 });

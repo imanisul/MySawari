@@ -123,11 +123,22 @@ export function useDealCars(nowMs: number) {
     };
     offers.forEach((o: any) => {
       if (o.isTopDeal || o.type === 'top_deal' || o.isExclusive || o.position === 'exclusive') {
+        const extractId = (x: any) => (x && typeof x === 'object' ? String(x._id || x.id || '') : String(x || ''));
         if (o.vehicleId) {
-          setOffer(String(typeof o.vehicleId === 'object' ? o.vehicleId._id || o.vehicleId.id : o.vehicleId), o);
+          const idStr = extractId(o.vehicleId);
+          if (idStr) setOffer(idStr, o);
         }
         if (Array.isArray(o.applicableVehicleIds)) {
-          o.applicableVehicleIds.forEach((vid: any) => setOffer(String(vid), o));
+          o.applicableVehicleIds.forEach((vid: any) => {
+            const idStr = extractId(vid);
+            if (idStr) setOffer(idStr, o);
+          });
+        }
+        if (Array.isArray(o.vehiclePrices)) {
+          o.vehiclePrices.forEach((vp: any) => {
+            const idStr = extractId(vp?.vehicleId);
+            if (idStr) setOffer(idStr, o);
+          });
         }
       }
     });

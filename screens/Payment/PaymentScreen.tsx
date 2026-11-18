@@ -97,7 +97,7 @@ export default function PaymentScreen() {
     const vehicleId = currentVehicleId;
     const rentalAmt = pricingQuote?.rentalAmount ?? 0;
 
-    const serverCheck = await API.validateCoupon(code, rentalAmt, vehicleId);
+    const serverCheck = await API.validateCoupon(code, rentalAmt, vehicleId, pricingQuote?.rentalDays || 1);
     if (!serverCheck.offline) {
       if (!serverCheck.valid || serverCheck.discount <= 0) {
         const reason = serverCheck.reason || `${code} isn't valid for this booking.`;

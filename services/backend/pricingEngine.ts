@@ -45,7 +45,10 @@ export type Coupon = {
   vehicleId?: string;
   pricingType?: 'promotional_price' | 'fixed_discount' | 'percentage_discount' | 'custom_pricing';
   promotionalPrice?: number;
+  dealPrice?: number;
+  vehiclePrices?: Array<{ vehicleId: any; dealPrice: number; originalPrice?: number }>;
   pricingUnit?: 'per_day' | 'per_trip';
+  allowMembershipStacking?: boolean;
   customerEligibility?: 'all' | 'specific_customers' | 'new_customers' | 'members_only';
   firstNCustomers?: number | null;
   remainingCustomerSlots?: number | null;
@@ -161,13 +164,43 @@ export type PricingQuote = {
 
   subscriptionDiscount: number;
   membershipPlanName?: string | null;
+  /** True when the applied coupon/deal forbids stacking with membership discount. */
+  membershipStackingBlocked?: boolean;
 
   /** A plan bought with this booking: its key, and its price included in onlinePayableNow (0 when none). */
   membershipPlanToBuy?: MembershipPlanKey | null;
   membershipFee?: number;
 
+  /** Deterministic key of the QuoteParams that produced this quote (prevents stale-quote reuse). */
+  _fingerprint?: string;
+
   error?: string;
 };
+
+/** Deterministic fingerprint of the booking inputs so stale quotes are never reused for a different trip/car/option. */
+export function buildQuoteFingerprint(params: Omit<QuoteParams, 'availableSawariCash'>): string {
+  const coord = (loc?: { latitude?: number; longitude?: number; name?: string } | null) =>
+    loc ? `${loc.name || ''}:${Number(loc.latitude || 0).toFixed(4)},${Number(loc.longitude || 0).toFixed(4)}` : '';
+  return [
+    String(params.vehicleId || ''),
+    String(Number(params.dailyRate) || 0),
+    String(Number(params.hourlyRate) || 0),
+    String(params.pickupDateStr || ''),
+    String(params.returnDateStr || ''),
+    String(params.pickupTime || ''),
+    String(params.returnTime || ''),
+    String(params.driverMode || 'Self Drive'),
+    params.isDeliveryRequested ? '1' : '0',
+    String(params.deliveryMode || ''),
+    coord(params.pickupLocation),
+    coord(params.returnLocation),
+    String(params.couponCode || '').trim().toUpperCase(),
+    String(Number(params.sawariCashToApply) || 0),
+    String(params.buyPlan || ''),
+    String(params.membership?.plan || '').toLowerCase(),
+    String(Number(params.membership?.totalSaved) || 0),
+  ].join('|');
+}
 
 export type FuelEstimate = {
   fuelRequiredLitres: number;
@@ -443,17 +476,39 @@ export function calculateCouponDiscount(
 
   // Only treat an offer as a promotional-price deal when it is ACTUALLY an exclusive/special deal with an
   // explicit promotionalPrice or dealPrice — NEVER apply promotional-price fallback to standard coupons!
+  const isCustomVehicleDeal =
+    coupon.pricingType === 'custom_pricing' &&
+    Array.isArray(coupon.vehiclePrices) &&
+    coupon.vehiclePrices.length > 0;
+
   const isPromoDeal =
+    !isCustomVehicleDeal &&
     (coupon.type === 'special_deal' || coupon.isExclusive === true) &&
     !(coupon.type === 'coupon' && !coupon.isExclusive) &&
     (coupon.pricingType === 'promotional_price' || coupon.type === 'special_deal') &&
     ((coupon.promotionalPrice !== null && coupon.promotionalPrice !== undefined && Number(coupon.promotionalPrice) > 0) ||
-      (Number((coupon as any).dealPrice) > 0));
+      (Number(coupon.dealPrice) > 0));
 
-  if (isPromoDeal) {
+  if (isCustomVehicleDeal) {
+    let dealPrice = Number(coupon.dealPrice ?? coupon.promotionalPrice ?? 0);
+    if (vehicleContext?.vehicleId) {
+      const targetId = String(vehicleContext.vehicleId);
+      const match = (coupon.vehiclePrices || []).find((vp) => {
+        const vid = vp?.vehicleId && typeof vp.vehicleId === 'object'
+          ? String(vp.vehicleId._id ?? vp.vehicleId.id ?? '')
+          : String(vp?.vehicleId ?? '');
+        return vid === targetId;
+      });
+      if (match && match.dealPrice !== undefined) {
+        dealPrice = Number(match.dealPrice);
+      }
+    }
+    const dealRental = coupon.pricingUnit === 'per_trip' ? dealPrice : dealPrice * Math.max(1, days);
+    discount = Math.max(0, base - dealRental);
+  } else if (isPromoDeal) {
     const promoPrice = coupon.promotionalPrice !== null && coupon.promotionalPrice !== undefined && Number(coupon.promotionalPrice) > 0
       ? Number(coupon.promotionalPrice)
-      : Number((coupon as any).dealPrice);
+      : Number(coupon.dealPrice);
     const dealRental = coupon.pricingUnit === 'per_trip' ? promoPrice : promoPrice * Math.max(1, days);
     discount = Math.max(0, base - dealRental);
   } else if (coupon.discountType === 'FLAT') {
@@ -470,6 +525,21 @@ export function calculateCouponDiscount(
     discount = Math.min(Number.isFinite(value) ? value : 0, base);
   }
   return Math.round(Math.max(0, Math.min(discount, base)));
+}
+
+/**
+ * Mirrors server `CouponService.validateCoupon` stacking policy:
+ * - No coupon / ₹0 coupon discount → membership applies normally.
+ * - Top Deals (`TOPDEAL-<hours>`) → server sets `allowMembershipStacking: true`.
+ * - Coupons & Flash Sales → server returns `Boolean(offer.allowMembershipStacking)` (defaults to false).
+ */
+export function doesCouponAllowMembershipStacking(couponCode?: string): boolean {
+  if (!couponCode || !couponCode.trim()) return true;
+  const upper = couponCode.trim().toUpperCase();
+  if (/^TOPDEAL-\d{1,2}$/i.test(upper)) return true;
+  const coupon = couponCatalog.find((c) => String(c.code).trim().toUpperCase() === upper);
+  if (!coupon) return true;
+  return coupon.allowMembershipStacking === true;
 }
 
 /** Trip total = rental (after driver charge + coupon) plus any pickup/drop service charges. */
@@ -565,8 +635,10 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
   // ── Membership subscription discount ───────────────────────────────────────
   const planKey = (membership?.plan || '').toLowerCase().trim();
   const isMembershipActive = !!(planKey && (!membership?.expiresAt || new Date(membership.expiresAt) > new Date()));
+  const allowStacking = couponDiscount <= 0 || doesCouponAllowMembershipStacking(couponCode);
+  const membershipStackingBlocked = isMembershipActive && !allowStacking;
   let subscriptionDiscount = 0;
-  if (isMembershipActive && planKey && MEMBERSHIP_PLANS[planKey]) {
+  if (isMembershipActive && allowStacking && planKey && MEMBERSHIP_PLANS[planKey]) {
     const { discountRate, tripCap, annualCap } = MEMBERSHIP_PLANS[planKey];
     const remaining = Math.max(0, annualCap - (membership?.totalSaved || 0));
     // Membership discount = the vehicle's rent × the plan's %, capped per trip and per year. The base is the rent only
@@ -581,22 +653,23 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
 
   // Only the fixed booking amount (₹500, or less if the whole trip costs less) is paid up front.
   // Everything else — rental, driver, pickup and drop services — is the remaining balance.
-  const bookingAdvance = calculateAdvanceAmount(totalAfterSubscription);
+  const bookingAdvance = Math.round(calculateAdvanceAmount(totalAfterSubscription));
 
   // Prevent users from draining their entire signup bonus at once.
-  // Cap SawariCash usage to 10% of the base rental amount, up to an absolute maximum of ₹50 per trip.
-  const maxSawariCashAllowed = Math.min(rentalAmount * 0.10, 50);
-  const verifiedCashToApply = Math.min(Math.max(0, sawariCashToApply || 0), Math.max(0, availableSawariCash || 0));
-  const sawariCashUsed = Math.min(verifiedCashToApply, maxSawariCashAllowed);
+  // Cap SawariCash usage to 10% of the base rental amount (whole rupees), up to ₹50 per trip,
+  // and never more than the trip total itself (e.g. ₹1 Flash Sale).
+  const maxSawariCashAllowed = Math.floor(Math.min(rentalAmount * 0.10, 50));
+  const verifiedCashToApply = Math.floor(Math.min(Math.max(0, sawariCashToApply || 0), Math.max(0, availableSawariCash || 0)));
+  const sawariCashUsed = Math.min(verifiedCashToApply, maxSawariCashAllowed, Math.round(totalAfterSubscription));
 
   // Apply SawariCash to the booking advance first
   const appliedToAdvance = Math.min(sawariCashUsed, bookingAdvance);
-  const onlinePayableNow = Math.max(0, bookingAdvance - appliedToAdvance);
+  const onlinePayableNow = Math.round(Math.max(0, bookingAdvance - appliedToAdvance));
 
   // Apply the remainder of the used SawariCash to the remaining balance
   const appliedToRemaining = Math.max(0, sawariCashUsed - appliedToAdvance);
   let remainingRentalAmount = calculateRemainingAmount(totalAfterSubscription, bookingAdvance);
-  remainingRentalAmount = Math.max(0, remainingRentalAmount - appliedToRemaining);
+  remainingRentalAmount = Math.round(Math.max(0, remainingRentalAmount - appliedToRemaining));
 
   // ── Resolve human-readable location names ──────────────────────────────────
   // Rules:
@@ -639,6 +712,7 @@ export async function calculateBookingPrice(params: QuoteParams): Promise<Pricin
     dropDistanceKm: drop.distanceKm,
     dropLocationName: resolvedDropName,
     subscriptionDiscount,
+    membershipStackingBlocked,
     membershipPlanName: isMembershipActive && planKey ? (MEMBERSHIP_PLAN_NAMES[planKey as MembershipPlanKey] || (planKey.charAt(0).toUpperCase() + planKey.slice(1))) : null,
   };
 }

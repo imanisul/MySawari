@@ -86,7 +86,7 @@ export default function BookingScreen() {
   const isDatesLocked = params.isFixedDates === 'true' || params.lockDates === 'true' || params.isTopDeal === 'true' || !!params.offerId;
   const insets = useSafeAreaInsets();
   const {
-    mode, setMode, selectedCar, pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested,
+    mode, setMode, selectedCar, selectCar, pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested,
     deliveryMode, setDeliveryMode, dateRange, pickupTime, returnTime, customer, isAuthenticated,
     applyCoupon, appliedCouponCode, isDealCoupon, sawariCash, sawariCashToApply, applySawariCash, membership,
     planToBuy, setPlanToBuy,
@@ -188,6 +188,18 @@ export default function BookingScreen() {
   // Checked against the live fleet, not the copy saved when the car was tapped.
   const { data: liveVehicles } = useVehicles();
   const liveCar = useLiveCar(liveVehicles?.find((v) => v.id === selectedCar?.id) || selectedCar);
+  // Keep selectedCar.perDay in sync with live server price so stale disk-cached prices never cause a hold mismatch.
+  useEffect(() => {
+    if (
+      liveCar &&
+      selectedCar &&
+      String(liveCar.id) === String(selectedCar.id) &&
+      Number(liveCar.perDay) > 0 &&
+      Number(liveCar.perDay) !== Number(selectedCar.perDay)
+    ) {
+      selectCar({ ...selectedCar, perDay: liveCar.perDay, price: liveCar.price });
+    }
+  }, [liveCar?.id, liveCar?.perDay, liveCar?.price, selectedCar, selectCar]);
   const isVehicleAvailable = !liveCar ? false : isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr, pickupTime, returnTime);
 
   // Detect if another customer holds an active 2-minute checkout lock on this car so we can show a live countdown
@@ -266,7 +278,7 @@ export default function BookingScreen() {
     const vehicleId = selectedCar?.id || (selectedCar as any)?._id;
     const rentalAmt = pricingQuote?.rentalAmount ?? 0;
 
-    const serverCheck = await API.validateCoupon(code, rentalAmt, vehicleId);
+    const serverCheck = await API.validateCoupon(code, rentalAmt, vehicleId, pricingQuote?.rentalDays || 1);
     if (!serverCheck.offline) {
       if (!serverCheck.valid || serverCheck.discount <= 0) {
         const reason = serverCheck.reason || `${code} isn't valid for this booking.`;

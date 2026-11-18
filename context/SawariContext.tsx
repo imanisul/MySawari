@@ -790,9 +790,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
     return true;
   }, [isAuthenticated]);
 
-  // Refresh quote whenever dependencies change — debounced so rapid changes
-  // (date selection, location pick, mode toggle) don't each fire a network call.
+  // Refresh quote whenever dependencies change — mark loading immediately so Pay & Book
+  // never submits a stale quote during the 300ms debounce window.
   useEffect(() => {
+    setIsQuoteLoading(true);
     const t = setTimeout(() => { refreshQuote(); }, 300);
     return () => clearTimeout(t);
   }, [refreshQuote]);

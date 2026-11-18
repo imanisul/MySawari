@@ -147,7 +147,7 @@ export default function PaymentProcessingScreen() {
 
         const orderPromise = needsRazorpay
           ? API.createRazorpayOrder(
-              { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
+              { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current, consume: true },
               idempotencyKey.current
             ).catch((err: any) => {
               if (String(err?.message || '').includes('No Razorpay order required')) {
@@ -157,7 +157,7 @@ export default function PaymentProcessingScreen() {
             })
           : Promise.resolve(null);
 
-        const [snapshot, order] = await Promise.all([holdPromise, orderPromise]);
+        const [snapshot, initialOrder] = await Promise.all([holdPromise, orderPromise]);
 
         if (snapshot) {
           holdId.current = snapshot.id;
@@ -168,10 +168,30 @@ export default function PaymentProcessingScreen() {
 
         if (left.current) { releaseHold(); return; }
 
-        if (!order) {
+        // Ensure the Razorpay order matches the EXACT online amount validated by the server hold
+        // (guards against stale prefetched orders or refreshed SawariCash / membership / coupon quotes).
+        const serverExpectedOnline = typeof snapshot?.serverExpectedOnline === 'number'
+          ? snapshot.serverExpectedOnline
+          : Math.round((snapshot?.onlinePayableNow ?? 0) + (pricingQuote.membershipFee || 0));
+        const expectedPaise = Math.round(Math.max(0, serverExpectedOnline) * 100);
+
+        let order = initialOrder;
+        if (expectedPaise <= 0) {
           // 100% SawariCash / zero online payable flow
           completeBookingFlow(null);
           return;
+        }
+        if (!order || order.amountPaise !== expectedPaise) {
+          order = await API.createRazorpayOrder(
+            {
+              onlinePayableNow: serverExpectedOnline,
+              idempotencyKey: `${idempotencyKey.current}_sync_${expectedPaise}`,
+              consume: true,
+              forceFresh: true,
+            },
+            `${idempotencyKey.current}_sync_${expectedPaise}`
+          );
+          if (left.current) { releaseHold(); return; }
         }
 
         setSetupStep(1);
@@ -199,7 +219,7 @@ export default function PaymentProcessingScreen() {
       try {
         const snapshot = await holdPromiseRef.current;
         if (snapshot) holdId.current = snapshot.id;
-      } catch {}
+      } catch { }
     }
     // One call: the server checks the signature and the payment with Razorpay as it confirms the booking
     // (a separate verify-signature call first cost an extra round trip).
@@ -226,10 +246,10 @@ export default function PaymentProcessingScreen() {
     try {
       // Step 3: Confirm Booking Payment securely
       await confirmWithRetry();
-      
+
       confirmBooking();
       setStatus('SUCCESS');
-      
+
       import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_success', 'PaymentProcessingScreen', { paymentId: paymentDetails?.razorpayPaymentId }));
 
       setTimeout(() => {
@@ -237,7 +257,7 @@ export default function PaymentProcessingScreen() {
       }, 600);
     } catch (e: any) {
       const reason = e.message || 'Failed to confirm booking';
-      
+
       if (paymentDetails?.razorpayPaymentId) {
         // Money has moved. The app never cancels this booking itself: when the car was lost or the checkout
         // had closed, the server has already cancelled the hold and handled the refund (its message says

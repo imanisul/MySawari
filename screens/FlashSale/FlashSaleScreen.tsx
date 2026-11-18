@@ -38,7 +38,7 @@ import { formatTime12, getIndiaDateParts, getAvailability, istDayMonth, istDayMo
 import { FlashSaleHeroTitle } from '@/components/home/FlashSaleHeroTitle';
 import { FlashSaleScheduledHeader, SCHEDULED_HEADER_VIEW } from '@/components/home/FlashSaleScheduledHeader';
 import { FlashSaleSwipeCoach, hasSeenSwipeCoach, markSwipeCoachSeen } from '@/components/home/FlashSaleSwipeCoach';
-import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
+import { formatCurrency, MYSAWARI_HUB_NAME, upsertCouponInCatalog } from '@/services/backend/pricingEngine';
 import { BACKEND_URL } from '@/services/backend/api';
 import * as Haptics from '@/utils/haptics';
 import { LoginBottomSheet } from '@/components';
@@ -560,6 +560,45 @@ export default function FlashSaleScreen() {
       }
 
       const car = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === String(activeCar.id)) || activeCar;
+      const carId = String(car.id ?? car._id);
+      const extractId = (x: any) => (x && typeof x === 'object' ? String(x._id ?? x.id ?? '') : String(x ?? ''));
+      const allowedIds = Array.from(
+        new Set(
+          [
+            ...(activeOffer.vehiclePrices || []).map((vp: any) => extractId(vp?.vehicleId)),
+            ...(activeOffer.applicableVehicleIds || []).map(extractId),
+            extractId(activeOffer.vehicleId),
+            carId,
+          ].filter(Boolean)
+        )
+      );
+      // Register the claimed Flash Sale token/code in the client pricing catalog so calculateBookingPrice
+      // computes the exact same couponDiscount & allowMembershipStacking as the backend's validateCoupon().
+      upsertCouponInCatalog({
+        _id: offerId,
+        code: String(code).trim().toUpperCase(),
+        type: 'special_deal',
+        isExclusive: true,
+        title: activeOffer.title || '',
+        subtitle: activeOffer.subtitle || '',
+        discountType: (activeOffer as any).discountType || (activeOffer.pricingType === 'percentage_discount' ? 'PERCENTAGE' : 'FLAT'),
+        discountValue: Number((activeOffer as any).discountValue) || 0,
+        minimumBooking: Number((activeOffer as any).minimumBooking) || 0,
+        maximumDiscount: (activeOffer as any).maximumDiscount ?? null,
+        expiryDate: activeOffer.expiryDate || new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+        startDate: activeOffer.startDate || null,
+        active: true,
+        allVehicles: Boolean(activeOffer.allVehicles || activeOffer.applicableType === 'all'),
+        applicableType: activeOffer.applicableType || 'specific_vehicles',
+        applicableVehicleIds: allowedIds,
+        vehicleId: activeOffer.vehicleId ? extractId(activeOffer.vehicleId) : undefined,
+        pricingType: activeOffer.pricingType || res.claim?.pricingType || 'promotional_price',
+        promotionalPrice: activeOffer.promotionalPrice,
+        dealPrice: res.claim?.dealPrice ?? activeOffer.dealPrice,
+        vehiclePrices: activeOffer.vehiclePrices,
+        pricingUnit: activeOffer.pricingUnit || res.claim?.pricingUnit || 'per_day',
+        allowMembershipStacking: Boolean(activeOffer.allowMembershipStacking),
+      });
       selectCar(car);
       applyCoupon(code, true);
 
@@ -569,7 +608,6 @@ export default function FlashSaleScreen() {
       if (!pickup?.name) setPickup({ id: 'hub_pickup', name: MYSAWARI_HUB_NAME, address: 'MySawari Hub, Kahilipara', latitude: 26.1412, longitude: 91.7645, source: 'database' });
       if (!dropoff?.name) setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
 
-      const carId = String(car.id ?? car._id);
       // The deal's date & time are fixed: car page and booking show them locked.
       router.push({ pathname: '/car-details', params: { id: carId, vehicleId: carId, lockDates: 'true', isFixedDates: 'true' } });
     } finally {

@@ -127,16 +127,35 @@ export default function CarDetailsScreen() {
     }
   }, [targetOffer, paramPromoCode, appliedCouponCode, isParamOfferExpired, applyCoupon]);
 
-  // If a specific car ID was passed or selectedCar is the dummy placeholder, select the real vehicle
+  // If a specific car ID was passed or selectedCar is the dummy placeholder, select the real vehicle.
+  // Also sync live perDay price when the fleet list refreshes (so stale disk-cached prices never cause a server mismatch)
+  // and preserve Top Deal hourlyRate if present.
   useEffect(() => {
+    const topDealHourly = params.isTopDeal === 'true' && Number(params.hourlyPrice) > 0
+      ? Number(params.hourlyPrice)
+      : undefined;
     if (targetCarId && fetchedVehicles.length > 0) {
       const match = fetchedVehicles.find((v) => String(v.id) === String(targetCarId));
-      if (match && match.id !== selectedCar?.id) selectCar(match);
+      if (match) {
+        if (match.id !== selectedCar?.id) {
+          selectCar(topDealHourly ? ({ ...match, hourlyRate: topDealHourly } as any) : match);
+        } else {
+          const priceChanged = Number(match.perDay) > 0 && Number(match.perDay) !== Number(selectedCar?.perDay);
+          const needsHourly = topDealHourly && Number((selectedCar as any)?.hourlyRate) !== topDealHourly;
+          if (priceChanged || needsHourly) {
+            selectCar({
+              ...selectedCar,
+              ...(priceChanged ? { perDay: match.perDay, price: match.price } : {}),
+              ...(topDealHourly ? { hourlyRate: topDealHourly } : {}),
+            } as any);
+          }
+        }
+      }
     } else if (!targetCarId && (!selectedCar || selectedCar === cars[0] || selectedCar.id === 'seltos')) {
       // Opened with no car chosen (the app was reloaded on this page): back to Home, not a random car.
       router.replace('/');
     }
-  }, [targetCarId, fetchedVehicles, selectedCar, selectCar, router]);
+  }, [targetCarId, fetchedVehicles, selectedCar, selectCar, router, params.isTopDeal, params.hourlyPrice]);
 
   // CarListCard already syncs the Explore page's date to dateRange before navigation.
   const effectiveDateRange = dateRange;
@@ -150,9 +169,14 @@ export default function CarDetailsScreen() {
   // Enrich the car with the computed availability so child components can access nextAvailableFrom etc.
   const enrichedCar = liveCar ? { ...liveCar, availability, isAvailable } : liveCar;
 
-  // Keep selectedCar in context synchronized with live availability facts
+  // Keep selectedCar in context synchronized with live availability facts and live daily price
   useEffect(() => {
-    if (liveCar && selectedCar && liveCar !== selectedCar && liveCar.bookedRanges !== selectedCar.bookedRanges) {
+    if (
+      liveCar &&
+      selectedCar &&
+      liveCar !== selectedCar &&
+      (liveCar.bookedRanges !== selectedCar.bookedRanges || liveCar.perDay !== selectedCar.perDay)
+    ) {
       selectCar(liveCar);
     }
   }, [liveCar, selectedCar, selectCar]);

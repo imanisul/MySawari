@@ -17,7 +17,8 @@ import { formatCurrency } from '@/services/backend/pricingEngine';
 import { RazorpayCheckoutWebView } from '@/components/payment/RazorpayCheckoutWebView';
 import { useSawari } from '@/context/SawariContext';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
-import { FaqList, FAQS } from '@/components/vehicle/details/CarDetailsSections';
+import { FaqList } from '@/components/vehicle/details/CarDetailsSections';
+import { MEMBERSHIP_FAQS } from './membershipFaqs';
 import { PaymentProgress } from '@/components/booking/PaymentProgress';
 import { ModalBlur } from '@/components/common/ModalBlur';
 import { MembershipRatingModal } from '@/components/membership/MembershipRatingModal';
@@ -398,8 +399,19 @@ export default function MembershipScreen() {
             ))}
           </View>
 
-          <Text style={[styles.sectionTitle, { color: p.fg, marginTop: 24 }]} accessibilityRole="header">FAQs</Text>
-          <FaqList items={FAQS.slice(0, 4)} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24 }}>
+            <Text style={[styles.sectionTitle, { color: p.fg, marginBottom: 12 }]} accessibilityRole="header">FAQs</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/membership-faqs')}
+              hitSlop={8}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 }}
+            >
+              <Text style={{ color: p.muted, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 }}>View all</Text>
+              <Feather name="chevron-right" size={13} color={p.muted} />
+            </Pressable>
+          </View>
+          <FaqList items={MEMBERSHIP_FAQS.slice(0, 5)} />
         </Animated.View>
       </ScrollView>
      </BlurTarget>

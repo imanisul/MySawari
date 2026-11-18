@@ -8,15 +8,15 @@ Short description (80): My Sawari self drive car & bike rental in Guwahati. MySa
 (Both spellings in the title and short description: Play ranks mostly on these two. Checked 2026-11-16: "mysawari" was #1, "my sawari" not in the top 30.)
 
 Full description:
-MySawari (My Sawari) is self drive car and bike rental in Guwahati, Assam. Pick a car or a scooty, choose your dates, pay a small booking amount and drive – for a day out in the city, a weekend in Shillong and Meghalaya, or a road trip across the Northeast.
+MySawari (My Sawari) is a car rental and self-drive car and bike rental service in Guwahati, Assam. Find a car rental near you, book an hourly car rental or an outstation cab, or plan a weekend getaway. Choose your vehicle and dates, pay a ₹500 booking amount, and drive. No security deposit is required.
 
 WHY MYSAWARI
 • Self drive cars – hatchbacks, sedans, SUVs and MUVs (7 seaters) for family trips
 • Bikes and scooters for the city
 • Need a driver? Add one for ₹1,400 a day
 • Doorstep delivery and pickup at your home, hotel, airport or railway station
+• No security deposit – book with just ₹500 now and pay the rest at pickup
 • Unlimited km on trips of 2 days or more (300 km on 1-day trips)
-• Book with just ₹500 now, pay the rest at pickup
 • Today's Deals and Flash Sales with real discounts on cars
 • MySawari membership: save on every trip
 • Sign in with your mobile number – code on WhatsApp
@@ -36,5 +36,7 @@ MySawari – Your Ride, Your Way.
 ## App Store
 App Name (30): MySawari: Car & Bike Rental
 Subtitle (30): Self Drive Cars in Guwahati
-Keywords (100): my,sawari,savari,mysavari,sawaari,selfdrive,hire,rent,assam,shillong,meghalaya,northeast,suv,scooty
+Keywords (100): hire,outstation,cab,hourly,weekend,mysawari,my sawari,savari,mysavari,sawaari,selfdrive,hire,rent,assam,shillong,meghalaya,northeast,suv,scooty,suv,sedan,hatchback,cheap,no,deposit,doorstep,delivery
 Description: same as the Play full description.
+
+ASO scope note: Airport pickup/delivery is available, but airport taxi service was not confirmed. Monthly car subscriptions and luxury car rentals were also not confirmed, so those terms are intentionally excluded from the listing until the services are verified.

@@ -303,6 +303,9 @@ export interface ExclusiveOffer {
     dealPrice: number;
     expiresAt: string;
   } | null;
+  /** From the server's bookings check: this deal's cars booked for its trip by this customer / by anyone else. */
+  myBookedVehicleIds?: string[];
+  soldVehicleIds?: string[];
   startDate?: string;
   startTime?: string;
   expiryDate?: string;
@@ -347,6 +350,7 @@ function stripActiveClaims(offers: any[]) {
   return offers.map((offer) => {
     const cachedOffer = { ...offer };
     delete cachedOffer.activeClaim;
+    delete cachedOffer.myBookedVehicleIds; // per customer: never reuse after another login
     return cachedOffer;
   });
 }
@@ -397,6 +401,8 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
           .map((o: any) => ({
             ...o,
             id: o._id,
+            // The server sends the customer's open claim as userClaim; the screens read activeClaim.
+            activeClaim: o.activeClaim ?? o.userClaim ?? null,
             image: plateSafeOfferImage(o.image, o.updatedAt),
           }));
         AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(stripActiveClaims(live))).catch(() => {});

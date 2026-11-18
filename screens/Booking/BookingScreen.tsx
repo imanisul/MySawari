@@ -187,15 +187,30 @@ export default function BookingScreen() {
     ]);
   };
 
-  // A code that gives nothing off is refused here, with the same rule the booking uses.
+  // Validate live against the server (enforces specific-customer targeting, First-N slots, new-customer, and private codes).
   const handleApplyCoupon = async (raw: string) => {
     const code = raw.trim().toUpperCase();
     if (!code) return;
     Haptics.selectionAsync();
     setCouponError(null);
+    const vehicleId = selectedCar?.id || (selectedCar as any)?._id;
+    const rentalAmt = pricingQuote?.rentalAmount ?? 0;
+
+    const serverCheck = await API.validateCoupon(code, rentalAmt, vehicleId);
+    if (!serverCheck.offline) {
+      if (!serverCheck.valid || serverCheck.discount <= 0) {
+        setCouponError(serverCheck.reason || `${code} isn't valid for this booking.`);
+        return;
+      }
+      setCouponInput(code);
+      applyCoupon(code);
+      return;
+    }
+
+    // Offline fallback
     await API.getCoupons().catch(() => []);
     if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code, {
-      vehicleId: selectedCar?.id || (selectedCar as any)?._id,
+      vehicleId,
       vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
     }) <= 0) {
       setCouponError(`${code} isn't valid for this booking.`);

@@ -149,7 +149,7 @@ function placeLabel(place: any): string | undefined {
   return undefined;
 }
 
-import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
+import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, upsertCouponInCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
 import { bikeTransmissionFor } from '../../utils/bikeModels';
 import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -995,13 +995,13 @@ export const API = {
 
   /**
    * GET /api/offers?type=coupon
-   * Fetches active coupon offers from the backend, falling back to the local
-   * COUPONS list if the API is unreachable.
+   * Fetches active coupon offers from the backend (authenticated when logged in so personal/specific-customer
+   * coupons appear automatically), falling back to the local COUPONS list if the API is unreachable.
    */
   async getCoupons(force: boolean = false): Promise<Coupon[]> {
     if (!force && couponCache && Date.now() - couponCache.at < COUPON_TTL_MS) return couponCache.list;
     try {
-      const res = await timedFetch(`${BACKEND_URL}/offers?type=coupon`);
+      const res = await fetchWithAuth(`${BACKEND_URL}/offers?type=coupon`);
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
@@ -1034,6 +1034,13 @@ export const API = {
               pricingType: o.pricingType,
               promotionalPrice: o.promotionalPrice,
               pricingUnit: o.pricingUnit,
+              customerEligibility: o.customerEligibility || 'all',
+              firstNCustomers: o.firstNCustomers ?? null,
+              remainingCustomerSlots: o.remainingCustomerSlots ?? null,
+              uniqueCustomersUsed: o.uniqueCustomersUsed ?? 0,
+              maxUsageLimit: o.maxUsageLimit ?? null,
+              perCustomerLimit: o.perCustomerLimit ?? null,
+              isPersonalForYou: Boolean(o.isPersonalForYou),
             }));
           couponCache = { at: Date.now(), list };
           setCouponCatalog(list);
@@ -1045,6 +1052,50 @@ export const API = {
     }
     // Server unreachable: the built-in list keeps the checkout usable offline.
     return COUPONS.filter(c => c.active && new Date(c.expiryDate) >= new Date());
+  },
+
+  /**
+   * POST /api/offers/validate
+   * Live server validation of a coupon code (enforces specific-customer targeting, First-N slots,
+   * new-customer / member eligibility, per-customer limits, and private/secret codes).
+   */
+  async validateCoupon(
+    code: string,
+    bookingAmount: number,
+    vehicleId?: string
+  ): Promise<{ valid: boolean; discount: number; reason?: string; coupon?: Coupon; offline?: boolean }> {
+    const clean = String(code || '').trim().toUpperCase();
+    if (!clean) return { valid: false, discount: 0, reason: 'Please enter a coupon code.' };
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/offers/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: clean,
+          bookingAmount: Math.max(0, Number(bookingAmount) || 0),
+          vehicleId: vehicleId || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success && json?.data) {
+        if (json.data.valid && json.data.coupon) {
+          upsertCouponInCatalog(json.data.coupon);
+        }
+        return {
+          valid: Boolean(json.data.valid),
+          discount: Number(json.data.discount) || 0,
+          reason: json.data.reason,
+          coupon: json.data.coupon,
+        };
+      }
+      return {
+        valid: false,
+        discount: 0,
+        reason: json?.message || `${clean} is not valid or has expired.`,
+      };
+    } catch {
+      return { valid: false, discount: 0, offline: true };
+    }
   },
 
   /**

@@ -326,14 +326,22 @@ export default function FlashSaleScreen() {
       const fleet: any = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === id);
       const car: any = fleet || (ref && typeof ref === 'object' ? { ...ref, id } : null);
       if (!car) return;
-      // Sold out only when the vehicle itself is unavailable for the offer dates.
-      const trip = offerTrip(offer);
-      const unavailable = fleet ? !getAvailability(fleet, trip.startLabel, trip.endLabel, trip.pickupT, trip.returnT).available : false;
+      // Booked for the deal's trip — decided by the server from the bookings collection. Only an older server
+      // without that check falls back to the fleet's own booked dates.
+      const mine = Array.isArray(offer?.myBookedVehicleIds) && offer.myBookedVehicleIds.map(String).includes(id);
+      let unavailable: boolean;
+      if (Array.isArray(offer?.soldVehicleIds)) {
+        unavailable = mine || offer.soldVehicleIds.map(String).includes(id);
+      } else {
+        const trip = offerTrip(offer);
+        unavailable = fleet ? !getAvailability(fleet, trip.startLabel, trip.endLabel, trip.pickupT, trip.returnT).available : false;
+      }
       list.push({
         ...car,
         id,
         offer,
         unavailable,
+        mine,
         dealPrice: dealPrice ?? offer?.promotionalPrice ?? offer?.dealPrice ?? null,
         originalPrice: originalPrice ?? offer?.originalPrice ?? null,
       });
@@ -381,7 +389,10 @@ export default function FlashSaleScreen() {
   }, [isAuthenticated]);
   const activeOfferId = activeOffer?._id || activeOffer?.id;
   const hasBookedSaleCar = useMemo(() => {
-    if (!isAuthenticated || !bookingsFresh || bookingsFailed || !activeOffer) return false;
+    if (!isAuthenticated || !activeOffer) return false;
+    // The server's answer (bookings collection) when it gives one; the phone's own bookings only for an older server.
+    if (Array.isArray(activeOffer.myBookedVehicleIds)) return activeOffer.myBookedVehicleIds.length > 0;
+    if (!bookingsFresh || bookingsFailed) return false;
 
     const trip = offerTrip(activeOffer);
     const claimedVehicleId = activeOffer.activeClaim?.vehicleId ? String(activeOffer.activeClaim.vehicleId) : null;
@@ -406,11 +417,8 @@ export default function FlashSaleScreen() {
       return sameClaimCode || sameTrip;
     });
   }, [isAuthenticated, bookingsFresh, bookingsFailed, customerBookings, activeOffer, displayCars]);
-  const hasClaimedDeal = isAuthenticated && (
-    alreadyClaimedOfferId === activeOfferId ||
-    (offersFresh && Boolean(activeOffer?.activeClaim)) ||
-    hasBookedSaleCar
-  );
+  // "Already claimed" only once this customer has really booked the deal (an unpaid claim can still go on to book).
+  const hasClaimedDeal = isAuthenticated && (alreadyClaimedOfferId === activeOfferId || hasBookedSaleCar);
 
   // Can the customer book this car now? (its own offer's early-access lock and members-only rule)
   const canBook = isLive && !activeCar.unavailable && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
@@ -474,6 +482,12 @@ export default function FlashSaleScreen() {
     (activeOffer?.rentalDays ? `${activeOffer.rentalDays} ${activeOffer.rentalDays === 1 ? 'Day' : 'Days'}` : null)
     || (activeOffer?.rentalHours ? `${activeOffer.rentalHours} Hours` : null);
 
+  // The trip this deal books (same values the booking is filled with), shown on the car photo.
+  const activeTrip = activeOffer ? offerTrip(activeOffer) : null;
+  const tripWhenLabel = activeTrip
+    ? `${activeTrip.startLabel}, ${activeTrip.pickupT.replace(/^0/, '')} → ${activeTrip.endLabel}, ${activeTrip.returnT.replace(/^0/, '')}`
+    : null;
+
   // The offer's real prices only (no estimates).
   const dealPrice: number | null = activeCar.dealPrice ?? null;
   const originalPrice: number | null = activeCar.originalPrice ?? null;
@@ -523,13 +537,12 @@ export default function FlashSaleScreen() {
     try {
       const offerId = String(activeOffer._id || activeOffer.id);
       recordOfferView(offerId);
+      // An existing unpaid claim comes back as alreadyClaimed with its code: carry on booking with it.
       const res = await claimExclusiveOffer(offerId);
-      if (res.alreadyClaimed) {
-        setAlreadyClaimedOfferId(offerId);
-        return;
-      }
       const code = res.claim?.couponCode || res.claim?.claimToken;
       if (!res.success || !code) {
+        // The server refuses a second claim once this customer has booked the deal.
+        if (/already|maximum usage/i.test(res.message || '')) { setAlreadyClaimedOfferId(offerId); return; }
         CustomAlert.alert('Couldn’t book this deal', res.message || 'This offer couldn’t be claimed right now. Please try again.');
         return;
       }
@@ -545,11 +558,8 @@ export default function FlashSaleScreen() {
       if (!dropoff?.name) setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
 
       const carId = String(car.id ?? car._id);
-      const flexible = activeOffer.rentalPeriodMode === 'flexible';
-      router.push({
-        pathname: '/car-details',
-        params: { id: carId, vehicleId: carId, allowExtend: 'true', ...(flexible ? {} : { lockDates: 'true', isFixedDates: 'true' }) },
-      });
+      // The deal's date & time are fixed: car page and booking show them locked.
+      router.push({ pathname: '/car-details', params: { id: carId, vehicleId: carId, lockDates: 'true', isFixedDates: 'true' } });
     } finally {
       setBooking(false);
     }
@@ -567,13 +577,13 @@ export default function FlashSaleScreen() {
       return;
     }
     selectCar(car);
-    // The deal's trip, so the car page shows its dates and price (and "Need more time?" to add days).
+    // The deal's trip, so the car page shows its dates and price — locked, same as Book Now.
     if (activeOffer) {
       const trip = offerTrip(activeOffer);
       setDates(`${trip.startLabel} – ${trip.endLabel}`, `${trip.days} ${trip.days === 1 ? 'Day' : 'Days'}`);
       setTimes(trip.pickupT, trip.returnT);
     }
-    router.push({ pathname: '/car-details', params: { id: String(car.id || car._id), allowExtend: 'true' } });
+    router.push({ pathname: '/car-details', params: { id: String(car.id || car._id), ...(activeOffer ? { lockDates: 'true', isFixedDates: 'true' } : {}) } });
   }, [activeCar, activeOffer, fleetVehicles, router, selectCar, setDates, setTimes, hasAccess, isMember, opensMs, isLive, earlyAccessMinutes]);
 
   // Schedule text calculations
@@ -791,6 +801,15 @@ export default function FlashSaleScreen() {
               {ticketLocked && <TicketShape fill="rgba(89, 89, 89, 0.4)" />}
               {/* Line 18: 320 dashed line at (16.5, 240), #6152D8 40% → 100% → 40% (Figma export) */}
               <FsDash width={320} height={1} style={styles.dashedDivider} />
+              {/* Trip date & time on the tear line, like the times printed on a ticket stub */}
+              {!ticketLocked && !!tripWhenLabel && (
+                <View style={styles.tripWhenRow} pointerEvents="none">
+                  <View style={styles.tripWhenPill} accessibilityLabel={`Trip ${tripWhenLabel.replace('→', 'to')}`}>
+                    <Feather name="calendar" size={12} color="#6152D8" />
+                    <Text style={styles.tripWhenText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tripWhenLabel}</Text>
+                  </View>
+                </View>
+              )}
 
               {/* Photo Area */}
               <View style={styles.photoContainer}>
@@ -1202,6 +1221,10 @@ const styles = createUnscaled({
   /* Photo inside ticket */
   photoContainer: { position: 'absolute', left: 12, top: 12, width: 329, height: 212, borderRadius: 8, overflow: 'hidden', backgroundColor: '#FFFFFF' },
   durationBadge: { position: 'absolute', left: 6, top: 6, height: 28, paddingHorizontal: 10, borderRadius: 20, backgroundColor: '#FBC422', alignItems: 'center', justifyContent: 'center', zIndex: 3 },
+  // Trip date & time centred on the dashed tear line (y 239), in the 32px gap between photo (ends 224) and details (256).
+  tripWhenRow: { position: 'absolute', left: 16, right: 16, top: 229, height: 21, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  tripWhenPill: { maxWidth: 300, height: 21, paddingHorizontal: 10, borderRadius: 11, backgroundColor: '#FEFDF0', borderWidth: 1, borderColor: 'rgba(97, 82, 216, 0.25)', flexDirection: 'row', alignItems: 'center', gap: 5 },
+  tripWhenText: { fontFamily: FONT_SEMI, fontSize: 11.5, lineHeight: 15, color: '#262626', includeFontPadding: false, flexShrink: 1 },
   durationBadgeText: { fontFamily: FONT_SEMI, fontSize: 11, lineHeight: 16.5, color: '#3D0700', includeFontPadding: false },
   // Frame 2147226247: 269 × 60, pill + line 4 apart, centred; top = 50% − 30 − 23 of the 361 ticket = 127.5.
   // Figma 1724:14343: #FEFDF0, 1px #FBC422, radius 12, padding 8, 4 between text and lock.

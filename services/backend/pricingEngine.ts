@@ -42,6 +42,13 @@ export type Coupon = {
   pricingType?: 'promotional_price' | 'fixed_discount' | 'percentage_discount' | 'custom_pricing';
   promotionalPrice?: number;
   pricingUnit?: 'per_day' | 'per_trip';
+  customerEligibility?: 'all' | 'specific_customers' | 'new_customers' | 'members_only';
+  firstNCustomers?: number | null;
+  remainingCustomerSlots?: number | null;
+  uniqueCustomersUsed?: number;
+  maxUsageLimit?: number | null;
+  perCustomerLimit?: number | null;
+  isPersonalForYou?: boolean;
 };
 
 /**
@@ -317,6 +324,13 @@ export function calculateDropCharge(
 let couponCatalog: Coupon[] = COUPONS;
 export function setCouponCatalog(list: Coupon[]) {
   couponCatalog = list;
+}
+export function upsertCouponInCatalog(coupon: Coupon) {
+  if (!coupon?.code) return;
+  const upper = String(coupon.code).trim().toUpperCase();
+  const next = couponCatalog.filter((c) => String(c.code).trim().toUpperCase() !== upper);
+  next.unshift({ ...coupon, code: upper });
+  couponCatalog = next;
 }
 
 /**

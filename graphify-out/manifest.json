@@ -18,9 +18,9 @@
     "semantic_hash": ""
   },
   "app/_layout.tsx": {
-    "mtime": 1794907794.7886944,
-    "seen": 1794920151.331156,
-    "ast_hash": "a646b98f154b37ec4f374b51d9a3b11a",
+    "mtime": 1794922718.7379935,
+    "seen": 1794923213.774569,
+    "ast_hash": "ae972c5c76b13927e815decbc9afc2a0",
     "semantic_hash": ""
   },
   "app/address-confirm.tsx": {
@@ -768,9 +768,9 @@
     "semantic_hash": ""
   },
   "screens/Booking/ConfirmationScreen.tsx": {
-    "mtime": 1794858557.8702967,
-    "seen": 1794920151.331309,
-    "ast_hash": "155a112b40e69027d5a40f830e4462b8",
+    "mtime": 1794923849.9741125,
+    "seen": 1794923868.109905,
+    "ast_hash": "7fdaf01ad96079f54851c7b5ab6317bd",
     "semantic_hash": ""
   },
   "screens/Booking/DriverChargesScreen.tsx": {
@@ -948,9 +948,9 @@
     "semantic_hash": ""
   },
   "services/api/offers.ts": {
-    "mtime": 1794901276.5258124,
-    "seen": 1794920151.331341,
-    "ast_hash": "8a4919b084ca8ef993421a1ae6e6711e",
+    "mtime": 1794923822.7767022,
+    "seen": 1794923868.1099432,
+    "ast_hash": "f995cf3ab4fb63b1358200af438b9aa6",
     "semantic_hash": ""
   },
   "services/backend/api.ts": {
@@ -2484,9 +2484,9 @@
     "semantic_hash": ""
   },
   "screens/FlashSale/FlashSaleScreen.tsx": {
-    "mtime": 1794909965.8297462,
-    "seen": 1794920151.331313,
-    "ast_hash": "d7f794422fd599f54b0717fb5b96ac4c",
+    "mtime": 1794923822.7772126,
+    "seen": 1794923868.10991,
+    "ast_hash": "cb76dd6c0e7b550a59f8251d7ce5cb2b",
     "semantic_hash": ""
   },
   "screens/TopDeals/TopDealsScreen.tsx": {
@@ -2658,9 +2658,9 @@
     "semantic_hash": ""
   },
   "assets/images/flash_sale/fs_title.svg": {
-    "mtime": 1794740156.43065,
-    "seen": 1794853980.5358,
-    "ast_hash": "4dfcf714f9cf7c124a7ca8bb17b774b8",
+    "mtime": 1794922718.7388163,
+    "seen": 1794923213.774861,
+    "ast_hash": "67c797e51164c79167054ffacd4d7b28",
     "semantic_hash": ""
   },
   "assets/images/flash_sale/fs_title_glow.svg": {
@@ -2937,6 +2937,18 @@
     "mtime": 1794907774.3378725,
     "seen": 1794907812.522957,
     "ast_hash": "03e45fff62f277fd26b19543944cd104",
+    "semantic_hash": ""
+  },
+  "assets/images/flash_sale/fs_scheduled_title.svg": {
+    "mtime": 1794922718.7381487,
+    "seen": 1794923213.774855,
+    "ast_hash": "233c528d8997a4fb81d54e4c9ee196dd",
+    "semantic_hash": ""
+  },
+  "assets/images/flash_sale/fs_scheduled_underline.svg": {
+    "mtime": 1794922718.738292,
+    "seen": 1794923213.7748559,
+    "ast_hash": "a1e4607f0038238d8d29cd0aac23d5ae",
     "semantic_hash": ""
   }
 }

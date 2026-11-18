@@ -70,15 +70,28 @@ export default function PaymentScreen() {
 
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  // A code that gives nothing off (typo, expired, minimum not met) used to show "Coupon Applied … You saved ₹0".
-  // It is checked against the server's coupon list with the same rule the booking uses before it is applied.
+  // Validate live against the server (enforces specific-customer targeting, First-N slots, new-customer, and private codes).
   const handleApplyCoupon = async (raw: string) => {
     const code = raw.trim().toUpperCase();
     if (!code) return;
     setCouponError(null);
+    const vehicleId = selectedCar?.id || (selectedCar as any)?._id;
+    const rentalAmt = pricingQuote?.rentalAmount ?? 0;
+
+    const serverCheck = await API.validateCoupon(code, rentalAmt, vehicleId);
+    if (!serverCheck.offline) {
+      if (!serverCheck.valid || serverCheck.discount <= 0) {
+        setCouponError(serverCheck.reason || `${code} isn't valid for this booking.`);
+        return;
+      }
+      applyCoupon(code);
+      return;
+    }
+
+    // Offline fallback
     await API.getCoupons().catch(() => []);
     if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code, {
-      vehicleId: selectedCar?.id || (selectedCar as any)?._id,
+      vehicleId,
       vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
     }) <= 0) {
       setCouponError(`${code} isn't valid for this booking.`);

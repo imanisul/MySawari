@@ -69,15 +69,22 @@ export default function OffersScreen() {
     setTimeout(() => setToast(false), 1200);
   };
 
-  const use = (c: Coupon) => {
+  const use = async (c: Coupon) => {
     Haptics.selectionAsync();
+    const vehicleId = selectedCar?.id || (selectedCar as any)?._id;
     const vehicleContext = {
-      vehicleId: selectedCar?.id || (selectedCar as any)?._id,
+      vehicleId,
       vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
     };
 
     if (applyMode) {
-      if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code, vehicleContext) <= 0) {
+      const serverCheck = await API.validateCoupon(c.code, pricingQuote?.rentalAmount ?? 0, vehicleId);
+      if (!serverCheck.offline) {
+        if (!serverCheck.valid || serverCheck.discount <= 0) {
+          Alert.alert('Not valid for this trip', serverCheck.reason || `${c.code} can't be used on this booking.`);
+          return;
+        }
+      } else if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code, vehicleContext) <= 0) {
         let msg = `${c.code} can't be used on this booking.`;
         if (c.minimumBooking > 0 && pricingQuote.rentalAmount < c.minimumBooking) {
           msg = `${c.code} needs a booking of at least ₹${c.minimumBooking.toLocaleString('en-IN')}.`;
@@ -138,15 +145,39 @@ export default function OffersScreen() {
                   <MaterialCommunityIcons name="ticket-percent-outline" size={18} color={p.fg} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Coupon code ${c.code}. Tap to copy`}
-                    onPress={() => copyCode(c.code)}
-                    style={({ pressed }) => [styles.codeBadge, { backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.7 }]}
-                  >
-                    <Text style={[styles.codeBadgeText, { color: p.fg }]}>{c.code}</Text>
-                    <Feather name="copy" size={11} color={p.muted} />
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Coupon code ${c.code}. Tap to copy`}
+                      onPress={() => copyCode(c.code)}
+                      style={({ pressed }) => [styles.codeBadge, { marginBottom: 0, backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.7 }]}
+                    >
+                      <Text style={[styles.codeBadgeText, { color: p.fg }]}>{c.code}</Text>
+                      <Feather name="copy" size={11} color={p.muted} />
+                    </Pressable>
+                    {c.isPersonalForYou && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#4338CA' }}>✨ Exclusive For You</Text>
+                      </View>
+                    )}
+                    {typeof c.firstNCustomers === 'number' && c.firstNCustomers > 0 && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#B45309' }}>
+                          🔥 {typeof c.remainingCustomerSlots === 'number' ? `${c.remainingCustomerSlots} of ${c.firstNCustomers} left` : `First ${c.firstNCustomers} users`}
+                        </Text>
+                      </View>
+                    )}
+                    {c.customerEligibility === 'new_customers' && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#047857' }}>First Trip Only</Text>
+                      </View>
+                    )}
+                    {c.customerEligibility === 'members_only' && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#DDD6FE' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#6D28D9' }}>Members Only</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={[styles.title, { color: p.fg }]}>{couponTitle(c)}</Text>
                   <Text style={[styles.sub, { color: p.muted }]}>Use until {until(c.expiryDate)}</Text>
                   {!applyMode && <View style={{ marginTop: 8, alignSelf: 'flex-start' }}>{btn}</View>}

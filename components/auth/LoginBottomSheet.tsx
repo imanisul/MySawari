@@ -151,6 +151,8 @@ export function LoginBottomSheet({
   // Focus the number field once the sheet has finished sliding up. With autoFocus the keyboard rose while the sheet
   // was still moving, and the two motions fought each other (the "shake").
   const phoneRef = useRef<TextInput>(null);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
   const slidingRef = useRef(false);
   const isVerifyingRef = useRef(false);
   const stepAnim = useRef(new Animated.Value(1)).current;
@@ -360,14 +362,17 @@ export function LoginBottomSheet({
 
     // Smooth auto-dismiss: checkmark pops with spring, then auto-closes after 800ms
     setTimeout(() => {
+      if (!mountedRef.current) return;
       onClose();
 
       // Run the success callback after the session has been saved.
       sessionSaved
         .catch(() => {})
         .then(() => {
-          if (onLoginSuccess) {
-            setTimeout(() => onLoginSuccess(), 200);
+          if (onLoginSuccess && mountedRef.current) {
+            setTimeout(() => {
+              if (mountedRef.current) onLoginSuccess();
+            }, 200);
           }
         });
     }, 800);
@@ -403,18 +408,24 @@ export function LoginBottomSheet({
       setDetectedClipOtp(null);
       return;
     }
-    // Check clipboard immediately on entering OTP step
-    checkClipboardForOtp();
-    const timer = setTimeout(checkClipboardForOtp, 350);
-
-    // Continuous 1s interval while waiting on OTP screen so notification/WhatsApp copy is caught instantly
-    const interval = setInterval(() => {
+    // Check clipboard immediately on entering OTP step (only while OTP box is still empty)
+    if (!otp || otp.trim().length === 0) {
       checkClipboardForOtp();
-    }, 1000);
+    }
+    const timer = setTimeout(() => {
+      if (mountedRef.current && (!otp || otp.trim().length === 0)) checkClipboardForOtp();
+    }, 400);
 
-    // AppState listener for switching from WhatsApp / SMS back to app
+    // Gentle 3s polling while waiting with an empty OTP box (avoids native bridge / iOS paste-banner spam)
+    const interval = setInterval(() => {
+      if (mountedRef.current && (!otp || otp.trim().length === 0)) {
+        checkClipboardForOtp();
+      }
+    }, 3000);
+
+    // AppState listener for switching from WhatsApp / SMS back to app (instant catch!)
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') {
+      if (state === 'active' && mountedRef.current) {
         checkClipboardForOtp();
       }
     });

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, BackHandler, StyleSheet } from 'react-native';
+import { AppState, View, Text, Pressable, BackHandler, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { useSawari, useQuote } from '@/context/SawariContext';
@@ -10,11 +11,19 @@ import { PaymentFailed } from '@/components/booking/PaymentResult';
 import { PaymentProgress } from '@/components/booking/PaymentProgress';
 
 const STEPS = ['Reserving your car', 'Opening secure payment', 'Confirming your booking'];
+const DEFAULT_LOCK_SECONDS = 120;
+
+function formatTimer(totalSeconds: number) {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
 
 export default function PaymentProcessingScreen() {
   const colors = useColors();
   const router = useRouter();
-  const { isAuthenticated, isAuthLoading, createBookingSnapshot, confirmBookingPayment, confirmBooking, customer } = useSawari();
+  const { isAuthenticated, isAuthLoading, createBookingSnapshot, confirmBookingPayment, confirmBooking, customer, selectedCar } = useSawari();
   const { pricingQuote, quoteParams } = useQuote();
 
   useEffect(() => {
@@ -27,6 +36,8 @@ export default function PaymentProcessingScreen() {
   const [razorpayOrder, setRazorpayOrder] = useState<{ orderId: string, amountPaise: number, keyId: string } | null>(null);
   // Which of STEPS is under way while setting up: 0 reserving the car, 1 creating the payment order.
   const [setupStep, setSetupStep] = useState(0);
+  const [lockExpiresAtMs, setLockExpiresAtMs] = useState<number | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState<number>(DEFAULT_LOCK_SECONDS);
   const started = useRef(false);
   // A plan bought in this payment (named on the success screen).
   const boughtPlan = useRef<string | null>(null);
@@ -36,19 +47,12 @@ export default function PaymentProcessingScreen() {
   const holdId = useRef<string | null>(null);
   const holdPromiseRef = useRef<Promise<any> | null>(null);
   const paid = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   // Unique idempotency key generated per payment attempt to prevent double-charging or double-booking
   const idempotencyKey = useRef<string>('pay_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9));
   // Set once the customer leaves this screen (back button, swipe, app navigation) before paying.
   const left = useRef(false);
-
-  // Keep the car soft-locked for this customer while the payment sheet is open (renewed every 45s,
-  // the server caps it at 10 minutes). Stops as soon as the sheet closes or this screen goes away.
-  useEffect(() => {
-    if (status !== 'PAYMENT_PENDING' || !holdId.current) return;
-    const id = holdId.current;
-    const timer = setInterval(() => { API.keepHoldAlive(id); }, 45 * 1000);
-    return () => clearInterval(timer);
-  }, [status]);
 
   // Leaving checkout without paying frees the car for other customers straight away.
   const releaseHold = () => {
@@ -59,10 +63,51 @@ export default function PaymentProcessingScreen() {
     }
   };
 
+  // Track foreground/background transitions: if user switches to GPay/PhonePe/Paytm UPI app,
+  // renew the server hold once so UPI PIN completion is never interrupted by timer expiry.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      const prev = appStateRef.current;
+      appStateRef.current = nextState;
+      if (
+        status === 'PAYMENT_PENDING' &&
+        !paid.current &&
+        holdId.current &&
+        prev === 'active' &&
+        (nextState === 'background' || nextState === 'inactive')
+      ) {
+        API.keepHoldAlive(holdId.current);
+      }
+    });
+    return () => sub.remove();
+  }, [status]);
+
+  // Live 2:00 countdown timer synchronized with the server lock.
+  // When foregrounded and the 2-minute window reaches 00:00 without payment, release the hold cleanly.
+  useEffect(() => {
+    if (status !== 'PAYMENT_PENDING' || !lockExpiresAtMs) return;
+
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((lockExpiresAtMs - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining <= 0 && !paid.current && !left.current && appStateRef.current === 'active') {
+        releaseHold();
+        setErrorMsg('Your 2-minute car reservation expired. Tap Try Again to check availability and lock the car again.');
+        setStatus('ERROR');
+      }
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [status, lockExpiresAtMs]);
+
   // However the screen is left before paying (Android back, iOS swipe, closing the sheet), the car is freed
   // and the temporary record is released — it used to stay behind and show up as a booking.
   useEffect(() => () => {
     left.current = true;
+    timersRef.current.forEach((t) => clearTimeout(t));
+    timersRef.current = [];
     releaseHold();
   }, []);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -94,44 +139,54 @@ export default function PaymentProcessingScreen() {
         return;
       }
       try {
-        // Step 1: Kick off vehicle hold concurrently in background (does not block opening Razorpay!)
+        // Step 1 & 2 in parallel, BOTH awaited BEFORE Razorpay opens:
+        // Guarantees atomic 2-min car lock wins the race condition before any customer can enter payment details!
+        const needsRazorpay = (pricingQuote.onlinePayableNow || 0) > 0;
         const holdPromise = createBookingSnapshot(idempotencyKey.current);
         holdPromiseRef.current = holdPromise;
-        holdPromise.then((snapshot) => {
-          if (snapshot) holdId.current = snapshot.id;
-          if (left.current) releaseHold();
-        }).catch((err) => {
-          if (!paid.current) {
-            setErrorMsg(err?.message || 'Failed to secure vehicle lock.');
-            setStatus('ERROR');
-          }
-        });
 
-        // Step 2: Fetch or reuse prefetched Razorpay order (sub-millisecond from preloaded cache)
-        const order = await API.createRazorpayOrder(
-          { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
-          idempotencyKey.current
-        );
+        const orderPromise = needsRazorpay
+          ? API.createRazorpayOrder(
+              { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current },
+              idempotencyKey.current
+            ).catch((err: any) => {
+              if (String(err?.message || '').includes('No Razorpay order required')) {
+                return null;
+              }
+              throw err;
+            })
+          : Promise.resolve(null);
+
+        const [snapshot, order] = await Promise.all([holdPromise, orderPromise]);
+
+        if (snapshot) {
+          holdId.current = snapshot.id;
+          const expiresMs = snapshot.lockExpiresAtMs || (Date.now() + DEFAULT_LOCK_SECONDS * 1000);
+          setLockExpiresAtMs(expiresMs);
+          setSecondsLeft(Math.max(1, Math.ceil((expiresMs - Date.now()) / 1000)));
+        }
 
         if (left.current) { releaseHold(); return; }
+
+        if (!order) {
+          // 100% SawariCash / zero online payable flow
+          completeBookingFlow(null);
+          return;
+        }
 
         setSetupStep(1);
         setRazorpayOrder(order);
-        // Show opening screen with 'Opening secure payment' then reveal Razorpay in milliseconds
-        setTimeout(() => {
+        const revealTimer = setTimeout(() => {
           if (!left.current) {
             setStatus('PAYMENT_PENDING');
           }
-        }, 250);
+        }, 120);
+        timersRef.current.push(revealTimer);
       } catch (err: any) {
-        // Handle 100% sawari cash / zero online payable flow
         if (left.current) { releaseHold(); return; }
-        if (String(err?.message || '').includes('No Razorpay order required')) {
-          completeBookingFlow(null); // Bypass Razorpay entirely
-        } else {
-          setErrorMsg(err.message || 'Failed to initiate payment');
-          setStatus('ERROR');
-        }
+        releaseHold();
+        setErrorMsg(err?.message || 'Failed to secure vehicle lock. Please try again.');
+        setStatus('ERROR');
       }
     }
     startPaymentFlow();
@@ -225,11 +280,48 @@ export default function PaymentProcessingScreen() {
   // loaded when the order arrives and the sheet opens straight away.
   if (status === 'INITIATING' || (status === 'PAYMENT_PENDING' && razorpayOrder)) {
     const pending = status === 'PAYMENT_PENDING';
+    const isCritical = secondsLeft <= 20;
+    const isWarning = secondsLeft > 20 && secondsLeft <= 45;
+    const bannerBg = isCritical ? '#991B1B' : isWarning ? '#92400E' : '#111A2B';
+    const pillBg = isCritical ? '#DC2626' : isWarning ? '#D97706' : '#10B981';
+    const vehicleLabel = selectedCar?.name ? `${selectedCar.name} locked for you` : 'Car locked for you';
+
+    const lockTimerBanner = (
+      <View style={[styles.lockBanner, { backgroundColor: bannerBg }]}>
+        <View style={styles.lockBannerLeft}>
+          <View style={[styles.lockIconCircle, { backgroundColor: pillBg + '33' }]}>
+            <Feather name="lock" size={14} color="#FFFFFF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text numberOfLines={1} style={styles.lockBannerTitle}>{vehicleLabel}</Text>
+            <Text numberOfLines={1} style={styles.lockBannerSub}>
+              {isCritical ? 'Hurry! Complete payment before lock expires' : 'Complete payment within 2 min to confirm'}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.lockBannerRight}>
+          <View style={[styles.timerPill, { backgroundColor: pillBg }]}>
+            <Feather name="clock" size={12} color="#FFFFFF" />
+            <Text style={styles.timerText}>{formatTimer(secondsLeft)}</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Cancel payment and release lock"
+            onPress={handleCancel}
+            hitSlop={8}
+            style={styles.cancelLockBtn}
+          >
+            <Feather name="x" size={16} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </View>
+    );
+
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <PaymentProgress
           title={pending ? 'Opening secure payment' : setupStep === 0 ? 'Reserving your car' : 'Initiating payment'}
-          subtitle={pending ? 'Connecting to Razorpay. Please don’t close the app or press back.' : 'Hold on, this only takes a few seconds. Please don’t press back.'}
+          subtitle={pending ? 'Connecting to Razorpay. Please don’t close the app or press back.' : 'Securing your exclusive 2-minute car lock. Please don’t press back.'}
           steps={STEPS}
           current={pending ? 1 : setupStep}
           amount={payNow}
@@ -237,6 +329,7 @@ export default function PaymentProcessingScreen() {
         <View style={pending ? StyleSheet.absoluteFill : { position: 'absolute', width: 1, height: 1, opacity: 0 }} pointerEvents={pending ? 'auto' : 'none'}>
           <RazorpayCheckoutWebView
             visible={pending}
+            topBanner={lockTimerBanner}
             orderId={razorpayOrder?.orderId}
             amount={razorpayOrder?.amountPaise}
             currency="INR"
@@ -266,6 +359,8 @@ export default function PaymentProcessingScreen() {
   }
 
   if (status === 'ERROR') {
+    const isReservationExpired = /reservation expired/i.test(String(errorMsg || ''));
+    const isTemporarilyHeld = /another customer is completing payment|already booked|temporarily reserved/i.test(String(errorMsg || ''));
     // Figma "Payment Failed". After money has moved, the button never goes back to checkout (that would
     // invite paying twice): it opens My Bookings, where the booking or the refund shows up.
     return paid.current ? (
@@ -277,7 +372,9 @@ export default function PaymentProcessingScreen() {
       />
     ) : (
       <PaymentFailed
+        title={isReservationExpired ? 'Reservation Expired' : isTemporarilyHeld ? 'Vehicle Currently Locked' : undefined}
         message={errorMsg && !/cancel/i.test(errorMsg) ? `${errorMsg} No money was taken.` : 'Your booking is Failed. Try again'}
+        buttonLabel={isReservationExpired || isTemporarilyHeld ? 'Back to Checkout' : undefined}
         onButton={handleCancel}
       />
     );
@@ -311,3 +408,65 @@ export default function PaymentProcessingScreen() {
     />
   );
 }
+
+const styles = StyleSheet.create({
+  lockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  lockBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  lockIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockBannerTitle: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 13,
+  },
+  lockBannerSub: {
+    color: 'rgba(255,255,255,0.82)',
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    marginTop: 1,
+  },
+  lockBannerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  timerPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  timerText: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_700Bold',
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
+  },
+  cancelLockBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

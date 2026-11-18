@@ -119,6 +119,47 @@ export function PriceSummarySkeleton() {
   );
 }
 
+/** Whole Payment Option page (trip, coupons, SawariCash, price) while the screen opens. */
+export function PaymentPageSkeleton() {
+  return (
+    <SkeletonGroup>
+      <View>
+        <Skeleton width={90} height={18} borderRadius={6} style={{ marginBottom: 12 }} />
+        <SkeletonCard style={{ gap: 16 }}>
+          {[0, 1, 2].map((i) => <Row key={i} delay={i * 70} />)}
+        </SkeletonCard>
+        <Skeleton width={120} height={18} borderRadius={6} style={{ marginTop: 8, marginBottom: 12 }} />
+        <SkeletonCard style={{ flexDirection: 'row', gap: 10 }}>
+          <Skeleton width="70%" height={40} borderRadius={8} delay={120} />
+          <Skeleton width="25%" height={40} borderRadius={8} delay={160} />
+        </SkeletonCard>
+        <SkeletonCard style={{ gap: 8, marginTop: 12 }}>
+          <Skeleton width="45%" height={14} borderRadius={6} delay={200} />
+          <Skeleton width="30%" height={12} borderRadius={5} delay={240} />
+        </SkeletonCard>
+      </View>
+      <PriceSummarySkeleton />
+    </SkeletonGroup>
+  );
+}
+
+/** Book Now's Payment Option page (car card on top, then the trip, coupon and price) while it opens. */
+export function BookingPageSkeleton() {
+  return (
+    <SkeletonGroup>
+      <SkeletonCard style={{ flexDirection: 'row', gap: 12, marginBottom: 20 }}>
+        <Skeleton width={96} height={72} borderRadius={10} />
+        <View style={{ flex: 1, gap: 8, justifyContent: 'center' }}>
+          <Skeleton width="70%" height={16} borderRadius={6} delay={40} />
+          <Skeleton width="50%" height={12} borderRadius={5} delay={90} />
+          <Skeleton width="35%" height={12} borderRadius={5} delay={140} />
+        </View>
+      </SkeletonCard>
+      <PaymentPageSkeleton />
+    </SkeletonGroup>
+  );
+}
+
 /** Ride-journey progress on the profile while it loads. */
 export function LoyaltySkeleton() {
   return (

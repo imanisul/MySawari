@@ -24,7 +24,7 @@ type Place = SearchPlace;
 export default function AddressSearchScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
-  const { kind, editId } = useLocalSearchParams<{ kind?: string; editId?: string }>();
+  const { kind, editId, gps } = useLocalSearchParams<{ kind?: string; editId?: string; gps?: string }>();
   const isReturn = kind === 'return';
   const kindParam = kind === 'save' ? 'save' : isReturn ? 'return' : 'pickup';
   const { customer, isAuthenticated } = useSawari();
@@ -103,6 +103,10 @@ export default function AddressSearchScreen() {
       setLocating(false);
     }
   };
+  // "Deliver to my location" on the Payment Option page: go straight to the GPS pin (search stays as the fallback).
+  useEffect(() => {
+    if (gps === '1') useCurrentLocation();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const searching = query.trim().length >= 2;
   // While typing: saved / top places that match show at once, then the online results (no duplicates).

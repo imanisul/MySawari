@@ -14,7 +14,7 @@ import { couponsQueryOptions } from '@/services/api/offers';
 import { formatCurrency, calculateCouponDiscount, isCouponApplicableToVehicle } from '@/services/backend/pricingEngine';
 import { CouponNotApplicableModal } from '@/components/common/CouponNotApplicableModal';
 import { Reveal } from '@/components/common/Reveal';
-import { PriceSummarySkeleton } from '@/components/loading/ScreenSkeletons';
+import { PriceSummarySkeleton, PaymentPageSkeleton } from '@/components/loading/ScreenSkeletons';
 
 export default function PaymentScreen() {
   useTrackTripProgress('payment'); // Recent searches resume this trip on this page
@@ -38,6 +38,13 @@ export default function PaymentScreen() {
     membership
   } = useSawari();
   const { pricingQuote, isQuoteLoading, quoteError, refreshQuote } = useQuote();
+  // Brief skeleton on open so the page slides in smoothly, then stays until the price quote is ready.
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setOpened(true), 450);
+    return () => clearTimeout(t);
+  }, []);
+  const showPageSkeleton = !opened || !pricingQuote;
 
   useFocusEffect(
     useCallback(() => {
@@ -148,6 +155,17 @@ export default function PaymentScreen() {
     }
   };
 
+  if (!selectedCar) {
+    return (
+      <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 24 }]}>
+        <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>No vehicle selected</Text>
+        <Pressable onPress={() => router.replace('/')} style={{ marginTop: 16, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: colors.button, borderRadius: 10 }}>
+          <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' }}>Browse Vehicles</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   if (quoteError) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }]}>
@@ -185,6 +203,15 @@ export default function PaymentScreen() {
         </View>
 
         <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+
+          {/* 2-MINUTE CAR LOCK NOTICE */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16 }}>
+            <Feather name="lock" size={14} color={colors.success || '#10B981'} />
+            <Text style={{ flex: 1, color: colors.mutedForeground, fontFamily: 'Inter_500Medium', fontSize: 12 }}>
+              2:00 exclusive car lock starts when you tap Pay — prevents double booking.
+            </Text>
+          </View>
+          {showPageSkeleton ? <PaymentPageSkeleton /> : (<Reveal>
 
           {/* YOUR TRIP — read-only summary of choices already made earlier in the funnel */}
           <View style={[styles.sectionHeaderRow, { marginTop: 0 }]}>
@@ -236,13 +263,13 @@ export default function PaymentScreen() {
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.row}>
               <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Name</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer.name}</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer?.name || '—'}</Text>
             </View>
             <View style={[styles.row, { marginTop: 12 }]}>
               <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Mobile</Text>
-              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer.mobile}</Text>
+              <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer?.mobile || '—'}</Text>
             </View>
-            {!!customer.email && (
+            {!!customer?.email && (
               <View style={[styles.row, { marginTop: 12 }]}>
                 <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Email</Text>
                 <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{customer.email}</Text>
@@ -475,6 +502,7 @@ export default function PaymentScreen() {
           </View>
           </Reveal>
           )}
+          </Reveal>)}
         </ScrollView>
 
         <View style={[styles.bottomNav, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 20) }]}>

@@ -13,7 +13,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoginBottomSheet } from '@/components';
 import { useSawari } from '@/context/SawariContext';
-import { API, BACKEND_URL, BASE_URL } from '@/services/backend/api';
+import { API } from '@/services/backend/api';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { FaqList } from '@/components/vehicle/details/CarDetailsSections';
 import { PF } from '@/components/profile/ProfileParts';
@@ -69,31 +69,20 @@ export default function ReferEarnScreen() {
 
   const code = customer.referralCode || '';
   const activeCode = activeQR?.token || code;
-  const backendBase = (BASE_URL || process.env.EXPO_PUBLIC_API_BASE_URL || 'https://mysawari-customer-backend-1.onrender.com').replace(/\/+$/, '');
+  // Branded smart redirect domain: auto-redirects iPhone -> App Store & Android -> Play Store (with referrer)
+  const appLinkBase = (process.env.EXPO_PUBLIC_APP_LINK_URL || 'https://app.mysawari.in').replace(/\/+$/, '');
 
-  // The store links, fetched from the server's referral settings (Operation App), with the app's own as fallback. The
-  // Play link carries the invite code as the install referrer, so it can be picked up on Android after install.
-  const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-  const appStore = config?.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836';
-  const link = useMemo(
-    () => (code ? `${playStore}${playStore.includes('?') ? '&' : '?'}referrer=${encodeURIComponent(`ref_code=${code}`)}` : ''),
-    [code, playStore],
-  );
-
-  // One QR for both platforms: the backend /r/:code redirects to App Store or Play (with referrer) by device
+  // One smart link & QR for both iOS and Android: https://app.mysawari.in/r/<CODE>
   const smartLink = useMemo(
-    () => (activeCode ? `${backendBase}/r/${activeCode}` : ''),
-    [activeCode, backendBase],
+    () => (activeCode ? `${appLinkBase}/r/${activeCode}` : appLinkBase),
+    [activeCode, appLinkBase],
   );
 
-  // Adapts dynamically to platform: iPhone gets App Store link, Android gets Play Store link with referrer code
-  const isIos = Platform.OS === 'ios';
-  const platformStoreLink = isIos ? appStore : link;
-  const shortLink = (platformStoreLink || link).replace(/^https?:\/\//, '');
+  const shortLink = smartLink.replace(/^https?:\/\//, '');
   const pct = config?.referralRewardType === 'PERCENTAGE' && config?.referralRewardAmount ? `${config.referralRewardAmount}%` : '10%';
   const friendGets = '100 SawariCash';
 
-  const message = `🚗 Join me on MySawari! Use my invite code *${code}* when you sign up to get 100 SawariCash in your wallet.\n\n📲 Download MySawari:\n${platformStoreLink}\n\n(Referral code: *${code}*)`;
+  const message = `🚗 Join me on MySawari! Use my invite code *${activeCode}* when you sign up to get ${friendGets} in your wallet.\n\n📲 Download MySawari:\n${smartLink}\n\n(Referral code: *${activeCode}*)`;
 
   const faqs = useMemo(() => [
     { q: 'How does the Refer & Earn program work?', a: `Share your personal invite link or code. When your friend signs up and completes their trip, you earn ${pct} commission of their total trip amount directly in your wallet.` },
@@ -106,7 +95,7 @@ export default function ReferEarnScreen() {
   ], [pct]);
 
   const needLogin = () => {
-    if (isAuthenticated && code) return false;
+    if (isAuthenticated && activeCode) return false;
     if (!isAuthenticated) setShowLogin(true);
     return true;
   };
@@ -121,7 +110,7 @@ export default function ReferEarnScreen() {
 
   const copyLinkOnly = async () => {
     if (needLogin()) return;
-    await Clipboard.setStringAsync(smartLink || platformStoreLink);
+    await Clipboard.setStringAsync(smartLink);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
@@ -210,7 +199,7 @@ export default function ReferEarnScreen() {
                     </Pressable>
                     <Pressable
                       onPress={async () => {
-                        await Clipboard.setStringAsync(platformStoreLink);
+                        await Clipboard.setStringAsync(smartLink);
                         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                         setCopied(true);
                         setTimeout(() => setCopied(false), 1800);
@@ -286,7 +275,7 @@ export default function ReferEarnScreen() {
       {/* ── Footer: invite link + share, with the page blurring under it ── */}
       <View style={[styles.footer, { backgroundColor: p.page, borderTopColor: p.divider, paddingBottom: Math.max(insets.bottom, 12) }]}>
         <BottomBlur height={56} fadeTo={p.page} style={{ top: -56, bottom: undefined }} />
-        {isAuthenticated && !!code && (
+        {isAuthenticated && !!activeCode && (
           <Pressable accessibilityRole="button" accessibilityLabel={`Copy invite link ${shortLink}`} onPress={copyLinkOnly} style={styles.linkRow} hitSlop={6}>
             <Text style={[styles.linkLabel, { color: p.muted }]} numberOfLines={1}>Invite Link :</Text>
             <Text style={[styles.link, { color: p.muted }]} numberOfLines={1} ellipsizeMode="tail">{shortLink}</Text>

@@ -267,6 +267,18 @@ export default function FlashSaleScreen() {
   // Also wait for the fleet on first load: a live offer names its cars by id, so without the fleet the page showed the
   // plain offers list for a moment and then jumped to the ticket (replaying its zoom-in).
   const ready = offersReady && (isLive || nextReady) && !fleetLoading && bookingsReady;
+  // While waiting, guess which page is coming from what Home already fetched, so the skeleton has that page's shape:
+  // a car ticket, the big "SCHEDULE ON <day>" / "COMING SOON" lettering, or the plain offers list.
+  const skeletonKind = useMemo<'ticket' | 'hero' | 'list'>(() => {
+    const now = Date.now();
+    const cars = (o: any) => (o?.vehiclePrices?.length || 0) + (o?.applicableVehicleIds?.length || 0) + (o?.vehicleId ? 1 : 0);
+    const live = rawOffers.filter((o: any) => isOfferLive(o, now, true));
+    if (live.length) return live.some((o: any) => cars(o) > 0) ? 'ticket' : 'list';
+    const starts = nextSale?.startsAt ? new Date(nextSale.startsAt).getTime() : 0;
+    if (starts > now) return cars(nextSale?.offer) > 0 || nextSale?.images?.length ? 'ticket' : 'hero';
+    // Nothing live or planned in the cache → "Coming Soon"; nothing cached at all (first open) → the ticket.
+    return offersAt > 0 || nextAt > 0 ? 'hero' : 'ticket';
+  }, [rawOffers, nextSale, offersAt, nextAt]);
 
   const [nowMs, setNowMs] = useState(Date.now());
   useEffect(() => {
@@ -643,7 +655,23 @@ export default function FlashSaleScreen() {
       </View>
 
       {/* Content depending on state */}
-      {!ready || !screenH ? (
+      {(!ready || !screenH) && skeletonKind === 'hero' ? (
+        // Coming next: the big centred lettering (Flash Sale / Schedule on <day> / Coming Soon) — shimmer bars in its place.
+        <SkeletonGroup style={styles.centerComingSoon}>
+          <View accessibilityLabel="Loading Flash Sale" style={{ width: Math.min(393, windowWidth) * 0.8, alignItems: 'center', gap: 14 }}>
+            <Skeleton width="92%" height={58} borderRadius={10} style={GHOST} />
+            <Skeleton width="64%" height={30} borderRadius={8} style={GHOST} delay={90} />
+            <Skeleton width="78%" height={46} borderRadius={10} style={GHOST} delay={180} />
+          </View>
+        </SkeletonGroup>
+      ) : (!ready || !screenH) && skeletonKind === 'list' ? (
+        // Coming next: live offers without named cars, shown as the offers list.
+        <SkeletonGroup style={{ flex: 1, paddingHorizontal: 16, paddingTop: 8, gap: 14 }}>
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} width="100%" height={150} borderRadius={16} style={GHOST} delay={i * 90} />
+          ))}
+        </SkeletonGroup>
+      ) : !ready || !screenH ? (
         // Waiting for the server: the real page's own pieces in place — the header row (title + ENDS IN timer), the cream
         // ticket with its bites, gold outline and dashed divider, the photo and details boxes, the button and the car arc
         // — with shimmer blocks where the text and photo go. The real content then fades in over the same spots.

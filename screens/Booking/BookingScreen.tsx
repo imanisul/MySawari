@@ -1,4 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { BookingPageSkeleton } from '@/components/loading/ScreenSkeletons';
+import { ChoiceSheet } from '@/components/booking/ChoiceSheet';
+import { Reveal } from '@/components/common/Reveal';
 import { safeBack } from '@/utils/navigation';
 import { BlurHost, BottomBlur } from '@/components/common/BottomBlur';
 import { BlurTargetView } from 'expo-blur';
@@ -14,10 +17,10 @@ import { useSawari, useQuote } from '@/context/SawariContext';
 import { checkCarAvailability } from '@/utils/sawari';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { API } from '@/services/backend/api';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { couponsQueryOptions } from '@/services/api/offers';
 import { ActivityAPI } from '@/services/api/activity';
-import { useVehicles, useLiveCar } from '@/hooks/useVehicles';
+import { useVehicles, useLiveCar, VEHICLES_KEY } from '@/hooks/useVehicles';
 import { calculateCouponDiscount, formatCurrency, isCouponApplicableToVehicle, MYSAWARI_HUB_NAME, type Coupon } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { useTripPrice } from '@/components/vehicle/details/useTripPrice';
@@ -89,6 +92,12 @@ export default function BookingScreen() {
     planToBuy, setPlanToBuy,
   } = useSawari();
   const { pricingQuote, isQuoteLoading, refreshQuote } = useQuote();
+  // Skeleton for a moment on open (and while the first price is being fetched), then the page fades in.
+  const [opened, setOpened] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setOpened(true), 450);
+    return () => clearTimeout(t);
+  }, []);
   const [celebrate, setCelebrate] = useState<{ name: string; price: number; save: number; pctLabel: string } | null>(null);
   const price = useTripPrice(!!dateRange && !dateRange.includes('Select'));
 
@@ -178,8 +187,55 @@ export default function BookingScreen() {
   const [startStr, endStr] = (dateRange || '').split(' – ');
   // Checked against the live fleet, not the copy saved when the car was tapped.
   const { data: liveVehicles } = useVehicles();
-  const liveCar = useLiveCar(liveVehicles?.find((v) => v.id === selectedCar.id) || selectedCar);
-  const isVehicleAvailable = isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr, pickupTime, returnTime);
+  const liveCar = useLiveCar(liveVehicles?.find((v) => v.id === selectedCar?.id) || selectedCar);
+  const isVehicleAvailable = !liveCar ? false : isMissingDates ? true : checkCarAvailability(liveCar, startStr, endStr, pickupTime, returnTime);
+
+  // Detect if another customer holds an active 2-minute checkout lock on this car so we can show a live countdown
+  const activeOtherHoldUntilMs = React.useMemo(() => {
+    const ranges: any[] = (liveCar as any)?.bookedRanges || [];
+    const nowMs = Date.now();
+    let maxHoldMs = 0;
+    for (const r of ranges) {
+      if (r?.status === 'hold' && r?.holdExpiresAt) {
+        const ms = new Date(r.holdExpiresAt).getTime();
+        if (ms > nowMs && ms > maxHoldMs) maxHoldMs = ms;
+      }
+    }
+    return maxHoldMs > nowMs ? maxHoldMs : null;
+  }, [liveCar]);
+
+  const [otherHoldSecLeft, setOtherHoldSecLeft] = useState(0);
+  useEffect(() => {
+    if (!activeOtherHoldUntilMs) { setOtherHoldSecLeft(0); return; }
+    const update = () => {
+      const sec = Math.max(0, Math.ceil((activeOtherHoldUntilMs - Date.now()) / 1000));
+      setOtherHoldSecLeft(sec);
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [activeOtherHoldUntilMs]);
+
+  // Checkout window shown on this page: counts 2:00 down from when the page opens. At 00:00 the price and the car's
+  // availability are fetched fresh from the server and a new 2:00 starts. The server's own car lock starts on Pay.
+  const queryClient = useQueryClient();
+  const [pageSecLeft, setPageSecLeft] = useState(120);
+  const windowEndsAt = useRef(Date.now() + 120 * 1000);
+  useEffect(() => {
+    const id = setInterval(() => {
+      const sec = Math.max(0, Math.ceil((windowEndsAt.current - Date.now()) / 1000));
+      if (sec === 0) {
+        windowEndsAt.current = Date.now() + 120 * 1000;
+        setPageSecLeft(120);
+        refreshQuote().catch(() => {});
+        queryClient.invalidateQueries({ queryKey: VEHICLES_KEY });
+        return;
+      }
+      setPageSecLeft(sec);
+    }, 1000);
+    return () => clearInterval(id);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const mmss = (sec: number) => `${String(Math.floor(sec / 60)).padStart(2, '0')}:${String(sec % 60).padStart(2, '0')}`;
 
   /** Pickup at the hub or delivered; return at the hub or collected — kept in the context's delivery mode. */
   const setService = (pick: boolean, ret: boolean) => {
@@ -188,22 +244,10 @@ export default function BookingScreen() {
     setIsDeliveryRequested(true);
     setDeliveryMode(pick && ret ? 'both' : pick ? 'delivery' : 'return');
   };
-  const choosePickup = () => {
-    Haptics.selectionAsync();
-    Alert.alert('Pickup', 'Where would you like to get the car?', [
-      { text: `Pick up at ${MYSAWARI_HUB_NAME}`, onPress: () => setService(false, collectReturn) },
-      { text: 'Deliver to my location', onPress: () => { setService(true, collectReturn); router.push({ pathname: '/address-search', params: { kind: 'pickup' } }); } },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
-  const chooseReturn = () => {
-    Haptics.selectionAsync();
-    Alert.alert('Return', 'Where will you return the car?', [
-      { text: `Return at ${MYSAWARI_HUB_NAME}`, onPress: () => setService(deliverPickup, false) },
-      { text: 'Collect from my location', onPress: () => { setService(deliverPickup, true); router.push({ pathname: '/address-search', params: { kind: 'return' } }); } },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
-  };
+  // Pickup / drop-off choice in the app's own bottom sheet (was the phone's plain system alert).
+  const [placeSheet, setPlaceSheet] = useState<'pickup' | 'return' | null>(null);
+  const choosePickup = () => { Haptics.selectionAsync(); setPlaceSheet('pickup'); };
+  const chooseReturn = () => { Haptics.selectionAsync(); setPlaceSheet('return'); };
   const chooseDriver = () => {
     Haptics.selectionAsync();
     Alert.alert('Driving option', undefined, [
@@ -338,15 +382,31 @@ export default function BookingScreen() {
     setTimeout(() => setIsSubmitting(false), 1000);
   };
 
+  if (!selectedCar) {
+    return (
+      <View style={[styles.screen, { backgroundColor: p.page, alignItems: 'center', justifyContent: 'center', padding: 24 }]}>
+        <Text style={{ color: p.fg, fontFamily: FONT.semibold, fontSize: 16, textAlign: 'center' }}>No vehicle selected</Text>
+        <Text style={{ color: p.sub, fontFamily: FONT.regular, fontSize: 13, textAlign: 'center', marginTop: 6 }}>
+          Please choose a car or bike to continue checkout.
+        </Text>
+        <Pressable onPress={() => router.replace('/')} style={{ marginTop: 18, backgroundColor: '#111A2B', paddingHorizontal: 22, paddingVertical: 12, borderRadius: 12 }}>
+          <Text style={{ color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: 14 }}>Browse Vehicles</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const ready = price.state === 'ready' ? price : null;
   const days = ready?.days ?? pricingQuote?.rentalDays ?? 1;
-  const name = selectedCar.name; // same name as the car details page
-  const year = selectedCar.modelYear || selectedCar.registrationYear;
+  const name = selectedCar?.name || 'Vehicle'; // same name as the car details page
+  const year = selectedCar?.modelYear || selectedCar?.registrationYear;
   const title = year && !String(name).includes(String(year)) ? `${name} ${year}` : name;
-  const meta = [selectedCar.transmission, selectedCar.fuel, selectedCar.type === 'Bike' ? null : (/seat/i.test(String(selectedCar.seats)) ? selectedCar.seats : `${selectedCar.seats} seats`)].filter(Boolean) as string[];
+  const meta = [selectedCar?.transmission, selectedCar?.fuel, selectedCar?.type === 'Bike' ? null : (/seat/i.test(String(selectedCar?.seats)) ? selectedCar?.seats : selectedCar?.seats ? `${selectedCar.seats} seats` : null)].filter(Boolean) as string[];
   const pickupWhere = deliverPickup ? (pickup?.name || 'Choose delivery address') : MYSAWARI_HUB_NAME;
   const returnWhere = collectReturn ? (returnAddress?.name || 'Choose collection address') : MYSAWARI_HUB_NAME;
   const payable = ready?.payableNow ?? pricingQuote?.onlinePayableNow ?? 500;
+
+  const showPageSkeleton = !opened || (!isMissingDates && !pricingQuote && isQuoteLoading);
 
   return (
     <BlurTargetProvider target={blurTarget}>
@@ -368,6 +428,27 @@ export default function BookingScreen() {
                 </Pressable>
               </View>
 
+              {/* Live 2-min lock status / anti-double-booking notice */}
+              {/* Checkout lock timer, always visible, time only. Another customer is paying → their server lock counting
+                  down (to holdExpiresAt). Otherwise the full 02:00 your own lock gets when you tap Pay; the server starts it
+                  then, and the payment screen counts it down. */}
+              {(() => {
+                const otherHold = !isVehicleAvailable && otherHoldSecLeft > 0;
+                const sec = otherHold ? otherHoldSecLeft : pageSecLeft;
+                return (
+                  <View
+                    accessible
+                    accessibilityRole="timer"
+                    accessibilityLabel={`${Math.floor(sec / 60)} minutes ${sec % 60} seconds`}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', alignSelf: 'center', gap: 6, backgroundColor: otherHold ? '#FEF3C7' : p.iconBg, borderColor: otherHold ? '#F59E0B' : 'transparent', borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 14 }}
+                  >
+                    <Feather name={otherHold ? 'clock' : 'lock'} size={14} color={otherHold ? '#B45309' : '#10B981'} />
+                    <Text style={{ color: otherHold ? '#92400E' : p.fg, fontFamily: FONT.bold, fontSize: 14, fontVariant: ['tabular-nums'] }}>{mmss(sec)}</Text>
+                  </View>
+                );
+              })()}
+
+              {showPageSkeleton ? <BookingPageSkeleton /> : (<Reveal>
               {/* Car */}
               <View style={[styles.carCard, { borderColor: '#EAECF1' }]}>
                 <View style={[styles.carImage, { backgroundColor: p.iconBg }]}>
@@ -458,7 +539,7 @@ export default function BookingScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.stopTitle, { color: p.fg }]}>Pickup{!isMissingDates ? ` · ${dayAndTime(startStr, pickupTime)}` : ''}</Text>
-                    <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    <Text style={[styles.stopSub, { color: isMissingPickup ? p.red : p.sub }]} numberOfLines={2}>
                       {deliverPickup ? `Doorstep delivery · ${pickupWhere}${ready?.pickupCharge ? ` · +${formatCurrency(ready.pickupCharge)}` : ''}` : pickupWhere}
                     </Text>
                   </View>
@@ -477,7 +558,7 @@ export default function BookingScreen() {
                   </View>
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.stopTitle, { color: p.fg }]}>Drop-off{!isMissingDates ? ` · ${dayAndTime(endStr, returnTime)}` : ''}</Text>
-                    <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                    <Text style={[styles.stopSub, { color: isMissingDrop ? p.red : p.sub }]} numberOfLines={2}>
                       {collectReturn ? `Doorstep collection · ${returnWhere}${ready?.dropCharge ? ` · +${formatCurrency(ready.dropCharge)}` : ''}` : returnWhere}
                     </Text>
                   </View>
@@ -629,6 +710,7 @@ export default function BookingScreen() {
               <Text style={[styles.note, { color: p.sub }]}>
                 *Note : Original Driving License and Aadhaar Card verification is Mandatory at the time of vehicle handover
               </Text>
+              </Reveal>)}
             </ScrollView>
           </BlurTargetView>
 
@@ -658,6 +740,19 @@ export default function BookingScreen() {
               onClose={() => setCelebrate(null)}
             />
           )}
+          <ChoiceSheet
+            visible={placeSheet !== null}
+            onClose={() => setPlaceSheet(null)}
+            title={placeSheet === 'return' ? 'Drop-off' : 'Pickup'}
+            subtitle={placeSheet === 'return' ? 'Where will you return the car?' : 'Where would you like to get the car?'}
+            options={placeSheet === 'return' ? [
+              { key: 'hub', icon: 'map-pin', title: `Return at ${MYSAWARI_HUB_NAME.replace(/^MySawari,\s*/, '')}`, subtitle: 'Drop the car back at our MySawari hub', selected: !collectReturn, onPress: () => setService(deliverPickup, false) },
+              { key: 'door', icon: 'home', title: 'Collect from my location', subtitle: 'Uses your current location · Charges apply', selected: collectReturn, onPress: () => { setService(deliverPickup, true); router.push({ pathname: '/address-search', params: { kind: 'return', gps: '1' } }); } },
+            ] : [
+              { key: 'hub', icon: 'map-pin', title: `Pickup at ${MYSAWARI_HUB_NAME.replace(/^MySawari,\s*/, '')}`, subtitle: 'Collect the car from our MySawari hub', selected: !deliverPickup, onPress: () => setService(false, collectReturn) },
+              { key: 'door', icon: 'truck', title: 'Deliver to my location', subtitle: 'Uses your current location · Charges apply', selected: deliverPickup, onPress: () => { setService(true, collectReturn); router.push({ pathname: '/address-search', params: { kind: 'pickup', gps: '1' } }); } },
+            ]}
+          />
           <LoginBottomSheet
             visible={showLogin}
             showSkip={false}
@@ -728,7 +823,7 @@ const styles = StyleSheet.create({
   ring: { width: 12, height: 12, borderRadius: 6, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   innerDot: { width: 4, height: 4, borderRadius: 2 },
   stopTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 16 },
-  stopSub: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
+  stopSub: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 17 },
   changeText: { fontFamily: FONT.medium, fontSize: 12, paddingLeft: 8 },
 
   couponField: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, height: 50, paddingLeft: 12, paddingRight: 6 },

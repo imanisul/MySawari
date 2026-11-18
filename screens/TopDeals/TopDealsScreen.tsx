@@ -361,15 +361,13 @@ function VehicleCard({
             )}
           </View>
 
-          {/* When the deal runs (India time), as a trip: Start · Today 3:00 PM → End · Tmrw 8:00 AM */}
+          {/* When the deal runs (India time): Today 3:00 PM → Tmrw 8:00 AM */}
           <View style={styles.whenRow} accessible accessibilityLabel={`Starts ${dealDayTime(startMs, nowMs)}, ends ${dealDayTime(endMs, nowMs)}`}>
             <View style={styles.whenCol}>
-              <Text style={styles.whenLbl}>Start</Text>
               <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(startMs, nowMs)}</Text>
             </View>
             <Feather name="arrow-right" size={12} color="#6152D8" />
             <View style={[styles.whenCol, { alignItems: 'flex-end' }]}>
-              <Text style={styles.whenLbl}>End</Text>
               <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(endMs, nowMs)}</Text>
             </View>
           </View>
@@ -1266,7 +1264,6 @@ const styles = StyleSheet.create({
   // ── Price & Action Row (Frame 2147225762) ──
   whenRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: '#DEDAFB', backgroundColor: '#FBFAFE' },
   whenCol: { flex: 1, minWidth: 0 },
-  whenLbl: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 14, color: '#737373' },
   whenVal: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 18, color: '#6B5AED' },
   priceActionRow: {
     flexDirection: 'row',

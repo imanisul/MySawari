@@ -92,8 +92,12 @@ export const vehiclesQueryOptions = {
       throw err;
     }
   },
-  staleTime: 10 * 1000, // 10 seconds: quick stale time so bookings reflect in real time
-  refetchInterval: 15 * 1000, // 15 seconds: live polling keeps vehicle availability in real time
+  staleTime: 5 * 1000, // quick stale time so bookings reflect in real time
+  refetchInterval: 10 * 1000, // live polling keeps vehicle availability in real time
+  // Availability is worked out against the clock at render time. With React Query's default sharing, an unchanged
+  // server answer kept the old list object, nothing re-rendered, and a car whose trip had just ended kept saying
+  // "Available from …" until the app was reloaded. A new list on every poll re-checks it against the time now.
+  structuralSharing: false,
   refetchOnWindowFocus: true, // re-checked when the app comes back to the foreground
   refetchOnMount: true,
   refetchOnReconnect: true,

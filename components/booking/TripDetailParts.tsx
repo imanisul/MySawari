@@ -348,7 +348,19 @@ export function PricingSummary({ booking }: { booking: BookingSnapshot }) {
         {(b.fastagAmount || 0) > 0 && <Row label="FASTag" value={rupees(b.fastagAmount)} />}
         {(b.securityDeposit || 0) > 0 && <Row label="Security deposit" value={rupees(b.securityDeposit)} />}
         {(b.membershipDiscount || 0) > 0 && <Row label="Membership discount" value={minus(b.membershipDiscount)} accent />}
-        {(b.couponDiscount || 0) > 0 && <Row label={`Coupon discount${b.couponCode ? ` (${b.couponCode})` : ''}`} value={minus(b.couponDiscount)} accent />}
+        {(b.couponDiscount || 0) > 0 && (
+          <Row
+            label={
+              /^TOPDEAL-/i.test(String(b.couponCode || ''))
+                ? `Top Deal discount${b.couponCode ? ` (${b.couponCode})` : ''}`
+                : /^(CLM_|EXCL_)/i.test(String(b.couponCode || ''))
+                  ? `Flash Sale discount${b.couponCode ? ` (${b.couponCode})` : ''}`
+                  : `Coupon discount${b.couponCode ? ` (${b.couponCode})` : ''}`
+            }
+            value={minus(b.couponDiscount)}
+            accent
+          />
+        )}
         {(b.manualDiscount || 0) > 0 && <Row label="Special discount" value={minus(b.manualDiscount)} accent />}
         {(b.sawariCashUsed || 0) > 0 && <Row label="SawariCash" value={minus(b.sawariCashUsed)} accent />}
       </View>

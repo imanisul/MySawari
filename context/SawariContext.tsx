@@ -887,13 +887,48 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         if (!id) throw new Error('No active booking hold found');
         const confirmedBooking = await API.confirmBookingPayment(id, paymentDetails.razorpayOrderId, paymentDetails.razorpayPaymentId, idempotencyKey, paymentDetails.razorpaySignature);
         
-        // Update the lastBooking state with the confirmed booking info so the ConfirmationScreen can read the real bookingCode
-        setLastBooking((prev: any) => ({
-          ...(prev || {}),
-          ...(confirmedBooking || {}),
-          id: String(confirmedBooking?._id || confirmedBooking?.id || (prev as any)?.id || id),
-          bookingCode: confirmedBooking?.bookingCode || (prev as any)?.bookingCode || '',
-        }));
+        // Update the lastBooking state with normalized fields (UPPERCASE status + handoverOtp + payment breakdown)
+        // so ConfirmationScreen and Trip Details show the handover OTP and exact pricing immediately.
+        setLastBooking((prev: any) => {
+          const rawStatus = String(confirmedBooking?.status || prev?.status || 'CONFIRMED').toUpperCase();
+          const normalizedStatus =
+            rawStatus === 'ACTIVE' || rawStatus === 'VEHICLE_HANDOVER' || rawStatus === 'ONGOING'
+              ? 'ONGOING'
+              : rawStatus === 'COMPLETED'
+                ? 'COMPLETED'
+                : rawStatus === 'CANCELLED'
+                  ? 'CANCELLED'
+                  : 'CONFIRMED';
+          const cp = confirmedBooking?.payment || {};
+          const rawOtp = confirmedBooking?.handoverOtp || prev?.handoverOtp;
+          return {
+            ...(prev || {}),
+            ...(confirmedBooking || {}),
+            id: String(confirmedBooking?._id || confirmedBooking?.id || (prev as any)?.id || id),
+            bookingCode: confirmedBooking?.bookingCode || (prev as any)?.bookingCode || '',
+            status: normalizedStatus,
+            onlinePayableNow: cp.bookingAmountPaid ?? prev?.onlinePayableNow ?? 0,
+            bookingAdvance: cp.bookingAmountPaid ?? prev?.bookingAdvance ?? 0,
+            remainingRentalAmount: cp.balanceAmount ?? prev?.remainingRentalAmount ?? 0,
+            couponCode: confirmedBooking?.couponCode || cp.couponCode || prev?.couponCode,
+            couponDiscount: confirmedBooking?.couponDiscount ?? cp.couponDiscount ?? prev?.couponDiscount ?? 0,
+            membershipDiscount: confirmedBooking?.membershipDiscount ?? cp.membershipDiscount ?? prev?.membershipDiscount ?? 0,
+            sawariCashUsed: confirmedBooking?.sawariCashUsed ?? cp.sawariCashUsed ?? prev?.sawariCashUsed ?? 0,
+            driverMode: confirmedBooking?.driverMode || prev?.driverMode,
+            driverCharge: cp.driverCharge ?? prev?.driverCharge ?? 0,
+            pickupCharge: cp.pickupCharge ?? prev?.pickupCharge ?? 0,
+            dropCharge: cp.dropCharge ?? prev?.dropCharge ?? 0,
+            handoverOtp: rawOtp?.otp
+              ? {
+                  otp: String(rawOtp.otp),
+                  status: rawOtp.status || 'PENDING',
+                  generatedAt: rawOtp.generatedAt,
+                  verifiedAt: rawOtp.verifiedAt,
+                  bypassedAt: rawOtp.bypassedAt,
+                }
+              : prev?.handoverOtp,
+          };
+        });
         
         // A plan paid for in this same payment: the server saves it with the booking. If it hasn't (an older
         // server), it is saved here with the same payment so the customer is never left without what they paid for.

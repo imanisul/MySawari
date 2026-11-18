@@ -71,11 +71,20 @@ export default function BookingDetailScreen() {
   // A cancel / extend answer from the sheets shows straight away, before the list catches up.
   const [updated, setUpdated] = useState<BookingSnapshot | null>(null);
   useEffect(() => { setUpdated(null); }, [allBookings]);
-  const snapshot: BookingSnapshot | null =
-    updated && updated.id === id
-      ? updated
-      : (allBookings || []).find((b) => b.id === id || (b as any)?._id === id || b.bookingCode === id) ||
-        (lastBooking && (lastBooking.id === id || (lastBooking as any)?._id === id || lastBooking.bookingCode === id) ? lastBooking : null);
+  const fromList = (allBookings || []).find((b) => b.id === id || (b as any)?._id === id || b.bookingCode === id) || null;
+  const fromLast =
+    lastBooking && (lastBooking.id === id || (lastBooking as any)?._id === id || lastBooking.bookingCode === id)
+      ? lastBooking
+      : null;
+  const merged =
+    fromList && fromLast
+      ? {
+          ...fromLast,
+          ...fromList,
+          handoverOtp: fromList.handoverOtp?.otp ? fromList.handoverOtp : (fromLast.handoverOtp || fromList.handoverOtp),
+        }
+      : (fromList || fromLast);
+  const snapshot: BookingSnapshot | null = updated && updated.id === id ? updated : merged;
   const loading = (!!id && !snapshot && (listLoading || listFetching)) || isAuthenticated === null;
   const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); };
   useFocusEffect(React.useCallback(() => { if (id && isAuthenticated) refetchBookings({ cancelRefetch: false }); }, [id, isAuthenticated, refetchBookings]));
@@ -169,14 +178,15 @@ export default function BookingDetailScreen() {
 
   const s = snapshot;
   const matchedCar = vehicles.find((v) => v.id === s.vehicleId);
-  const upcoming = s.status === 'CONFIRMED' || s.status === 'PENDING';
-  const ongoing = s.status === 'ONGOING';
-  const completed = s.status === 'COMPLETED';
-  const cancelled = s.status === 'CANCELLED' || s.status === 'FAILED';
+  const normStatus = String(s.status || '').toUpperCase();
+  const upcoming = normStatus === 'CONFIRMED' || normStatus === 'PENDING';
+  const ongoing = normStatus === 'ONGOING' || normStatus === 'ACTIVE' || normStatus === 'VEHICLE_HANDOVER';
+  const completed = normStatus === 'COMPLETED';
+  const cancelled = normStatus === 'CANCELLED' || normStatus === 'FAILED';
   const overdue = ongoing && !!s.rawEndDate && new Date() > new Date(s.rawEndDate);
   const pendingExt = s.extensions?.some((e: any) => e.status === 'pending');
   const rejectedExt = s.extensions?.some((e: any) => e.status === 'rejected');
-  const canExtend = (upcoming && s.status === 'CONFIRMED') || ongoing ? !pendingExt && !rejectedExt : false;
+  const canExtend = (upcoming && normStatus === 'CONFIRMED') || ongoing ? !pendingExt && !rejectedExt : false;
   const reviewed = !!myReviews && (myReviews.bookingIds.includes(s.id) || myReviews.legacyCarIds.includes(String(s.vehicleId)));
   const code = s.bookingCode || s.id.slice(-6).toUpperCase();
 
@@ -251,8 +261,8 @@ export default function BookingDetailScreen() {
           {(() => {
             const isVerified = s.handoverOtp?.status === 'VERIFIED';
             const isBypassed = s.handoverOtp?.status === 'BYPASSED';
-            const otpCode = s.handoverOtp?.otp;
-            const isEligible = !cancelled && (upcoming || ongoing || isVerified) && s.status !== 'CANCELLED';
+            const otpCode = s.handoverOtp?.otp ? String(s.handoverOtp.otp).trim() : '';
+            const isEligible = !cancelled && (upcoming || ongoing || isVerified) && normStatus !== 'CANCELLED';
 
             if (!isEligible) return null;
 
@@ -270,8 +280,8 @@ export default function BookingDetailScreen() {
               return null;
             }
 
-            // Display OTP only for eligible confirmed bookings that have not yet completed handover
-            if (otpCode && (upcoming || s.status === 'CONFIRMED')) {
+            // Display OTP for all eligible confirmed/upcoming bookings (Normal, Top Deals, Flash Sale)
+            if (otpCode && (upcoming || normStatus === 'CONFIRMED')) {
               const digits = otpCode.split('');
               return (
                 <View style={[styles.box, styles.handoverSection, { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0' }]}>

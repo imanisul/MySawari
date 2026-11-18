@@ -30,6 +30,7 @@ export type Coupon = {
   discountType: 'FLAT' | 'PERCENTAGE';
   discountValue: number;
   minimumBooking: number;
+  minimumDiscount?: number | null;
   maximumDiscount?: number | null;
   expiryDate: string;
   startDate?: string | null;
@@ -42,6 +43,13 @@ export type Coupon = {
   pricingType?: 'promotional_price' | 'fixed_discount' | 'percentage_discount' | 'custom_pricing';
   promotionalPrice?: number;
   pricingUnit?: 'per_day' | 'per_trip';
+  customerEligibility?: 'all' | 'specific_customers' | 'new_customers' | 'members_only';
+  firstNCustomers?: number | null;
+  remainingCustomerSlots?: number | null;
+  uniqueCustomersUsed?: number;
+  maxUsageLimit?: number | null;
+  perCustomerLimit?: number | null;
+  isPersonalForYou?: boolean;
 };
 
 /**
@@ -318,6 +326,54 @@ let couponCatalog: Coupon[] = COUPONS;
 export function setCouponCatalog(list: Coupon[]) {
   couponCatalog = list;
 }
+export function upsertCouponInCatalog(coupon: Coupon) {
+  if (!coupon?.code) return;
+  const upper = String(coupon.code).trim().toUpperCase();
+  const next = couponCatalog.filter((c) => String(c.code).trim().toUpperCase() !== upper);
+  next.unshift({ ...coupon, code: upper });
+  couponCatalog = next;
+}
+
+/**
+ * Returns true if the coupon can be shown/used for the given vehicle.
+ * Coupons restricted to specific car(s) or categories are hidden for all other vehicles.
+ */
+export function isCouponApplicableToVehicle(
+  coupon: Coupon,
+  vehicleId?: string | null,
+  vehicleCategory?: string | null
+): boolean {
+  if (!coupon) return false;
+  const isAll = coupon.applicableType === 'all' || coupon.allVehicles === true;
+  const hasSpecificIds =
+    !isAll &&
+    (coupon.applicableType === 'specific_vehicles' ||
+      Boolean(coupon.vehicleId) ||
+      (Array.isArray(coupon.applicableVehicleIds) && coupon.applicableVehicleIds.length > 0));
+
+  if (hasSpecificIds) {
+    if (!vehicleId) return false;
+    const allowed = new Set<string>();
+    if (coupon.vehicleId) allowed.add(String(coupon.vehicleId));
+    if (Array.isArray(coupon.applicableVehicleIds)) {
+      coupon.applicableVehicleIds.forEach((id) => allowed.add(String(id)));
+    }
+    if (allowed.size > 0 && !allowed.has(String(vehicleId))) return false;
+  }
+
+  if (
+    coupon.applicableType === 'category' &&
+    Array.isArray(coupon.applicableCategories) &&
+    coupon.applicableCategories.length > 0
+  ) {
+    const cat = String(vehicleCategory || '').trim().toLowerCase();
+    if (!cat) return false;
+    const matches = coupon.applicableCategories.some((c) => String(c).trim().toLowerCase() === cat);
+    if (!matches) return false;
+  }
+
+  return true;
+}
 
 /**
  * Discount for a coupon code — the exact rule the server applies when the booking is saved:
@@ -392,7 +448,12 @@ export function calculateCouponDiscount(
     discount = Math.min(value, base);
   } else if (coupon.discountType === 'PERCENTAGE') {
     discount = base * (Math.min(value, 100) / 100);
-    if (coupon.maximumDiscount) discount = Math.min(discount, coupon.maximumDiscount);
+    if (coupon.minimumDiscount && Number(coupon.minimumDiscount) > 0) {
+      discount = Math.max(discount, Number(coupon.minimumDiscount));
+    }
+    if (coupon.maximumDiscount && Number(coupon.maximumDiscount) > 0) {
+      discount = Math.min(discount, Number(coupon.maximumDiscount));
+    }
   } else {
     discount = Math.min(value, base);
   }

@@ -1,18 +1,20 @@
 import React from 'react';
 import { ListSkeleton } from '@/components/loading/ListSkeleton';
 import { safeBack } from '@/utils/navigation';
-import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl } from 'react-native';
 import { MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { couponsQueryOptions } from '@/services/api/offers';
 import { useSawari, useQuote } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
-import { calculateCouponDiscount, type Coupon } from '@/services/backend/pricingEngine';
+import { calculateCouponDiscount, isCouponApplicableToVehicle, type Coupon } from '@/services/backend/pricingEngine';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
 import { ScreenHeader, Dashes, PF } from '@/components/profile/ProfileParts';
+import { CouponNotApplicableModal } from '@/components/common/CouponNotApplicableModal';
 import { getIndiaDateParts, istDayMonth, formatTime12 } from '@/utils/sawari';
 
 /**
@@ -21,10 +23,16 @@ import { getIndiaDateParts, istDayMonth, formatTime12 } from '@/utils/sawari';
  */
 function couponTitle(c: Coupon) {
   const n = (v: number) => Number(v).toLocaleString('en-IN');
-  const off = c.discountType === 'FLAT'
-    ? `${n(c.discountValue)} Rupees off`
-    : `${c.discountValue}% off${c.maximumDiscount ? ` (up to ${n(c.maximumDiscount)} Rupees)` : ''}`;
-  return c.minimumBooking > 0 ? `${off} on bookings above ${n(c.minimumBooking)} Rupees` : `${off} on your trip`;
+  let off: string;
+  if (c.discountType === 'FLAT') {
+    off = `Flat ₹${n(c.discountValue)} off`;
+  } else {
+    const bounds: string[] = [];
+    if (c.minimumDiscount && Number(c.minimumDiscount) > 0) bounds.push(`min ₹${n(c.minimumDiscount)}`);
+    if (c.maximumDiscount && Number(c.maximumDiscount) > 0) bounds.push(`up to ₹${n(c.maximumDiscount)}`);
+    off = `${c.discountValue}% off${bounds.length ? ` (${bounds.join(' · ')})` : ''}`;
+  }
+  return c.minimumBooking > 0 ? `${off} on bookings above ₹${n(c.minimumBooking)}` : `${off} on your trip`;
 }
 
 /** Formats exact date and time e.g. "Valid until 15th nov'26 · 11:59 PM" */
@@ -55,11 +63,17 @@ export default function OffersScreen() {
   const { pricingQuote } = useQuote();
   const [toast, setToast] = React.useState(false);
   const [toastMsg, setToastMsg] = React.useState('Coupon Applied');
-  const { data: coupons = [], isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['coupons'],
-    queryFn: () => API.getCoupons(true),
-    staleTime: 5 * 60 * 1000,
-  });
+  const [notApplicable, setNotApplicable] = React.useState<{ code: string; reason: string } | null>(null);
+  const { data: rawCoupons = [], isLoading, refetch, isRefetching } = useQuery(couponsQueryOptions);
+
+  const currentVehicleId = selectedCar?.id || (selectedCar as any)?._id;
+  const currentVehicleCategory = selectedCar?.category || (selectedCar as any)?.segment;
+
+  // When opened from checkout (?mode=apply) for a specific car, ONLY show coupons valid for that car!
+  const coupons = React.useMemo(() => {
+    if (!applyMode || !currentVehicleId) return rawCoupons;
+    return rawCoupons.filter((c) => isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory));
+  }, [rawCoupons, applyMode, currentVehicleId, currentVehicleCategory]);
 
   const copyCode = (code: string) => {
     Clipboard.setStringAsync(code);
@@ -69,24 +83,36 @@ export default function OffersScreen() {
     setTimeout(() => setToast(false), 1200);
   };
 
-  const use = (c: Coupon) => {
+  const use = async (c: Coupon) => {
     Haptics.selectionAsync();
+    const vehicleId = currentVehicleId;
     const vehicleContext = {
-      vehicleId: selectedCar?.id || (selectedCar as any)?._id,
-      vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
+      vehicleId,
+      vehicleCategory: currentVehicleCategory,
     };
 
     if (applyMode) {
-      if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code, vehicleContext) <= 0) {
+      const serverCheck = await API.validateCoupon(c.code, pricingQuote?.rentalAmount ?? 0, vehicleId);
+      if (!serverCheck.offline) {
+        if (!serverCheck.valid || serverCheck.discount <= 0) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          setNotApplicable({
+            code: c.code,
+            reason: serverCheck.reason || `${c.code} cannot be applied to this booking.`,
+          });
+          return;
+        }
+      } else if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code, vehicleContext) <= 0) {
         let msg = `${c.code} can't be used on this booking.`;
         if (c.minimumBooking > 0 && pricingQuote.rentalAmount < c.minimumBooking) {
           msg = `${c.code} needs a booking of at least ₹${c.minimumBooking.toLocaleString('en-IN')}.`;
-        } else if (c.applicableType === 'specific_vehicles' || c.vehicleId) {
+        } else if (c.applicableType === 'specific_vehicles' || c.vehicleId || (c.applicableVehicleIds && c.applicableVehicleIds.length > 0)) {
           msg = `${c.code} is only valid for selected cars and cannot be applied to this vehicle.`;
         } else if (c.applicableType === 'category') {
           msg = `${c.code} is only valid for ${c.applicableCategories?.join(', ')} vehicles.`;
         }
-        Alert.alert('Not valid for this trip', msg);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        setNotApplicable({ code: c.code, reason: msg });
         return;
       }
       applyCoupon(c.code);
@@ -98,9 +124,10 @@ export default function OffersScreen() {
       return;
     }
 
-    applyCoupon(c.code); // checked again against the trip at checkout
-    if (c.vehicleId) {
-      router.push({ pathname: '/car-details', params: { id: c.vehicleId, vehicleId: c.vehicleId, promoCode: c.code } });
+    // Do NOT auto-apply when browsing from Profile: let the customer explicitly apply at checkout!
+    const targetCarId = c.vehicleId || (Array.isArray(c.applicableVehicleIds) && c.applicableVehicleIds.length === 1 ? c.applicableVehicleIds[0] : undefined);
+    if (targetCarId) {
+      router.push({ pathname: '/car-details', params: { id: targetCarId, vehicleId: targetCarId } });
     } else {
       router.push('/explore');
     }
@@ -138,15 +165,44 @@ export default function OffersScreen() {
                   <MaterialCommunityIcons name="ticket-percent-outline" size={18} color={p.fg} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Coupon code ${c.code}. Tap to copy`}
-                    onPress={() => copyCode(c.code)}
-                    style={({ pressed }) => [styles.codeBadge, { backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.7 }]}
-                  >
-                    <Text style={[styles.codeBadgeText, { color: p.fg }]}>{c.code}</Text>
-                    <Feather name="copy" size={11} color={p.muted} />
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Coupon code ${c.code}. Tap to copy`}
+                      onPress={() => copyCode(c.code)}
+                      style={({ pressed }) => [styles.codeBadge, { marginBottom: 0, backgroundColor: p.soft, borderColor: p.border }, pressed && { opacity: 0.7 }]}
+                    >
+                      <Text style={[styles.codeBadgeText, { color: p.fg }]}>{c.code}</Text>
+                      <Feather name="copy" size={11} color={p.muted} />
+                    </Pressable>
+                    {c.isPersonalForYou && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#4338CA' }}>✨ Exclusive For You</Text>
+                      </View>
+                    )}
+                    {typeof c.firstNCustomers === 'number' && c.firstNCustomers > 0 && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#B45309' }}>
+                          🔥 {typeof c.remainingCustomerSlots === 'number' ? `${c.remainingCustomerSlots} of ${c.firstNCustomers} left` : `First ${c.firstNCustomers} users`}
+                        </Text>
+                      </View>
+                    )}
+                    {c.customerEligibility === 'new_customers' && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#047857' }}>First Trip Only</Text>
+                      </View>
+                    )}
+                    {c.customerEligibility === 'members_only' && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#F5F3FF', borderWidth: 1, borderColor: '#DDD6FE' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#6D28D9' }}>Members Only</Text>
+                      </View>
+                    )}
+                    {(c.applicableType === 'specific_vehicles' || Boolean(c.vehicleId) || (Array.isArray(c.applicableVehicleIds) && c.applicableVehicleIds.length > 0 && !c.allVehicles)) && (
+                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#EFF6FF', borderWidth: 1, borderColor: '#BFDBFE' }}>
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#1D4ED8' }}>Selected Car Only</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={[styles.title, { color: p.fg }]}>{couponTitle(c)}</Text>
                   <Text style={[styles.sub, { color: p.muted }]}>Use until {until(c.expiryDate)}</Text>
                   {!applyMode && <View style={{ marginTop: 8, alignSelf: 'flex-start' }}>{btn}</View>}
@@ -171,6 +227,13 @@ export default function OffersScreen() {
           </View>
         </View>
       )}
+      <CouponNotApplicableModal
+        visible={Boolean(notApplicable)}
+        code={notApplicable?.code || ''}
+        reason={notApplicable?.reason || ''}
+        carName={selectedCar?.name}
+        onClose={() => setNotApplicable(null)}
+      />
     </SafeAreaView>
   );
 }

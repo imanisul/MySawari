@@ -22,6 +22,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { bookingsQueryOptions } from '@/hooks/useHomeData';
 import { safeBack } from '@/utils/navigation';
 import {
   ExclusiveOffer,
@@ -33,7 +34,7 @@ import {
 } from '@/services/api/offers';
 import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
-import { formatTime12, getIndiaDateParts, getAvailability, istDayMonth } from '@/utils/sawari';
+import { formatTime12, getIndiaDateParts, getAvailability, istDayMonth, istDayMonthYear } from '@/utils/sawari';
 import { FlashSaleHeroTitle } from '@/components/home/FlashSaleHeroTitle';
 import { FlashSaleScheduledHeader, SCHEDULED_HEADER_VIEW } from '@/components/home/FlashSaleScheduledHeader';
 import { FlashSaleSwipeCoach, hasSeenSwipeCoach, markSwipeCoachSeen } from '@/components/home/FlashSaleSwipeCoach';
@@ -42,7 +43,6 @@ import { BACKEND_URL } from '@/services/backend/api';
 import * as Haptics from '@/utils/haptics';
 import { LoginBottomSheet } from '@/components';
 import FsTitle from '@/assets/images/flash_sale/fs_title.svg';
-import FsTitleGlow from '@/assets/images/flash_sale/fs_title_glow.svg';
 import FsRatingStar from '@/assets/images/flash_sale/fs_rating_star.svg';
 import FsChevron from '@/assets/images/flash_sale/fs_chevron.svg';
 import FsDash from '@/assets/images/flash_sale/fs_dash.svg';
@@ -125,7 +125,15 @@ function offerTrip(offer: any) {
     days = Math.max(1, Number(offer?.rentalDays) || 1);
     end = new Date(today.getTime() + days * 86400000);
   }
-  return { startLabel: label(start), endLabel: label(end), days, pickupT, returnT };
+  return {
+    startLabel: label(start),
+    endLabel: label(end),
+    startFullLabel: istDayMonthYear(start),
+    endFullLabel: istDayMonthYear(end),
+    days,
+    pickupT,
+    returnT,
+  };
 }
 
 function indiaDayOrdinal(ms: number): number {
@@ -178,8 +186,6 @@ function LiveCountdownHeader({ expiryMs, scale = 1 }: { expiryMs: number; scale?
 
   return (
     <View style={[styles.liveHeaderWrap, scale < 1 && { transform: [{ scale }], marginBottom: -92.42 * (1 - scale) }]}>
-      {/* Ellipse 13 glow (154 × 70 at 18, 10; exported with its blur, so it spills 118.7 each way) behind the title */}
-      <FsTitleGlow width={391.449} height={307.449} style={{ position: 'absolute', left: 18 - 118.72, top: 10 - 118.72 }} pointerEvents="none" />
       {/* Frame 2147226232: the bolt + FLASH / SALE lettering, exported from Figma (172.87 × 92.42) */}
       <FsTitle width={174.073} height={92.4218} style={{ marginLeft: -1.2 }} />
 
@@ -235,6 +241,16 @@ export default function FlashSaleScreen() {
   // the offers remembered from earlier (an ended sale used to flash its car, then switch to "Coming Soon"). It then
   // refreshes every 20 s, and an offer is dropped the moment its end time passes, without waiting for a refresh.
   const { data: rawOffers = [], isFetchedAfterMount: offersFresh, isError: offersFailed, dataUpdatedAt: offersAt } = useQuery({ ...exclusiveOffersQueryOptions, refetchOnMount: 'always' });
+  const {
+    data: customerBookings = [],
+    isFetchedAfterMount: bookingsFresh,
+    isError: bookingsFailed,
+  } = useQuery({
+    ...bookingsQueryOptions,
+    enabled: isAuthenticated === true,
+    refetchOnMount: 'always',
+  });
+  const bookingsReady = !isAuthenticated || bookingsFresh || bookingsFailed;
   // A list fetched in the last minute (Home already loaded it) is shown at once; an older one waits for the server.
   const offersReady = offersFresh || offersFailed || (offersAt > 0 && Date.now() - offersAt < 60 * 1000);
   const offers = rawOffers.filter((o: any) => isOfferLive(o, Date.now(), true));
@@ -250,7 +266,7 @@ export default function FlashSaleScreen() {
   // Nothing is decided until the server has answered (both questions when there is no live sale).
   // Also wait for the fleet on first load: a live offer names its cars by id, so without the fleet the page showed the
   // plain offers list for a moment and then jumped to the ticket (replaying its zoom-in).
-  const ready = offersReady && (isLive || nextReady) && !fleetLoading;
+  const ready = offersReady && (isLive || nextReady) && !fleetLoading && bookingsReady;
 
   const [nowMs, setNowMs] = useState(Date.now());
   useEffect(() => {
@@ -304,37 +320,44 @@ export default function FlashSaleScreen() {
   const displayCars = useMemo(() => {
     const list: any[] = [];
     const asId = (v: any) => (v && typeof v === 'object' ? String(v._id ?? v.id ?? '') : String(v ?? ''));
-    const add = (offer: any, ref: any, dealPrice?: number, originalPrice?: number, vp?: any) => {
+    const add = (offer: any, ref: any, dealPrice?: number, originalPrice?: number) => {
       const id = asId(ref);
       if (!id || list.some((c) => String(c.id) === id)) return;
       const fleet: any = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === id);
       const car: any = fleet || (ref && typeof ref === 'object' ? { ...ref, id } : null);
       if (!car) return;
-      // Booked: this car's deal stock is used up, or the car is already taken for the deal's dates.
-      const trip = offerTrip(offer);
-      const soldOut = Boolean(vp?.stockLimit != null && Number(vp.soldCount) >= Number(vp.stockLimit));
-      const taken = fleet ? !getAvailability(fleet, trip.startLabel, trip.endLabel, trip.pickupT, trip.returnT).available : false;
+      // Booked for the deal's trip — decided by the server from the bookings collection. Only an older server
+      // without that check falls back to the fleet's own booked dates.
+      const mine = Array.isArray(offer?.myBookedVehicleIds) && offer.myBookedVehicleIds.map(String).includes(id);
+      let unavailable: boolean;
+      if (Array.isArray(offer?.soldVehicleIds)) {
+        unavailable = mine || offer.soldVehicleIds.map(String).includes(id);
+      } else {
+        const trip = offerTrip(offer);
+        unavailable = fleet ? !getAvailability(fleet, trip.startLabel, trip.endLabel, trip.pickupT, trip.returnT).available : false;
+      }
       list.push({
         ...car,
         id,
         offer,
-        booked: soldOut || taken,
+        unavailable,
+        mine,
         dealPrice: dealPrice ?? offer?.promotionalPrice ?? offer?.dealPrice ?? null,
         originalPrice: originalPrice ?? offer?.originalPrice ?? null,
       });
     };
     if (isLive) {
       for (const offer of offers as any[]) {
-        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice, vp));
+        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice));
         (offer.applicableVehicleIds || []).forEach((v: any) => add(offer, v));
         if (offer.vehicleId) add(offer, offer.vehicleId);
       }
-      // Free cars first, booked ones after (still shown, locked).
-      list.sort((a, b) => Number(!!a.booked) - Number(!!b.booked));
+      // Available cars first, unavailable ones after (still shown, locked).
+      list.sort((a, b) => Number(!!a.unavailable) - Number(!!b.unavailable));
     } else if (isScheduled) {
       const offer = nextSale?.offer;
       if (offer) {
-        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice, vp));
+        (offer.vehiclePrices || []).forEach((vp: any) => add(offer, vp.vehicleId, vp.dealPrice, vp.originalPrice));
         (offer.applicableVehicleIds || []).forEach((v: any) => add(offer, v));
         if (offer.vehicleId) add(offer, offer.vehicleId);
       }
@@ -346,7 +369,7 @@ export default function FlashSaleScreen() {
   }, [offers, isLive, isScheduled, nextSale, fleetVehicles]);
 
   const [selectedCarIndex, setSelectedCarIndex] = useState(0);
-  // Keep the same car on screen when the list re-sorts (free first, booked last — "booked" is re-checked on every fleet
+  // Keep the same car on screen when the list re-sorts (available first, unavailable last — availability is re-checked on every fleet
   // refresh): follow the car's id, not its position, so the ticket doesn't jump to a different car by itself.
   const selectedIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -360,9 +383,45 @@ export default function FlashSaleScreen() {
   // Remember the shown car after each change (runs after the re-sort check above, so that check sees the old car).
   useEffect(() => { selectedIdRef.current = activeCar.id != null ? String(activeCar.id) : null; }, [selectedCarIndex, displayCars]); // eslint-disable-line react-hooks/exhaustive-deps
   const activeOffer: any = activeCar.offer || liveOffer || (isScheduled ? nextSale?.offer : null) || null;
+  const [alreadyClaimedOfferId, setAlreadyClaimedOfferId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isAuthenticated) setAlreadyClaimedOfferId(null);
+  }, [isAuthenticated]);
+  const activeOfferId = activeOffer?._id || activeOffer?.id;
+  const hasBookedSaleCar = useMemo(() => {
+    if (!isAuthenticated || !activeOffer) return false;
+    // The server's answer (bookings collection) when it gives one; the phone's own bookings only for an older server.
+    if (Array.isArray(activeOffer.myBookedVehicleIds)) return activeOffer.myBookedVehicleIds.length > 0;
+    if (!bookingsFresh || bookingsFailed) return false;
+
+    const trip = offerTrip(activeOffer);
+    const claimedVehicleId = activeOffer.activeClaim?.vehicleId ? String(activeOffer.activeClaim.vehicleId) : null;
+    const saleVehicleIds = new Set(displayCars.map((car: any) => String(car.id)));
+    if (claimedVehicleId) saleVehicleIds.add(claimedVehicleId);
+    const claimCodes = [
+      activeOffer.activeClaim?.couponCode,
+      activeOffer.activeClaim?.claimToken,
+      activeOffer.code,
+    ]
+      .filter((code: unknown): code is string => typeof code === 'string' && Boolean(code.trim()))
+      .map((code: string) => code.trim().toUpperCase());
+
+    return customerBookings.some((booking: any) => {
+      if (['CANCELLED', 'FAILED', 'HOLD'].includes(String(booking.status).toUpperCase())) return false;
+      const vehicleId = String(booking.vehicleId ?? '');
+      if (!saleVehicleIds.has(vehicleId)) return false;
+      const sameClaimCode = claimCodes.includes(String(booking.couponCode ?? '').trim().toUpperCase());
+      const sameTrip =
+        booking.pickupDate === trip.startFullLabel &&
+        booking.returnDate === trip.endFullLabel;
+      return sameClaimCode || sameTrip;
+    });
+  }, [isAuthenticated, bookingsFresh, bookingsFailed, customerBookings, activeOffer, displayCars]);
+  // "Already claimed" only once this customer has really booked the deal (an unpaid claim can still go on to book).
+  const hasClaimedDeal = isAuthenticated && (alreadyClaimedOfferId === activeOfferId || hasBookedSaleCar);
 
   // Can the customer book this car now? (its own offer's early-access lock and members-only rule)
-  const canBook = isLive && !activeCar.booked && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
+  const canBook = isLive && !activeCar.unavailable && !activeOffer?.isEarlyAccessLocked && (activeOffer?.isEligible !== false || isMember);
   // Who may open a car's page: the sale is live and this customer is past the members' lock (members during early
   // access, everyone after it). Non-members still SEE every car and price, swipe through them, and are sent to buy a
   // membership if they try to open one.
@@ -423,6 +482,12 @@ export default function FlashSaleScreen() {
     (activeOffer?.rentalDays ? `${activeOffer.rentalDays} ${activeOffer.rentalDays === 1 ? 'Day' : 'Days'}` : null)
     || (activeOffer?.rentalHours ? `${activeOffer.rentalHours} Hours` : null);
 
+  // The trip this deal books (same values the booking is filled with), shown on the car photo.
+  const activeTrip = activeOffer ? offerTrip(activeOffer) : null;
+  const tripWhenLabel = activeTrip
+    ? `${activeTrip.startLabel}, ${activeTrip.pickupT.replace(/^0/, '')} → ${activeTrip.endLabel}, ${activeTrip.returnT.replace(/^0/, '')}`
+    : null;
+
   // The offer's real prices only (no estimates).
   const dealPrice: number | null = activeCar.dealPrice ?? null;
   const originalPrice: number | null = activeCar.originalPrice ?? null;
@@ -465,26 +530,26 @@ export default function FlashSaleScreen() {
     if (booking || !activeOffer || !activeCar?.id || String(activeCar.id).startsWith('hidden-')) return;
     Haptics.selectionAsync();
     if (!isAuthenticated && !justLoggedIn) { setShowLogin(true); return; }
-    if (activeCar.booked) return;
+    if (activeCar.unavailable) return;
     if (!canBook) { router.push('/membership'); return; }
 
     setBooking(true);
     try {
       const offerId = String(activeOffer._id || activeOffer.id);
       recordOfferView(offerId);
-      let code: string | undefined = activeOffer.activeClaim?.couponCode;
-      if (!code) {
-        const res = await claimExclusiveOffer(offerId);
-        code = res.claim?.couponCode || res.claim?.claimToken;
-        if (!res.success || !code) {
-          CustomAlert.alert('Couldn’t book this deal', res.message || 'This offer couldn’t be claimed right now. Please try again.');
-          return;
-        }
+      // An existing unpaid claim comes back as alreadyClaimed with its code: carry on booking with it.
+      const res = await claimExclusiveOffer(offerId);
+      const code = res.claim?.couponCode || res.claim?.claimToken;
+      if (!res.success || !code) {
+        // The server refuses a second claim once this customer has booked the deal.
+        if (/already|maximum usage/i.test(res.message || '')) { setAlreadyClaimedOfferId(offerId); return; }
+        CustomAlert.alert('Couldn’t book this deal', res.message || 'This offer couldn’t be claimed right now. Please try again.');
+        return;
       }
 
       const car = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === String(activeCar.id)) || activeCar;
       selectCar(car);
-      applyCoupon(code);
+      applyCoupon(code, true);
 
       const trip = offerTrip(activeOffer);
       setDates(`${trip.startLabel} – ${trip.endLabel}`, `${trip.days} ${trip.days === 1 ? 'Day' : 'Days'}`);
@@ -493,11 +558,8 @@ export default function FlashSaleScreen() {
       if (!dropoff?.name) setDropoff({ id: 'city_trip', name: 'Local City Trip', address: 'City limits / Self-drive destination', latitude: 26.1412, longitude: 91.7645, source: 'database' });
 
       const carId = String(car.id ?? car._id);
-      const flexible = activeOffer.rentalPeriodMode === 'flexible';
-      router.push({
-        pathname: '/car-details',
-        params: { id: carId, vehicleId: carId, allowExtend: 'true', ...(flexible ? {} : { lockDates: 'true', isFixedDates: 'true' }) },
-      });
+      // The deal's date & time are fixed: car page and booking show them locked.
+      router.push({ pathname: '/car-details', params: { id: carId, vehicleId: carId, lockDates: 'true', isFixedDates: 'true' } });
     } finally {
       setBooking(false);
     }
@@ -515,13 +577,13 @@ export default function FlashSaleScreen() {
       return;
     }
     selectCar(car);
-    // The deal's trip, so the car page shows its dates and price (and "Need more time?" to add days).
+    // The deal's trip, so the car page shows its dates and price — locked, same as Book Now.
     if (activeOffer) {
       const trip = offerTrip(activeOffer);
       setDates(`${trip.startLabel} – ${trip.endLabel}`, `${trip.days} ${trip.days === 1 ? 'Day' : 'Days'}`);
       setTimes(trip.pickupT, trip.returnT);
     }
-    router.push({ pathname: '/car-details', params: { id: String(car.id || car._id), allowExtend: 'true' } });
+    router.push({ pathname: '/car-details', params: { id: String(car.id || car._id), ...(activeOffer ? { lockDates: 'true', isFixedDates: 'true' } : {}) } });
   }, [activeCar, activeOffer, fleetVehicles, router, selectCar, setDates, setTimes, hasAccess, isMember, opensMs, isLive, earlyAccessMinutes]);
 
   // Schedule text calculations
@@ -585,23 +647,37 @@ export default function FlashSaleScreen() {
         // Waiting for the server: the real page's own pieces in place — the header row (title + ENDS IN timer), the cream
         // ticket with its bites, gold outline and dashed divider, the photo and details boxes, the button and the car arc
         // — with shimmer blocks where the text and photo go. The real content then fades in over the same spots.
-        <SkeletonGroup>
+        <SkeletonGroup style={{ flex: 1 }}>
           <View style={styles.mainContainer} accessibilityLabel="Loading Flash Sale">
             <View style={[styles.liveHeaderWrap, fitW < 1 && { transform: [{ translateX: -8.4 }, { scale: fitW }], marginBottom: -92.42 * (1 - fitW) }]}>
-              <Skeleton width={174} height={52} borderRadius={10} style={GHOST} />
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <Skeleton width={64} height={12} borderRadius={4} style={GHOST} delay={40} />
-                <View style={{ flexDirection: 'row', gap: 6 }}>
-                  {[0, 1, 2].map((i) => <Skeleton key={i} width={38} height={38} borderRadius={8} style={GHOST} delay={60 + i * 30} />)}
+              <FsTitle width={174.073} height={92.4218} style={{ marginLeft: -1.2 }} />
+              <View style={styles.liveTimerCol}>
+                <Text style={styles.endsInLabel}>ENDS IN</Text>
+                <View style={styles.timerRow}>
+                  {['Hrs', 'Min', 'Sec'].map((unit, i) => (
+                    <View key={i} style={styles.timerUnit}>
+                      <View style={styles.timerBox}>
+                        <Skeleton width={22} height={18} borderRadius={4} style={GHOST} delay={60 + i * 30} />
+                      </View>
+                      <Text style={styles.timerUnitText}>{unit}</Text>
+                    </View>
+                  ))}
                 </View>
               </View>
             </View>
             <View style={[styles.ticketSection, { position: 'absolute', left: (windowWidth - 353) / 2, top: ticketTop, transform: [{ scale: ticketScale }] }]}>
+              <Sparkle size={13.867} left={-8.87} top={-9} />
+              <Sparkle size={6.934} left={-12} top={-14} />
+              <Sparkle size={13.867} left={348} top={-9} />
+              <Sparkle size={6.934} left={358.07} top={-14} />
               <View style={styles.ticketCard}>
                 <TicketShape fill="#FEFDF0" />
                 <FsDash width={320} height={1} style={styles.dashedDivider} />
                 <View style={[styles.photoContainer, { backgroundColor: 'transparent' }]}>
                   <Skeleton width="100%" height={212} borderRadius={8} delay={80} />
+                  <View style={styles.durationBadge}>
+                    <Skeleton width={36} height={14} borderRadius={4} style={GHOST} delay={110} />
+                  </View>
                 </View>
                 <View style={styles.detailsContainer}>
                   <View style={styles.detailsRow1}>
@@ -628,7 +704,7 @@ export default function FlashSaleScreen() {
               <Svg width={712} height={300} style={{ position: 'absolute', left: -200, top: 35 }} pointerEvents="none">
                 <Ellipse cx={356} cy={150} rx={355.5} ry={149.5} stroke="rgba(255,255,255,0.4)" strokeWidth={1} strokeDasharray="6 6" fill="none" />
               </Svg>
-              {ARC_SLOTS.map((slot, i) => (
+              {ARC_SLOTS.slice(0, Math.max(1, Math.min(displayCars.length, ARC_SLOTS.length))).map((slot, i) => (
                 <Skeleton
                   key={slot.offset}
                   width={slot.size}
@@ -638,9 +714,29 @@ export default function FlashSaleScreen() {
                   style={{ ...GHOST, position: 'absolute', left: slot.left, top: slot.top, borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)' }}
                 />
               ))}
+              <PillCrown left={128} top={2} />
             </View>
           </View>
         </SkeletonGroup>
+      ) : hasClaimedDeal ? (
+        <View style={styles.alreadyClaimedPage}>
+          <View style={styles.alreadyClaimedCard}>
+            <View style={styles.alreadyClaimedIcon}>
+              <Feather name="check" size={30} color="#FFFFFF" />
+            </View>
+            <Text style={styles.alreadyClaimedTitle}>You’ve already claimed this deal</Text>
+            <Text style={styles.alreadyClaimedMessage}>
+              Today’s Flash Sale deal has already been claimed on your account.
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/bookings')}
+              style={({ pressed }) => [styles.alreadyClaimedButton, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.alreadyClaimedButtonText}>VIEW MY BOOKINGS</Text>
+            </Pressable>
+          </View>
+        </View>
       ) : isLive && displayCars.length === 0 ? (
         // Live offers that name no car (all cars / a category): the offers themselves.
         <View style={{ flex: 1, paddingBottom: insets.bottom }}>
@@ -705,6 +801,15 @@ export default function FlashSaleScreen() {
               {ticketLocked && <TicketShape fill="rgba(89, 89, 89, 0.4)" />}
               {/* Line 18: 320 dashed line at (16.5, 240), #6152D8 40% → 100% → 40% (Figma export) */}
               <FsDash width={320} height={1} style={styles.dashedDivider} />
+              {/* Trip date & time on the tear line, like the times printed on a ticket stub */}
+              {!ticketLocked && !!tripWhenLabel && (
+                <View style={styles.tripWhenRow} pointerEvents="none">
+                  <View style={styles.tripWhenPill} accessibilityLabel={`Trip ${tripWhenLabel.replace('→', 'to')}`}>
+                    <Feather name="calendar" size={12} color="#6152D8" />
+                    <Text style={styles.tripWhenText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tripWhenLabel}</Text>
+                  </View>
+                </View>
+              )}
 
               {/* Photo Area */}
               <View style={styles.photoContainer}>
@@ -715,7 +820,7 @@ export default function FlashSaleScreen() {
                   transition={200}
                 />
                 {/* Sold out (Figma 1844:16201): red ribbon across the photo's top-right corner, rotated 39.76° */}
-                {isLive && activeCar.booked && (
+                {isLive && activeCar.unavailable && (
                   <View style={styles.soldRibbonBox} pointerEvents="none">
                     <View style={styles.soldRibbon}>
                       <View style={styles.soldRibbonInner}>
@@ -896,7 +1001,7 @@ export default function FlashSaleScreen() {
                   </Text>
                 </Pressable>
               )
-            ) : isLive && activeCar.booked ? (
+            ) : isLive && activeCar.unavailable ? (
               // Sold out (Figma 1844:16246): red, nothing to tap
               <View style={[styles.mainCtaBtn, styles.soldCta]} accessibilityRole="button" accessibilityState={{ disabled: true }}>
                 <Text style={[styles.mainCtaText, { color: '#FFFFFF' }]}>SOLD OUT</Text>
@@ -1044,6 +1149,61 @@ const styles = createUnscaled({
     justifyContent: 'space-between',
     paddingBottom: 16,
   },
+  alreadyClaimedPage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  alreadyClaimedCard: {
+    width: '100%',
+    maxWidth: 353,
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: GOLD,
+    backgroundColor: '#FEFDF0',
+    gap: 14,
+  },
+  alreadyClaimedIcon: {
+    width: 60,
+    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 30,
+    backgroundColor: '#2E9D62',
+  },
+  alreadyClaimedTitle: {
+    fontFamily: FONT,
+    fontSize: 20,
+    lineHeight: 28,
+    color: '#202020',
+    textAlign: 'center',
+  },
+  alreadyClaimedMessage: {
+    fontFamily: FONT_MED,
+    fontSize: 14,
+    lineHeight: 21,
+    color: '#737373',
+    textAlign: 'center',
+  },
+  alreadyClaimedButton: {
+    minHeight: 48,
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+    borderRadius: 12,
+    backgroundColor: BG,
+  },
+  alreadyClaimedButtonText: {
+    fontFamily: FONT_SEMI,
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#FFFFFF',
+  },
 
   /* Ticket Section */
   ticketSection: {
@@ -1061,6 +1221,10 @@ const styles = createUnscaled({
   /* Photo inside ticket */
   photoContainer: { position: 'absolute', left: 12, top: 12, width: 329, height: 212, borderRadius: 8, overflow: 'hidden', backgroundColor: '#FFFFFF' },
   durationBadge: { position: 'absolute', left: 6, top: 6, height: 28, paddingHorizontal: 10, borderRadius: 20, backgroundColor: '#FBC422', alignItems: 'center', justifyContent: 'center', zIndex: 3 },
+  // Trip date & time centred on the dashed tear line (y 239), in the 32px gap between photo (ends 224) and details (256).
+  tripWhenRow: { position: 'absolute', left: 16, right: 16, top: 229, height: 21, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  tripWhenPill: { maxWidth: 300, height: 21, paddingHorizontal: 10, borderRadius: 11, backgroundColor: '#FEFDF0', borderWidth: 1, borderColor: 'rgba(97, 82, 216, 0.25)', flexDirection: 'row', alignItems: 'center', gap: 5 },
+  tripWhenText: { fontFamily: FONT_SEMI, fontSize: 11.5, lineHeight: 15, color: '#262626', includeFontPadding: false, flexShrink: 1 },
   durationBadgeText: { fontFamily: FONT_SEMI, fontSize: 11, lineHeight: 16.5, color: '#3D0700', includeFontPadding: false },
   // Frame 2147226247: 269 × 60, pill + line 4 apart, centred; top = 50% − 30 − 23 of the 361 ticket = 127.5.
   // Figma 1724:14343: #FEFDF0, 1px #FBC422, radius 12, padding 8, 4 between text and lock.

@@ -52,7 +52,7 @@ export default function MyReferralsScreen() {
   const p = useDetailsPalette();
   const router = useRouter();
   const { data: refs = [], isLoading, isError, refetch, isRefetching } = useReferrals();
-  const { data: partnerQRs = [] } = usePartnerQRs();
+  const { data: partnerQRs = [] } = usePartnerQRs(true);
 
   const completed = refs.filter((r) => r.stage === 'processing' || r.stage === 'credited').length;
   const earned = refs.reduce((s, r) => s + (r.stage === 'credited' ? r.amount : 0), 0);
@@ -80,9 +80,6 @@ export default function MyReferralsScreen() {
               <Text style={styles.partnerPillText}>{partnerQRs[0].token}</Text>
             </View>
           </View>
-          <Text style={styles.partnerSub}>
-            Assigned QR sticker. Guests scanning your sticker link here and earn you commission on every booking.
-          </Text>
         </View>
       )}
 
@@ -198,13 +195,6 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: '#FFFFFF',
     letterSpacing: 1,
-  },
-  partnerSub: {
-    fontFamily: PF.regular,
-    fontSize: 11.5,
-    lineHeight: 16,
-    color: '#323E71',
-    marginTop: 6,
   },
   stats: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingTop: 14, paddingBottom: 13 },
   statLabel: { fontFamily: PF.medium, fontSize: 13 },

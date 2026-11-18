@@ -180,6 +180,16 @@ export function LoginBottomSheet({
   const [focus, setFocus] = useState<string | null>(null);
   const [viewingPolicy, setViewingPolicy] = useState<PolicyKey | null>(null);
 
+  // Android can drop the first focus() in a Modal that just opened (its window isn't focused yet), so check once and retry.
+  const focusPhone = () => {
+    phoneRef.current?.focus();
+    setTimeout(() => {
+      if (stepRef.current !== 'phone' || Keyboard.isVisible()) return;
+      phoneRef.current?.blur();
+      phoneRef.current?.focus();
+    }, 250);
+  };
+
   // Fresh sheet every time it opens.
   useEffect(() => {
     API.warmUpBackend();
@@ -233,7 +243,7 @@ export function LoginBottomSheet({
     }).start(() => {
       slidingRef.current = false;
       // Keyboard up the moment the sheet lands (not on a fixed timer that could fire late or mid-slide).
-      if (stepRef.current === 'phone') phoneRef.current?.focus();
+      if (stepRef.current === 'phone') focusPhone();
     });
   }, [visible]);
 
@@ -312,9 +322,7 @@ export function LoginBottomSheet({
 
     // Opening: the slide's end focuses it (above). Coming back to this step inside an open sheet: focus right away.
     if (slidingRef.current) return;
-    const t = setTimeout(() => {
-      phoneRef.current?.focus();
-    }, 60);
+    const t = setTimeout(focusPhone, 60);
 
     return () => clearTimeout(t);
   }, [visible, step]);

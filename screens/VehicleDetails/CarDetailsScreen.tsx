@@ -81,7 +81,7 @@ export default function CarDetailsScreen() {
   const {
     selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate,
     isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates, isDarkMode,
-    applyCoupon, appliedCouponCode,
+    applyCoupon, appliedCouponCode, isDealCoupon,
   } = useSawari();
 
   const { data: offers = [] } = useQuery(offersQueryOptions);
@@ -104,14 +104,26 @@ export default function CarDetailsScreen() {
   // (Explore, Search) must not keep it.
   useEffect(() => {
     if (params.isTopDeal !== 'true' && /^TOPDEAL-/i.test(appliedCouponCode || '')) applyCoupon(null);
-  }, [params.isTopDeal, appliedCouponCode, applyCoupon]);
+    // Same for any deal code (Flash Sale / Exclusive claim): it only belongs to the deal page that applied it.
+    else if (!isDatesLocked && isDealCoupon) applyCoupon(null);
+  }, [params.isTopDeal, appliedCouponCode, isDealCoupon, isDatesLocked, applyCoupon]);
 
-  // Auto-apply promo code if valid and not yet applied
+  // Only carry explicitly claimed Flash Sale / Top Deal tokens; NEVER auto-apply standard coupons (let the customer apply them).
   useEffect(() => {
-    if (targetOffer?.code && appliedCouponCode !== targetOffer.code && !isParamOfferExpired) {
-      applyCoupon(targetOffer.code);
-    } else if (paramPromoCode && !appliedCouponCode && !isParamOfferExpired) {
-      applyCoupon(paramPromoCode);
+    const offerType = String((targetOffer as any)?.type || '');
+    const isClaimedDealOffer = Boolean(
+      targetOffer &&
+        (targetOffer.isExclusive ||
+          offerType === 'special_deal' ||
+          offerType === 'top_deal' ||
+          (targetOffer as any).isTopDeal)
+    );
+    const isDealToken = (c?: string | null) => /^TOPDEAL-|^CLM_|^EXCL_/i.test(String(c || '').trim());
+
+    if (isClaimedDealOffer && targetOffer?.code && appliedCouponCode !== targetOffer.code && !isParamOfferExpired) {
+      applyCoupon(targetOffer.code, true);
+    } else if (paramPromoCode && isDealToken(paramPromoCode) && !appliedCouponCode && !isParamOfferExpired) {
+      applyCoupon(paramPromoCode, true);
     }
   }, [targetOffer, paramPromoCode, appliedCouponCode, isParamOfferExpired, applyCoupon]);
 
@@ -254,10 +266,17 @@ export default function CarDetailsScreen() {
     if ((!hasTrip || isMissingEnd) && !isDatesLocked) {
       router.push({ pathname: '/dates', params: { forSpecificCar: 'true', returnBack: 'true', thenBook: 'true' } });
     } else {
+      const offerType = String((targetOffer as any)?.type || '');
+      const isClaimedDeal = Boolean(
+        params.isTopDeal === 'true' ||
+          targetOffer?.isExclusive ||
+          offerType === 'special_deal' ||
+          offerType === 'top_deal'
+      );
       router.push({
         pathname: '/booking',
         params: {
-          couponCode: appliedCouponCode || paramPromoCode || targetOffer?.code || '',
+          couponCode: appliedCouponCode || (isClaimedDeal ? (paramPromoCode || targetOffer?.code || '') : ''),
           isOvernight: params.isOvernight || '',
           lockDates: isDatesLocked ? 'true' : undefined,
           isFixedDates: isDatesLocked ? 'true' : undefined,

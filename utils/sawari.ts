@@ -798,6 +798,12 @@ export function carTitle(car: Pick<Car, 'displayName' | 'name' | 'manufacturer' 
   return [make, car.variant].filter(Boolean).join(' ') || 'Vehicle';
 }
 
+/** "Swift 2023": the name with the model year (or, failing that, the registration year) unless the name already has it. */
+export function nameWithYear(car: Pick<Car, 'name' | 'modelYear' | 'registrationYear'>): string {
+  const year = car.modelYear || car.registrationYear;
+  return year && !String(car.name).includes(year) ? `${car.name} ${year}` : car.name;
+}
+
 /**
  * Is this vehicle free for the chosen dates and times, and if so for how long / if not,
  * when is it next free?

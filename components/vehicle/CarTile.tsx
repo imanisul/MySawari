@@ -4,7 +4,7 @@ import { LoadingImage } from '@/components/common/LoadingImage';
 import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Car, getAvailability, dayNumToLabel, todayDayNum } from '@/utils/sawari';
+import { Car, getAvailability, dayNumToLabel, todayDayNum, nameWithYear } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 
 export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }: { car: Car; onPress?: () => void; onIntercept?: () => void }) {
@@ -36,7 +36,7 @@ export const CarTile = React.memo(function CarTile({ car, onPress, onIntercept }
       <View style={[styles.carTileCopy]}>
         <View style={styles.carHeader}>
           <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.carName, { color: colors.foreground }]}>
-            {car.name}
+            {nameWithYear(car)}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
             <Text style={[styles.carPrice, { color: colors.foreground }]}>{car.price}</Text>

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { LogBox, View, Linking, Platform } from 'react-native';
+import { LogBox, View, Linking } from 'react-native';
 
-const PAGE_ANIMATION = Platform.OS === 'android' ? 'ios_from_right' : 'default';
+const PAGE_ANIMATION = 'none';
 
 LogBox.ignoreLogs([
   'ProgressBarAndroid has been extracted from react-native core',

@@ -550,13 +550,14 @@ export default function TopDealsScreen() {
   const handleShare = async () => {
     Haptics.selectionAsync();
     try {
-      // Store links from the server's settings (with the app's own as fallback).
+      // Store link from the server's settings (with the app's own as fallback) — adapts to platform.
       const config = await API.getAppConfig().catch(() => null);
       const playStore = config?.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer';
-      const appStore = config?.appStoreUrl || 'https://apps.apple.com/app/id6829408836';
+      const appStore = config?.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836';
+      const storeUrl = Platform.OS === 'ios' ? appStore : playStore;
       await Share.share({
         title: `MySawari Today's Deals`,
-        message: `Book top self-drive cars in Today's Deals on MySawari starting at discounted hourly rates!\n\n📲 Download the MySawari App:\nAndroid: ${playStore}\niPhone: ${appStore}`,
+        message: `Book top self-drive cars in Today's Deals on MySawari starting at discounted hourly rates!\n\n📲 Download the MySawari App:\n${storeUrl}`,
       });
     } catch {
       // dismissed

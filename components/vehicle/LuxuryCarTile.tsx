@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
-import { Car, getAvailability, splitDateRange, dayNumToLabel, todayDayNum } from '@/utils/sawari';
+import { Car, getAvailability, splitDateRange, dayNumToLabel, todayDayNum, nameWithYear } from '@/utils/sawari';
 import { useSawari } from '@/context/SawariContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -128,7 +128,7 @@ export const LuxuryCarTile = React.memo(function LuxuryCarTile({ car, onPress, o
       {/* Details */}
       <View style={styles.details}>
         <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} style={[styles.carName, { color: colors.foreground }]}>
-          {car.name}
+          {nameWithYear(car)}
         </Text>
         <View style={styles.specsRow}>
           <View style={styles.specItem}>

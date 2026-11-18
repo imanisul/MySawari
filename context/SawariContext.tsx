@@ -83,10 +83,12 @@ type SawariContextValue = {
   
   // NEW BOOKING STATE (the price quote itself lives in QuoteContext — see useQuote)
   appliedCouponCode: string | null;
+  /** The applied code came from a deal (Flash Sale, Top Deal, Exclusive Offer) rather than the customer picking it. */
+  isDealCoupon: boolean;
   sawariCashToApply: number;
   fuelEstimate: { estimatedKm: number, estimatedFuelCost: number, fuelPriceUsed: number, vehicleMileageUsed: number } | null;
   
-  applyCoupon: (code: string | null) => void;
+  applyCoupon: (code: string | null, fromDeal?: boolean) => void;
   applySawariCash: (amount: number) => void;
   setFuelEstimate: (estimate: SawariContextValue['fuelEstimate']) => void;
   createBookingSnapshot: (idempotencyKey?: string) => Promise<BookingSnapshot | null>;
@@ -356,6 +358,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
   const [isQuoteLoading, setIsQuoteLoading] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [appliedCouponCode, setAppliedCouponCode] = useState<string | null>(null);
+  const [isDealCoupon, setIsDealCoupon] = useState(false);
+  const applyCoupon = useCallback((code: string | null, fromDeal = false) => {
+    setAppliedCouponCode(code);
+    setIsDealCoupon(Boolean(code) && fromDeal);
+  }, []);
   const [sawariCashToApply, setSawariCashToApply] = useState(0);
   const [fuelEstimate, setFuelEstimate] = useState<SawariContextValue['fuelEstimate']>(null);
   const [lastBooking, setLastBooking] = useState<BookingSnapshot | null>(null);
@@ -844,9 +851,10 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       membership,
       totalBookings,
       appliedCouponCode,
+      isDealCoupon,
       sawariCashToApply,
       fuelEstimate,
-      applyCoupon: setAppliedCouponCode,
+      applyCoupon,
       applySawariCash: setSawariCashToApply,
       setFuelEstimate,
       lastBooking,
@@ -998,7 +1006,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         setBookingConfirmed(false);
         setBookingStatus('upcoming');
         setPaymentAttempts(0);
-        setAppliedCouponCode(null);
+        applyCoupon(null);
         setSawariCashToApply(0);
         setFuelEstimate(null);
       },
@@ -1102,8 +1110,11 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       logout: async () => {
         try {
           invalidateWalletCache();
-          const refreshToken = await SecureStore.getItemAsync('refresh_token').catch(() => null);
-          const authToken = await SecureStore.getItemAsync('auth_token').catch(() => null);
+          // Read before the screen flips, but don't wait on them: the sign-in sheet shouldn't sit behind native calls.
+          const tokens = Promise.all([
+            SecureStore.getItemAsync('refresh_token').catch(() => null),
+            SecureStore.getItemAsync('auth_token').catch(() => null),
+          ]);
 
           // Logged out on screen straight away, so the sign-in sheet comes up with no wait. The server calls below
           // still use the saved session (it is deleted only after them), they just no longer hold the screen up
@@ -1122,6 +1133,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           API.setWalletSnapshotUser(null);
           queryClient.clear();
           setIsAuthenticated(false);
+          const [refreshToken, authToken] = await tokens;
 
           await Promise.race([
             Promise.allSettled([
@@ -1188,6 +1200,7 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
       isAuthLoading,
       quoteDays,
       appliedCouponCode,
+      isDealCoupon,
       sawariCashToApply,
       fuelEstimate,
       lastBooking,

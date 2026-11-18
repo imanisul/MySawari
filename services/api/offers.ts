@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { formatCurrency } from '@/services/backend/pricingEngine';
-import { BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch, isOfflineError } from '@/services/backend/api';
+import { API, BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch, isOfflineError } from '@/services/backend/api';
 
 /** Deal / offer photos usually show a fleet vehicle, so they go through plate processing too. */
 import { Image as CachedImage } from 'expo-image';
@@ -99,6 +99,13 @@ export function isOfferLive(offer: { active?: boolean; startDate?: string | Date
   if (Number.isFinite(expires) && expires < now) return false;
   return true;
 }
+
+/** One coupon list for Booking, Payment and Offers: shown straight from cache, refreshed from the server on every open. */
+export const couponsQueryOptions = {
+  queryKey: ['coupons'] as const,
+  queryFn: () => API.getCoupons(true),
+  staleTime: 0,
+};
 
 /** One shared query, so the home screen and the app-start prefetch use the same cached offers. */
 const OFFERS_CACHE_KEY = '@offers_cache_v1';
@@ -303,6 +310,9 @@ export interface ExclusiveOffer {
     dealPrice: number;
     expiresAt: string;
   } | null;
+  /** From the server's bookings check: this deal's cars booked for its trip by this customer / by anyone else. */
+  myBookedVehicleIds?: string[];
+  soldVehicleIds?: string[];
   startDate?: string;
   startTime?: string;
   expiryDate?: string;
@@ -342,6 +352,15 @@ export interface ExclusiveOffer {
 }
 
 const EXCLUSIVE_OFFERS_CACHE_KEY = '@exclusive_offers_cache_v1';
+
+function stripActiveClaims(offers: any[]) {
+  return offers.map((offer) => {
+    const cachedOffer = { ...offer };
+    delete cachedOffer.activeClaim;
+    delete cachedOffer.myBookedVehicleIds; // per customer: never reuse after another login
+    return cachedOffer;
+  });
+}
 
 export const exclusiveOffersQueryOptions = {
   queryKey: ['exclusive-offers'] as const,
@@ -389,9 +408,11 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
           .map((o: any) => ({
             ...o,
             id: o._id,
+            // The server sends the customer's open claim as userClaim; the screens read activeClaim.
+            activeClaim: o.activeClaim ?? o.userClaim ?? null,
             image: plateSafeOfferImage(o.image, o.updatedAt),
           }));
-        AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(live)).catch(() => {});
+        AsyncStorage.setItem(EXCLUSIVE_OFFERS_CACHE_KEY, JSON.stringify(stripActiveClaims(live))).catch(() => {});
         prefetchOfferImages(live);
         return live;
       }
@@ -409,7 +430,7 @@ export async function fetchExclusiveOffers(): Promise<ExclusiveOffer[]> {
     const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
     if (saved) {
       const list = JSON.parse(saved);
-      if (Array.isArray(list)) return list.filter((o: any) => o && isOfferLive(o, Date.now(), true));
+      if (Array.isArray(list)) return stripActiveClaims(list.filter((o: any) => o && isOfferLive(o, Date.now(), true)));
     }
   } catch {}
 
@@ -420,7 +441,7 @@ export async function hydrateExclusiveOffers(queryClient: { getQueryData: (k: re
   try {
     const saved = await AsyncStorage.getItem(EXCLUSIVE_OFFERS_CACHE_KEY);
     if (!saved || queryClient.getQueryData(exclusiveOffersQueryOptions.queryKey)) return;
-    const list = (JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o, Date.now(), true));
+    const list = stripActiveClaims((JSON.parse(saved) as any[]).filter((o) => o && isOfferLive(o, Date.now(), true)));
     queryClient.setQueryData(exclusiveOffersQueryOptions.queryKey, list, { updatedAt: 0 });
   } catch {}
 }

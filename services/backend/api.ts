@@ -149,7 +149,7 @@ function placeLabel(place: any): string | undefined {
   return undefined;
 }
 
-import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
+import { calculateBookingPrice, QuoteParams, PricingQuote, COUPONS, Coupon, setCouponCatalog, upsertCouponInCatalog, canBuyPlan, MEMBERSHIP_PRICES } from './pricingEngine';
 import { bikeTransmissionFor } from '../../utils/bikeModels';
 import { Car, parseDayLabel, MIN_PUBLIC_REVIEW_RATING } from '../../utils/sawari';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -175,7 +175,7 @@ export function enforceHttpsUrl(url: string): string {
   return url;
 }
 
-const BASE_URL = enforceHttpsUrl(rawBase);
+export const BASE_URL = enforceHttpsUrl(rawBase);
 export const BACKEND_URL = `${BASE_URL}/api`;
 
 
@@ -721,7 +721,14 @@ export const API = {
     return valid.map((v: any) => {
       // Robust check for bikes: Seating capacity <= 2 guarantees it's a two-wheeler,
       // even if someone mistakenly saved it as 'SUV' or 'Luxury' in the DB.
-      const isBike = v.seatingCapacity <= 2 || /^(bike|scooter|cruiser|sports|standard)$/i.test(v.vehicleType);
+      // The Operation App's category (car / bike) decides when it is set; older records fall back to the old guess.
+      const isBike = v.category === 'bike' || (v.category !== 'car' && (v.seatingCapacity <= 2 || /^(bike|scooter|geared|cruiser|sports|standard|commuter)$/i.test(v.vehicleType)));
+      // Body type picked in the Operation App (SUV / Sedan / Hatchback / MUV/MPV) drives Home tiles and Explore filters.
+      const pickedBody = /^(suv|sedan|hatchback)$/i.test(String(v.vehicleType || '').trim())
+        ? (String(v.vehicleType).trim().replace(/^suv$/i, 'SUV').replace(/^sedan$/i, 'Sedan').replace(/^hatchback$/i, 'Hatchback') as Car['category'])
+        : /^(muv|mpv|muv\s*\/\s*mpv)$/i.test(String(v.vehicleType || '').trim()) ? 'MUV' as Car['category'] : null;
+      // Bike type picked in the Operation App: Scooter = no gears (Automatic), Geared = Manual. Explore's Bikes / Scooters split uses this.
+      const pickedBikeTransmission = /^scooter$/i.test(String(v.vehicleType || '').trim()) ? 'Automatic' : /^geared$/i.test(String(v.vehicleType || '').trim()) ? 'Manual' : null;
       const { getVehicleImage } = require('../../utils/vehicleImages');
       const fallbackImage = getVehicleImage(v.vehicleName, isBike);
       const hasImages = Array.isArray(v.images) && v.images.length > 0 && typeof v.images[0]?.url === 'string' && v.images[0].url;
@@ -906,14 +913,14 @@ export const API = {
         name: resolvedDisplayName,
         displayName: resolvedDisplayName,
         vehicleName: resolvedDisplayName,
-        category: isBike ? 'Bike' : inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''} ${v.model || ''}`, v.vehicleType, v.seatingCapacity),
+        category: isBike ? 'Bike' : pickedBody || inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''} ${v.model || ''}`, v.vehicleType, v.seatingCapacity),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
         image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,
         images: hasImages ? v.images.map((img: any) => getFullUrl(img.url)) : [fallbackImage],
         seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
         // A bike's gearbox follows from its model (scooter / geared); hand-typed records had some wrong.
-        transmission: (isBike ? bikeTransmissionFor(resolvedDisplayName) || bikeTransmissionFor(v.vehicleName) : null) || v.transmission || 'Manual',
+        transmission: (isBike ? pickedBikeTransmission || bikeTransmissionFor(resolvedDisplayName) || bikeTransmissionFor(v.vehicleName) : null) || v.transmission || 'Manual',
         // Never guess the fuel. Defaulting a missing fuelType to 'Petrol' made diesel cars (e.g. the Thar
         // 1.5L AXT Diesel, whose name says Diesel and whose mileage is quoted in km/l) read as petrol —
         // which also feeds Explore's fuel filter and SearchScreen. An unknown fuel simply omits the row.
@@ -925,6 +932,7 @@ export const API = {
         variant: v.variant || undefined,
         color: inferredColor || undefined,
         registrationYear: regYear,
+        modelYear: Number(v.modelYear) > 1900 ? String(v.modelYear) : undefined,
         vehicleNumber: v.vehicleNumber || undefined,
 
         // Specifications & Features from DB with knowledge base enrichment
@@ -995,13 +1003,13 @@ export const API = {
 
   /**
    * GET /api/offers?type=coupon
-   * Fetches active coupon offers from the backend, falling back to the local
-   * COUPONS list if the API is unreachable.
+   * Fetches active coupon offers from the backend (authenticated when logged in so personal/specific-customer
+   * coupons appear automatically), falling back to the local COUPONS list if the API is unreachable.
    */
   async getCoupons(force: boolean = false): Promise<Coupon[]> {
     if (!force && couponCache && Date.now() - couponCache.at < COUPON_TTL_MS) return couponCache.list;
     try {
-      const res = await timedFetch(`${BACKEND_URL}/offers?type=coupon`);
+      const res = await fetchWithAuth(`${BACKEND_URL}/offers?type=coupon`);
       if (res.ok) {
         const json = await res.json();
         if (json.success && Array.isArray(json.data)) {
@@ -1022,6 +1030,7 @@ export const API = {
               discountType: o.discountType || (o.pricingType === 'percentage_discount' ? 'PERCENTAGE' : 'FLAT'),
               discountValue: Number(o.discountValue) || (o.pricingType === 'percentage_discount' ? (o.discountPercent || 0) : (o.originalPrice && o.promotionalPrice ? Math.max(0, o.originalPrice - o.promotionalPrice) : (o.promotionalPrice || 0))),
               minimumBooking: Number(o.minimumBooking) || 0,
+              minimumDiscount: o.minimumDiscount ?? null,
               maximumDiscount: o.maximumDiscount ?? null,
               expiryDate: o.expiryDate,
               startDate: o.startDate || null,
@@ -1034,6 +1043,13 @@ export const API = {
               pricingType: o.pricingType,
               promotionalPrice: o.promotionalPrice,
               pricingUnit: o.pricingUnit,
+              customerEligibility: o.customerEligibility || 'all',
+              firstNCustomers: o.firstNCustomers ?? null,
+              remainingCustomerSlots: o.remainingCustomerSlots ?? null,
+              uniqueCustomersUsed: o.uniqueCustomersUsed ?? 0,
+              maxUsageLimit: o.maxUsageLimit ?? null,
+              perCustomerLimit: o.perCustomerLimit ?? null,
+              isPersonalForYou: Boolean(o.isPersonalForYou),
             }));
           couponCache = { at: Date.now(), list };
           setCouponCatalog(list);
@@ -1045,6 +1061,50 @@ export const API = {
     }
     // Server unreachable: the built-in list keeps the checkout usable offline.
     return COUPONS.filter(c => c.active && new Date(c.expiryDate) >= new Date());
+  },
+
+  /**
+   * POST /api/offers/validate
+   * Live server validation of a coupon code (enforces specific-customer targeting, First-N slots,
+   * new-customer / member eligibility, per-customer limits, and private/secret codes).
+   */
+  async validateCoupon(
+    code: string,
+    bookingAmount: number,
+    vehicleId?: string
+  ): Promise<{ valid: boolean; discount: number; reason?: string; coupon?: Coupon; offline?: boolean }> {
+    const clean = String(code || '').trim().toUpperCase();
+    if (!clean) return { valid: false, discount: 0, reason: 'Please enter a coupon code.' };
+    try {
+      const res = await fetchWithAuth(`${BACKEND_URL}/offers/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: clean,
+          bookingAmount: Math.max(0, Number(bookingAmount) || 0),
+          vehicleId: vehicleId || undefined,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success && json?.data) {
+        if (json.data.valid && json.data.coupon) {
+          upsertCouponInCatalog(json.data.coupon);
+        }
+        return {
+          valid: Boolean(json.data.valid),
+          discount: Number(json.data.discount) || 0,
+          reason: json.data.reason,
+          coupon: json.data.coupon,
+        };
+      }
+      return {
+        valid: false,
+        discount: 0,
+        reason: json?.message || `${clean} is not valid or has expired.`,
+      };
+    } catch {
+      return { valid: false, discount: 0, offline: true };
+    }
   },
 
   /**
@@ -1936,7 +1996,7 @@ export const API = {
           referralDiscountType: 'FLAT',
           referralShareUrl: res.data.shareBaseUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
           playStoreUrl: res.data.playStoreUrl || 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
-          appStoreUrl: res.data.appStoreUrl || 'https://apps.apple.com/app/id6829408836',
+          appStoreUrl: res.data.appStoreUrl || 'https://apps.apple.com/in/app/mysawari/id6829408836',
         };
       }
     } catch {
@@ -1949,7 +2009,7 @@ export const API = {
       referralDiscountType: 'FLAT',
       referralShareUrl: 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
       playStoreUrl: 'https://play.google.com/store/apps/details?id=com.mysawari.customer',
-      appStoreUrl: 'https://apps.apple.com/app/id6829408836',
+      appStoreUrl: 'https://apps.apple.com/in/app/mysawari/id6829408836',
     };
   },
 
@@ -2208,14 +2268,11 @@ export const API = {
    * GET /api/auth/my-partner-qrs — fetch assigned physical QR stickers for this partner
    */
   async getPartnerQRs() {
-    try {
-      const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-partner-qrs`);
-      const data = await response.json();
-      if (!response.ok) return [];
-      return data.data || [];
-    } catch {
-      return [];
-    }
+    // Throws on failure so a network blip keeps the saved QRs instead of replacing them with none.
+    const response = await fetchWithAuth(`${BACKEND_URL}/auth/my-partner-qrs`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.message || 'Could not load partner QRs');
+    return Array.isArray(data.data) ? data.data : [];
   },
 
   /**
@@ -2258,6 +2315,31 @@ export const API = {
       throw new Error(data.message || 'Invalid referral code');
     }
     return data.data;
+  },
+
+  /**
+   * GET /api/auth/referral/deferred
+   * Checks if an invite/QR was recently scanned from this client's IP address (e.g. on iOS after downloading from App Store).
+   */
+  async getDeferredReferral(): Promise<{
+    valid: boolean;
+    referralCode: string;
+    referrerName: string;
+    rewardText: string;
+    bonusSawariCash?: number;
+    isPartnerQr?: boolean;
+  } | null> {
+    try {
+      const response = await timedFetch(`${BACKEND_URL}/auth/referral/deferred`, {
+        method: 'GET',
+        headers: await withInstallId({ 'Content-Type': 'application/json' }),
+      });
+      const data = await response.json();
+      if (response.ok && data?.success && data?.data?.valid) {
+        return data.data;
+      }
+    } catch {}
+    return null;
   },
 
   /**

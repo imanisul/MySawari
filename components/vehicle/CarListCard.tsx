@@ -6,7 +6,7 @@ import * as Haptics from '@/utils/haptics';
 import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { LoadingImage } from '@/components/common/LoadingImage';
-import { Car, getAvailability, MIN_PUBLIC_REVIEW_RATING, parseDayLabel, bestFor } from '@/utils/sawari';
+import { Car, getAvailability, MIN_PUBLIC_REVIEW_RATING, parseDayLabel, bestFor, nameWithYear } from '@/utils/sawari';
 export { bestFor };
 import { formatCurrency } from '@/services/backend/pricingEngine';
 import { API } from '@/services/backend/api';
@@ -181,7 +181,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
         <View style={styles.body}>
           <View style={styles.titleRow}>
             <View style={{ flex: 1, gap: 4 }}>
-              <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{car.name}</Text>
+              <Text style={[styles.name, { color: p.fg }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{nameWithYear(car)}</Text>
               <View style={styles.metaRow}>
                 {meta.map((m, i) => (
                   <React.Fragment key={m}>

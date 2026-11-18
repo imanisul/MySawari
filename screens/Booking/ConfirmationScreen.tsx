@@ -38,6 +38,7 @@ export default function ConfirmationScreen() {
   // The new booking shows on Home and in My Trips straight away.
   React.useEffect(() => {
     queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    queryClient.invalidateQueries({ queryKey: ['exclusive-offers'] }); // the booked flash-sale car shows "already claimed" / sold out at once
   }, [queryClient]);
 
   const b = lastBooking;

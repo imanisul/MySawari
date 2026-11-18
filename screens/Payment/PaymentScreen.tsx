@@ -9,7 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari, useQuote } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
-import { formatCurrency, calculateCouponDiscount } from '@/services/backend/pricingEngine';
+import { formatCurrency, calculateCouponDiscount, isCouponApplicableToVehicle } from '@/services/backend/pricingEngine';
+import { CouponNotApplicableModal } from '@/components/common/CouponNotApplicableModal';
 import { Reveal } from '@/components/common/Reveal';
 import { PriceSummarySkeleton } from '@/components/loading/ScreenSkeletons';
 
@@ -69,19 +70,31 @@ export default function PaymentScreen() {
   }, []);
 
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [notApplicableModal, setNotApplicableModal] = useState<{ code: string; reason: string } | null>(null);
+
+  const currentVehicleId = selectedCar?.id || (selectedCar as any)?._id;
+  const currentVehicleCategory = selectedCar?.category || (selectedCar as any)?.segment;
+
+  // Show ONLY coupons valid for this specific vehicle
+  const eligibleCoupons = React.useMemo(
+    () => availableCoupons.filter((c) => isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory)),
+    [availableCoupons, currentVehicleId, currentVehicleCategory]
+  );
 
   // Validate live against the server (enforces specific-customer targeting, First-N slots, new-customer, and private codes).
   const handleApplyCoupon = async (raw: string) => {
     const code = raw.trim().toUpperCase();
     if (!code) return;
     setCouponError(null);
-    const vehicleId = selectedCar?.id || (selectedCar as any)?._id;
+    const vehicleId = currentVehicleId;
     const rentalAmt = pricingQuote?.rentalAmount ?? 0;
 
     const serverCheck = await API.validateCoupon(code, rentalAmt, vehicleId);
     if (!serverCheck.offline) {
       if (!serverCheck.valid || serverCheck.discount <= 0) {
-        setCouponError(serverCheck.reason || `${code} isn't valid for this booking.`);
+        const reason = serverCheck.reason || `${code} isn't valid for this booking.`;
+        setCouponError(reason);
+        setNotApplicableModal({ code, reason });
         return;
       }
       applyCoupon(code);
@@ -89,12 +102,20 @@ export default function PaymentScreen() {
     }
 
     // Offline fallback
-    await API.getCoupons().catch(() => []);
+    const freshList = await API.getCoupons().catch(() => []);
+    const matched = freshList.find((c) => String(c.code).toUpperCase() === code);
     if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code, {
       vehicleId,
-      vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
+      vehicleCategory: currentVehicleCategory,
     }) <= 0) {
-      setCouponError(`${code} isn't valid for this booking.`);
+      let reason = `${code} isn't valid for this booking.`;
+      if (matched && !isCouponApplicableToVehicle(matched, vehicleId, currentVehicleCategory)) {
+        reason = `${code} is only valid for selected vehicles and cannot be applied to this car.`;
+      } else if (matched && matched.minimumBooking > 0 && pricingQuote.rentalAmount < matched.minimumBooking) {
+        reason = `Minimum booking of ₹${matched.minimumBooking.toLocaleString('en-IN')} required for ${code}.`;
+      }
+      setCouponError(reason);
+      setNotApplicableModal({ code, reason });
       return;
     }
     applyCoupon(code);
@@ -287,12 +308,18 @@ export default function PaymentScreen() {
                 </Pressable>
                 {showCoupons && (
                   <View style={{ marginTop: 16, gap: 12 }}>
-                    {availableCoupons.map(c => (
+                    {eligibleCoupons.length === 0 ? (
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12, textAlign: 'center', paddingVertical: 8 }}>
+                        No coupons available for this vehicle right now.
+                      </Text>
+                    ) : eligibleCoupons.map(c => (
                       <View key={c.code} style={[styles.couponItem, { borderColor: colors.border, backgroundColor: colors.background }]}>
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{c.code}</Text>
                           <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>
-                            {c.discountType === 'FLAT' ? `₹${c.discountValue} OFF` : `${c.discountValue}% OFF${c.maximumDiscount ? ` (Max ₹${c.maximumDiscount})` : ''}`}
+                            {c.discountType === 'FLAT'
+                              ? `₹${c.discountValue} OFF`
+                              : `${c.discountValue}% OFF${c.minimumDiscount || c.maximumDiscount ? ` (${[c.minimumDiscount ? `Min ₹${c.minimumDiscount}` : null, c.maximumDiscount ? `Max ₹${c.maximumDiscount}` : null].filter(Boolean).join(' • ')})` : ''}`}
                           </Text>
                           <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 2 }}>Min booking ₹{c.minimumBooking}</Text>
                         </View>
@@ -458,6 +485,18 @@ export default function PaymentScreen() {
             )}
           </Pressable>
         </View>
+        <CouponNotApplicableModal
+          visible={Boolean(notApplicableModal)}
+          code={notApplicableModal?.code || ''}
+          reason={notApplicableModal?.reason || ''}
+          carName={selectedCar?.name}
+          onClose={() => setNotApplicableModal(null)}
+          onViewCoupons={
+            eligibleCoupons.length > 0
+              ? () => setShowCoupons(true)
+              : undefined
+          }
+        />
       </View>
     </KeyboardAvoidingView>
   );

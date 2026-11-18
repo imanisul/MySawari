@@ -1022,6 +1022,7 @@ export const API = {
               discountType: o.discountType || (o.pricingType === 'percentage_discount' ? 'PERCENTAGE' : 'FLAT'),
               discountValue: Number(o.discountValue) || (o.pricingType === 'percentage_discount' ? (o.discountPercent || 0) : (o.originalPrice && o.promotionalPrice ? Math.max(0, o.originalPrice - o.promotionalPrice) : (o.promotionalPrice || 0))),
               minimumBooking: Number(o.minimumBooking) || 0,
+              minimumDiscount: o.minimumDiscount ?? null,
               maximumDiscount: o.maximumDiscount ?? null,
               expiryDate: o.expiryDate,
               startDate: o.startDate || null,

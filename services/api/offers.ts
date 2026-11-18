@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { formatCurrency } from '@/services/backend/pricingEngine';
-import { BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch, isOfflineError } from '@/services/backend/api';
+import { API, BACKEND_URL, fetchWithAuth, plateSafeImageUrl, timedFetch, isOfflineError } from '@/services/backend/api';
 
 /** Deal / offer photos usually show a fleet vehicle, so they go through plate processing too. */
 import { Image as CachedImage } from 'expo-image';
@@ -99,6 +99,13 @@ export function isOfferLive(offer: { active?: boolean; startDate?: string | Date
   if (Number.isFinite(expires) && expires < now) return false;
   return true;
 }
+
+/** One coupon list for Booking, Payment and Offers: shown straight from cache, refreshed from the server on every open. */
+export const couponsQueryOptions = {
+  queryKey: ['coupons'] as const,
+  queryFn: () => API.getCoupons(true),
+  staleTime: 0,
+};
 
 /** One shared query, so the home screen and the app-start prefetch use the same cached offers. */
 const OFFERS_CACHE_KEY = '@offers_cache_v1';

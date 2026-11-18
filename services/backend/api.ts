@@ -721,7 +721,14 @@ export const API = {
     return valid.map((v: any) => {
       // Robust check for bikes: Seating capacity <= 2 guarantees it's a two-wheeler,
       // even if someone mistakenly saved it as 'SUV' or 'Luxury' in the DB.
-      const isBike = v.seatingCapacity <= 2 || /^(bike|scooter|cruiser|sports|standard)$/i.test(v.vehicleType);
+      // The Operation App's category (car / bike) decides when it is set; older records fall back to the old guess.
+      const isBike = v.category === 'bike' || (v.category !== 'car' && (v.seatingCapacity <= 2 || /^(bike|scooter|geared|cruiser|sports|standard|commuter)$/i.test(v.vehicleType)));
+      // Body type picked in the Operation App (SUV / Sedan / Hatchback / MUV/MPV) drives Home tiles and Explore filters.
+      const pickedBody = /^(suv|sedan|hatchback)$/i.test(String(v.vehicleType || '').trim())
+        ? (String(v.vehicleType).trim().replace(/^suv$/i, 'SUV').replace(/^sedan$/i, 'Sedan').replace(/^hatchback$/i, 'Hatchback') as Car['category'])
+        : /^(muv|mpv|muv\s*\/\s*mpv)$/i.test(String(v.vehicleType || '').trim()) ? 'MUV' as Car['category'] : null;
+      // Bike type picked in the Operation App: Scooter = no gears (Automatic), Geared = Manual. Explore's Bikes / Scooters split uses this.
+      const pickedBikeTransmission = /^scooter$/i.test(String(v.vehicleType || '').trim()) ? 'Automatic' : /^geared$/i.test(String(v.vehicleType || '').trim()) ? 'Manual' : null;
       const { getVehicleImage } = require('../../utils/vehicleImages');
       const fallbackImage = getVehicleImage(v.vehicleName, isBike);
       const hasImages = Array.isArray(v.images) && v.images.length > 0 && typeof v.images[0]?.url === 'string' && v.images[0].url;
@@ -906,14 +913,14 @@ export const API = {
         name: resolvedDisplayName,
         displayName: resolvedDisplayName,
         vehicleName: resolvedDisplayName,
-        category: isBike ? 'Bike' : inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''} ${v.model || ''}`, v.vehicleType, v.seatingCapacity),
+        category: isBike ? 'Bike' : pickedBody || inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''} ${v.model || ''}`, v.vehicleType, v.seatingCapacity),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
         image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,
         images: hasImages ? v.images.map((img: any) => getFullUrl(img.url)) : [fallbackImage],
         seats: `${v.seatingCapacity || (isBike ? 2 : 4)} seats`,
         // A bike's gearbox follows from its model (scooter / geared); hand-typed records had some wrong.
-        transmission: (isBike ? bikeTransmissionFor(resolvedDisplayName) || bikeTransmissionFor(v.vehicleName) : null) || v.transmission || 'Manual',
+        transmission: (isBike ? pickedBikeTransmission || bikeTransmissionFor(resolvedDisplayName) || bikeTransmissionFor(v.vehicleName) : null) || v.transmission || 'Manual',
         // Never guess the fuel. Defaulting a missing fuelType to 'Petrol' made diesel cars (e.g. the Thar
         // 1.5L AXT Diesel, whose name says Diesel and whose mileage is quoted in km/l) read as petrol —
         // which also feeds Explore's fuel filter and SearchScreen. An unknown fuel simply omits the row.
@@ -925,6 +932,7 @@ export const API = {
         variant: v.variant || undefined,
         color: inferredColor || undefined,
         registrationYear: regYear,
+        modelYear: Number(v.modelYear) > 1900 ? String(v.modelYear) : undefined,
         vehicleNumber: v.vehicleNumber || undefined,
 
         // Specifications & Features from DB with knowledge base enrichment

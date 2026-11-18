@@ -14,6 +14,8 @@ import { useSawari, useQuote } from '@/context/SawariContext';
 import { checkCarAvailability } from '@/utils/sawari';
 import { LoadingImage } from '@/components/common/LoadingImage';
 import { API } from '@/services/backend/api';
+import { useQuery } from '@tanstack/react-query';
+import { couponsQueryOptions } from '@/services/api/offers';
 import { ActivityAPI } from '@/services/api/activity';
 import { useVehicles, useLiveCar } from '@/hooks/useVehicles';
 import { calculateCouponDiscount, formatCurrency, isCouponApplicableToVehicle, MYSAWARI_HUB_NAME, type Coupon } from '@/services/backend/pricingEngine';
@@ -83,7 +85,7 @@ export default function BookingScreen() {
   const {
     mode, setMode, selectedCar, pickup, dropoff, returnAddress, isDeliveryRequested, setIsDeliveryRequested,
     deliveryMode, setDeliveryMode, dateRange, pickupTime, returnTime, customer, isAuthenticated,
-    applyCoupon, appliedCouponCode, sawariCash, sawariCashToApply, applySawariCash, membership,
+    applyCoupon, appliedCouponCode, isDealCoupon, sawariCash, sawariCashToApply, applySawariCash, membership,
     planToBuy, setPlanToBuy,
   } = useSawari();
   const { pricingQuote, isQuoteLoading, refreshQuote } = useQuote();
@@ -103,7 +105,7 @@ export default function BookingScreen() {
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [notApplicableModal, setNotApplicableModal] = useState<{ code: string; reason: string } | null>(null);
-  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const { data: coupons = [] } = useQuery(couponsQueryOptions);
 
   const currentVehicleId = selectedCar?.id || (selectedCar as any)?._id;
   const currentVehicleCategory = selectedCar?.category || (selectedCar as any)?.segment;
@@ -123,30 +125,26 @@ export default function BookingScreen() {
       const isDealToken = /^TOPDEAL-|^CLM_|^EXCL_/i.test(codeParam) || params.isTopDeal === 'true' || Boolean(params.offerId);
       if (isDealToken) {
         setCouponInput(codeParam);
-        applyCoupon(codeParam);
+        applyCoupon(codeParam, true);
       }
-      API.getCoupons(true).then((list) => {
-        setCoupons(list || []);
-      }).catch(() => {});
     }
   }, [params.couponCode]);
 
   // If a previously applied coupon is restricted to a DIFFERENT vehicle than the current selectedCar, clear it automatically.
   useEffect(() => {
     if (!appliedCouponCode || !currentVehicleId || coupons.length === 0) return;
-    if (/^TOPDEAL-|^CLM_|^EXCL_/i.test(appliedCouponCode)) return;
+    if (isDealCoupon || /^TOPDEAL-|^CLM_|^EXCL_/i.test(appliedCouponCode)) return;
     const match = coupons.find((c) => String(c.code).toUpperCase() === appliedCouponCode.toUpperCase());
     if (match && !isCouponApplicableToVehicle(match, currentVehicleId, currentVehicleCategory)) {
       applyCoupon(null);
     }
-  }, [appliedCouponCode, currentVehicleId, currentVehicleCategory, coupons, applyCoupon]);
+  }, [appliedCouponCode, isDealCoupon, currentVehicleId, currentVehicleCategory, coupons, applyCoupon]);
   // The plans are shown open for a non-member (to offer them) and when one was already picked on car details;
   // a member's row stays folded until tapped.
   const [showPlans, setShowPlans] = useState(() => !!planToBuy || !(membership?.plan && (!membership.expiresAt || new Date(membership.expiresAt) > new Date())));
 
   useEffect(() => {
     ActivityAPI.logActivity('initiate_checkout', 'BookingScreen', { carId: selectedCar?.id });
-    API.getCoupons().then((list) => setCoupons(list || [])).catch(() => setCoupons([]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pre-create Razorpay order in background as soon as payable amount is known.

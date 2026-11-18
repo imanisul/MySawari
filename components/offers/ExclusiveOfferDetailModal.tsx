@@ -307,7 +307,7 @@ export function ExclusiveOfferDetailModal({
 
   const handleProceedToBooking = async (justLoggedIn = false) => {
     if (checking) return;
-    if (appliedCode) applyCoupon(appliedCode);
+    if (appliedCode) applyCoupon(appliedCode, true);
 
     const car = selectedVehicle?.carObj || vehicles[0];
     if (car) selectCar(car);

@@ -8,6 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { couponsQueryOptions } from '@/services/api/offers';
 import { useSawari, useQuote } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
 import { calculateCouponDiscount, isCouponApplicableToVehicle, type Coupon } from '@/services/backend/pricingEngine';
@@ -63,11 +64,7 @@ export default function OffersScreen() {
   const [toast, setToast] = React.useState(false);
   const [toastMsg, setToastMsg] = React.useState('Coupon Applied');
   const [notApplicable, setNotApplicable] = React.useState<{ code: string; reason: string } | null>(null);
-  const { data: rawCoupons = [], isLoading, refetch, isRefetching } = useQuery({
-    queryKey: ['coupons'],
-    queryFn: () => API.getCoupons(true),
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: rawCoupons = [], isLoading, refetch, isRefetching } = useQuery(couponsQueryOptions);
 
   const currentVehicleId = selectedCar?.id || (selectedCar as any)?._id;
   const currentVehicleCategory = selectedCar?.category || (selectedCar as any)?.segment;

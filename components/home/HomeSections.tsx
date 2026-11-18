@@ -878,10 +878,13 @@ export function HomeSearchCard({ vehicleType, onType, onDates }: {
 }
 
 /** A trip the customer searched: only its pickup and return date + time. Tap to search those dates again. */
-export function TripSearchCard({ search, onPress, onRemove }: {
+export function TripSearchCard({ search, car, onPress, onRemove, onViewDetails }: {
   search: RecentSearch;
+  /** The car or bike this search reached, if any: "View Details" shows only while it is free for these dates. */
+  car?: Car;
   onPress: () => void;
   onRemove?: () => void;
+  onViewDetails?: () => void;
 }) {
   const p = useDetailsPalette();
   const [startLabel, endLabel] = search.dateRange && search.dateRange !== 'Upcoming Trip' ? splitDateRange(search.dateRange) : ['', ''];
@@ -890,6 +893,7 @@ export function TripSearchCard({ search, onPress, onRemove }: {
     { label: 'Pickup', value: [startLabel, search.pickupTime].filter(Boolean).join(', ') },
     { label: 'Return', value: [endLabel || startLabel, search.returnTime].filter(Boolean).join(', ') },
   ];
+  const available = !!car && !!startLabel && getAvailability(car, startLabel, endLabel || startLabel, search.pickupTime, search.returnTime).available;
 
   return (
     <Pressable
@@ -911,6 +915,18 @@ export function TripSearchCard({ search, onPress, onRemove }: {
             </Text>
           </View>
         ))}
+        {available && !!onViewDetails && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`View details of ${search.carName || carTitle(car!)}`}
+            hitSlop={8}
+            onPress={() => { Haptics.selectionAsync(); onViewDetails(); }}
+            style={({ pressed }) => [styles.tripStatus, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={[styles.tripViewDetails, { color: p.muted }]}>View Details</Text>
+            <Feather name="chevron-right" size={12} color={p.muted} />
+          </Pressable>
+        )}
       </View>
       {onRemove ? (
         <Pressable accessibilityRole="button" accessibilityLabel="Remove this search" onPress={onRemove} hitSlop={10}>
@@ -1540,7 +1556,9 @@ const styles = StyleSheet.create({
   tripCard: { width: 246, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 12 },
   tripWhen: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   tripLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  // Recent car search: "View Details ›" when free for the searched dates.
+  // Recent car / bike search: "View Details ›" when free for the searched dates.
+  tripStatus: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
+  tripViewDetails: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, textDecorationLine: 'underline' },
 
   // Top picks
   pick: { width: 246, borderWidth: 1, borderRadius: 12, padding: 2, overflow: 'hidden' },

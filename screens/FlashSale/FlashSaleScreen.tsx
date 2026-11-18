@@ -549,7 +549,7 @@ export default function FlashSaleScreen() {
 
       const car = fleetVehicles.find((fv: any) => String(fv.id ?? fv._id) === String(activeCar.id)) || activeCar;
       selectCar(car);
-      applyCoupon(code);
+      applyCoupon(code, true);
 
       const trip = offerTrip(activeOffer);
       setDates(`${trip.startLabel} – ${trip.endLabel}`, `${trip.days} ${trip.days === 1 ? 'Day' : 'Days'}`);

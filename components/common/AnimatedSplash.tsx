@@ -76,11 +76,11 @@ const FESTIVE_HALO = 'rgba(212, 154, 61, 0.14)';
  *  - Mode 2: Custom Admin Uploaded Splash Screen (when uploaded and festive mode is off).
  *  - Mode 3: Signature Classic MySawari Branding.
  */
-// The launch-screen logo (app.json expo-splash-screen: MySawari_nobg.png, 470 × 480, imageWidth 160, centred).
-const LOGO_W = 160;
-const LOGO_H = (160 * 480) / 470;
-const ENTER_MS = 850;
-// Slice [a, b] of the entrance clock (0–850 ms) mapped to [from, to], eased with a small overshoot (springy settle).
+// The splash logo: the trimmed artwork (MySawari_logo_trim.png, 365 × 313), so its size is the logo's own size.
+const LOGO_W = 140;
+const LOGO_H = (140 * 313) / 365;
+const ENTER_MS = 1500;
+// Slice [a, b] of the entrance clock (0–1500 ms) mapped to [from, to], eased with a small overshoot (springy settle).
 const BACK = Easing.out(Easing.back(1.6));
 // The native driver ignores `easing`, so the curve is sampled into 12 straight pieces instead.
 const seg = (v: Animated.Value, a: number, b: number, from: number, to: number, easing: (t: number) => number = BACK) => {
@@ -278,10 +278,10 @@ export function AnimatedSplash({
   // Duration timer
   useEffect(() => {
     if (skipSplash || config?.isEnabled === false || brandDone) return;
-    // Never before the entrance has finished, so "Your Ride, Your Way" is always seen.
+    // Never before the entrance has finished, and the full line holds a moment so "Your Ride, Your Way" is read.
     const t = setTimeout(() => {
       setBrandDone(true);
-    }, Math.max(durationMs, ENTER_MS + 250));
+    }, Math.max(durationMs, ENTER_MS + 450));
     return () => clearTimeout(t);
   }, [durationMs, skipSplash, config?.isEnabled, brandDone]);
 
@@ -636,24 +636,25 @@ export function AnimatedSplash({
             /* ======================================================== */
             /* MODE 3: SIGNATURE CLASSIC SPLASH                         */
             /* ======================================================== */
-            // One screen, not two: the phone's own launch screen (app.json: white, this logo 160 wide, centred) hands
-            // over to this view with the logo already showing in exactly the same place and size — nothing blinks or
-            // jumps. Only the name and tagline fade in under it.
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF' }]}>
-              <Image
-                source={require('@/assets/images/MySawari_nobg.png')}
-                style={{ position: 'absolute', width: LOGO_W, height: LOGO_H, left: (windowWidth - LOGO_W) / 2, top: (windowHeight - LOGO_H) / 2 }}
+            // The phone's launch screen is plain white (app.json: splash_blank.png), so this continues it:
+            // a beat of white, then the logo grows in, then the name, then the tagline — one after another.
+            // Logo, name and tagline are one group, centred on the screen on every device size.
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }]}>
+              {/* 0.15–0.65 s: the logo fades and grows into place */}
+              <Animated.Image
+                source={require('@/assets/images/MySawari_logo_trim.png')}
+                style={{ width: LOGO_W, height: LOGO_H, opacity: seg(enter, 150, 450, 0, 1, Easing.linear), transform: [{ scale: seg(enter, 150, 650, 0.8, 1) }] }}
                 resizeMode="contain"
               />
-              <View style={{ position: 'absolute', left: 0, right: 0, top: (windowHeight + LOGO_H) / 2 + 14, alignItems: 'center' }}>
-                {/* 0.05–0.5 s: the name springs up and grows into place */}
-                <Animated.View style={{ opacity: seg(enter, 50, 300, 0, 1, Easing.linear), transform: [{ translateY: seg(enter, 50, 500, 22, 0) }, { scale: seg(enter, 50, 500, 0.9, 1) }] }}>
+              <View style={{ marginTop: 22, alignItems: 'center' }}>
+                {/* 0.6–1.0 s: the name springs up and grows into place */}
+                <Animated.View style={{ opacity: seg(enter, 600, 850, 0, 1, Easing.linear), transform: [{ translateY: seg(enter, 600, 1000, 22, 0) }, { scale: seg(enter, 600, 1000, 0.9, 1) }] }}>
                   <Text allowFontScaling={false} style={styles.classicTitle}>{displayTitle}</Text>
                 </Animated.View>
                 <View style={{ flexDirection: 'row', marginTop: 8 }} accessible accessibilityLabel={displayTagline}>
-                  {/* 0.25–0.7 s "Your Ride," from the left; 0.4–0.85 s "Your Way" from the right */}
-                  <Animated.Text allowFontScaling={false} style={[styles.classicTagline, { opacity: seg(enter, 250, 450, 0, 1, Easing.linear), transform: [{ translateX: seg(enter, 250, 700, -18, 0) }] }]}>Your Ride, </Animated.Text>
-                  <Animated.Text allowFontScaling={false} style={[styles.classicTagline, { opacity: seg(enter, 400, 600, 0, 1, Easing.linear), transform: [{ translateX: seg(enter, 400, 850, 18, 0) }] }]}>Your Way</Animated.Text>
+                  {/* 1.0–1.4 s "Your Ride," from the left; 1.1–1.5 s "Your Way" from the right */}
+                  <Animated.Text allowFontScaling={false} style={[styles.classicTagline, { opacity: seg(enter, 1000, 1200, 0, 1, Easing.linear), transform: [{ translateX: seg(enter, 1000, 1400, -18, 0) }] }]}>Your Ride, </Animated.Text>
+                  <Animated.Text allowFontScaling={false} style={[styles.classicTagline, { opacity: seg(enter, 1100, 1300, 0, 1, Easing.linear), transform: [{ translateX: seg(enter, 1100, 1500, 18, 0) }] }]}>Your Way</Animated.Text>
                 </View>
               </View>
             </View>

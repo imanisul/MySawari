@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
 import { useSawari, useQuote } from '@/context/SawariContext';
 import { API } from '@/services/backend/api';
+import { useQuery } from '@tanstack/react-query';
+import { couponsQueryOptions } from '@/services/api/offers';
 import { formatCurrency, calculateCouponDiscount, isCouponApplicableToVehicle } from '@/services/backend/pricingEngine';
 import { CouponNotApplicableModal } from '@/components/common/CouponNotApplicableModal';
 import { Reveal } from '@/components/common/Reveal';
@@ -51,7 +53,7 @@ export default function PaymentScreen() {
   // Coupon State
   const [couponInput, setCouponInput] = useState('');
   const [showCoupons, setShowCoupons] = useState(false);
-  const [availableCoupons, setAvailableCoupons] = useState<any[]>([]);
+  const { data: availableCoupons = [] } = useQuery(couponsQueryOptions);
 
   // Toggle for Sawari Cash
   const useCash = sawariCashToApply > 0;
@@ -63,11 +65,6 @@ export default function PaymentScreen() {
       API.prefetchRazorpayOrder(pricingQuote.onlinePayableNow);
     }
   }, [isAuthenticated, pricingQuote?.onlinePayableNow]);
-
-  useEffect(() => {
-    // Fetch coupons (likely already cached from startup warm-up, so this is instant)
-    API.getCoupons().then(res => setAvailableCoupons(res)).catch(() => setAvailableCoupons([]));
-  }, []);
 
   const [couponError, setCouponError] = useState<string | null>(null);
   const [notApplicableModal, setNotApplicableModal] = useState<{ code: string; reason: string } | null>(null);

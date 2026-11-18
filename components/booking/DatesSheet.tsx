@@ -479,7 +479,7 @@ export function DatesSheet() {
       const dealPrice = Math.min(perDay || Infinity, deal.rate * hours);
       const label = (ms: number) => { const q = getIndiaDateParts(ms); return dayNumToLabel(toDayNum(q.year, q.month, q.date)); };
       selectCar({ ...liveSelectedCar, hourlyRate: deal.rate } as any);
-      applyCoupon(`TOPDEAL-${hours}`);
+      applyCoupon(`TOPDEAL-${hours}`, true);
       setDates(`${label(startMs)} – ${label(deal.endMs)}`, '1 Day');
       setTimes(formatTime12(startMs), formatTime12(deal.endMs));
       router.replace({

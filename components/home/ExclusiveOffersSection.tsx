@@ -154,7 +154,7 @@ export function ExclusiveOffersSection({ layout = 'row' }: { layout?: 'row' | 'l
 
     // 3. Auto-apply coupon code
     if (offer.code) {
-      applyCoupon(offer.code.trim().toUpperCase());
+      applyCoupon(offer.code.trim().toUpperCase(), true);
     }
 
     // 4. Default pickup & destination if empty so booking does not block

@@ -278,6 +278,18 @@ export default function HomeScreen() {
     router.push('/search');
   }, [setBookingSource, setVehicleType, setDropoff, setDates, setTimes, router]);
 
+  // A recent search that reached one car or bike, still free for its dates: that vehicle's page with the trip filled in.
+  const openSearchedCar = useCallback((t: RecentSearch, car: any) => {
+    setBookingSource('home');
+    setVehicleType(t.vehicleType);
+    selectCar(car);
+    prefetchCarGallery(car);
+    if (t.dropoff) setDropoff(t.dropoff);
+    if (t.dateRange && t.duration && t.dateRange !== 'Upcoming Trip') setDates(t.dateRange, t.duration);
+    if (t.pickupTime && t.returnTime) setTimes(t.pickupTime, t.returnTime);
+    router.push('/car-details');
+  }, [setBookingSource, setVehicleType, selectCar, setDropoff, setDates, setTimes, router]);
+
 
   const openPick = useCallback((item: any) => {
     selectCar(item);
@@ -485,11 +497,14 @@ export default function HomeScreen() {
               horizontal
               keyExtractor={(t) => `trip-${t.id}`}
               renderItem={({ item: t }) => {
+                const car = t.carId ? fetchedVehicles.find((v) => String(v.id) === String(t.carId) || String((v as any)._id) === String(t.carId)) : undefined;
                 return (
                   <TripSearchCard
                     search={t}
+                    car={car && !isInService(car) ? car : undefined}
                     onPress={() => openTripSearch(t)}
                     onRemove={() => removeTripSearch(t.id)}
+                    onViewDetails={car ? () => openSearchedCar(t, car) : undefined}
                   />
                 );
               }}
@@ -562,7 +577,7 @@ export default function HomeScreen() {
     if (!content) return null;
     // Figma: 16px gap between every block.
     return <Reveal delay={Math.min(index, 6) * 40}><View style={{ marginTop: 16 }}>{content}</View></Reveal>;
-  }, [p, isDarkMode, insets.top, city, dateRange, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, fetchedVehicles, openPick, vehiclesLoading, showRecent, fromRate, milestone, journey, claimable, claim, isMember, membership]);
+  }, [p, isDarkMode, insets.top, city, dateRange, isAuthenticated, sawariCash, unreadCount, router, referEarn, requireLogin, vehicleType, setVehicleType, openDates, openDestination, handleDestinationPress, picks, recent, tripSearches, openTripSearch, removeTripSearch, openSearchedCar, fetchedVehicles, openPick, vehiclesLoading, showRecent, fromRate, milestone, journey, claimable, claim, isMember, membership]);
 
   return (
     <View style={styles.screen}>

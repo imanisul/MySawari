@@ -81,7 +81,7 @@ export default function CarDetailsScreen() {
   const {
     selectedCar, selectCar, pickup, dropoff, dateRange, isDeliveryRequested, setFuelEstimate,
     isAuthenticated, customer, duration, pickupTime, returnTime, membership, setDates, isDarkMode,
-    applyCoupon, appliedCouponCode,
+    applyCoupon, appliedCouponCode, isDealCoupon,
   } = useSawari();
 
   const { data: offers = [] } = useQuery(offersQueryOptions);
@@ -104,7 +104,9 @@ export default function CarDetailsScreen() {
   // (Explore, Search) must not keep it.
   useEffect(() => {
     if (params.isTopDeal !== 'true' && /^TOPDEAL-/i.test(appliedCouponCode || '')) applyCoupon(null);
-  }, [params.isTopDeal, appliedCouponCode, applyCoupon]);
+    // Same for any deal code (Flash Sale / Exclusive claim): it only belongs to the deal page that applied it.
+    else if (!isDatesLocked && isDealCoupon) applyCoupon(null);
+  }, [params.isTopDeal, appliedCouponCode, isDealCoupon, isDatesLocked, applyCoupon]);
 
   // Only carry explicitly claimed Flash Sale / Top Deal tokens; NEVER auto-apply standard coupons (let the customer apply them).
   useEffect(() => {
@@ -119,9 +121,9 @@ export default function CarDetailsScreen() {
     const isDealToken = (c?: string | null) => /^TOPDEAL-|^CLM_|^EXCL_/i.test(String(c || '').trim());
 
     if (isClaimedDealOffer && targetOffer?.code && appliedCouponCode !== targetOffer.code && !isParamOfferExpired) {
-      applyCoupon(targetOffer.code);
+      applyCoupon(targetOffer.code, true);
     } else if (paramPromoCode && isDealToken(paramPromoCode) && !appliedCouponCode && !isParamOfferExpired) {
-      applyCoupon(paramPromoCode);
+      applyCoupon(paramPromoCode, true);
     }
   }, [targetOffer, paramPromoCode, appliedCouponCode, isParamOfferExpired, applyCoupon]);
 

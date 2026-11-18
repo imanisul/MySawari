@@ -62,7 +62,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#F9F9F8"
+        "backgroundColor": "#FFFFFF"
       },
       "intentFilters": [
         {
@@ -133,7 +133,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/MySawari_nobg.png",
+          "image": "./assets/images/splash_blank.png",
           "imageWidth": 160,
           "resizeMode": "contain",
           "backgroundColor": "#FFFFFF"
@@ -165,7 +165,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/notification_icon_alpha.png",
-          "color": "#D3302D"
+          "color": "#6B5AED"
         }
       ],
       "@react-native-community/datetimepicker",

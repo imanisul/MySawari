@@ -252,7 +252,7 @@ export function useOpenTopDeal() {
     const hours = Math.max(1, Math.ceil(Math.max(0, endMs - startMs) / (3600 * 1000)));
     const { rate, price } = dealPricing(car, hours);
     selectCar({ ...car, hourlyRate: rate });
-    applyCoupon(`TOPDEAL-${hours}`);
+    applyCoupon(`TOPDEAL-${hours}`, true);
 
     const dayLabel = (ms: number) => {
       const p = getIndiaDateParts(ms);

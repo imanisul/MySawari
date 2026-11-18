@@ -72,11 +72,15 @@ export default function PaymentScreen() {
   const currentVehicleId = selectedCar?.id || (selectedCar as any)?._id;
   const currentVehicleCategory = selectedCar?.category || (selectedCar as any)?.segment;
 
-  // Show ONLY coupons valid for this specific vehicle
-  const eligibleCoupons = React.useMemo(
-    () => availableCoupons.filter((c) => isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory)),
-    [availableCoupons, currentVehicleId, currentVehicleCategory]
-  );
+  // Show ONLY live (non-expired) coupons valid for this specific vehicle
+  const eligibleCoupons = React.useMemo(() => {
+    const now = Date.now();
+    return availableCoupons.filter(
+      (c) =>
+        (!c.expiryDate || new Date(c.expiryDate).getTime() > now) &&
+        isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory)
+    );
+  }, [availableCoupons, currentVehicleId, currentVehicleCategory]);
 
   // Validate live against the server (enforces specific-customer targeting, First-N slots, new-customer, and private codes).
   const handleApplyCoupon = async (raw: string) => {
@@ -98,17 +102,29 @@ export default function PaymentScreen() {
       return;
     }
 
-    // Offline fallback
+    // Offline fallback: never allow unverified restricted or unknown coupons without server confirmation
     const freshList = await API.getCoupons().catch(() => []);
     const matched = freshList.find((c) => String(c.code).toUpperCase() === code);
+    const requiresServerVerification =
+      !matched ||
+      (matched.customerEligibility && matched.customerEligibility !== 'all') ||
+      (typeof matched.firstNCustomers === 'number' && matched.firstNCustomers > 0);
+    if (requiresServerVerification) {
+      const reason = `Please connect to the internet to verify eligibility for ${code}.`;
+      setCouponError(reason);
+      setNotApplicableModal({ code, reason });
+      return;
+    }
     if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code, {
       vehicleId,
       vehicleCategory: currentVehicleCategory,
     }) <= 0) {
       let reason = `${code} isn't valid for this booking.`;
-      if (matched && !isCouponApplicableToVehicle(matched, vehicleId, currentVehicleCategory)) {
+      if (matched.expiryDate && new Date(matched.expiryDate).getTime() <= Date.now()) {
+        reason = `${code} has expired.`;
+      } else if (!isCouponApplicableToVehicle(matched, vehicleId, currentVehicleCategory)) {
         reason = `${code} is only valid for selected vehicles and cannot be applied to this car.`;
-      } else if (matched && matched.minimumBooking > 0 && pricingQuote.rentalAmount < matched.minimumBooking) {
+      } else if (matched.minimumBooking > 0 && pricingQuote.rentalAmount < matched.minimumBooking) {
         reason = `Minimum booking of ₹${matched.minimumBooking.toLocaleString('en-IN')} required for ${code}.`;
       }
       setCouponError(reason);

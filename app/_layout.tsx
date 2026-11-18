@@ -12,7 +12,7 @@ LogBox.ignoreLogs([
   // Dev-only and harmless: a finger lifted that React Native never saw land (two fingers at once, or a touch that
   // began inside a native gesture area like the deals swipe). The tap/swipe itself still works.
   'Cannot record touch end without a touch start',
-]);
+]); 
 
 import { QueryClient, QueryClientProvider, focusManager, useQueryClient } from '@tanstack/react-query';
 import { AppState } from 'react-native';

@@ -818,7 +818,7 @@ export function ReferStrip({ earnText, onPress }: { earnText: string; onPress: (
       </View>
       <View style={{ flex: 1 }}>
         <View style={styles.referTop}>
-          <Text style={[styles.referTitle, { color: '#262626' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Refer & Earn up to {earnText}</Text>
+          <Text style={[styles.referTitle, { color: '#262626' }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Refer & Earn {earnText}</Text>
           <View style={[styles.referBtn, { backgroundColor: p.button }]}>
             <Text style={styles.referBtnText}>Refer</Text>
             <Feather name="arrow-right" size={8} color="#FFFFFF" />
@@ -1078,7 +1078,7 @@ export function TopPickCard({ car, membership, onPress }: { car: Car & { availab
               {available
                 ? 'Available now'
                 : availability.nextAvailableFrom
-                  ? `Available on ${cardDate(availability.nextAvailableFrom)}`
+                  ? `Available from ${cardDate(availability.nextAvailableFrom)}`
                   : availability.headline}
           </Text>
         </View>
@@ -1119,14 +1119,14 @@ export function TripMilestoneCard({ rides, target, reward, claimable, claiming, 
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Complete ${target} trips, get up to ${formatCurrency(reward)} rewards. ${done} of ${target} completed.`}
+      accessibilityLabel={`Complete ${target} trips, get up to ${formatCurrency(reward)} off. ${done} of ${target} completed.`}
       onPress={onPress}
       // Figma "Membership" card: #EFEDFD fill, 1px #D1CCF9 border (dark mode keeps the palette's dark card).
       style={[styles.milestone, dark ? { backgroundColor: p.purpleBg, borderColor: p.memberBorder } : { backgroundColor: '#EFEDFD', borderColor: '#D1CCF9' }]}
     >
       <Image source={require('@/assets/images/MySawari_nobg.png')} style={styles.milestoneLogo} resizeMode="contain" />
-      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} trips, earn {formatCurrency(reward)} off</Text>
-      <Text style={[styles.milestoneSub, { color: p.muted }]}>Get {formatCurrency(reward)} off after completing {target} trips.</Text>
+      <Text style={[styles.milestoneTitle, { color: p.fg }]}>Complete {target} trips, get up to {formatCurrency(reward)} off</Text>
+      <Text style={[styles.milestoneSub, { color: p.muted }]}>Get up to {formatCurrency(reward)} off after completing {target} trips.</Text>
 
       <View style={styles.track}>
         <View style={styles.trackRail}>
@@ -1249,7 +1249,7 @@ export function MemberBenefitsCard({ isMember, onPress }: { isMember: boolean; o
     <Pressable accessibilityRole="button" onPress={() => { Haptics.selectionAsync(); onPress(); }} style={({ pressed }) => [styles.member, { backgroundColor: p.purpleBg, borderColor: p.memberBorder }, pressed && { opacity: 0.9 }]}>
       <View style={styles.memberHead}>
         <Text style={[styles.memberTitle, { color: p.fg }]}>{isMember ? 'Your Member Benefits' : 'Unlock Member Benefits'}</Text>
-        <View style={[styles.memberBtn, { backgroundColor: HOME_PURPLE }]}>
+        <View style={[styles.memberBtn, { backgroundColor: HERO_BOTTOM }]}>
           <Text style={styles.memberBtnText}>{isMember ? 'My Membership' : 'Buy Membership'}</Text>
           <Feather name="arrow-right" size={8} color="#FFFFFF" />
         </View>
@@ -1589,7 +1589,7 @@ const styles = StyleSheet.create({
   milestone: { marginHorizontal: 16, marginTop: 0, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   // The logo's artwork fills 360 × 316 of its 470 × 480 file; this shows that part at 32 × 27.
   milestoneLogo: { position: 'absolute', top: 11.5, right: 2, width: 42, height: 40, opacity: 0.32 },
-  milestoneTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5 },
+  milestoneTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginRight: 40 },
   milestoneSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 3, marginRight: 40 },
   // The marks' centres sit 8 in from each edge, so the rail runs between them.
   track: { height: 16, marginTop: 12, justifyContent: 'center' },

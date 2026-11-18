@@ -69,10 +69,12 @@ export default function OffersScreen() {
   const currentVehicleId = selectedCar?.id || (selectedCar as any)?._id;
   const currentVehicleCategory = selectedCar?.category || (selectedCar as any)?.segment;
 
-  // When opened from checkout (?mode=apply) for a specific car, ONLY show coupons valid for that car!
+  // Always hide expired coupons; when opened from checkout (?mode=apply) for a specific car, ONLY show coupons valid for that car!
   const coupons = React.useMemo(() => {
-    if (!applyMode || !currentVehicleId) return rawCoupons;
-    return rawCoupons.filter((c) => isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory));
+    const now = Date.now();
+    const live = rawCoupons.filter((c) => !c.expiryDate || new Date(c.expiryDate).getTime() > now);
+    if (!applyMode || !currentVehicleId) return live;
+    return live.filter((c) => isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory));
   }, [rawCoupons, applyMode, currentVehicleId, currentVehicleCategory]);
 
   const copyCode = (code: string) => {
@@ -102,18 +104,33 @@ export default function OffersScreen() {
           });
           return;
         }
-      } else if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code, vehicleContext) <= 0) {
-        let msg = `${c.code} can't be used on this booking.`;
-        if (c.minimumBooking > 0 && pricingQuote.rentalAmount < c.minimumBooking) {
-          msg = `${c.code} needs a booking of at least ₹${c.minimumBooking.toLocaleString('en-IN')}.`;
-        } else if (c.applicableType === 'specific_vehicles' || c.vehicleId || (c.applicableVehicleIds && c.applicableVehicleIds.length > 0)) {
-          msg = `${c.code} is only valid for selected cars and cannot be applied to this vehicle.`;
-        } else if (c.applicableType === 'category') {
-          msg = `${c.code} is only valid for ${c.applicableCategories?.join(', ')} vehicles.`;
+      } else {
+        const requiresServerVerification =
+          (c.customerEligibility && c.customerEligibility !== 'all') ||
+          (typeof c.firstNCustomers === 'number' && c.firstNCustomers > 0);
+        if (requiresServerVerification) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          setNotApplicable({
+            code: c.code,
+            reason: `Please connect to the internet to verify eligibility for ${c.code}.`,
+          });
+          return;
         }
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setNotApplicable({ code: c.code, reason: msg });
-        return;
+        if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, c.code, vehicleContext) <= 0) {
+          let msg = `${c.code} can't be used on this booking.`;
+          if (c.expiryDate && new Date(c.expiryDate).getTime() <= Date.now()) {
+            msg = `${c.code} has expired.`;
+          } else if (c.minimumBooking > 0 && pricingQuote.rentalAmount < c.minimumBooking) {
+            msg = `${c.code} needs a booking of at least ₹${c.minimumBooking.toLocaleString('en-IN')}.`;
+          } else if (c.applicableType === 'specific_vehicles' || c.vehicleId || (c.applicableVehicleIds && c.applicableVehicleIds.length > 0)) {
+            msg = `${c.code} is only valid for selected cars and cannot be applied to this vehicle.`;
+          } else if (c.applicableType === 'category') {
+            msg = `${c.code} is only valid for ${c.applicableCategories?.join(', ')} vehicles.`;
+          }
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          setNotApplicable({ code: c.code, reason: msg });
+          return;
+        }
       }
       applyCoupon(c.code);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

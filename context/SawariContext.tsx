@@ -1090,6 +1090,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setIsAuthenticated(true);
 
           invalidateWalletCache();
+          API.clearCouponCache();
+          queryClient.invalidateQueries({ queryKey: ['coupons'] });
           API.setWalletSnapshotUser(user.id); // from now on the wallet is saved for the next launch
           startQueryPersistence(queryClient, user.id); // and so are the trips / rewards lists
           API.getWallet(true).then(applyWallet).catch(() => {});
@@ -1128,6 +1130,8 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
           setEarnedRewards([]);
           setTotalBookings(0);
           setNotifications([]);
+          applyCoupon(null);
+          API.clearCouponCache();
           // (Favourites switch to the guest list on their own; clearing them here could save [] over the account's list.)
           clearQueryPersistence();
           API.setWalletSnapshotUser(null);

@@ -19,7 +19,7 @@ import { clearMembershipPopupShown } from '@/components/vehicle/details/Membersh
 
 /**
  * Vehicle card (Figma "Explore": photo carousel with a "Best for …" tag and heart, name with the rating pill,
- * specs with the review count, price, and "View Details" or "Available on …").
+ * specs with the review count, price, and "View Details" or "Available from …").
  * Used by Explore, Search results and Wishlist. Everything shown comes from the vehicle record, its reviews and
  * nothing else — the price is the vehicle's real day rate.
  */
@@ -114,7 +114,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
     <View style={[styles.wrap, style]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`${car.name}, ${formatCurrency(car.perDay)} per day${unavailable && availability.nextAvailableFrom ? `, available on ${availability.nextAvailableFrom}` : ''}`}
+        accessibilityLabel={`${car.name}, ${formatCurrency(car.perDay)} per day${unavailable && availability.nextAvailableFrom ? `, available from ${availability.nextAvailableFrom}` : ''}`}
         testID={`list-car-${car.id}`}
         onPress={onCarPress}
         style={({ pressed }) => [styles.card, { backgroundColor: p.summary, borderColor: p.deliveryBorder, opacity: pressed ? 0.92 : 1 }]}
@@ -233,7 +233,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
                 >
-                  {(availability.nextAvailableFrom ? `Available on ${shortAvail(availability.nextAvailableFrom)}` : availability.headline)}
+                  {(availability.nextAvailableFrom ? `Available from ${shortAvail(availability.nextAvailableFrom)}` : availability.headline)}
                 </Text>
                 <Feather name="chevron-right" size={13} color={(availability.availableToday || availability.nextAvailableFrom) && availability.reason !== 'service' ? p.green : p.red} />
               </View>

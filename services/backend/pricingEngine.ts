@@ -24,6 +24,8 @@ function legCharge(loc: Coordinates, roadKm?: number | null): { charge: number; 
 export type Coupon = {
   _id?: string;
   code: string;
+  type?: string;
+  isExclusive?: boolean;
   title?: string;
   subtitle?: string;
   description?: string;
@@ -33,6 +35,7 @@ export type Coupon = {
   minimumDiscount?: number | null;
   maximumDiscount?: number | null;
   expiryDate: string;
+  endTime?: string;
   startDate?: string | null;
   active: boolean;
   applicableType?: 'all' | 'specific_vehicles' | 'category' | 'campaign';
@@ -399,8 +402,8 @@ export function calculateCouponDiscount(
   }
   const coupon = couponCatalog.find(c => String(c.code).toUpperCase() === couponCode.trim().toUpperCase());
   if (!coupon || coupon.active === false) return 0;
-  if (new Date(coupon.expiryDate) < new Date()) return 0;
-  if (coupon.startDate && new Date(coupon.startDate) > new Date()) return 0;
+  if (new Date(coupon.expiryDate).getTime() <= Date.now()) return 0;
+  if (coupon.startDate && new Date(coupon.startDate).getTime() > Date.now()) return 0;
 
   // Vehicle-specific eligibility check (unless offer is for all vehicles)
   const isVehicleSpecific =
@@ -438,16 +441,25 @@ export function calculateCouponDiscount(
   let discount: number;
   const days = vehicleContext?.days || 1;
 
-  if (coupon.pricingType === 'promotional_price' || (coupon as any).type === 'special_deal') {
-    const promoPrice = coupon.promotionalPrice !== null && coupon.promotionalPrice !== undefined
+  // Only treat an offer as a promotional-price deal when it is ACTUALLY an exclusive/special deal with an
+  // explicit promotionalPrice or dealPrice — NEVER apply promotional-price fallback to standard coupons!
+  const isPromoDeal =
+    (coupon.type === 'special_deal' || coupon.isExclusive === true) &&
+    !(coupon.type === 'coupon' && !coupon.isExclusive) &&
+    (coupon.pricingType === 'promotional_price' || coupon.type === 'special_deal') &&
+    ((coupon.promotionalPrice !== null && coupon.promotionalPrice !== undefined && Number(coupon.promotionalPrice) > 0) ||
+      (Number((coupon as any).dealPrice) > 0));
+
+  if (isPromoDeal) {
+    const promoPrice = coupon.promotionalPrice !== null && coupon.promotionalPrice !== undefined && Number(coupon.promotionalPrice) > 0
       ? Number(coupon.promotionalPrice)
-      : (Number((coupon as any).dealPrice) || 1);
+      : Number((coupon as any).dealPrice);
     const dealRental = coupon.pricingUnit === 'per_trip' ? promoPrice : promoPrice * Math.max(1, days);
     discount = Math.max(0, base - dealRental);
   } else if (coupon.discountType === 'FLAT') {
-    discount = Math.min(value, base);
+    discount = Math.min(Number.isFinite(value) ? value : 0, base);
   } else if (coupon.discountType === 'PERCENTAGE') {
-    discount = base * (Math.min(value, 100) / 100);
+    discount = base * (Math.min(Number.isFinite(value) ? value : 0, 100) / 100);
     if (coupon.minimumDiscount && Number(coupon.minimumDiscount) > 0) {
       discount = Math.max(discount, Number(coupon.minimumDiscount));
     }
@@ -455,7 +467,7 @@ export function calculateCouponDiscount(
       discount = Math.min(discount, Number(coupon.maximumDiscount));
     }
   } else {
-    discount = Math.min(value, base);
+    discount = Math.min(Number.isFinite(value) ? value : 0, base);
   }
   return Math.round(Math.max(0, Math.min(discount, base)));
 }

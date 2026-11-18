@@ -110,11 +110,15 @@ export default function BookingScreen() {
   const currentVehicleId = selectedCar?.id || (selectedCar as any)?._id;
   const currentVehicleCategory = selectedCar?.category || (selectedCar as any)?.segment;
 
-  // Only show coupons applicable to THIS specific car (never show Car A's coupon on Car B)
-  const eligibleCoupons = React.useMemo(
-    () => coupons.filter((c) => isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory)),
-    [coupons, currentVehicleId, currentVehicleCategory]
-  );
+  // Only show live (non-expired) coupons applicable to THIS specific car (never show Car A's coupon on Car B)
+  const eligibleCoupons = React.useMemo(() => {
+    const now = Date.now();
+    return coupons.filter(
+      (c) =>
+        (!c.expiryDate || new Date(c.expiryDate).getTime() > now) &&
+        isCouponApplicableToVehicle(c, currentVehicleId, currentVehicleCategory)
+    );
+  }, [coupons, currentVehicleId, currentVehicleCategory]);
 
   // Only carry explicit Flash Sale / Top Deal claim tokens; NEVER auto-apply standard coupons — let the customer apply them.
   const autoCouponAttempted = useRef(false);
@@ -233,17 +237,30 @@ export default function BookingScreen() {
       return;
     }
 
-    // Offline fallback
+    // Offline fallback: never allow unverified restricted or unknown coupons without server confirmation
     const freshList = await API.getCoupons().catch(() => []);
     const matched = freshList.find((c) => String(c.code).toUpperCase() === code);
+    const requiresServerVerification =
+      !matched ||
+      (matched.customerEligibility && matched.customerEligibility !== 'all') ||
+      (typeof matched.firstNCustomers === 'number' && matched.firstNCustomers > 0);
+    if (requiresServerVerification) {
+      const reason = `Please connect to the internet to verify eligibility for ${code}.`;
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setCouponError(reason);
+      setNotApplicableModal({ code, reason });
+      return;
+    }
     if (pricingQuote && calculateCouponDiscount(pricingQuote.rentalAmount, pricingQuote.driverCharge, code, {
       vehicleId,
       vehicleCategory: selectedCar?.category || (selectedCar as any)?.segment,
     }) <= 0) {
       let reason = `${code} isn't valid for this booking.`;
-      if (matched && !isCouponApplicableToVehicle(matched, vehicleId, currentVehicleCategory)) {
+      if (matched.expiryDate && new Date(matched.expiryDate).getTime() <= Date.now()) {
+        reason = `${code} has expired.`;
+      } else if (!isCouponApplicableToVehicle(matched, vehicleId, currentVehicleCategory)) {
         reason = `${code} is only valid for selected vehicles and cannot be applied to this car.`;
-      } else if (matched && matched.minimumBooking > 0 && pricingQuote.rentalAmount < matched.minimumBooking) {
+      } else if (matched.minimumBooking > 0 && pricingQuote.rentalAmount < matched.minimumBooking) {
         reason = `Minimum booking of ₹${matched.minimumBooking.toLocaleString('en-IN')} required for ${code}.`;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

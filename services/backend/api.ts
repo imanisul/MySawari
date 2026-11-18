@@ -1001,6 +1001,12 @@ export const API = {
     }
   },
 
+  /** Clears cached coupons & local pricing catalog (must run on login / logout so personal coupons never bleed across accounts). */
+  clearCouponCache() {
+    couponCache = null;
+    setCouponCatalog([]);
+  },
+
   /**
    * GET /api/offers?type=coupon
    * Fetches active coupon offers from the backend (authenticated when logged in so personal/specific-customer
@@ -1020,19 +1026,25 @@ export const API = {
             // Expired, unapproved, or switched-off codes are refused at checkout, so they are not offered either.
             .filter((o: any) => typeof o?.code === 'string' && o.code.trim() && o.active !== false
               && (!o.approvalStatus || o.approvalStatus === 'approved')
-              && Number.isFinite(new Date(o.expiryDate).getTime()) && new Date(o.expiryDate).getTime() >= now)
-            .map((o: any) => ({
+              && Number.isFinite(new Date(o.expiryDate).getTime()) && new Date(o.expiryDate).getTime() > now)
+            .map((o: any) => {
+              const isStandardCoupon = o.type === 'coupon' && !o.isExclusive;
+              const resolvedDiscountType = o.discountType || (o.pricingType === 'percentage_discount' ? 'PERCENTAGE' : 'FLAT');
+              return {
               _id: o._id,
               code: o.code.trim().toUpperCase(),
+              type: o.type || 'coupon',
+              isExclusive: Boolean(o.isExclusive),
               title: o.title || '',
               subtitle: o.subtitle || '',
               description: o.description || '',
-              discountType: o.discountType || (o.pricingType === 'percentage_discount' ? 'PERCENTAGE' : 'FLAT'),
+              discountType: resolvedDiscountType,
               discountValue: Number(o.discountValue) || (o.pricingType === 'percentage_discount' ? (o.discountPercent || 0) : (o.originalPrice && o.promotionalPrice ? Math.max(0, o.originalPrice - o.promotionalPrice) : (o.promotionalPrice || 0))),
               minimumBooking: Number(o.minimumBooking) || 0,
               minimumDiscount: o.minimumDiscount ?? null,
               maximumDiscount: o.maximumDiscount ?? null,
               expiryDate: o.expiryDate,
+              endTime: o.endTime || '',
               startDate: o.startDate || null,
               active: o.active !== false,
               allVehicles: o.allVehicles === true || o.applicableType === 'all',
@@ -1040,8 +1052,10 @@ export const API = {
               applicableVehicleIds: Array.isArray(o.applicableVehicleIds) ? o.applicableVehicleIds.map(String) : [],
               applicableCategories: Array.isArray(o.applicableCategories) ? o.applicableCategories : [],
               vehicleId: o.vehicleId ? String(o.vehicleId) : undefined,
-              pricingType: o.pricingType,
-              promotionalPrice: o.promotionalPrice,
+              pricingType: isStandardCoupon
+                ? (resolvedDiscountType === 'PERCENTAGE' ? 'percentage_discount' : 'fixed_discount')
+                : o.pricingType,
+              promotionalPrice: isStandardCoupon ? undefined : o.promotionalPrice,
               pricingUnit: o.pricingUnit,
               customerEligibility: o.customerEligibility || 'all',
               firstNCustomers: o.firstNCustomers ?? null,
@@ -1050,7 +1064,8 @@ export const API = {
               maxUsageLimit: o.maxUsageLimit ?? null,
               perCustomerLimit: o.perCustomerLimit ?? null,
               isPersonalForYou: Boolean(o.isPersonalForYou),
-            }));
+            };
+            });
           couponCache = { at: Date.now(), list };
           setCouponCatalog(list);
           return list;

@@ -1065,7 +1065,7 @@ export const API = {
               dealPrice: isStandardCoupon ? undefined : o.dealPrice,
               vehiclePrices: Array.isArray(o.vehiclePrices) ? o.vehiclePrices : undefined,
               pricingUnit: o.pricingUnit,
-              allowMembershipStacking: Boolean(o.allowMembershipStacking),
+              allowMembershipStacking: isStandardCoupon ? true : Boolean(o.allowMembershipStacking),
               customerEligibility: o.customerEligibility || 'all',
               firstNCustomers: o.firstNCustomers ?? null,
               remainingCustomerSlots: o.remainingCustomerSlots ?? null,
@@ -1114,10 +1114,12 @@ export const API = {
       const json = await res.json().catch(() => null);
       if (res.ok && json?.success && json?.data) {
         if (json.data.valid && json.data.coupon) {
+          const isStd = json.data.coupon.type !== 'special_deal' && !json.data.coupon.isExclusive;
           upsertCouponInCatalog({
             ...json.data.coupon,
-            allowMembershipStacking:
-              json.data.allowMembershipStacking ?? json.data.coupon.allowMembershipStacking ?? false,
+            allowMembershipStacking: isStd
+              ? true
+              : (json.data.allowMembershipStacking ?? json.data.coupon.allowMembershipStacking ?? false),
           });
         }
         return {

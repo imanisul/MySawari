@@ -949,7 +949,18 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Refresh cash (and the new membership) from the server
+        invalidateWalletCache();
+        API.clearCouponCache();
         API.getWallet(true).then(applyWallet).catch(() => {});
+        // Everything this booking changed is fetched fresh, so no screen keeps the data from before it: the trip in
+        // My Bookings, the car now booked for those dates, used / first-N coupons, claimed or sold-out deals, and
+        // the trip-milestone progress.
+        for (const key of ['bookings', 'vehicles', 'vehicle-availability', 'coupons', 'offers', 'exclusive-offers', 'exclusive-offers-next', 'ride-journey']) {
+          queryClient.invalidateQueries({ queryKey: [key] });
+        }
+        // The coupon and SawariCash were spent on this booking: the next checkout starts without them.
+        applyCoupon(null);
+        setSawariCashToApply(0);
         return confirmedBooking;
       },
       selectCar: setSelectedCar,

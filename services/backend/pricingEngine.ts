@@ -530,8 +530,9 @@ export function calculateCouponDiscount(
 /**
  * Mirrors server `CouponService.validateCoupon` stacking policy:
  * - No coupon / ₹0 coupon discount → membership applies normally.
- * - Top Deals (`TOPDEAL-<hours>`) → server sets `allowMembershipStacking: true`.
- * - Coupons & Flash Sales → server returns `Boolean(offer.allowMembershipStacking)` (defaults to false).
+ * - Top Deals (`TOPDEAL-<hours>`) → stacks with membership (`true`).
+ * - Standard Coupons (`!isExclusive && type !== 'special_deal'`) → ALWAYS stack with membership (`true`).
+ * - Exclusive / Flash Sale deals → stack only if `allowMembershipStacking === true`.
  */
 export function doesCouponAllowMembershipStacking(couponCode?: string): boolean {
   if (!couponCode || !couponCode.trim()) return true;
@@ -539,6 +540,8 @@ export function doesCouponAllowMembershipStacking(couponCode?: string): boolean 
   if (/^TOPDEAL-\d{1,2}$/i.test(upper)) return true;
   const coupon = couponCatalog.find((c) => String(c.code).trim().toUpperCase() === upper);
   if (!coupon) return true;
+  const isExclusiveDeal = Boolean(coupon.isExclusive || coupon.type === 'special_deal');
+  if (!isExclusiveDeal) return true;
   return coupon.allowMembershipStacking === true;
 }
 

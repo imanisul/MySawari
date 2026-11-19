@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Animated } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Modal, Animated, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
@@ -37,7 +37,7 @@ export function FilterSheet({
   const colors = useColors();
 
   // The scrim fades in behind the sheet; the sheet slides up from the bottom and slides back down on close.
-  const SHEET_OFFSET = 600;
+  const SHEET_OFFSET = Math.max(700, Dimensions.get('window').height);
   const slide = useRef(new Animated.Value(SHEET_OFFSET)).current;
   useEffect(() => {
     if (visible) {

@@ -238,14 +238,25 @@ export function TripTimeline({ booking }: { booking: BookingSnapshot }) {
     { title: pickedUp ? 'Pickup - Completed' : 'Pickup', date: shortDate(booking.pickupDate), time: booking.pickupTime || '10:00 AM', place: placeName(booking.pickupLocationName), color: pickedUp ? c.navy : IDLE },
     { title: dropped ? 'Drop-off - Completed' : 'Drop-off', date: shortDate(booking.returnDate), time: booking.dropTime || '10:00 AM', place: placeName(booking.dropLocationName || booking.dropoffLocationName), color: dropped ? c.navy : IDLE },
   ];
+  // Row centres, measured: a long address wraps to 2 lines, so rows are not a fixed height.
+  const [mids, setMids] = React.useState<number[]>([]);
+  const lineTop = mids[0] ?? 33.5;
+  const lineH = mids[1] != null ? mids[1] - lineTop : 0;
   return (
     <View style={[styles.stops, { backgroundColor: c.card, borderColor: c.border }]}>
-      {/* From the first dot's centre to the last one's (both rows are 51px tall). */}
-      <View style={styles.stopsLine} pointerEvents="none">
+      {/* From the first dot's centre to the last one's. */}
+      <View style={[styles.stopsLine, { top: lineTop, height: lineH }]} pointerEvents="none">
         {Array.from({ length: 40 }, (_, k) => <View key={k} style={styles.stopsBit} />)}
       </View>
-      {stops.map((st) => (
-        <View key={st.title} style={styles.stop}>
+      {stops.map((st, i) => (
+        <View
+          key={st.title}
+          style={styles.stop}
+          onLayout={(e) => {
+            const { y, height } = e.nativeEvent.layout;
+            setMids((m) => (m[i] === y + height / 2 ? m : Object.assign([...m], { [i]: y + height / 2 })));
+          }}
+        >
           <View style={[styles.stopDot, { backgroundColor: st.color }]} />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[styles.stopTitle, { color: c.foreground }]}>{st.title}</Text>
@@ -256,7 +267,7 @@ export function TripTimeline({ booking }: { booking: BookingSnapshot }) {
                 <Text style={[styles.stopLine, { color: c.mutedForeground }]}>{st.time}</Text>
               </View>
             )}
-            <Text style={[styles.stopLine, { color: c.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{st.place}</Text>
+            <Text style={[styles.stopLine, { color: c.mutedForeground }]} numberOfLines={2}>{st.place}</Text>
           </View>
         </View>
       ))}
@@ -469,7 +480,7 @@ const styles = StyleSheet.create({
   stepLine: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
 
   stops: { borderWidth: 1, borderRadius: 12, padding: 8, gap: 8 },
-  stopsLine: { position: 'absolute', left: 13, top: 33.5, bottom: 33.5, width: 1, overflow: 'hidden', gap: 3 },
+  stopsLine: { position: 'absolute', left: 13, width: 1, overflow: 'hidden', gap: 3 },
   stopsBit: { width: 1, height: 4, backgroundColor: '#9FA6C0' },
   stop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   refundRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },

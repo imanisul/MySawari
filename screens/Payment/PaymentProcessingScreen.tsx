@@ -253,7 +253,9 @@ export default function PaymentProcessingScreen() {
       import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_success', 'PaymentProcessingScreen', { paymentId: paymentDetails?.razorpayPaymentId }));
 
       setTimeout(() => {
-        router.replace('/confirmation');
+        // Paid: clear checkout screens from history so Back / iOS swipe can never reach the payment page again.
+        router.dismissAll();
+        router.push('/confirmation');
       }, 600);
     } catch (e: any) {
       const reason = e.message || 'Failed to confirm booking';
@@ -287,7 +289,7 @@ export default function PaymentProcessingScreen() {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (status === 'VERIFYING' || status === 'SUCCESS') return true;
-      if (status === 'ERROR' && paid.current) { router.replace('/bookings'); return true; }
+      if (status === 'ERROR' && paid.current) { router.dismissAll(); router.push('/bookings'); return true; }
       handleCancel();
       return true;
     });
@@ -388,7 +390,7 @@ export default function PaymentProcessingScreen() {
         title="Booking Not Confirmed"
         message={errorMsg || 'Your payment was received but the booking could not be confirmed.'}
         buttonLabel="View My Bookings"
-        onButton={() => router.replace('/bookings')}
+        onButton={() => { router.dismissAll(); router.push('/bookings'); }}
       />
     ) : (
       <PaymentFailed

@@ -193,14 +193,17 @@ export default function OffersScreen() {
                       <Feather name="copy" size={11} color={p.muted} />
                     </Pressable>
                     {c.isPersonalForYou && (
-                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE' }}>
-                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#4338CA' }}>✨ Exclusive For You</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#EEF2FF', borderWidth: 1, borderColor: '#C7D2FE' }}>
+                        {/* Icon, not emoji: the custom font has no emoji glyphs, so iPhone showed "?". */}
+                        <MaterialCommunityIcons name="star-four-points" size={10} color="#4338CA" />
+                        <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#4338CA' }}>Exclusive For You</Text>
                       </View>
                     )}
                     {typeof c.firstNCustomers === 'number' && c.firstNCustomers > 0 && (
-                      <View style={{ paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 2.5, borderRadius: 6, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A' }}>
+                        <MaterialCommunityIcons name="fire" size={11} color="#B45309" />
                         <Text style={{ fontFamily: PF.semibold || PF.medium, fontSize: 10, color: '#B45309' }}>
-                          🔥 {typeof c.remainingCustomerSlots === 'number' ? `${c.remainingCustomerSlots} of ${c.firstNCustomers} left` : `First ${c.firstNCustomers} users`}
+                          {typeof c.remainingCustomerSlots === 'number' ? `${c.remainingCustomerSlots} of ${c.firstNCustomers} left` : `First ${c.firstNCustomers} users`}
                         </Text>
                       </View>
                     )}

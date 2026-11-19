@@ -24,10 +24,6 @@
       "backgroundColor": "#FFFFFF",
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
-      "associatedDomains": [
-        "applinks:app.mysawari.in",
-        "applinks:mysawari.in"
-      ],
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"

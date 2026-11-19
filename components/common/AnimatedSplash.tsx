@@ -111,9 +111,24 @@ export function AnimatedSplash({
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
   const skipSplash = useRef(hasShownSplash).current;
-  const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash);
   const [config, setConfig] = useState<FlashScreenConfig>(getSynchronousFlashScreenConfig);
   const [customImageError, setCustomImageError] = useState(false);
+
+  // Only show secondary animated splash if a custom active promo image was uploaded or festive mode is on.
+  // The default duplicate splash (Mode 3: logo + "Your Ride, Your Way") is disabled so that the app only shows
+  // ONE single splash screen (the native splash).
+  const hasCustomActiveImage = Boolean(
+    !customImageError &&
+    config?.isActive &&
+    (config?.imageUrl || config?.bgImageUrl)
+  );
+  const isFestiveMode = Boolean(
+    config?.isOccasionActive &&
+    (config?.occasionTheme === 'diwali_animated' || config?.occasionTheme === 'diwali_gold')
+  );
+  const shouldShowSplash = !skipSplash && config?.isEnabled !== false && (hasCustomActiveImage || isFestiveMode);
+
+  const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash || !shouldShowSplash);
   const [brandDone, setBrandDone] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
   const entranceStartedRef = useRef(false);
@@ -175,17 +190,17 @@ export function AnimatedSplash({
     return !isNaN(sec) && sec >= 0.5 ? Math.min(sec, 1.5) * 1000 : 1200;
   }, [config?.durationSeconds]);
 
-  // If splash screen is explicitly disabled by admin, complete immediately
+  // If splash screen should not show, complete immediately
   useEffect(() => {
-    if (config?.isEnabled === false && !skipSplash) {
+    if (!shouldShowSplash && !skipSplash) {
       markSplashGone();
       setIsAnimationComplete(true);
     }
-  }, [config?.isEnabled, skipSplash]);
+  }, [shouldShowSplash, skipSplash]);
 
   // Entrance & Loop animations
   useEffect(() => {
-    if (skipSplash || config?.isEnabled === false || entranceStartedRef.current) return;
+    if (!shouldShowSplash || entranceStartedRef.current) return;
     entranceStartedRef.current = true;
 
     // Fade in brand container
@@ -273,17 +288,17 @@ export function AnimatedSplash({
       t3.stop();
       t4.stop();
     };
-  }, [skipSplash, config?.isEnabled]);
+  }, [shouldShowSplash]);
 
   // Duration timer
   useEffect(() => {
-    if (skipSplash || config?.isEnabled === false || brandDone) return;
+    if (!shouldShowSplash || brandDone) return;
     // Never before the entrance has finished, and the full line holds a moment so "Your Ride, Your Way" is read.
     const t = setTimeout(() => {
       setBrandDone(true);
     }, Math.max(durationMs, ENTER_MS + 450));
     return () => clearTimeout(t);
-  }, [durationMs, skipSplash, config?.isEnabled, brandDone]);
+  }, [durationMs, shouldShowSplash, brandDone]);
 
   // Handle slow loads
   useEffect(() => {
@@ -347,9 +362,6 @@ export function AnimatedSplash({
   // - OR no custom static image was uploaded
   // Always the classic MySawari splash (logo + "Your Ride, Your Way"): the Diwali splash and any admin-uploaded
   // splash image are switched off. Flip these back to re-enable them.
-  const isFestiveMode = false;
-  const hasCustomActiveImage = false;
-
   const activeBg = isFestiveMode ? FESTIVE_BG : (config?.backgroundColor || '#FFFFFF');
   const showProblem = !isDataReady && (loadFailed || isSlow);
 
@@ -358,7 +370,7 @@ export function AnimatedSplash({
       {/* App renders underneath directly to prevent blank flicker */}
       {children}
 
-      {!isAnimationComplete && config?.isEnabled !== false && (
+      {!isAnimationComplete && shouldShowSplash && (
         <Animated.View
           pointerEvents="auto"
           style={[

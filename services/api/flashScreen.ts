@@ -30,22 +30,22 @@ export interface FlashScreenConfig {
 
 export const DEFAULT_FLASH_SCREEN_CONFIG: FlashScreenConfig = {
   imageUrl: '',
-  isActive: true,
+  isActive: false,
   version: 1,
-  durationSeconds: 3.5,
-  isEnabled: true,
+  durationSeconds: 1.5,
+  isEnabled: false,
   bgImageUrl: '',
   brandTitle: 'MySawari',
   brandTagline: 'Your ride, your way.',
-  isOccasionActive: true, // Default to true so Diwali Flash Screen is active!
-  occasionName: 'Diwali Special',
-  occasionGreeting: 'Festival of Lights • Lighting Every Journey',
-  occasionSubtext: 'Wishing you safe, joyous and prosperous travels',
-  occasionBadge: '✦ HAPPY DIWALI ✦',
-  occasionTheme: 'diwali_animated',
-  animationStyle: 'diwali_animated',
-  backgroundColor: '#FCFBF7',
-  gradientColors: ['#FCFBF7', '#FAF7F0'],
+  isOccasionActive: false,
+  occasionName: '',
+  occasionGreeting: '',
+  occasionSubtext: '',
+  occasionBadge: '',
+  occasionTheme: '',
+  animationStyle: '',
+  backgroundColor: '#FFFFFF',
+  gradientColors: ['#FFFFFF', '#FFFFFF'],
 };
 
 const FLASH_STORAGE_KEY = '@mysawari_single_splash_config_v2';
@@ -89,14 +89,14 @@ function normalizeConfig(raw: any): FlashScreenConfig {
 
   const rawUrl = String(raw.imageUrl || raw.bgImageUrl || '').trim();
   const secureUrl = rawUrl ? rawUrl.replace(/^http:\/\//i, 'https://') : '';
-  const isActive = raw.isActive !== undefined ? Boolean(raw.isActive) : (raw.isEnabled !== false);
+  const isActive = raw.isActive !== undefined ? Boolean(raw.isActive) : (Boolean(secureUrl) && raw.isEnabled !== false);
   const version = Number(raw.version) || (raw.updatedAt ? new Date(raw.updatedAt).getTime() : 1);
   const duration = Number(raw.durationSeconds);
-  const durationSeconds = !isNaN(duration) && duration >= 1 && duration <= 10 ? duration : 3.5;
+  const durationSeconds = !isNaN(duration) && duration >= 1 && duration <= 10 ? duration : 1.5;
 
   const isOccasionActive = raw.isOccasionActive !== undefined
     ? Boolean(raw.isOccasionActive)
-    : (raw.occasionTheme === 'diwali_animated' || raw.occasionTheme === 'diwali_gold' || !secureUrl);
+    : false;
 
   return {
     ...DEFAULT_FLASH_SCREEN_CONFIG,

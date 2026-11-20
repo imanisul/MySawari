@@ -329,6 +329,7 @@ function AppGate({
     <View style={{ flex: 1, backgroundColor: colors.background }} onLayout={onLayout}>
       <AnimatedSplash
         isReady={status === 'ready' || status === 'error'}
+        isDataReady={homeDataReady}
       >
         {children}
       </AnimatedSplash>

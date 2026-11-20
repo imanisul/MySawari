@@ -14,6 +14,8 @@ import Svg, { Path, Circle, G } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import LottieView from 'lottie-react-native';
 import {
   FlashScreenConfig,
   getCachedFlashScreenConfig,
@@ -62,24 +64,18 @@ const FESTIVE_GOLD = '#D49A3D';
 const FESTIVE_GOLD_DARK = '#B45309';
 const FESTIVE_AMBER = '#E08714';
 const FESTIVE_HALO = 'rgba(212, 154, 61, 0.14)';
+const ENABLE_DIWALI_SPLASH = false;
+// Turn off to restore the remote/custom and legacy splash modes.
+const ENABLE_BRANDED_SPLASH = true;
+const BRAND_SPLASH_COLORS = ['#2F2767', '#6B5AED'] as const;
 
 /**
- * High-End Dynamic Splash Screen:
- *  - Mode 1: Senior Designer Diwali Special / Festive Animated Mode:
- *      * Top toran hanging garland arch with marigold bells and sparkling sacred lamps.
- *      * Twinkling 4-point auspicious gold stars.
- *      * Centerpiece concentric rotating gold mandala geometry (clockwise dashed orbit + counter-clockwise petals).
- *      * Authentic MySawari monogram emblem with soft breathing golden halo aura.
- *      * Handcrafted brass Diya with living flickering sinusoidal flame.
- *      * "✦ HAPPY DIWALI ✦" ribbon and "Festival of Lights • Lighting Every Journey".
- *      * Bottom grounding sacred lotus petal arc.
- *  - Mode 2: Custom Admin Uploaded Splash Screen (when uploaded and festive mode is off).
- *  - Mode 3: Signature Classic MySawari Branding.
+ * The local branded animation takes precedence; otherwise, remote festive and custom splash modes are available.
  */
 // The splash logo: the trimmed artwork (MySawari_logo_trim.png, 365 × 313), so its size is the logo's own size.
 const LOGO_W = 140;
 const LOGO_H = (140 * 313) / 365;
-const ENTER_MS = 1500;
+const ENTER_MS = 1000;
 // Slice [a, b] of the entrance clock (0–1500 ms) mapped to [from, to], eased with a small overshoot (springy settle).
 const BACK = Easing.out(Easing.back(1.6));
 // The native driver ignores `easing`, so the curve is sampled into 12 straight pieces instead.
@@ -114,24 +110,27 @@ export function AnimatedSplash({
   const [config, setConfig] = useState<FlashScreenConfig>(getSynchronousFlashScreenConfig);
   const [customImageError, setCustomImageError] = useState(false);
 
-  // Only show secondary animated splash if a custom active promo image was uploaded or festive mode is on.
-  // The default duplicate splash (Mode 3: logo + "Your Ride, Your Way") is disabled so that the app only shows
-  // ONE single splash screen (the native splash).
+  // Remote splash modes remain available when the bundled branded splash is disabled.
   const hasCustomActiveImage = Boolean(
     !customImageError &&
     config?.isActive &&
     (config?.imageUrl || config?.bgImageUrl)
   );
   const isFestiveMode = Boolean(
+    ENABLE_DIWALI_SPLASH &&
     config?.isOccasionActive &&
     (config?.occasionTheme === 'diwali_animated' || config?.occasionTheme === 'diwali_gold')
   );
-  const shouldShowSplash = !skipSplash && config?.isEnabled !== false && (hasCustomActiveImage || isFestiveMode);
+  const shouldShowSplash = !skipSplash && (
+    ENABLE_BRANDED_SPLASH ||
+    (config?.isEnabled !== false && (hasCustomActiveImage || isFestiveMode))
+  );
 
   const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash || !shouldShowSplash);
   const [brandDone, setBrandDone] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
   const entranceStartedRef = useRef(false);
+  const brandAnimationRef = useRef<LottieView>(null);
 
   // Common animated values
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -200,7 +199,7 @@ export function AnimatedSplash({
 
   // Entrance & Loop animations
   useEffect(() => {
-    if (!shouldShowSplash || entranceStartedRef.current) return;
+    if (!shouldShowSplash || ENABLE_BRANDED_SPLASH || entranceStartedRef.current) return;
     entranceStartedRef.current = true;
 
     // Fade in brand container
@@ -292,7 +291,7 @@ export function AnimatedSplash({
 
   // Duration timer
   useEffect(() => {
-    if (!shouldShowSplash || brandDone) return;
+    if (!shouldShowSplash || brandDone || ENABLE_BRANDED_SPLASH) return;
     // Never before the entrance has finished, and the full line holds a moment so "Your Ride, Your Way" is read.
     const t = setTimeout(() => {
       setBrandDone(true);
@@ -308,7 +307,9 @@ export function AnimatedSplash({
     return () => clearTimeout(t);
   }, [isDataReady, skipSplash, loadFailed]);
 
-  const canExit = (isReady && isDataReady) || brandDone;
+  const canExit = ENABLE_BRANDED_SPLASH
+    ? isReady && isDataReady && brandDone
+    : (isReady && isDataReady) || brandDone;
 
   // Smooth exit fade transition
   useEffect(() => {
@@ -354,15 +355,10 @@ export function AnimatedSplash({
     outputRange: [0, -1.8, 0.4],
   });
 
-  // Mode Selection:
-  // Festive mode is active if:
-  // - isOccasionActive is true (default during Diwali)
-  // - OR occasionTheme is diwali_animated / diwali_gold
-  // - OR animationStyle is diwali_animated
-  // - OR no custom static image was uploaded
-  // Always the classic MySawari splash (logo + "Your Ride, Your Way"): the Diwali splash and any admin-uploaded
-  // splash image are switched off. Flip these back to re-enable them.
-  const activeBg = isFestiveMode ? FESTIVE_BG : (config?.backgroundColor || '#FFFFFF');
+  // The local feature flag keeps remote occasion settings from enabling Diwali until it is turned back on.
+  const activeBg = ENABLE_BRANDED_SPLASH
+    ? BRAND_SPLASH_COLORS[0]
+    : isFestiveMode ? FESTIVE_BG : (config?.backgroundColor || '#FFFFFF');
   const showProblem = !isDataReady && (loadFailed || isSlow);
 
   return (
@@ -381,12 +377,44 @@ export function AnimatedSplash({
             },
           ]}
         >
-          <StatusBar barStyle="dark-content" backgroundColor={activeBg} />
+          <StatusBar barStyle={ENABLE_BRANDED_SPLASH ? 'light-content' : 'dark-content'} backgroundColor={activeBg} />
+
+          {ENABLE_BRANDED_SPLASH && (
+            <LinearGradient
+              colors={[...BRAND_SPLASH_COLORS]}
+              start={{ x: 0.15, y: 0 }}
+              end={{ x: 0.85, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+          )}
 
           {/* ======================================================== */}
           {/* MODE 1: SENIOR DESIGNER DIWALI SPECIAL / FESTIVE MODE     */}
           {/* ======================================================== */}
-          {isFestiveMode ? (
+          {ENABLE_BRANDED_SPLASH ? (
+            <View style={styles.brandSplashContent}>
+              <LottieView
+                ref={brandAnimationRef}
+                source={require('@/assets/animations/Opening Animation.json')}
+                style={styles.brandSplashAnimation}
+                resizeMode="contain"
+                autoPlay={false}
+                loop={false}
+                onAnimationLoaded={() => {
+                  setBrandDone(false);
+                  brandAnimationRef.current?.reset();
+                  brandAnimationRef.current?.play();
+                }}
+                onAnimationFinish={(isCancelled) => {
+                  if (!isCancelled) setBrandDone(true);
+                }}
+                onAnimationFailure={(error) => {
+                  if (__DEV__) console.warn('Branded splash animation failed:', error);
+                  setBrandDone(true);
+                }}
+              />
+            </View>
+          ) : isFestiveMode ? (
             <Animated.View
               style={[
                 styles.diwaliContainer,
@@ -745,6 +773,16 @@ const styles = StyleSheet.create({
     color: '#5A6689',
     letterSpacing: 0.3,
     textAlign: 'center',
+  },
+  brandSplashContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ translateY: 24 }],
+  },
+  brandSplashAnimation: {
+    width: 300,
+    height: 300,
   },
   // Diwali Layout Styles
   diwaliContainer: {

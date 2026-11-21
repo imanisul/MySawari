@@ -9,6 +9,8 @@ import {
   useWindowDimensions,
   StatusBar,
   Pressable,
+  Platform,
+  UIManager,
 } from 'react-native';
 import Svg, { Path, Circle, G } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
@@ -69,6 +71,13 @@ const ENABLE_DIWALI_SPLASH = false;
 const ENABLE_BRANDED_SPLASH = true;
 const BRAND_SPLASH_COLORS = ['#2F2767', '#6B5AED'] as const;
 
+const isLottieSupported =
+  Platform.OS !== 'web' &&
+  Boolean(
+    UIManager?.getViewManagerConfig?.('LottieAnimationView') ||
+      (UIManager as any)?.hasViewManagerConfig?.('LottieAnimationView')
+  );
+
 /**
  * The local branded animation takes precedence; otherwise, remote festive and custom splash modes are available.
  */
@@ -127,10 +136,16 @@ export function AnimatedSplash({
   );
 
   const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash || !shouldShowSplash);
-  const [brandDone, setBrandDone] = useState(false);
+  const [brandDone, setBrandDone] = useState(!isLottieSupported);
   const [isSlow, setIsSlow] = useState(false);
   const entranceStartedRef = useRef(false);
   const brandAnimationRef = useRef<LottieView>(null);
+
+  useEffect(() => {
+    if (!isLottieSupported && ENABLE_BRANDED_SPLASH) {
+      setBrandDone(true);
+    }
+  }, []);
 
   // Common animated values
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -393,26 +408,34 @@ export function AnimatedSplash({
           {/* ======================================================== */}
           {ENABLE_BRANDED_SPLASH ? (
             <View style={styles.brandSplashContent}>
-              <LottieView
-                ref={brandAnimationRef}
-                source={require('@/assets/animations/Opening Animation.json')}
-                style={styles.brandSplashAnimation}
-                resizeMode="contain"
-                autoPlay={false}
-                loop={false}
-                onAnimationLoaded={() => {
-                  setBrandDone(false);
-                  brandAnimationRef.current?.reset();
-                  brandAnimationRef.current?.play();
-                }}
-                onAnimationFinish={(isCancelled) => {
-                  if (!isCancelled) setBrandDone(true);
-                }}
-                onAnimationFailure={(error) => {
-                  if (__DEV__) console.warn('Branded splash animation failed:', error);
-                  setBrandDone(true);
-                }}
-              />
+              {isLottieSupported ? (
+                <LottieView
+                  ref={brandAnimationRef}
+                  source={require('@/assets/animations/Opening Animation.json')}
+                  style={styles.brandSplashAnimation}
+                  resizeMode="contain"
+                  autoPlay={false}
+                  loop={false}
+                  onAnimationLoaded={() => {
+                    setBrandDone(false);
+                    brandAnimationRef.current?.reset();
+                    brandAnimationRef.current?.play();
+                  }}
+                  onAnimationFinish={(isCancelled) => {
+                    if (!isCancelled) setBrandDone(true);
+                  }}
+                  onAnimationFailure={(error) => {
+                    if (__DEV__) console.warn('Branded splash animation failed:', error);
+                    setBrandDone(true);
+                  }}
+                />
+              ) : (
+                <ExpoImage
+                  source={require('@/assets/images/MySawari_nobg.png')}
+                  style={{ width: 140, height: 140 }}
+                  contentFit="contain"
+                />
+              )}
             </View>
           ) : isFestiveMode ? (
             <Animated.View

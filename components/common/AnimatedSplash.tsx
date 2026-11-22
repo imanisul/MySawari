@@ -136,16 +136,10 @@ export function AnimatedSplash({
   );
 
   const [isAnimationComplete, setIsAnimationComplete] = useState(skipSplash || !shouldShowSplash);
-  const [brandDone, setBrandDone] = useState(!isLottieSupported);
+  const [brandDone, setBrandDone] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
   const entranceStartedRef = useRef(false);
   const brandAnimationRef = useRef<LottieView>(null);
-
-  useEffect(() => {
-    if (!isLottieSupported && ENABLE_BRANDED_SPLASH) {
-      setBrandDone(true);
-    }
-  }, []);
 
   // Common animated values
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -156,6 +150,14 @@ export function AnimatedSplash({
   const titleOpacity = useRef(new Animated.Value(0)).current;
   const taglineY = useRef(new Animated.Value(12)).current;
   const taglineOpacity = useRef(new Animated.Value(0)).current;
+
+  // Branded splash dedicated animated values
+  const brandTaglineOpacity = useRef(new Animated.Value(0)).current;
+  const brandTaglineY = useRef(new Animated.Value(14)).current;
+  const fallbackLogoOpacity = useRef(new Animated.Value(0)).current;
+  const fallbackLogoScale = useRef(new Animated.Value(0.85)).current;
+  const fallbackTitleOpacity = useRef(new Animated.Value(0)).current;
+  const fallbackTitleY = useRef(new Animated.Value(16)).current;
   // Classic splash entrance: ONE native-driven 0 → 1 clock; every piece is a slice of it. A chain of separate steps
   // (delay, then the next) is handed over by JS, which is busy booting the app, so the tagline used to start too late
   // and the splash was gone before it showed.
@@ -304,7 +306,101 @@ export function AnimatedSplash({
     };
   }, [shouldShowSplash]);
 
-  // Duration timer
+  // Branded splash entrance sequence (Lottie + Fallback)
+  useEffect(() => {
+    if (!shouldShowSplash || !ENABLE_BRANDED_SPLASH || skipSplash) return;
+
+    if (isLottieSupported) {
+      // With Lottie: The emblem & MySawari assemble in the first 500ms.
+      // At 500ms, the tagline "Your Ride, Your Way" smoothly fades and slides up right under the logo.
+      Animated.sequence([
+        Animated.delay(500),
+        Animated.parallel([
+          Animated.timing(brandTaglineOpacity, {
+            toValue: 1,
+            duration: 450,
+            easing: Easing.out(Easing.cubic),
+            useNativeDriver: true,
+          }),
+          Animated.timing(brandTaglineY, {
+            toValue: 0,
+            duration: 450,
+            easing: Easing.out(Easing.back(1.4)),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    } else {
+      // Fallback (when Lottie is not available on native binary / web):
+      // 1. Logo icon fades and scales in (0-450ms)
+      // 2. Title "MySawari" springs up (350-750ms)
+      // 3. Tagline "Your Ride, Your Way" slides up (650-1100ms)
+      Animated.parallel([
+        Animated.timing(fallbackLogoOpacity, {
+          toValue: 1,
+          duration: 450,
+          useNativeDriver: true,
+        }),
+        Animated.spring(fallbackLogoScale, {
+          toValue: 1,
+          tension: 35,
+          friction: 6,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(350),
+          Animated.parallel([
+            Animated.timing(fallbackTitleOpacity, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.spring(fallbackTitleY, {
+              toValue: 0,
+              tension: 40,
+              friction: 6,
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
+        Animated.sequence([
+          Animated.delay(650),
+          Animated.parallel([
+            Animated.timing(brandTaglineOpacity, {
+              toValue: 1,
+              duration: 450,
+              easing: Easing.out(Easing.cubic),
+              useNativeDriver: true,
+            }),
+            Animated.timing(brandTaglineY, {
+              toValue: 0,
+              duration: 450,
+              easing: Easing.out(Easing.back(1.4)),
+              useNativeDriver: true,
+            }),
+          ]),
+        ]),
+      ]).start();
+
+      // Duration timer for fallback mode (holds ~600ms after tagline finishes)
+      const fallbackTimer = setTimeout(() => {
+        setBrandDone(true);
+      }, 1700);
+
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [shouldShowSplash, skipSplash, isLottieSupported]);
+
+  // Master safety timeout: ensure splash never stays stuck longer than 3.5s
+  useEffect(() => {
+    if (!shouldShowSplash || brandDone || skipSplash) return;
+    const safetyTimer = setTimeout(() => {
+      setBrandDone(true);
+    }, 3500);
+    return () => clearTimeout(safetyTimer);
+  }, [shouldShowSplash, brandDone, skipSplash]);
+
+  // Duration timer for remote/classic modes
   useEffect(() => {
     if (!shouldShowSplash || brandDone || ENABLE_BRANDED_SPLASH) return;
     // Never before the entrance has finished, and the full line holds a moment so "Your Ride, Your Way" is read.
@@ -409,32 +505,88 @@ export function AnimatedSplash({
           {ENABLE_BRANDED_SPLASH ? (
             <View style={styles.brandSplashContent}>
               {isLottieSupported ? (
-                <LottieView
-                  ref={brandAnimationRef}
-                  source={require('@/assets/animations/Opening Animation.json')}
-                  style={styles.brandSplashAnimation}
-                  resizeMode="contain"
-                  autoPlay={false}
-                  loop={false}
-                  onAnimationLoaded={() => {
-                    setBrandDone(false);
-                    brandAnimationRef.current?.reset();
-                    brandAnimationRef.current?.play();
-                  }}
-                  onAnimationFinish={(isCancelled) => {
-                    if (!isCancelled) setBrandDone(true);
-                  }}
-                  onAnimationFailure={(error) => {
-                    if (__DEV__) console.warn('Branded splash animation failed:', error);
-                    setBrandDone(true);
-                  }}
-                />
+                <View style={styles.lottieWrap}>
+                  <LottieView
+                    ref={brandAnimationRef}
+                    source={require('@/assets/animations/Opening Animation.json')}
+                    style={styles.brandSplashAnimation}
+                    resizeMode="contain"
+                    autoPlay={true}
+                    loop={false}
+                    onAnimationLoaded={() => {
+                      brandAnimationRef.current?.play();
+                    }}
+                    onAnimationFinish={(isCancelled) => {
+                      if (!isCancelled) {
+                        // Hold for 600ms so "Your Ride, Your Way" is read comfortably
+                        setTimeout(() => {
+                          setBrandDone(true);
+                        }, 600);
+                      }
+                    }}
+                    onAnimationFailure={(error) => {
+                      if (__DEV__) console.warn('Branded splash animation failed:', error);
+                      setBrandDone(true);
+                    }}
+                  />
+                  <Animated.View
+                    style={[
+                      styles.lottieTaglineWrap,
+                      {
+                        opacity: brandTaglineOpacity,
+                        transform: [{ translateY: brandTaglineY }],
+                      },
+                    ]}
+                    accessible
+                    accessibilityRole="text"
+                    accessibilityLabel="Your Ride, Your Way"
+                  >
+                    <Text allowFontScaling={false} style={styles.brandTaglineText}>
+                      Your Ride, Your Way
+                    </Text>
+                  </Animated.View>
+                </View>
               ) : (
-                <ExpoImage
-                  source={require('@/assets/images/MySawari_nobg.png')}
-                  style={{ width: 140, height: 140 }}
-                  contentFit="contain"
-                />
+                <View style={styles.fallbackWrap}>
+                  <Animated.Image
+                    source={require('@/assets/images/splash_white_icon.png')}
+                    style={[
+                      styles.fallbackLogoImage,
+                      {
+                        opacity: fallbackLogoOpacity,
+                        transform: [{ scale: fallbackLogoScale }],
+                      },
+                    ]}
+                    resizeMode="contain"
+                  />
+                  <Animated.View
+                    style={{
+                      opacity: fallbackTitleOpacity,
+                      transform: [{ translateY: fallbackTitleY }],
+                      marginTop: 18,
+                    }}
+                  >
+                    <Text allowFontScaling={false} style={styles.brandWhiteTitle}>
+                      {displayTitle}
+                    </Text>
+                  </Animated.View>
+                  <Animated.View
+                    style={[
+                      styles.fallbackTaglineWrap,
+                      {
+                        opacity: brandTaglineOpacity,
+                        transform: [{ translateY: brandTaglineY }],
+                      },
+                    ]}
+                    accessible
+                    accessibilityRole="text"
+                    accessibilityLabel="Your Ride, Your Way"
+                  >
+                    <Text allowFontScaling={false} style={styles.brandTaglineText}>
+                      Your Ride, Your Way
+                    </Text>
+                  </Animated.View>
+                </View>
               )}
             </View>
           ) : isFestiveMode ? (
@@ -801,11 +953,49 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    transform: [{ translateY: 24 }],
+  },
+  lottieWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   brandSplashAnimation: {
-    width: 300,
-    height: 300,
+    width: 280,
+    height: 280,
+  },
+  lottieTaglineWrap: {
+    marginTop: -58,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  fallbackWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  fallbackLogoImage: {
+    width: 124,
+    height: 124,
+  },
+  brandWhiteTitle: {
+    fontFamily: 'PlusJakartaSans_700Bold',
+    fontSize: 34,
+    color: '#FFFFFF',
+    letterSpacing: -0.6,
+    textAlign: 'center',
+  },
+  fallbackTaglineWrap: {
+    marginTop: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  brandTaglineText: {
+    fontFamily: 'PlusJakartaSans_500Medium',
+    fontSize: 16.5,
+    color: 'rgba(255, 255, 255, 0.94)',
+    letterSpacing: 0.8,
+    textAlign: 'center',
   },
   // Diwali Layout Styles
   diwaliContainer: {

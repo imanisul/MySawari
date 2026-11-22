@@ -10,6 +10,11 @@
       "mysawari"
     ],
     "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/images/splash_blank.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2F2767"
+    },
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -20,8 +25,8 @@
     },
     "ios": {
       "bundleIdentifier": "com.mysawari.customer",
-      "buildNumber": "10",
-      "backgroundColor": "#FFFFFF",
+      "buildNumber": "11",
+      "backgroundColor": "#2F2767",
       "supportsTablet": false,
       "icon": "./assets/images/MySawari.png",
       "infoPlist": {
@@ -44,8 +49,13 @@
       }
     },
     "android": {
-      "backgroundColor": "#FFFFFF",
+      "backgroundColor": "#2F2767",
       "package": "com.mysawari.customer",
+      "splash": {
+        "image": "./assets/images/splash_blank.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#2F2767"
+      },
       "allowBackup": false,
       "blockedPermissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -53,7 +63,7 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.SYSTEM_ALERT_WINDOW"
       ],
-      "versionCode": 11,
+      "versionCode": 12,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_COARSE_LOCATION",
@@ -153,10 +163,14 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/MySawari_nobg.png",
-          "imageWidth": 160,
+          "image": "./assets/images/splash_blank.png",
+          "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#FFFFFF"
+          "backgroundColor": "#2F2767",
+          "dark": {
+            "image": "./assets/images/splash_blank.png",
+            "backgroundColor": "#2F2767"
+          }
         }
       ],
       "expo-font",

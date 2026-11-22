@@ -56,10 +56,18 @@ export default function PaymentProcessingScreen() {
 
   // Leaving checkout without paying frees the car for other customers straight away.
   const releaseHold = () => {
-    if (holdId.current && !paid.current) {
+    if (paid.current) return;
+    if (holdId.current) {
       const id = holdId.current;
       holdId.current = null; // release once only
       API.releaseHold(id);
+    } else if (holdPromiseRef.current) {
+      // If snapshot is still in-flight when customer leaves/cancels, release immediately when it resolves
+      holdPromiseRef.current.then((snapshot) => {
+        if (snapshot?.id && !paid.current) {
+          API.releaseHold(snapshot.id);
+        }
+      }).catch(() => {});
     }
   };
 
@@ -147,14 +155,14 @@ export default function PaymentProcessingScreen() {
 
         const orderPromise = needsRazorpay
           ? API.createRazorpayOrder(
-              { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current, consume: true },
-              idempotencyKey.current
-            ).catch((err: any) => {
-              if (String(err?.message || '').includes('No Razorpay order required')) {
-                return null;
-              }
-              throw err;
-            })
+            { onlinePayableNow: pricingQuote.onlinePayableNow, idempotencyKey: idempotencyKey.current, consume: true },
+            idempotencyKey.current
+          ).catch((err: any) => {
+            if (String(err?.message || '').includes('No Razorpay order required')) {
+              return null;
+            }
+            throw err;
+          })
           : Promise.resolve(null);
 
         const [snapshot, initialOrder] = await Promise.all([holdPromise, orderPromise]);
@@ -253,9 +261,7 @@ export default function PaymentProcessingScreen() {
       import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_success', 'PaymentProcessingScreen', { paymentId: paymentDetails?.razorpayPaymentId }));
 
       setTimeout(() => {
-        // Paid: clear checkout screens from history so Back / iOS swipe can never reach the payment page again.
-        router.dismissAll();
-        router.push('/confirmation');
+        router.replace('/confirmation');
       }, 600);
     } catch (e: any) {
       const reason = e.message || 'Failed to confirm booking';
@@ -289,7 +295,7 @@ export default function PaymentProcessingScreen() {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (status === 'VERIFYING' || status === 'SUCCESS') return true;
-      if (status === 'ERROR' && paid.current) { router.dismissAll(); router.push('/bookings'); return true; }
+      if (status === 'ERROR' && paid.current) { router.replace('/bookings'); return true; }
       handleCancel();
       return true;
     });
@@ -367,6 +373,13 @@ export default function PaymentProcessingScreen() {
             onSuccess={handleRazorpaySuccess}
             onFailure={(err) => {
               releaseHold();
+              const isCancel =
+                err?.reason === 'payment_cancelled' ||
+                /cancelled|canceled|closed/i.test(String(err?.description || err?.message || err?.reason || ''));
+              if (isCancel) {
+                handleCancel();
+                return;
+              }
               const message = typeof err === 'string'
                 ? err
                 : (err?.description || err?.message || err?.reason || 'Payment failed or cancelled.');
@@ -390,7 +403,7 @@ export default function PaymentProcessingScreen() {
         title="Booking Not Confirmed"
         message={errorMsg || 'Your payment was received but the booking could not be confirmed.'}
         buttonLabel="View My Bookings"
-        onButton={() => { router.dismissAll(); router.push('/bookings'); }}
+        onButton={() => router.replace('/bookings')}
       />
     ) : (
       <PaymentFailed

@@ -122,9 +122,18 @@ export function RazorpayCheckoutWebView({
             function launch(options) {
                 try {
                     options.handler = function (response) { post({ event: 'success', data: response }); };
-                    options.modal = { ondismiss: function () { post({ event: 'dismiss' }); } };
+                    options.modal = {
+                        ondismiss: function () { post({ event: 'dismiss' }); },
+                        escape: true,
+                        backdropclose: false,
+                        handleback: true,
+                        confirm_close: false
+                    };
                     var rzp1 = new Razorpay(options);
-                    rzp1.on('payment.failed', function (response) { post({ event: 'failure', data: response.error }); });
+                    rzp1.on('payment.failed', function (response) {
+                        var err = response && response.error ? response.error : {};
+                        post({ event: 'failure', data: err });
+                    });
                     try { rzp1.open(); } catch (e) { setTimeout(function () { rzp1.open(); }, 50); }
                     post({ event: 'opened' });
                 } catch (e) {

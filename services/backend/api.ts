@@ -1609,7 +1609,10 @@ export const API = {
   /** Frees the car for other customers as soon as this checkout is abandoned (best effort). */
   async releaseHold(bookingId: string): Promise<void> {
     try {
-      await fetchWithAuth(`${BACKEND_URL}/bookings/${encodeURIComponent(bookingId)}/hold/release`, { method: 'POST' });
+      if (!bookingId) return;
+      await fetchWithAuth(`${BACKEND_URL}/bookings/${encodeURIComponent(bookingId)}/hold/release`, {
+        method: 'POST',
+      });
     } catch {
       // The lock also frees itself after 2 minutes.
     }

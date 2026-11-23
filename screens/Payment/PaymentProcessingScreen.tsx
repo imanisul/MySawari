@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AppState, View, Text, Pressable, BackHandler, StyleSheet } from 'react-native';
+import { AppState, View, Text, Pressable, BackHandler, StyleSheet, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -53,6 +53,12 @@ export default function PaymentProcessingScreen() {
   const idempotencyKey = useRef<string>('pay_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 9));
   // Set once the customer leaves this screen (back button, swipe, app navigation) before paying.
   const left = useRef(false);
+  // Back pressed (or the lock ran out) on the payment sheet: the server asks Razorpay whether this order was
+  // paid before the car is released, so a paid booking is never cancelled by leaving checkout.
+  const [checking, setChecking] = useState(false);
+  const checkingRef = useRef(false);
+  // A success Razorpay reports while that check runs is kept and used if the check finds nothing.
+  const lateSuccess = useRef<{ razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string } | null>(null);
 
   // Leaving checkout without paying frees the car for other customers straight away.
   const releaseHold = () => {
@@ -99,9 +105,7 @@ export default function PaymentProcessingScreen() {
       const remaining = Math.max(0, Math.ceil((lockExpiresAtMs - Date.now()) / 1000));
       setSecondsLeft(remaining);
       if (remaining <= 0 && !paid.current && !left.current && appStateRef.current === 'active') {
-        releaseHold();
-        setErrorMsg('Your 2-minute car reservation expired. Tap Try Again to check availability and lock the car again.');
-        setStatus('ERROR');
+        verifyBeforeLeaving('expired');
       }
     };
 
@@ -221,6 +225,7 @@ export default function PaymentProcessingScreen() {
   }, [quoteParams, pricingQuote]);
 
   const handleRazorpaySuccess = async (data: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
+    if (checkingRef.current) { lateSuccess.current = data; return; } // the running check confirms it
     paid.current = true; // money has moved: never release this hold from the app
     setStatus('VERIFYING');
     if (holdPromiseRef.current) {
@@ -290,24 +295,95 @@ export default function PaymentProcessingScreen() {
     router.back(); // Go back to payment page to retry
   };
 
+  const wait = (ms: number) => new Promise((r) => { timersRef.current.push(setTimeout(r, ms)); });
+
+  // Asks the server (which asks Razorpay) whether this order was paid. Paid: the booking is confirmed as usual.
+  // Not paid: the car is released and "Payment unsuccessful" is shown. Runs once, whatever triggered it.
+  const verifyBeforeLeaving = async (reason: 'back' | 'expired') => {
+    if (checkingRef.current || paid.current || left.current) return;
+    const orderId = razorpayOrder?.orderId;
+    checkingRef.current = true;
+    setChecking(true);
+    let outcome: 'paid' | 'unpaid' | 'processing' | 'error' = 'error';
+    let message = '';
+    if (orderId) {
+      // A UPI payment can still be completing: ask again a few times before calling it unpaid.
+      for (let attempt = 0; attempt < 5 && !left.current; attempt++) {
+        try {
+          await confirmBookingPayment({ razorpayOrderId: orderId }, holdId.current || undefined, idempotencyKey.current);
+          outcome = 'paid';
+          break;
+        } catch (e: any) {
+          if (e?.code === 'PAYMENT_NOT_FOUND') { outcome = 'unpaid'; break; }
+          if (e?.code === 'PAYMENT_IN_PROGRESS') { outcome = 'processing'; await wait(3000); continue; }
+          if (/connect|taking too long|network/i.test(String(e?.message || '')) && attempt < 4) { await wait(2000); continue; }
+          outcome = 'error';
+          message = e?.message || '';
+          break;
+        }
+      }
+    } else {
+      outcome = 'unpaid'; // no order yet: nothing could have been paid
+    }
+    checkingRef.current = false;
+    if (left.current) return;
+
+    // Razorpay reported a payment while the check ran: finish that one.
+    if (outcome !== 'paid' && lateSuccess.current) {
+      const data = lateSuccess.current;
+      lateSuccess.current = null;
+      handleRazorpaySuccess(data);
+      return;
+    }
+    if (outcome === 'paid') {
+      paid.current = true;
+      confirmBooking();
+      setStatus('SUCCESS');
+      import('@/services/api/activity').then(({ ActivityAPI }) => ActivityAPI.logActivity('payment_success', 'PaymentProcessingScreen', { orderId, via: 'back_check' }));
+      timersRef.current.push(setTimeout(() => router.replace('/confirmation'), 600));
+      return;
+    }
+    if (outcome === 'unpaid') {
+      releaseHold();
+      setErrorMsg(reason === 'expired'
+        ? 'Your 2-minute car reservation expired. Tap Try Again to check availability and lock the car again.'
+        : 'Payment unsuccessful. You left the payment page before paying.');
+    } else if (outcome === 'processing') {
+      // Not released: the payment may still complete; the lock frees itself if it doesn't.
+      paid.current = true; // never offer to pay again for this order
+      setErrorMsg(`Your payment for order ${orderId} is still being processed by your bank. Please check My Bookings in a few minutes — if money was deducted and no booking appears, contact support with this order ID.`);
+    } else {
+      // Payment state unknown: keep the hold (it frees itself) and never offer to pay this order again.
+      paid.current = true;
+      setErrorMsg(message || `We couldn’t check your payment for order ${orderId}. If money was deducted, please check My Bookings in a few minutes or contact support with this order ID.`);
+    }
+    setStatus('ERROR');
+  };
+
+  const handleBack = () => {
+    if (status !== 'PAYMENT_PENDING') { handleCancel(); return; }
+    verifyBeforeLeaving('back');
+  };
+
   // Android back button: before payment it cancels the checkout (and frees the hold); while the payment is
   // being verified it is ignored, so a paid booking is never abandoned half-way.
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (status === 'VERIFYING' || status === 'SUCCESS') return true;
       if (status === 'ERROR' && paid.current) { router.replace('/bookings'); return true; }
-      handleCancel();
+      if (checkingRef.current) return true;
+      handleBack();
       return true;
     });
     return () => sub.remove();
-  }, [status]);
+  }, [status, razorpayOrder]);
 
   const payNow = pricingQuote?.onlinePayableNow;
 
   // The payment page is mounted (hidden) while the car is held and the order created, so checkout.js is already
   // loaded when the order arrives and the sheet opens straight away.
   if (status === 'INITIATING' || (status === 'PAYMENT_PENDING' && razorpayOrder)) {
-    const pending = status === 'PAYMENT_PENDING';
+    const pending = status === 'PAYMENT_PENDING' && !checking;
     const isCritical = secondsLeft <= 20;
     const isWarning = secondsLeft > 20 && secondsLeft <= 45;
     const bannerBg = isCritical ? '#991B1B' : isWarning ? '#92400E' : '#111A2B';
@@ -317,6 +393,17 @@ export default function PaymentProcessingScreen() {
     const lockTimerBanner = (
       <View style={[styles.lockBanner, { backgroundColor: bannerBg }]}>
         <View style={styles.lockBannerLeft}>
+          {Platform.OS === 'ios' && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              onPress={handleBack}
+              hitSlop={8}
+              style={styles.cancelLockBtn}
+            >
+              <Feather name="chevron-left" size={18} color="#FFFFFF" />
+            </Pressable>
+          )}
           <View style={[styles.lockIconCircle, { backgroundColor: pillBg + '33' }]}>
             <Feather name="lock" size={14} color="#FFFFFF" />
           </View>
@@ -335,7 +422,7 @@ export default function PaymentProcessingScreen() {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Cancel payment and release lock"
-            onPress={handleCancel}
+            onPress={handleBack}
             hitSlop={8}
             style={styles.cancelLockBtn}
           >
@@ -348,8 +435,8 @@ export default function PaymentProcessingScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <PaymentProgress
-          title={pending ? 'Opening secure payment' : setupStep === 0 ? 'Reserving your car' : 'Initiating payment'}
-          subtitle={pending ? 'Connecting to Razorpay. Please don’t close the app or press back.' : 'Securing your exclusive 2-minute car lock. Please don’t press back.'}
+          title={checking ? 'Checking payment status' : pending ? 'Opening secure payment' : setupStep === 0 ? 'Reserving your car' : 'Initiating payment'}
+          subtitle={checking ? 'Checking with Razorpay whether your payment went through. Please don’t close the app.' : pending ? 'Connecting to Razorpay. Please don’t close the app or press back.' : 'Securing your exclusive 2-minute car lock. Please don’t press back.'}
           steps={STEPS}
           current={pending ? 1 : setupStep}
           amount={payNow}
@@ -372,6 +459,7 @@ export default function PaymentProcessingScreen() {
             }}
             onSuccess={handleRazorpaySuccess}
             onFailure={(err) => {
+              if (checkingRef.current) return; // the running payment check decides what happens
               releaseHold();
               const isCancel =
                 err?.reason === 'payment_cancelled' ||
@@ -386,7 +474,7 @@ export default function PaymentProcessingScreen() {
               setErrorMsg(message);
               setStatus('ERROR');
             }}
-            onClose={handleCancel}
+            onClose={handleBack}
           />
         </View>
       </View>
@@ -407,7 +495,7 @@ export default function PaymentProcessingScreen() {
       />
     ) : (
       <PaymentFailed
-        title={isReservationExpired ? 'Reservation Expired' : isTemporarilyHeld ? 'Vehicle Currently Locked' : undefined}
+        title={isReservationExpired ? 'Reservation Expired' : isTemporarilyHeld ? 'Vehicle Currently Locked' : /^Payment unsuccessful/.test(String(errorMsg || '')) ? 'Payment Unsuccessful' : undefined}
         message={errorMsg && !/cancel/i.test(errorMsg) ? `${errorMsg} No money was taken.` : 'Your booking is Failed. Try again'}
         buttonLabel={isReservationExpired || isTemporarilyHeld ? 'Back to Checkout' : undefined}
         onButton={handleCancel}

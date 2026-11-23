@@ -139,7 +139,6 @@ export function AnimatedSplash({
   const [brandDone, setBrandDone] = useState(false);
   const [isSlow, setIsSlow] = useState(false);
   const entranceStartedRef = useRef(false);
-  const brandAnimationRef = useRef<LottieView>(null);
 
   // Common animated values
   const overlayOpacity = useRef(new Animated.Value(1)).current;
@@ -311,10 +310,14 @@ export function AnimatedSplash({
     if (!shouldShowSplash || !ENABLE_BRANDED_SPLASH || skipSplash) return;
 
     if (isLottieSupported) {
-      // With Lottie: The emblem & MySawari assemble in the first 500ms.
-      // At 500ms, the tagline "Your Ride, Your Way" smoothly fades and slides up right under the logo.
+      // Blank purple first, then the whole logo (emblem + MySawari) fades in at once, then the tagline.
+      // The animation file shows the emblem alone from its first frame, so it is shown on its last frame instead.
       Animated.sequence([
-        Animated.delay(500),
+        Animated.delay(300),
+        Animated.parallel([
+          Animated.timing(fallbackLogoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
+          Animated.spring(fallbackLogoScale, { toValue: 1, tension: 35, friction: 6, useNativeDriver: true }),
+        ]),
         Animated.parallel([
           Animated.timing(brandTaglineOpacity, {
             toValue: 1,
@@ -330,6 +333,8 @@ export function AnimatedSplash({
           }),
         ]),
       ]).start();
+      const lottieTimer = setTimeout(() => setBrandDone(true), 1800);
+      return () => clearTimeout(lottieTimer);
     } else {
       // Fallback (when Lottie is not available on native binary / web):
       // 1. Logo icon fades and scales in (0-450ms)
@@ -506,29 +511,20 @@ export function AnimatedSplash({
             <View style={styles.brandSplashContent}>
               {isLottieSupported ? (
                 <View style={styles.lottieWrap}>
-                  <LottieView
-                    ref={brandAnimationRef}
-                    source={require('@/assets/animations/Opening Animation.json')}
-                    style={styles.brandSplashAnimation}
-                    resizeMode="contain"
-                    autoPlay={true}
-                    loop={false}
-                    onAnimationLoaded={() => {
-                      brandAnimationRef.current?.play();
-                    }}
-                    onAnimationFinish={(isCancelled) => {
-                      if (!isCancelled) {
-                        // Hold for 600ms so "Your Ride, Your Way" is read comfortably
-                        setTimeout(() => {
-                          setBrandDone(true);
-                        }, 600);
-                      }
-                    }}
-                    onAnimationFailure={(error) => {
-                      if (__DEV__) console.warn('Branded splash animation failed:', error);
-                      setBrandDone(true);
-                    }}
-                  />
+                  <Animated.View style={{ opacity: fallbackLogoOpacity, transform: [{ scale: fallbackLogoScale }] }}>
+                    <LottieView
+                      source={require('@/assets/animations/Opening Animation.json')}
+                      style={styles.brandSplashAnimation}
+                      resizeMode="contain"
+                      autoPlay={false}
+                      loop={false}
+                      progress={1}
+                      onAnimationFailure={(error) => {
+                        if (__DEV__) console.warn('Branded splash animation failed:', error);
+                        setBrandDone(true);
+                      }}
+                    />
+                  </Animated.View>
                   <Animated.View
                     style={[
                       styles.lottieTaglineWrap,

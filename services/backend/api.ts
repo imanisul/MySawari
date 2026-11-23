@@ -1633,7 +1633,8 @@ export const API = {
     });
     const saved = await response.json().catch(() => ({}));
     if (!response.ok) {
-      throw new Error(saved.message || 'Failed to confirm booking payment');
+      // `code` tells the payment screen "not paid" (PAYMENT_NOT_FOUND) from "still processing" (PAYMENT_IN_PROGRESS).
+      throw Object.assign(new Error(saved.message || 'Failed to confirm booking payment'), { code: saved.code });
     }
     return saved.data;
   },

@@ -67,6 +67,10 @@ export default function BookingDetailScreen() {
     ...bookingsQueryOptions,
     // A trip belongs to an account: nothing to fetch until the customer is signed in.
     enabled: !!id && isAuthenticated === true,
+    staleTime: 3 * 1000,
+    refetchInterval: 5 * 1000, // Live real-time polling every 5s while looking at booking details
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
   // A cancel / extend answer from the sheets shows straight away, before the list catches up.
   const [updated, setUpdated] = useState<BookingSnapshot | null>(null);
@@ -87,7 +91,17 @@ export default function BookingDetailScreen() {
   const snapshot: BookingSnapshot | null = updated && updated.id === id ? updated : merged;
   const loading = (!!id && !snapshot && (listLoading || listFetching)) || isAuthenticated === null;
   const setSnapshot = (b: BookingSnapshot | null) => { setUpdated(b); refetchBookings(); };
-  useFocusEffect(React.useCallback(() => { if (id && isAuthenticated) refetchBookings({ cancelRefetch: false }); }, [id, isAuthenticated, refetchBookings]));
+  useFocusEffect(
+    React.useCallback(() => {
+      if (id && isAuthenticated) {
+        refetchBookings({ cancelRefetch: false });
+        const timer = setInterval(() => {
+          refetchBookings({ cancelRefetch: false });
+        }, 5000);
+        return () => clearInterval(timer);
+      }
+    }, [id, isAuthenticated, refetchBookings])
+  );
 
   const [showManage, setShowManage] = useState(false);
   const [showCancel, setShowCancel] = useState(false);

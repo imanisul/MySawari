@@ -753,20 +753,52 @@ export function SawariProvider({ children }: { children: React.ReactNode }) {
 
   liveRef.current = { sync: syncNotifications, authed: isAuthenticated };
 
-  // Pushes that arrived while the app was in the background or closed never reach the listener above:
-  // coming back to the app picks them (and any booking status change) up.
+  // Initial notification sync as soon as auth state initializes
+  useEffect(() => {
+    syncNotifications().catch(() => {});
+  }, [syncNotifications]);
+
+  // Real-time synchronization engine:
+  // 1. When returning from background, immediately refresh wallet, notifications, bookings, referrals, and offers.
+  // 2. While app is active in foreground, run a lightweight periodic sync (every 12s) so changes from operations,
+  //    counter handover, referral rewards, or admin updates reflect live without manual pull-to-refresh.
   useEffect(() => {
     let previous = AppState.currentState;
+
+    const performSync = () => {
+      const { sync, authed } = liveRef.current;
+      sync?.().catch(() => {});
+      if (authed) {
+        invalidateWalletCache();
+        fetchWallet().catch(() => {});
+        queryClient.invalidateQueries({ queryKey: ['bookings'] });
+        queryClient.invalidateQueries({ queryKey: ['referrals'] });
+        queryClient.invalidateQueries({ queryKey: ['ride-journey'] });
+        queryClient.invalidateQueries({ queryKey: ['vehicles'] });
+        queryClient.invalidateQueries({ queryKey: ['offers'] });
+        queryClient.invalidateQueries({ queryKey: ['exclusive-offers'] });
+      }
+    };
+
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && previous !== 'active') {
-        const { sync, authed } = liveRef.current;
-        sync?.().catch(() => {});
-        if (authed) queryClient.invalidateQueries({ queryKey: ['bookings'] });
+        performSync();
       }
       previous = state;
     });
-    return () => sub.remove();
-  }, [queryClient]);
+
+    // Foreground periodic sync (every 12 seconds when active)
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        performSync();
+      }
+    }, 12000);
+
+    return () => {
+      sub.remove();
+      clearInterval(interval);
+    };
+  }, [queryClient, fetchWallet]);
 
   const markNotificationRead = useCallback(async (id: string) => {
     // Optimistic UI update for instantaneous feedback

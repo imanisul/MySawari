@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { ListSkeleton } from '@/components/loading/ListSkeleton';
 import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -43,7 +43,18 @@ export default function RefundsScreen() {
   const { isAuthenticated } = useSawari();
   const [showLogin, setShowLogin] = useState(false);
   const { data: vehicles = [] } = useVehicles();
-  const { data: bookings = [], isLoading, isError, refetch, isRefetching } = useQuery({ ...bookingsQueryOptions, enabled: isAuthenticated === true });
+  const { data: bookings = [], isLoading, isError, refetch, isRefetching } = useQuery({
+    ...bookingsQueryOptions,
+    enabled: isAuthenticated === true,
+    staleTime: 5 * 1000,
+    refetchInterval: 10 * 1000,
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isAuthenticated) refetch({ cancelRefetch: false });
+    }, [isAuthenticated, refetch])
+  );
 
   if (!isAuthenticated) {
     return (

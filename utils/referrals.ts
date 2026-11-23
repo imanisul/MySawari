@@ -92,7 +92,10 @@ export function useReferrals() {
       return list;
     },
     enabled: isAuthenticated === true && !!customer?.id,
-    staleTime: 60 * 1000,
+    staleTime: 5 * 1000,
+    refetchInterval: 8 * 1000, // Live real-time updates for referral stages and reward credits
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -130,8 +133,10 @@ export function usePartnerQRs(live = false) {
       return qrs;
     },
     enabled: isAuthenticated === true && !!customer?.id,
-    staleTime: 15 * 1000,
-    refetchInterval: live && focused ? 15 * 1000 : false,
+    staleTime: 5 * 1000,
+    refetchInterval: live && focused ? 8 * 1000 : 12 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 }
 

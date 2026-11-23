@@ -29,9 +29,11 @@ export const bookingsQueryOptions = {
     const userBookings = await API.getAllBookings();
     return userBookings.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   },
-  staleTime: 5 * 60 * 1000,
-  refetchInterval: 5 * 60 * 1000,
+  staleTime: 5 * 1000,
+  refetchInterval: 10 * 1000,
+  refetchOnMount: 'always' as const,
   refetchOnWindowFocus: true,
+  refetchOnReconnect: true,
 };
 
 // Safety net only: every request has its own timeout and retries, and the loading screen offers

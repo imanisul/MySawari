@@ -12,7 +12,10 @@ export function useRideJourney() {
     queryKey: ['ride-journey', customer?.id],
     queryFn: () => API.getRideJourney(),
     enabled: !!isAuthenticated,
-    staleTime: 30_000,
+    staleTime: 5_000,
+    refetchInterval: 12_000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
   const j = query.data;
   const cards: PendingCard[] = [];

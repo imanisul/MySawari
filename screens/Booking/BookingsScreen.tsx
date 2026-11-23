@@ -49,9 +49,11 @@ export default function BookingsScreen() {
   const { data: bookings = [], isLoading: loading, isError: fetchError, refetch } = useQuery({
     ...bookingsQueryOptions,
     enabled: isAuthenticated === true,
-    refetchInterval: 30 * 1000, // status changes (e.g. trip completed by the ops team) appear on their own
-    // Shown at once from the saved list, but always re-read from the server on opening (it could be minutes old).
+    staleTime: 3 * 1000,
+    refetchInterval: 8 * 1000, // status changes (e.g. car assigned, handover OTP, trip completed) appear in real time
+    // Shown at once from the saved list, but always re-read from the server on opening
     refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   // Which trips are already reviewed, so "Rate us" only shows where it is still wanted.
@@ -59,15 +61,19 @@ export default function BookingsScreen() {
     queryKey: ['myReviews'],
     queryFn: () => API.reviews.mine(),
     enabled: isAuthenticated === true,
-    staleTime: 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
   });
   const reviewed = (b: BookingSnapshot) =>
     !!myReviews && (myReviews.bookingIds.includes(b.id) || myReviews.legacyCarIds.includes(String(b.vehicleId)));
 
   useFocusEffect(
     useCallback(() => {
-      if (isAuthenticated) refetch({ cancelRefetch: false });
-    }, [isAuthenticated, refetch])
+      if (isAuthenticated) {
+        refetch({ cancelRefetch: false });
+        refetchReviews();
+      }
+    }, [isAuthenticated, refetch, refetchReviews])
   );
 
   // Jump to Active when the ops team hands a vehicle over, and to Completed when a trip ends.

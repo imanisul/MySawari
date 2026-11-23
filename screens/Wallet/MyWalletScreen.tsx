@@ -83,9 +83,19 @@ export default function MyWalletScreen() {
     if (w?.failed) { if (!known) setFailed(true); return; }
     setFailed(false);
     apply(w);
-  }, [apply]);
+    fetchWallet().catch(() => {});
+  }, [apply, fetchWallet]);
 
-  useFocusEffect(useCallback(() => { if (isAuthenticated) load(); }, [isAuthenticated, load]));
+  useFocusEffect(
+    useCallback(() => {
+      if (!isAuthenticated) return;
+      load();
+      const timer = setInterval(() => {
+        load();
+      }, 8000);
+      return () => clearInterval(timer);
+    }, [isAuthenticated, load])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

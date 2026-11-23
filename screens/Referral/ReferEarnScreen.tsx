@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BlurHost, BlurTarget, BottomBlur } from '@/components/common/BottomBlur';
-import { View, Text, StyleSheet, ScrollView, Pressable, Image, Share, Linking, useWindowDimensions, Platform, Modal } from 'react-native';
+import { View, Text, StyleSheet, Animated, Pressable, Image, Share, Linking, useWindowDimensions, Platform, Modal } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
@@ -144,12 +144,22 @@ export default function ReferEarnScreen() {
   // bottom edge, 123 tall; the photos sit 46 above the card.
   const heroH = insets.top + 182;
   const cardTop = heroH - 88;
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const goBack = () => {
+    Haptics.selectionAsync();
+    safeBack(router);
+  };
 
   return (
     <BlurHost style={[styles.screen, { backgroundColor: p.page }]}>
       <StatusBar style="light" />
       <BlurTarget style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 140 + insets.bottom }} showsVerticalScrollIndicator={false}>
+        <Animated.ScrollView
+          contentContainerStyle={{ paddingBottom: 140 + insets.bottom }}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        >
           {/* ── Hero ── */}
           <View style={{ height: cardTop + 123 }}>
             <LinearGradient colors={['#332B72', '#6B5AED']} style={[styles.heroBg, { height: heroH }]}>
@@ -158,10 +168,7 @@ export default function ReferEarnScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Back"
-              onPress={() => {
-                Haptics.selectionAsync();
-                safeBack(router);
-              }}
+              onPress={goBack}
               hitSlop={8}
               style={({ pressed }) => [styles.backBtn, { top: insets.top + 8 }, pressed && { opacity: 0.7 }]}
             >
@@ -269,8 +276,22 @@ export default function ReferEarnScreen() {
             {/* TODO: The Figma frame shows 4 FAQ rows in a different order; this list renders 6 and changes page height. */}
             <FaqList items={faqs} openFirst={false} />
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </BlurTarget>
+
+      {/* Scrolled past the hero: a purple "Refer & Earn" bar holds the status bar area, so the clock and
+          notification icons (white) never sit on top of the page text. */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[styles.stickyBar, { height: insets.top + 52, opacity: scrollY.interpolate({ inputRange: [cardTop - insets.top - 60, cardTop - insets.top - 10], outputRange: [0, 1], extrapolate: 'clamp' }) }]}
+      >
+        <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: PURPLE, paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+          <Text style={styles.stickyTitle} accessibilityRole="header">Refer & Earn</Text>
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel="Back" onPress={goBack} hitSlop={8} style={[styles.backBtn, { top: insets.top + 8 }]}>
+          <Feather name="chevron-left" size={22} color="#FFFFFF" />
+        </Pressable>
+      </Animated.View>
 
       {/* ── Footer: invite link + share, with the page blurring under it ── */}
       <View style={[styles.footer, { backgroundColor: p.page, borderTopColor: p.divider, paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -417,6 +438,8 @@ export default function ReferEarnScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
+  stickyBar: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 20 },
+  stickyTitle: { fontFamily: PF.semibold, fontSize: 17, color: '#FFFFFF' },
   backBtn: {
     position: 'absolute',
     left: 16,

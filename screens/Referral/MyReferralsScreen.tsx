@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { ListSkeleton } from '@/components/loading/ListSkeleton';
 import { View, Text, StyleSheet, FlatList, Pressable, RefreshControl } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from '@/utils/haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useDetailsPalette } from '@/components/vehicle/details/detailsPalette';
@@ -53,6 +53,12 @@ export default function MyReferralsScreen() {
   const router = useRouter();
   const { data: refs = [], isLoading, isError, refetch, isRefetching } = useReferrals();
   const { data: partnerQRs = [] } = usePartnerQRs(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const completed = refs.filter((r) => r.stage === 'processing' || r.stage === 'credited').length;
   const earned = refs.reduce((s, r) => s + (r.stage === 'credited' ? r.amount : 0), 0);

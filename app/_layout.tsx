@@ -76,11 +76,12 @@ type AppStatus = 'booting' | 'ready' | 'error';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 1000,
+      staleTime: 5 * 1000,
       gcTime: 10 * 60 * 1000, // keep screens' data for 10 min so going back is instant
       retry: 2,
       retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
       refetchOnReconnect: true,
+      refetchOnWindowFocus: true,
     },
   },
 });

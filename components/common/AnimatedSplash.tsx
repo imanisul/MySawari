@@ -11,6 +11,7 @@ import {
   Pressable,
   Platform,
   UIManager,
+  AccessibilityInfo,
 } from 'react-native';
 import Svg, { Path, Circle, G } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
@@ -82,16 +83,22 @@ const isLottieSupported =
  * The local branded animation takes precedence; otherwise, remote festive and custom splash modes are available.
  */
 // The splash logo: the trimmed artwork (MySawari_logo_trim.png, 365 × 313), so its size is the logo's own size.
+// Branded splash: one native-driven clock (0 → BRAND_MS) drives every piece, so the entrance stays smooth
+// while JS is busy starting the app. Times below are milliseconds on that clock.
+const BRAND_MS = 1500;
+const BRAND_HOLD_MS = 2000; // when the splash may close (the tagline has been readable for a moment)
+const OUT = Easing.out(Easing.cubic);
+const TAGLINE_WORDS = ['Your', 'Ride,', 'Your', 'Way'];
 const LOGO_W = 140;
 const LOGO_H = (140 * 313) / 365;
 const ENTER_MS = 1000;
 // Slice [a, b] of the entrance clock (0–1500 ms) mapped to [from, to], eased with a small overshoot (springy settle).
 const BACK = Easing.out(Easing.back(1.6));
 // The native driver ignores `easing`, so the curve is sampled into 12 straight pieces instead.
-const seg = (v: Animated.Value, a: number, b: number, from: number, to: number, easing: (t: number) => number = BACK) => {
+const seg = (v: Animated.Value, a: number, b: number, from: number, to: number, easing: (t: number) => number = BACK, total = ENTER_MS) => {
   const ts = Array.from({ length: 13 }, (_, i) => i / 12);
   return v.interpolate({
-    inputRange: ts.map((t) => (a + (b - a) * t) / ENTER_MS),
+    inputRange: ts.map((t) => (a + (b - a) * t) / total),
     outputRange: ts.map((t) => from + (to - from) * easing(t)),
     extrapolate: 'clamp',
   });
@@ -161,6 +168,7 @@ export function AnimatedSplash({
   // (delay, then the next) is handed over by JS, which is busy booting the app, so the tagline used to start too late
   // and the splash was gone before it showed.
   const enter = useRef(new Animated.Value(0)).current;
+  const brandClock = useRef(new Animated.Value(0)).current;
 
   // Celestial / Signature Diwali animation values
   const spinAnim = useRef(new Animated.Value(0)).current;
@@ -310,31 +318,19 @@ export function AnimatedSplash({
     if (!shouldShowSplash || !ENABLE_BRANDED_SPLASH || skipSplash) return;
 
     if (isLottieSupported) {
-      // Blank purple first, then the whole logo (emblem + MySawari) fades in at once, then the tagline.
-      // The animation file shows the emblem alone from its first frame, so it is shown on its last frame instead.
-      Animated.sequence([
-        Animated.delay(300),
-        Animated.parallel([
-          Animated.timing(fallbackLogoOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-          Animated.spring(fallbackLogoScale, { toValue: 1, tension: 35, friction: 6, useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(brandTaglineOpacity, {
-            toValue: 1,
-            duration: 450,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(brandTaglineY, {
-            toValue: 0,
-            duration: 450,
-            easing: Easing.out(Easing.back(1.4)),
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
-      const lottieTimer = setTimeout(() => setBrandDone(true), 1800);
-      return () => clearTimeout(lottieTimer);
+      // Blank purple, then the logo simply fades in and the tagline rises in word by word (only the text moves).
+      // The animation file shows the emblem alone from its first frame, so it is shown on its last frame
+      // (emblem + MySawari) instead.
+      let cancelled = false;
+      AccessibilityInfo.isReduceMotionEnabled()
+        .catch(() => false)
+        .then((reduce) => {
+          if (cancelled) return;
+          if (reduce) brandClock.setValue(1);
+          else Animated.timing(brandClock, { toValue: 1, duration: BRAND_MS, easing: Easing.linear, useNativeDriver: true }).start();
+        });
+      const lottieTimer = setTimeout(() => setBrandDone(true), BRAND_HOLD_MS);
+      return () => { cancelled = true; clearTimeout(lottieTimer); };
     } else {
       // Fallback (when Lottie is not available on native binary / web):
       // 1. Logo icon fades and scales in (0-450ms)
@@ -511,36 +507,53 @@ export function AnimatedSplash({
             <View style={styles.brandSplashContent}>
               {isLottieSupported ? (
                 <View style={styles.lottieWrap}>
-                  <Animated.View style={{ opacity: fallbackLogoOpacity, transform: [{ scale: fallbackLogoScale }] }}>
-                    <LottieView
-                      source={require('@/assets/animations/Opening Animation.json')}
-                      style={styles.brandSplashAnimation}
-                      resizeMode="contain"
-                      autoPlay={false}
-                      loop={false}
-                      progress={1}
-                      onAnimationFailure={(error) => {
-                        if (__DEV__) console.warn('Branded splash animation failed:', error);
-                        setBrandDone(true);
+                  <View style={styles.brandStage}>
+                    <Animated.View
+                      style={{
+                        opacity: seg(brandClock, 250, 550, 0, 1, OUT, BRAND_MS),
                       }}
-                    />
-                  </Animated.View>
-                  <Animated.View
-                    style={[
-                      styles.lottieTaglineWrap,
-                      {
-                        opacity: brandTaglineOpacity,
-                        transform: [{ translateY: brandTaglineY }],
-                      },
-                    ]}
+                    >
+                      <LottieView
+                        source={require('@/assets/animations/Opening Animation.json')}
+                        style={styles.brandSplashAnimation}
+                        resizeMode="contain"
+                        autoPlay={false}
+                        loop={false}
+                        progress={1}
+                        onAnimationFailure={(error) => {
+                          if (__DEV__) console.warn('Branded splash animation failed:', error);
+                          setBrandDone(true);
+                        }}
+                      />
+                    </Animated.View>
+                  </View>
+                  <View
+                    style={styles.lottieTaglineWrap}
                     accessible
                     accessibilityRole="text"
                     accessibilityLabel="Your Ride, Your Way"
                   >
-                    <Text allowFontScaling={false} style={styles.brandTaglineText}>
-                      Your Ride, Your Way
-                    </Text>
-                  </Animated.View>
+                    <View style={styles.brandTaglineRow}>
+                      {TAGLINE_WORDS.map((word, i) => {
+                        const t0 = 600 + i * 110;
+                        return (
+                          <Animated.Text
+                            key={i}
+                            allowFontScaling={false}
+                            style={[styles.brandTaglineText, {
+                              opacity: seg(brandClock, t0, t0 + 320, 0, 1, OUT, BRAND_MS),
+                              transform: [
+                                { translateY: seg(brandClock, t0, t0 + 420, 16, 0, BACK, BRAND_MS) },
+                                { scale: seg(brandClock, t0, t0 + 420, 0.8, 1, BACK, BRAND_MS) },
+                              ],
+                            }]}
+                          >
+                            {word}
+                          </Animated.Text>
+                        );
+                      })}
+                    </View>
+                  </View>
                 </View>
               ) : (
                 <View style={styles.fallbackWrap}>
@@ -957,6 +970,16 @@ const styles = StyleSheet.create({
   brandSplashAnimation: {
     width: 280,
     height: 280,
+  },
+  brandStage: {
+    width: 280,
+    height: 280,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandTaglineRow: {
+    flexDirection: 'row',
+    gap: 6,
   },
   lottieTaglineWrap: {
     marginTop: -58,

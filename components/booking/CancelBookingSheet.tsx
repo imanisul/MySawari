@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -11,6 +11,7 @@ import { useSawari } from '@/context/SawariContext';
 import { useVehicles } from '@/hooks/useVehicles';
 import { BookingCard, FONT, refundQuote, rupees } from '@/components/booking/TripDetailParts';
 import { ModalBlur } from '@/components/common/ModalBlur';
+import { useKeyboardScroll } from '@/components/common/KeyboardAwareScrollViewCompat';
 
 const REASONS = [
   'My plans have changed',
@@ -38,6 +39,7 @@ export function CancelBookingSheet({
   const { data: vehicles = [] } = useVehicles();
   const image = vehicles.find((v) => v.id === booking.vehicleId)?.image;
   const { eligible, refund } = refundQuote(booking);
+  const kb = useKeyboardScroll();
 
   const [reason, setReason] = useState<string | null>(null);
   const [typed, setTyped] = useState('');
@@ -128,7 +130,7 @@ export function CancelBookingSheet({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={done ? closeSubmitted : onClose}>
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.background }} behavior="padding">
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={onClose} style={styles.back} accessibilityLabel="Back" hitSlop={8}>
@@ -137,7 +139,7 @@ export function CancelBookingSheet({
           <Text style={[styles.headerTitle, { color: c.foreground }]}>Cancellation request</Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <ScrollView {...kb.scrollProps} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
           <BookingCard booking={booking} image={image} compact />
 
           {/* Refund eligibility */}
@@ -172,6 +174,7 @@ export function CancelBookingSheet({
             <TextInput
               value={typed}
               onChangeText={setTyped}
+              onFocus={kb.onFocus}
               placeholder="Type your reason"
               placeholderTextColor={c.mutedForeground}
               multiline
@@ -214,22 +217,22 @@ export function CancelBookingSheet({
                   </View>
                 </View>
               ) : payoutType === 'upi' ? (
-                <Field label="UPI ID" value={upiId} onChange={setUpiId} placeholder="e.g. 9876543210@upi" />
+                <Field onFocus={kb.onFocus} label="UPI ID" value={upiId} onChange={setUpiId} placeholder="e.g. 9876543210@upi" />
               ) : (
                 <>
-                  <Field label="Account holder name" value={holder} onChange={setHolder} placeholder="e.g. Rahul Sharma" />
-                  <Field label="Account number" value={accountNumber} onChange={setAccountNumber} placeholder="e.g. 123456789012" numeric />
-                  <Field label="Confirm account number" value={confirmAccount} onChange={setConfirmAccount} placeholder="Re-enter account number" numeric />
-                  <Field label="IFSC code" value={ifsc} onChange={(t) => setIfsc(t.toUpperCase())} placeholder="e.g. SBIN0001234" caps />
-                  <Field label="Bank name (optional)" value={bankName} onChange={setBankName} placeholder="e.g. State Bank of India" />
+                  <Field onFocus={kb.onFocus} label="Account holder name" value={holder} onChange={setHolder} placeholder="e.g. Rahul Sharma" />
+                  <Field onFocus={kb.onFocus} label="Account number" value={accountNumber} onChange={setAccountNumber} placeholder="e.g. 123456789012" numeric />
+                  <Field onFocus={kb.onFocus} label="Confirm account number" value={confirmAccount} onChange={setConfirmAccount} placeholder="Re-enter account number" numeric />
+                  <Field onFocus={kb.onFocus} label="IFSC code" value={ifsc} onChange={(t) => setIfsc(t.toUpperCase())} placeholder="e.g. SBIN0001234" caps />
+                  <Field onFocus={kb.onFocus} label="Bank name (optional)" value={bankName} onChange={setBankName} placeholder="e.g. State Bank of India" />
                 </>
               )}
             </View>
           )}
         </ScrollView>
 
-        {/* Policy + CTA */}
-        <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 8) + 8, backgroundColor: c.background }]}>
+        {/* Policy + CTA (hidden while typing so the keyboard doesn't cover the field) */}
+        {!kb.keyboardUp && <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 8) + 8, backgroundColor: c.background }]}>
           <Pressable onPress={() => setAgreed(!agreed)} style={styles.agreeRow} accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
             <View style={[styles.check, { borderColor: agreed ? c.navy : '#BFC3D4', backgroundColor: agreed ? c.navy : 'transparent' }]}>
               {agreed && <Feather name="check" size={12} color="#FFFFFF" />}
@@ -250,7 +253,7 @@ export function CancelBookingSheet({
               <Text style={[styles.ctaText, { color: canSubmit ? c.primaryForeground : c.disabledText }]}>Cancellation request</Text>
             )}
           </Pressable>
-        </View>
+        </View>}
 
         {/* Request submitted */}
         {!!done && (
@@ -294,8 +297,8 @@ export function CancelBookingSheet({
   );
 }
 
-function Field({ label, value, onChange, placeholder, numeric, caps }: {
-  label: string; value: string; onChange: (t: string) => void; placeholder: string; numeric?: boolean; caps?: boolean;
+export function Field({ label, value, onChange, placeholder, numeric, caps, onFocus }: {
+  label: string; value: string; onChange: (t: string) => void; placeholder: string; numeric?: boolean; caps?: boolean; onFocus?: () => void;
 }) {
   const c = useTripColors();
   return (
@@ -304,6 +307,7 @@ function Field({ label, value, onChange, placeholder, numeric, caps }: {
       <TextInput
         value={value}
         onChangeText={onChange}
+        onFocus={onFocus}
         placeholder={placeholder}
         placeholderTextColor={c.mutedForeground}
         keyboardType={numeric ? 'number-pad' : 'default'}

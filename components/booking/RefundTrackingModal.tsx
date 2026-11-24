@@ -1,812 +1,340 @@
-import React, { useState } from 'react';
-import { SheetModal } from '@/components/common/SheetModal';
+import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  Modal,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  ActivityIndicator,
-  Alert,
+  ActivityIndicator, KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
-import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useTripColors } from '@/components/booking/tripColors';
+import { Feather } from '@expo/vector-icons';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTripColors } from '@/components/booking/tripColors';
 import { API, BookingSnapshot } from '@/services/backend/api';
 import { useSawari } from '@/context/SawariContext';
-import * as Clipboard from 'expo-clipboard';
-import { ModalBlur } from '@/components/common/ModalBlur';
+import { useVehicles } from '@/hooks/useVehicles';
+import { BookingCard, FONT, RefundTimeline, SectionTitle, refundAmountOf, refundStage, rupees } from '@/components/booking/TripDetailParts';
+import { Field } from '@/components/booking/CancelBookingSheet';
+import { useKeyboardScroll } from '@/components/common/KeyboardAwareScrollViewCompat';
 import { istDayMonthYear, formatTime12 } from '@/utils/sawari';
 
-interface RefundTrackingModalProps {
+type PayoutType = 'original_payment' | 'upi' | 'bank_account';
+const PAYOUT_OPTIONS = [
+  { id: 'original_payment', label: 'Original Source' },
+  { id: 'upi', label: 'UPI ID' },
+  { id: 'bank_account', label: 'Bank Account' },
+] as const;
+
+const STAGE_TAG = {
+  none: { label: 'No refund', fg: '#737373', bg: '#F5F5F5' },
+  received: { label: 'In review', fg: '#B58703', bg: '#FEF9E7' },
+  approved: { label: 'Approved', fg: '#6B5AED', bg: '#EEF0F7' },
+  refunded: { label: 'Refunded', fg: '#008758', bg: '#E8F5EF' },
+  rejected: { label: 'Rejected', fg: '#DC2626', bg: '#FEF2F2' },
+};
+
+const when = (s?: string) => {
+  const d = s ? new Date(s) : null;
+  return d && !isNaN(d.getTime()) ? `${istDayMonthYear(d)}, ${formatTime12(d)}` : '';
+};
+
+/**
+ * Refund tracking page, drawn like "Cancellation request" (same header, booking card, timeline and fields).
+ * Server calls are unchanged: API.updateRefundPayoutDetails for an existing refund, else API.requestRefund.
+ */
+export function RefundTrackingModal({ visible, onClose, booking, onRefundUpdated }: {
   visible: boolean;
   onClose: () => void;
   booking: BookingSnapshot;
   onRefundUpdated?: () => void;
-}
-
-export function RefundTrackingModal({
-  visible,
-  onClose,
-  booking,
-  onRefundUpdated,
-}: RefundTrackingModalProps) {
-  const colors = useTripColors();
+}) {
+  const c = useTripColors();
   const insets = useSafeAreaInsets();
   const { customer } = useSawari();
+  const { data: vehicles = [] } = useVehicles();
+  const image = vehicles.find((v) => v.id === booking.vehicleId)?.image;
 
   const refund = booking?.pendingRefund;
-  const status = (refund?.status || 'pending').toLowerCase();
-  const refundAmount = refund?.refundAmount || booking?.refundAmount || 0;
+  const stage = refundStage(booking);
+  const amount = refundAmountOf(booking);
+  const savedType: PayoutType = refund?.refundType === 'bank_account' ? 'bank_account' : refund?.refundType === 'upi' ? 'upi' : 'original_payment';
+  const tag = STAGE_TAG[stage];
+  const kb = useKeyboardScroll();
 
-  // Edit / Input state for pending payout update
-  const [isEditing, setIsEditing] = useState(false);
-  const [editType, setEditType] = useState<'original_payment' | 'upi' | 'bank_account'>(
-    refund?.refundType === 'bank_account' ? 'bank_account' : refund?.refundType === 'upi' ? 'upi' : 'original_payment'
-  );
-  const [upiId, setUpiId] = useState(refund?.upiId || '');
-  const [accountNumber, setAccountNumber] = useState(
-    refund?.accountDetails?.accountNumber || ''
-  );
-  const [confirmAccountNumber, setConfirmAccountNumber] = useState(
-    refund?.accountDetails?.accountNumber || ''
-  );
-  const [ifscCode, setIfscCode] = useState(
-    refund?.accountDetails?.ifscCode || ''
-  );
-  const [accountHolderName, setAccountHolderName] = useState(
-    refund?.accountDetails?.accountHolderName || ''
-  );
-  const [bankName, setBankName] = useState(
-    refund?.accountDetails?.bankName || ''
-  );
-  const [submitting, setSubmitting] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [payoutType, setPayoutType] = useState<PayoutType>(savedType);
+  const [upiId, setUpiId] = useState('');
+  const [holder, setHolder] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
+  const [confirmAccount, setConfirmAccount] = useState('');
+  const [ifsc, setIfsc] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
 
-  const copyToClipboard = async (text: string, key: string) => {
+  // Each open starts from the details saved on the server.
+  useEffect(() => {
+    if (!visible) return;
+    const a = refund?.accountDetails;
+    setEditing(false); setError(null); setSaved(false); setPayoutType(savedType);
+    setUpiId(refund?.upiId || '');
+    setHolder(a?.accountHolderName || customer?.name || '');
+    setAccountNumber(a?.accountNumber || ''); setConfirmAccount(a?.accountNumber || '');
+    setIfsc(a?.ifscCode || ''); setBankName(a?.bankName || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const copy = async (text: string, key: string) => {
     if (!text) return;
     await Clipboard.setStringAsync(text);
-    setCopiedKey(key);
-    setTimeout(() => setCopiedKey(null), 2000);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const formatDate = (dateStr?: string) => {
-    if (!dateStr) return '';
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) return dateStr;
-      return `${istDayMonthYear(d)}, ${formatTime12(d)}`; // India time
-    } catch {
-      return dateStr;
-    }
+  const payoutError = (): string | null => {
+    if (payoutType === 'original_payment') return null;
+    if (payoutType === 'upi') return upiId.trim().includes('@') ? null : 'Enter a valid UPI ID (for example 9876543210@upi).';
+    if (!holder.trim()) return 'Enter the account holder name.';
+    if (!accountNumber.trim()) return 'Enter the account number.';
+    if (accountNumber.trim() !== confirmAccount.trim()) return 'The account numbers don’t match.';
+    if (ifsc.trim().length < 4) return 'Enter a valid IFSC code.';
+    return null;
   };
 
-  const handleSavePayoutDetails = async () => {
-    if (editType === 'upi') {
-      const cleanUpi = upiId.trim();
-      if (!cleanUpi || !cleanUpi.includes('@')) {
-        Alert.alert('Invalid UPI ID', 'Please enter a valid UPI ID (e.g. mobile@upi or name@bank).');
-        return;
-      }
-    } else if (editType === 'bank_account') {
-      if (!accountHolderName.trim()) {
-        Alert.alert('Missing Detail', 'Please enter Account Holder Name.');
-        return;
-      }
-      if (!accountNumber.trim()) {
-        Alert.alert('Missing Detail', 'Please enter Account Number.');
-        return;
-      }
-      if (accountNumber.trim() !== confirmAccountNumber.trim()) {
-        Alert.alert('Account Number Mismatch', 'Account numbers do not match.');
-        return;
-      }
-      if (ifscCode.trim().length < 4) {
-        Alert.alert('Invalid IFSC', 'Please enter a valid IFSC code.');
-        return;
-      }
-    }
-
-    setSubmitting(true);
+  const save = async () => {
+    const pe = payoutError();
+    if (pe) { setError(pe); return; }
+    setError(null);
+    setSaving(true);
+    const payout = {
+      refundType: payoutType,
+      upiId: payoutType === 'upi' ? upiId.trim() : undefined,
+      accountDetails: payoutType === 'bank_account'
+        ? { accountNumber: accountNumber.trim(), ifscCode: ifsc.trim().toUpperCase(), accountHolderName: holder.trim(), bankName: bankName.trim() }
+        : undefined,
+    };
     try {
       if (refund?.id) {
-        await API.updateRefundPayoutDetails(refund.id, {
-          refundType: editType,
-          upiId: editType === 'upi' ? upiId.trim() : undefined,
-          accountDetails: editType === 'bank_account' ? {
-            accountNumber: accountNumber.trim(),
-            ifscCode: ifscCode.trim().toUpperCase(),
-            accountHolderName: accountHolderName.trim(),
-            bankName: bankName.trim(),
-          } : undefined,
-        });
+        await API.updateRefundPayoutDetails(refund.id, payout);
       } else {
         await API.requestRefund({
           bookingId: booking.id,
-          amount: refundAmount,
+          amount,
           reason: 'Booking Cancelled',
           customerId: customer?.id || '',
           customerMobile: customer?.mobile || booking.customerMobile || '',
-          refundType: editType,
-          upiId: editType === 'upi' ? upiId.trim() : undefined,
-          accountDetails: editType === 'bank_account' ? {
-            accountNumber: accountNumber.trim(),
-            ifscCode: ifscCode.trim().toUpperCase(),
-            accountHolderName: accountHolderName.trim(),
-            bankName: bankName.trim(),
-          } : undefined,
+          ...payout,
         });
       }
-      Alert.alert('Updated', 'Payout details saved successfully!');
-      setIsEditing(false);
-      if (onRefundUpdated) onRefundUpdated();
+      setEditing(false);
+      setSaved(true);
+      onRefundUpdated?.();
     } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to update payout details');
+      setError(e?.message || 'Couldn’t save your payout details. Please try again.');
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  // Determine stage flags
-  const isRejected = status === 'rejected';
-  const isApproved = status === 'approved' || status === 'refunded';
-  const isRefunded = status === 'refunded';
+  // Payout details can only change while the refund is still in review.
+  const canEdit = stage === 'received';
+  const dates = [
+    ['Requested', when(refund?.requestedAt || booking?.cancelledAt)],
+    [stage === 'rejected' ? 'Rejected' : 'Approved', when(refund?.approvedAt || refund?.rejectedAt)],
+    ['Refunded', when(refund?.refundedAt)],
+  ].filter(([, v]) => !!v);
 
-  const badgeColor = isRefunded
-    ? '#10B981'
-    : isApproved
-    ? '#6B5AED'
-    : isRejected
-    ? '#EF4444'
-    : '#F59E0B';
-
-  const badgeBg = isRefunded
-    ? '#D1FAE5'
-    : isApproved
-    ? '#EEF0F7'
-    : isRejected
-    ? '#FEE2E2'
-    : '#FEF3C7';
-
-  const badgeLabel = isRefunded
-    ? 'REFUNDED'
-    : isApproved
-    ? 'APPROVED'
-    : isRejected
-    ? 'REJECTED'
-    : 'IN REVIEW';
+  const DetailRow = ({ label, value, copyKey }: { label: string; value?: string; copyKey?: string }) => (
+    <View style={styles.row}>
+      <Text style={[styles.rowLabel, { color: c.mutedForeground }]}>{label}</Text>
+      <Pressable disabled={!copyKey || !value} onPress={() => copy(value || '', copyKey || '')} style={styles.rowValueWrap} hitSlop={6}>
+        <Text style={[styles.rowValue, { color: c.foreground }]} numberOfLines={1}>{value || '—'}</Text>
+        {!!copyKey && !!value && (
+          <Feather name={copied === copyKey ? 'check' : 'copy'} size={12} color={copied === copyKey ? c.success : c.mutedForeground} />
+        )}
+      </Pressable>
+    </View>
+  );
 
   return (
-    <SheetModal visible={visible} onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
-        <View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.background,
-              paddingBottom: Math.max(insets.bottom, 24),
-            },
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <View>
-              <Text style={[styles.title, { color: colors.foreground }]}>Refund Tracking</Text>
-              <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-                {booking?.vehicleName || 'Booking'} • #{booking?.id?.slice(-6)?.toUpperCase()}
-              </Text>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: c.background }} behavior="padding">
+        {/* Header */}
+        <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+          <Pressable onPress={onClose} style={styles.back} accessibilityLabel="Back" hitSlop={8}>
+            <Feather name="chevron-left" size={24} color={c.mutedForeground} />
+          </Pressable>
+          <Text style={[styles.headerTitle, { color: c.foreground }]}>Refund tracking</Text>
+        </View>
+
+        <ScrollView {...kb.scrollProps} contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
+          <BookingCard booking={booking} image={image} compact />
+
+          {/* Amount + status */}
+          <View style={[styles.notice, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4' }]}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={[styles.noticeLabel, { color: c.mutedForeground }]}>Refund amount</Text>
+              <Text style={[styles.amount, { color: stage === 'refunded' ? c.success : c.foreground }]}>{rupees(amount)}</Text>
             </View>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Feather name="x" size={22} color={colors.foreground} />
-            </TouchableOpacity>
+            <View style={[styles.tag, { backgroundColor: tag.bg }]}>
+              <Text style={[styles.tagText, { color: tag.fg }]}>{tag.label}</Text>
+            </View>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 20 }}>
-            {/* Amount Banner */}
-            <View style={[styles.amountCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View>
-                <Text style={[styles.amountLabel, { color: colors.mutedForeground }]}>Total Refund Amount</Text>
-                <Text style={[styles.amountValue, { color: colors.foreground }]}>
-                  ₹{(refundAmount || 0).toLocaleString('en-IN')}
+          {/* Progress */}
+          <View style={{ gap: 4 }}>
+            <SectionTitle title="Refund status" />
+            <RefundTimeline booking={booking} />
+            {refund?.transactionReference && stage === 'refunded' ? (
+              <View style={{ marginTop: 8 }}><DetailRow label="UTR / reference" value={refund.transactionReference} copyKey="utr" /></View>
+            ) : null}
+          </View>
+
+          {dates.length > 0 && (
+            <View style={[styles.box, { borderColor: c.segBorder }]}>
+              {dates.map(([label, value]) => <DetailRow key={label} label={label} value={value} />)}
+            </View>
+          )}
+
+          {/* Payout destination */}
+          {stage !== 'none' && (
+            <View style={{ gap: 12 }}>
+              <View style={styles.sectionRow}>
+                <Text style={[styles.section, { color: c.foreground }]}>
+                  {editing ? `Where should we send ${rupees(amount)}?` : 'Payout destination'}
                 </Text>
-              </View>
-              <View style={[styles.badge, { backgroundColor: badgeBg }]}>
-                <Text style={[styles.badgeText, { color: badgeColor }]}>{badgeLabel}</Text>
-              </View>
-            </View>
-
-            {/* Stepper / Timeline */}
-            <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Refund Progress Stages</Text>
-
-              {/* Step 1: Requested */}
-              <View style={styles.timelineItem}>
-                <View style={styles.timelineLeft}>
-                  <View style={[styles.circle, styles.circleActive]}>
-                    <Feather name="check" size={14} color="#FFF" />
-                  </View>
-                  <View style={[styles.line, (isApproved || isRejected) ? styles.lineActive : styles.linePending]} />
-                </View>
-                <View style={styles.timelineRight}>
-                  <Text style={[styles.stepTitle, { color: colors.foreground }]}>Refund Requested</Text>
-                  <Text style={[styles.stepDesc, { color: colors.mutedForeground }]}>
-                    Request submitted by customer
-                  </Text>
-                  <Text style={[styles.stepTime, { color: colors.mutedForeground }]}>
-                    {formatDate(refund?.requestedAt || booking?.cancelledAt)}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Step 2: Under Review / Approved / Rejected */}
-              <View style={styles.timelineItem}>
-                <View style={styles.timelineLeft}>
-                  <View
-                    style={[
-                      styles.circle,
-                      isRejected
-                        ? styles.circleRejected
-                        : isApproved
-                        ? styles.circleActive
-                        : styles.circlePending,
-                    ]}
-                  >
-                    {isRejected ? (
-                      <Feather name="x" size={14} color="#FFF" />
-                    ) : isApproved ? (
-                      <Feather name="check" size={14} color="#FFF" />
-                    ) : (
-                      <Feather name="clock" size={12} color="#FFF" />
-                    )}
-                  </View>
-                  <View style={[styles.line, isRefunded ? styles.lineActive : styles.linePending]} />
-                </View>
-                <View style={styles.timelineRight}>
-                  <Text
-                    style={[
-                      styles.stepTitle,
-                      { color: isRejected ? '#EF4444' : isApproved ? colors.foreground : '#D97706' },
-                    ]}
-                  >
-                    {isRejected ? 'Request Rejected' : isApproved ? 'Approved by Operations' : 'Under Review by Operations'}
-                  </Text>
-                  <Text style={[styles.stepDesc, { color: colors.mutedForeground }]}>
-                    {isRejected
-                      ? refund?.rejectionReason || 'Refund criteria not met.'
-                      : isApproved
-                      ? 'Payout approved and queued for bank/UPI transfer'
-                      : 'Operations team is verifying trip and cancellation details'}
-                  </Text>
-                  {(refund?.approvedAt || refund?.rejectedAt) && (
-                    <Text style={[styles.stepTime, { color: colors.mutedForeground }]}>
-                      {formatDate(refund?.approvedAt || refund?.rejectedAt)}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Step 3: Refunded / Money Sent */}
-              <View style={[styles.timelineItem, { marginBottom: 0 }]}>
-                <View style={styles.timelineLeft}>
-                  <View
-                    style={[
-                      styles.circle,
-                      isRefunded
-                        ? styles.circleActive
-                        : isRejected
-                        ? styles.circleDisabled
-                        : styles.circlePendingEmpty,
-                    ]}
-                  >
-                    {isRefunded ? (
-                      <Feather name="check" size={14} color="#FFF" />
-                    ) : (
-                      <MaterialCommunityIcons
-                        name="bank-transfer"
-                        size={14}
-                        color={isRejected ? '#9CA3AF' : colors.mutedForeground}
-                      />
-                    )}
-                  </View>
-                </View>
-                <View style={styles.timelineRight}>
-                  <Text
-                    style={[
-                      styles.stepTitle,
-                      { color: isRefunded ? '#10B981' : isRejected ? colors.mutedForeground : colors.foreground },
-                    ]}
-                  >
-                    {isRefunded ? 'Refund Processed & Credited' : 'Money Transfer to Account/UPI'}
-                  </Text>
-                  <Text style={[styles.stepDesc, { color: colors.mutedForeground }]}>
-                    {isRefunded
-                      ? `Transferred via ${refund?.refundType === 'bank_account' ? 'Bank Transfer' : 'UPI'}${refund?.transactionReference ? ` (UTR: ${refund.transactionReference})` : ''}`
-                      : isRejected
-                      ? 'Process halted due to rejection'
-                      : 'Amount will be credited directly to your payout method once approved'}
-                  </Text>
-                  {refund?.refundedAt && (
-                    <Text style={[styles.stepTime, { color: colors.mutedForeground }]}>
-                      {formatDate(refund?.refundedAt)}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            </View>
-
-            {/* Payout Details Section */}
-            <View style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={styles.payoutHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <MaterialCommunityIcons
-                    name={refund?.refundType === 'bank_account' ? 'bank' : 'cellphone-wireless'}
-                    size={20}
-                    color="#6B5AED"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>
-                    Payout Destination
-                  </Text>
-                </View>
-
-                {status === 'pending' && !isEditing && (
-                  <TouchableOpacity
-                    onPress={() => setIsEditing(true)}
-                    style={styles.editBtn}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  >
-                    <Feather name="edit-2" size={13} color="#6B5AED" />
-                    <Text style={styles.editBtnText}>Edit</Text>
-                  </TouchableOpacity>
+                {canEdit && !editing && (
+                  <Pressable onPress={() => { setSaved(false); setEditing(true); }} hitSlop={8} style={styles.editLink} accessibilityRole="button">
+                    <Feather name="edit-2" size={13} color={c.navy} />
+                    <Text style={[styles.editText, { color: c.navy }]}>Edit</Text>
+                  </Pressable>
                 )}
               </View>
 
-              {!isEditing ? (
-                <View style={styles.payoutDetailsBox}>
-                  {refund?.refundType === 'bank_account' || refund?.accountDetails?.accountNumber ? (
-                    <>
-                      <View style={styles.payoutRow}>
-                        <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Account Number</Text>
-                        <TouchableOpacity
-                          style={styles.copyableRow}
-                          onPress={() =>
-                            copyToClipboard(refund?.accountDetails?.accountNumber || '', 'acc')
-                          }
+              {editing ? (
+                <>
+                  <View style={styles.switchRow}>
+                    {PAYOUT_OPTIONS.map((t) => {
+                      const on = payoutType === t.id;
+                      return (
+                        <Pressable
+                          key={t.id}
+                          onPress={() => setPayoutType(t.id)}
+                          style={[styles.switchBtn, { borderColor: on ? c.navy : c.border, backgroundColor: on ? c.navy : c.card }]}
+                          accessibilityRole="radio"
+                          accessibilityState={{ checked: on }}
                         >
-                          <Text style={[styles.payoutVal, { color: colors.foreground }]}>
-                            {refund?.accountDetails?.accountNumber || '—'}
-                          </Text>
-                          <Feather
-                            name={copiedKey === 'acc' ? 'check' : 'copy'}
-                            size={12}
-                            color={copiedKey === 'acc' ? '#10B981' : colors.mutedForeground}
-                            style={{ marginLeft: 6 }}
-                          />
-                        </TouchableOpacity>
-                      </View>
-
-                      <View style={styles.payoutRow}>
-                        <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>IFSC Code</Text>
-                        <TouchableOpacity
-                          style={styles.copyableRow}
-                          onPress={() =>
-                            copyToClipboard(refund?.accountDetails?.ifscCode || '', 'ifsc')
-                          }
-                        >
-                          <Text style={[styles.payoutVal, { color: colors.foreground }]}>
-                            {refund?.accountDetails?.ifscCode || '—'}
-                          </Text>
-                          <Feather
-                            name={copiedKey === 'ifsc' ? 'check' : 'copy'}
-                            size={12}
-                            color={copiedKey === 'ifsc' ? '#10B981' : colors.mutedForeground}
-                            style={{ marginLeft: 6 }}
-                          />
-                        </TouchableOpacity>
-                      </View>
-
-                      <View style={styles.payoutRow}>
-                        <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Account Holder</Text>
-                        <Text style={[styles.payoutVal, { color: colors.foreground }]}>
-                          {refund?.accountDetails?.accountHolderName || '—'}
-                        </Text>
-                      </View>
-
-                      {!!refund?.accountDetails?.bankName && (
-                        <View style={styles.payoutRow}>
-                          <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Bank Name</Text>
-                          <Text style={[styles.payoutVal, { color: colors.foreground }]}>
-                            {refund.accountDetails.bankName}
-                          </Text>
-                        </View>
-                      )}
-                    </>
-                  ) : refund?.upiId ? (
-                    <View style={styles.payoutRow}>
-                      <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>UPI ID</Text>
-                      <TouchableOpacity
-                        style={styles.copyableRow}
-                        onPress={() => copyToClipboard(refund.upiId || '', 'upi')}
-                      >
-                        <Text style={[styles.payoutVal, { color: colors.foreground }]}>{refund.upiId}</Text>
-                        <Feather
-                          name={copiedKey === 'upi' ? 'check' : 'copy'}
-                          size={12}
-                          color={copiedKey === 'upi' ? '#10B981' : colors.mutedForeground}
-                          style={{ marginLeft: 6 }}
-                        />
-                      </TouchableOpacity>
-                    </View>
+                          <Text style={{ fontFamily: FONT.semibold, fontSize: 11.5, color: on ? '#FFFFFF' : c.mutedForeground }}>{t.label}</Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {payoutType === 'original_payment' ? (
+                    <OriginalBox amount={amount} />
+                  ) : payoutType === 'upi' ? (
+                    <Field onFocus={kb.onFocus} label="UPI ID" value={upiId} onChange={setUpiId} placeholder="e.g. 9876543210@upi" />
                   ) : (
-                    <View style={{ paddingVertical: 4, gap: 4 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Feather name="refresh-cw" size={14} color="#6B5AED" />
-                        <Text style={[styles.payoutVal, { color: colors.foreground, fontFamily: 'Outfit-SemiBold' }]}>
-                          Original Payment Method
-                        </Text>
-                      </View>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 12.5, lineHeight: 18 }}>
-                        Refund will be credited back directly to the original account, card, or UPI app used during booking.
-                      </Text>
-                    </View>
+                    <>
+                      <Field onFocus={kb.onFocus} label="Account holder name" value={holder} onChange={setHolder} placeholder="e.g. Rahul Sharma" />
+                      <Field onFocus={kb.onFocus} label="Account number" value={accountNumber} onChange={setAccountNumber} placeholder="e.g. 123456789012" numeric />
+                      <Field onFocus={kb.onFocus} label="Confirm account number" value={confirmAccount} onChange={setConfirmAccount} placeholder="Re-enter account number" numeric />
+                      <Field onFocus={kb.onFocus} label="IFSC code" value={ifsc} onChange={(t) => setIfsc(t.toUpperCase())} placeholder="e.g. SBIN0001234" caps />
+                      <Field onFocus={kb.onFocus} label="Bank name (optional)" value={bankName} onChange={setBankName} placeholder="e.g. State Bank of India" />
+                    </>
                   )}
-                </View>
+                </>
+              ) : savedType === 'original_payment' ? (
+                <OriginalBox amount={amount} />
               ) : (
-                /* Edit Mode Form */
-                <View style={styles.editForm}>
-                  <View style={styles.typeSelector}>
-                    <TouchableOpacity
-                      style={[
-                        styles.typeBtn,
-                        editType === 'original_payment' && { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
-                      ]}
-                      onPress={() => setEditType('original_payment')}
-                    >
-                      <Text
-                        style={[
-                          styles.typeBtnText,
-                          { color: editType === 'original_payment' ? '#FFF' : colors.mutedForeground },
-                        ]}
-                      >
-                        Original
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.typeBtn,
-                        editType === 'upi' && { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
-                      ]}
-                      onPress={() => setEditType('upi')}
-                    >
-                      <Text
-                        style={[
-                          styles.typeBtnText,
-                          { color: editType === 'upi' ? '#FFF' : colors.mutedForeground },
-                        ]}
-                      >
-                        UPI ID
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.typeBtn,
-                        editType === 'bank_account' && { backgroundColor: '#6B5AED', borderColor: '#6B5AED' },
-                      ]}
-                      onPress={() => setEditType('bank_account')}
-                    >
-                      <Text
-                        style={[
-                          styles.typeBtnText,
-                          { color: editType === 'bank_account' ? '#FFF' : colors.mutedForeground },
-                        ]}
-                      >
-                        Bank Account
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {editType === 'original_payment' ? (
-                    <View style={{ paddingVertical: 10, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#F3F4F6', gap: 4 }}>
-                      <Text style={{ fontFamily: 'Outfit-Medium', fontSize: 13, color: colors.foreground }}>
-                        Return to original payment method
-                      </Text>
-                      <Text style={{ fontSize: 12, color: colors.mutedForeground, lineHeight: 17 }}>
-                        No extra payout details needed. The refund will automatically be credited to the original payment source.
-                      </Text>
-                    </View>
-                  ) : editType === 'upi' ? (
-                    <View style={styles.inputGroup}>
-                      <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>UPI ID</Text>
-                      <TextInput
-                        style={[styles.input, { borderColor: colors.border, color: colors.foreground }]}
-                        placeholder="e.g. 9876543210@upi or name@okaxis"
-                        placeholderTextColor="#9CA3AF"
-                        value={upiId}
-                        onChangeText={setUpiId}
-                        autoCapitalize="none"
-                        autoCorrect={false}
-                      />
-                    </View>
+                <View style={[styles.box, { borderColor: c.segBorder }]}>
+                  {savedType === 'upi' ? (
+                    <DetailRow label="UPI ID" value={refund?.upiId} copyKey="upi" />
                   ) : (
                     <>
-                      <View style={styles.inputGroup}>
-                        <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Account Holder Name</Text>
-                        <TextInput
-                          style={[styles.input, { borderColor: colors.border, color: colors.foreground }]}
-                          placeholder="e.g. Rahul Sharma"
-                          placeholderTextColor="#9CA3AF"
-                          value={accountHolderName}
-                          onChangeText={setAccountHolderName}
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Account Number</Text>
-                        <TextInput
-                          style={[styles.input, { borderColor: colors.border, color: colors.foreground }]}
-                          placeholder="e.g. 1234567890"
-                          placeholderTextColor="#9CA3AF"
-                          value={accountNumber}
-                          onChangeText={setAccountNumber}
-                          keyboardType="number-pad"
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Confirm Account Number</Text>
-                        <TextInput
-                          style={[styles.input, { borderColor: colors.border, color: colors.foreground }]}
-                          placeholder="Re-enter account number"
-                          placeholderTextColor="#9CA3AF"
-                          value={confirmAccountNumber}
-                          onChangeText={setConfirmAccountNumber}
-                          keyboardType="number-pad"
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>IFSC Code</Text>
-                        <TextInput
-                          style={[styles.input, { borderColor: colors.border, color: colors.foreground }]}
-                          placeholder="e.g. SBIN0001234"
-                          placeholderTextColor="#9CA3AF"
-                          value={ifscCode}
-                          onChangeText={(t) => setIfscCode(t.toUpperCase())}
-                          autoCapitalize="characters"
-                        />
-                      </View>
-
-                      <View style={styles.inputGroup}>
-                        <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Bank Name (Optional)</Text>
-                        <TextInput
-                          style={[styles.input, { borderColor: colors.border, color: colors.foreground }]}
-                          placeholder="e.g. State Bank of India"
-                          placeholderTextColor="#9CA3AF"
-                          value={bankName}
-                          onChangeText={setBankName}
-                        />
-                      </View>
+                      <DetailRow label="Account holder" value={refund?.accountDetails?.accountHolderName} />
+                      <DetailRow label="Account number" value={refund?.accountDetails?.accountNumber} copyKey="acc" />
+                      <DetailRow label="IFSC code" value={refund?.accountDetails?.ifscCode} copyKey="ifsc" />
+                      {!!refund?.accountDetails?.bankName && <DetailRow label="Bank name" value={refund.accountDetails.bankName} />}
                     </>
                   )}
-
-                  <View style={styles.editActions}>
-                    <TouchableOpacity
-                      style={[styles.cancelBtn, { borderColor: colors.border }]}
-                      onPress={() => setIsEditing(false)}
-                      disabled={submitting}
-                    >
-                      <Text style={[styles.cancelBtnText, { color: colors.mutedForeground }]}>Cancel</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.saveBtn, { backgroundColor: colors.button }]}
-                      onPress={handleSavePayoutDetails}
-                      disabled={submitting}
-                    >
-                      {submitting ? (
-                        <ActivityIndicator size="small" color="#FFF" />
-                      ) : (
-                        <Text style={styles.saveBtnText}>Save Details</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
                 </View>
               )}
+              {saved && <Text style={[styles.note, { color: c.success }]}>Payout details saved.</Text>}
             </View>
+          )}
 
-            {/* Note */}
-            <View style={[styles.noteBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name="info" size={15} color="#6B5AED" style={{ marginTop: 2, marginRight: 8 }} />
-              <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
-                Refunds are processed to the specified payout method within 24–48 business hours after approval by Mysawari.
-              </Text>
+          <Text style={[styles.note, { color: c.mutedForeground }]}>
+            Refunds are sent to your payout method within 5–7 business days after approval by MySawari.
+          </Text>
+        </ScrollView>
+
+        {editing && (
+          <View style={[styles.bottom, { paddingBottom: Math.max(insets.bottom, 8) + 8, backgroundColor: c.background }]}>
+            {!!error && <Text style={[styles.note, { color: c.destructive }]}>{error}</Text>}
+            <View style={styles.ctaRow}>
+              <Pressable
+                disabled={saving}
+                onPress={() => { setEditing(false); setError(null); }}
+                style={({ pressed }) => [styles.cta, styles.ctaGhost, { borderColor: c.segBorder, opacity: pressed ? 0.85 : 1 }]}
+              >
+                <Text style={[styles.ctaText, { color: c.mutedForeground }]}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                disabled={saving}
+                onPress={save}
+                style={({ pressed }) => [styles.cta, { flex: 1.4, backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 }]}
+              >
+                {saving ? <ActivityIndicator color={c.primaryForeground} /> : <Text style={[styles.ctaText, { color: c.primaryForeground }]}>Save details</Text>}
+              </Pressable>
             </View>
-          </ScrollView>
-        </View>
+          </View>
+        )}
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+function OriginalBox({ amount }: { amount: number }) {
+  const c = useTripColors();
+  return (
+    <View style={[styles.originalBox, { backgroundColor: c.lightBlue, borderColor: '#E7EAF4' }]}>
+      <Feather name="refresh-cw" size={16} color={c.navy} style={{ marginTop: 2 }} />
+      <View style={{ flex: 1, gap: 3 }}>
+        <Text style={[styles.originalTitle, { color: c.foreground }]}>Original Payment Method</Text>
+        <Text style={[styles.originalDesc, { color: c.mutedForeground }]}>
+          {rupees(amount)} will be credited back to the account / card / UPI used during booking.
+        </Text>
       </View>
-    </SheetModal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    maxHeight: '90%',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  title: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(150,150,150,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  amountCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  amountLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-  amountValue: { fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 4 },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-  },
-  badgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
-  sectionCard: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontFamily: 'Inter_600SemiBold',
-    marginBottom: 16,
-  },
-  timelineItem: {
-    flexDirection: 'row',
-    marginBottom: 18,
-  },
-  timelineLeft: {
-    alignItems: 'center',
-    width: 28,
-    marginRight: 12,
-  },
-  circle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  circleActive: { backgroundColor: '#10B981' },
-  circlePending: { backgroundColor: '#F59E0B' },
-  circlePendingEmpty: { backgroundColor: '#E5E7EB' },
-  circleRejected: { backgroundColor: '#EF4444' },
-  circleDisabled: { backgroundColor: '#D1D5DB' },
-  line: {
-    width: 2,
-    flex: 1,
-    minHeight: 28,
-    marginTop: 4,
-  },
-  lineActive: { backgroundColor: '#10B981' },
-  linePending: { backgroundColor: '#E5E7EB' },
-  timelineRight: { flex: 1 },
-  stepTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  stepDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2, lineHeight: 17 },
-  stepTime: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 4 },
-  payoutHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: '#EEF0F7',
-    gap: 4,
-  },
-  editBtnText: { color: '#6B5AED', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  payoutDetailsBox: {
-    backgroundColor: 'rgba(150,150,150,0.05)',
-    borderRadius: 10,
-    padding: 12,
-  },
-  payoutRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  payoutLabel: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  payoutVal: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  copyableRow: { flexDirection: 'row', alignItems: 'center' },
-  editForm: { marginTop: 4 },
-  typeSelector: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 14,
-  },
-  typeBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-  },
-  typeBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  inputGroup: { marginBottom: 12 },
-  inputLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 4 },
-  input: {
-    height: 42,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    fontFamily: 'Inter_400Regular',
-  },
-  editActions: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 6,
-  },
-  cancelBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  cancelBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  saveBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveBtnText: { color: '#FFF', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  noteBox: {
-    flexDirection: 'row',
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    alignItems: 'flex-start',
-  },
-  noteText: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
-  primaryBtn: {
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    fontFamily: 'Inter_600SemiBold',
-  },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
+  back: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#F5F5F5', alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontFamily: FONT.semibold, fontSize: 19, lineHeight: 28 },
+  body: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 24, gap: 16 },
+  notice: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12 },
+  noticeLabel: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
+  amount: { fontFamily: FONT.bold, fontSize: 22, lineHeight: 30 },
+  tag: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  tagText: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 16 },
+  box: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 6 },
+  rowLabel: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
+  rowValueWrap: { flexShrink: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  rowValue: { flexShrink: 1, fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  section: { flex: 1, fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
+  editLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  editText: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
+  switchRow: { flexDirection: 'row', gap: 8 },
+  switchBtn: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  originalBox: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 8, padding: 12, alignItems: 'flex-start' },
+  originalTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 18 },
+  originalDesc: { fontFamily: FONT.medium, fontSize: 11.5, lineHeight: 17 },
+  note: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
+  bottom: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
+  ctaRow: { flexDirection: 'row', gap: 10 },
+  cta: { flex: 1, height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  ctaGhost: { borderWidth: 1 },
+  ctaText: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
 });

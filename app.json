@@ -39,12 +39,19 @@
         "ITSAppUsesNonExemptEncryption": false,
         "LSApplicationQueriesSchemes": [
           "upi",
-          "phonepe",
           "tez",
+          "gpay",
+          "phonepe",
           "paytmmp",
+          "paytm",
           "bhim",
           "credpay",
-          "whatsapp"
+          "cred",
+          "whatsapp",
+          "amazonpay",
+          "payzapp",
+          "mobikwik",
+          "ppe"
         ]
       }
     },

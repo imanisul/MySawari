@@ -27,6 +27,9 @@ interface RazorpayCheckoutWebViewProps {
   onClose: () => void;
 }
 
+const IOS_SAFARI_USER_AGENT =
+  'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+
 export function RazorpayCheckoutWebView({
   visible = true,
   orderId,
@@ -77,7 +80,7 @@ export function RazorpayCheckoutWebView({
     }
 
     const t = setTimeout(() => fail('The secure payment page is taking too long to open. Please check your connection and try again.'), 25000);
-    const options = {
+    const options: any = {
       key: razorpayKey || '',
       amount: Number(amount) || 0,
       currency: currency || 'INR',
@@ -87,6 +90,14 @@ export function RazorpayCheckoutWebView({
       order_id: orderId,
       prefill: { name: prefill?.name || '', email: prefill?.email || '', contact: prefill?.contact || '' },
       theme: { color: themeColor },
+      modal: {
+        confirm_close: false,
+        escape: true,
+        backdropclose: false,
+      },
+      upi: {
+        flow: 'intent',
+      },
     };
     webRef.current?.injectJavaScript(`window.startCheckout(${JSON.stringify(options)}); true;`);
     return () => clearTimeout(t);
@@ -179,26 +190,48 @@ export function RazorpayCheckoutWebView({
     const { url } = request;
     if (!url) return true;
 
-    // Handle UPI and banking application schemes
+    const lower = url.toLowerCase();
+
+    // Standard web navigation within Razorpay domain
     if (
-      url.startsWith('upi://') ||
-      url.startsWith('phonepe://') ||
-      url.startsWith('tez://') ||
-      url.startsWith('paytmmp://') ||
-      url.startsWith('bhim://') ||
-      url.startsWith('credpay://') ||
-      url.startsWith('whatsapp://')
+      lower.startsWith('http://') ||
+      lower.startsWith('https://') ||
+      lower.startsWith('about:') ||
+      lower.startsWith('blob:') ||
+      lower.startsWith('data:')
     ) {
-      Linking.openURL(url).catch(() => {});
+      return true;
+    }
+
+    // Intercept all UPI, intent, and banking deep links on iOS and Android
+    if (
+      lower.startsWith('upi:') ||
+      lower.startsWith('tez:') ||
+      lower.startsWith('gpay:') ||
+      lower.startsWith('phonepe:') ||
+      lower.startsWith('paytmmp:') ||
+      lower.startsWith('paytm:') ||
+      lower.startsWith('bhim:') ||
+      lower.startsWith('credpay:') ||
+      lower.startsWith('cred:') ||
+      lower.startsWith('whatsapp:') ||
+      lower.startsWith('amazonpay:') ||
+      lower.startsWith('payzapp:') ||
+      lower.startsWith('mobikwik:') ||
+      lower.startsWith('ppe:')
+    ) {
+      Linking.openURL(url).catch((err) => {
+        if (__DEV__) console.warn('Could not open UPI URL:', url, err);
+      });
       return false;
     }
 
-    if (url.startsWith('intent://')) {
+    if (lower.startsWith('intent://')) {
       if (Platform.OS === 'android') {
         try {
           const schemeMatch = url.match(/scheme=([^;]+)/);
           if (schemeMatch && schemeMatch[1]) {
-            const rawUrl = url.split('#Intent')[0].replace('intent://', `${schemeMatch[1]}://`);
+            const rawUrl = url.split('#Intent')[0].replace(/intent:\/\//i, `${schemeMatch[1]}://`);
             Linking.openURL(rawUrl).catch(() => {
               Linking.openURL(url).catch(() => {});
             });
@@ -212,7 +245,11 @@ export function RazorpayCheckoutWebView({
       return false;
     }
 
-    return true;
+    // Any other custom non-http(s) deep link
+    Linking.openURL(url).catch((err) => {
+      if (__DEV__) console.warn('Could not launch custom link:', url, err);
+    });
+    return false;
   };
 
   return (
@@ -235,6 +272,8 @@ export function RazorpayCheckoutWebView({
           source={{ html: checkoutHtml, baseUrl: 'https://checkout.razorpay.com' }}
           onMessage={onMessage}
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+          userAgent={Platform.OS === 'ios' ? IOS_SAFARI_USER_AGENT : undefined}
+          allowsBackForwardNavigationGestures={false}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           cacheEnabled={true}

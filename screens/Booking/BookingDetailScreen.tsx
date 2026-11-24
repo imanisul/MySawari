@@ -592,7 +592,7 @@ const styles = StyleSheet.create({
   noteText: { flex: 1, fontFamily: FONT.medium, fontSize: 13, lineHeight: 18 },
 
   extendCard: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8 },
-  pillBtn: { borderRadius: 6, paddingHorizontal: 10, height: 33, justifyContent: 'center' },
+  pillBtn: { borderRadius: 6, paddingHorizontal: 10, minHeight: 33, justifyContent: 'center' },
   pillBtnText: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17, color: '#FFFFFF' },
   extRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   extStatus: { fontFamily: FONT.semibold, fontSize: 11, textTransform: 'uppercase' },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
 
   bottomBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 16, gap: 8, boxShadow: '0px -52px 21px rgba(47, 62, 117, 0.01), 0px -29px 17px rgba(47, 62, 117, 0.05)' },
   hint: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, textAlign: 'center' },
-  cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { minHeight: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
 
   // Vehicle Handover Verification

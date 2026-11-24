@@ -415,12 +415,12 @@ const styles = StyleSheet.create({
   tileText: { fontFamily: F.medium, fontSize: 8, lineHeight: 12, color: '#737373' },
   remove: { position: 'absolute', top: -3, right: -3.75, width: 19, height: 19, borderRadius: 9.5, borderWidth: 1, borderColor: '#BFC3D4', backgroundColor: '#F9F9FB', alignItems: 'center', justifyContent: 'center' },
   error: { fontFamily: F.medium, fontSize: 11.5, lineHeight: 16, textAlign: 'center' },
-  submit: { height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  submit: { minHeight: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   submitText: { fontFamily: F.semibold, fontSize: 17, lineHeight: 25.5, color: '#FFFFFF' },
   thanks: { borderWidth: 1, borderRadius: 13, paddingVertical: 16, marginTop: 16, alignItems: 'center' },
   thanksText: { fontFamily: F.semibold, fontSize: 17, lineHeight: 24, textAlign: 'center' },
   appreciate: { fontFamily: F.medium, fontSize: 13, lineHeight: 19.5, textAlign: 'center', marginTop: 16, paddingHorizontal: 12 },
-  doneBtn: { height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
+  doneBtn: { minHeight: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 16 },
   doneText: { fontFamily: F.semibold, fontSize: 17 },
 
   // Photo source chooser
@@ -431,6 +431,6 @@ const styles = StyleSheet.create({
   optionIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#EAECF1', alignItems: 'center', justifyContent: 'center' },
   optionTitle: { fontFamily: F.semibold, fontSize: 15, lineHeight: 22.5 },
   optionSub: { fontFamily: F.medium, fontSize: 12, lineHeight: 18 },
-  cancelBtn: { height: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAFAFA' },
+  cancelBtn: { minHeight: 50, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAFAFA' },
   cancelText: { fontFamily: F.semibold, fontSize: 17 },
 });

@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     width: '100%',
-    height: 46,
+    minHeight: 46,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   },
   secondaryBtn: {
     width: '100%',
-    height: 42,
+    minHeight: 42,
     borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',

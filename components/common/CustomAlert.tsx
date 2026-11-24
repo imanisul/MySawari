@@ -108,6 +108,6 @@ const styles = StyleSheet.create({
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, textAlign: 'center' },
   message: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 8, paddingHorizontal: 8 },
   buttons: { flexDirection: 'row', gap: 12, alignSelf: 'stretch', marginTop: 20 },
-  button: { height: 47, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  button: { minHeight: 47, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
   buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22 },
 });

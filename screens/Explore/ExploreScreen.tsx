@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   // Figma: chips 36 high, 8 apart, padding 6/8, 1px Primary/blue-50 border, 8px radius, 13/20 weight-500 text.
   // The chips frame pads 8 below, and the card list under it pads 8 above: the first card starts 16 below the chips.
   chips: { gap: 8, alignItems: 'flex-start', paddingHorizontal: 16, paddingTop: 8, paddingBottom: 16 },
-  chip: { height: 38, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip: { minHeight: 38, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4 },
   filterChipFixed: { height: 38 },
   chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },

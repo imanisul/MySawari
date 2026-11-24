@@ -1078,7 +1078,7 @@ const styles = StyleSheet.create({
   },
   cta: {
     flex: 1,
-    height: 48,
+    minHeight: 48,
     borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',

@@ -941,7 +941,7 @@ export function LoginBottomSheet({
             {loading ? (
               <ActivityIndicator color={ui.onNavy} />
             ) : (
-              <Text style={[styles.ctaText, { color: cta.enabled ? ui.onNavy : ui.disabledText }]}>{cta.label}</Text>
+              <Text style={[styles.ctaText, { color: cta.enabled ? ui.onNavy : ui.disabledText }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{cta.label}</Text>
             )}
           </Pressable>
           )}
@@ -1061,7 +1061,7 @@ const styles = StyleSheet.create({
   copy: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 22, marginTop: -8 },
   copyPlain: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 15, lineHeight: 22 },
   small: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
-  field: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 52, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12 },
+  field: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 52, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 4 },
   cc: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 17 },
   input: { flex: 1, height: '100%', padding: 0, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 17 },
   terms: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
   checkRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
   check: { width: 15, height: 15, borderRadius: 4, borderWidth: 1.5, marginTop: 4, alignItems: 'center', justifyContent: 'center' },
   checkText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },
-  cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { minHeight: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
 
   // Navi referral banner (Step 1)

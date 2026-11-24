@@ -729,8 +729,7 @@ export function DatesSheet() {
                                 <Text style={[styles.offText, { color: selected ? '#6B5AED' : '#FFFFFF' }]} allowFontScaling={false}>OFF</Text>
                               </View>
                             )}
-                            <Text
-                              style={[
+                            <Text style={[
                                 styles.dayText,
                                 { color: selected ? ui.onNavy : disabled ? ui.past : ui.text },
                                 disabled && !selected && date < today && styles.struck,
@@ -941,7 +940,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: 62,
+    minHeight: 62,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderRadius: 8,
@@ -978,7 +977,7 @@ const styles = StyleSheet.create({
   wheels: {
   flexDirection: 'row',
   gap: 12,
-  height: 146,
+  minHeight: 146,
 },
 
 wheelCard: {
@@ -1024,7 +1023,7 @@ wheelText: {
 },
   // Figma footer: 393×86 = 16 + 54 button + 16 (plus the device's bottom inset).
   footer: { paddingHorizontal: 16, paddingTop: 16 },
-  cta: { height: 54, padding: 4, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { minHeight: 54, padding: 4, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaDisabled: { opacity: 0.5 },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, textAlign: 'center' },
   // Figma popups: white card (radius 16) over a dimmed page, round close button underneath.
@@ -1047,6 +1046,6 @@ wheelText: {
   earlyClose: { width: 32, height: 32, borderRadius: 30, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FAFAFA' },
   // Figma "Late Return": warning 30, title 19, body 13/20 with "1 extra day" in navy, full-width 46 button.
   lateExtra: { fontFamily: 'PlusJakartaSans_600SemiBold' },
-  lateBtn: { alignSelf: 'stretch', height: 46, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
+  lateBtn: { alignSelf: 'stretch', minHeight: 46, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 24 },
   lateBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22, color: '#FFFFFF' },
 });

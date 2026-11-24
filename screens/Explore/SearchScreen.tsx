@@ -212,7 +212,7 @@ export default function SearchResultsScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
-            style={[styles.searchText, { color: p.fg }]}
+           style={[styles.searchText, { color: p.fg }]}
           />
           {!!searchQuery && (
             <Pressable onPress={() => setSearchQuery('')} hitSlop={8} accessibilityLabel="Clear search">
@@ -280,13 +280,13 @@ export default function SearchResultsScreen() {
         </View>
         <Pressable onPress={openDates} style={[styles.dates, { backgroundColor: p.summary }]} accessibilityRole="button" accessibilityLabel={`Trip ${startLabel || ''} ${pickupTime} to ${endLabel || ''} ${returnTime}. Change dates`}>
           <View style={styles.dateCol}>
-            <Text style={[styles.dateDay, { color: p.fg }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{startLabel || 'Start'}</Text>
-            <Text style={[styles.dateTime, { color: p.sub }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{startLabel ? shortTime(pickupTime) : 'Pick'}</Text>
+            <Text style={[styles.dateDay, { color: p.fg }]} numberOfLines={1}>{startLabel || 'Start'}</Text>
+            <Text style={[styles.dateTime, { color: p.sub }]} numberOfLines={1}>{startLabel ? shortTime(pickupTime) : 'Pick'}</Text>
           </View>
           <View style={[styles.dateDivider, { backgroundColor: p.border }]} />
           <View style={styles.dateCol}>
-            <Text style={[styles.dateDay, { color: p.fg }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{(hasRange ? endLabel : startLabel) || 'End'}</Text>
-            <Text style={[styles.dateTime, { color: p.sub }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{startLabel ? shortTime(returnTime) : 'Pick'}</Text>
+            <Text style={[styles.dateDay, { color: p.fg }]} numberOfLines={1}>{(hasRange ? endLabel : startLabel) || 'End'}</Text>
+            <Text style={[styles.dateTime, { color: p.sub }]} numberOfLines={1}>{startLabel ? shortTime(returnTime) : 'Pick'}</Text>
           </View>
         </Pressable>
       </View>
@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
   dateDay: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 15 },
   dateTime: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 10, lineHeight: 14 },
   dateDivider: { width: 1, alignSelf: 'stretch', marginVertical: 2 },
-  strip: { borderWidth: 1, borderRadius: 8, height: 39, alignItems: 'center', justifyContent: 'center' },
+  strip: { borderWidth: 1, borderRadius: 8, minHeight: 39, alignItems: 'center', justifyContent: 'center' },
   stripText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12 },
   stripRow: { flexDirection: 'row', alignItems: 'center', gap: 2, maxWidth: '100%', paddingHorizontal: 8 },
   stripIcon: { width: 11, height: 11 },
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
   searchText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, paddingVertical: 0 },
   sortBtn: { width: 48, height: 39, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   chips: { gap: 6, paddingHorizontal: 16 },
-  chip: { height: 30, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  chip: { minHeight: 30, paddingHorizontal: 14, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   filterChip: { flexDirection: 'row', gap: 4, paddingHorizontal: 10 },
   chipText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
 });

@@ -660,7 +660,7 @@ const styles = StyleSheet.create({
   dash: { width: 4, height: 1, backgroundColor: '#D9DDEC' },
   innerFoot: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, lineHeight: 16.5, color: '#737373', textAlign: 'center' },
   capPillWrap: { position: 'absolute', left: 0, right: 0, top: '37.4%', alignItems: 'center' },
-  capPill: { height: 19.5, minWidth: 116, paddingHorizontal: 8, borderRadius: 10, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
+  capPill: { minHeight: 19.5, minWidth: 116, paddingHorizontal: 8, borderRadius: 10, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
   capPillText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8.5, color: '#FFFFFF' },
 
   // Sheet
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
   radioDot: { width: 5, height: 5, borderRadius: 2.5 },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   planName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 20 },
-  offChip: { height: 19.5, paddingHorizontal: 8, borderRadius: 10, backgroundColor: GREEN, justifyContent: 'center', marginLeft: 2 },
+  offChip: { minHeight: 19.5, paddingHorizontal: 8, borderRadius: 10, backgroundColor: GREEN, justifyContent: 'center', marginLeft: 2 },
   offChipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, color: '#FFFFFF' },
   planSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, marginTop: 4 },
   planPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 22 },
@@ -689,7 +689,7 @@ const styles = StyleSheet.create({
   // Sticky button
   ctaWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   ctaFade: { height: 40 },
-  cta: { height: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { minHeight: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28, color: '#FFFFFF' },
 
   // Popups
@@ -698,6 +698,6 @@ const styles = StyleSheet.create({
   popupIcon: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   popupTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 26, textAlign: 'center', marginTop: 14 },
   popupBody: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13, lineHeight: 20, textAlign: 'center', paddingHorizontal: 8, marginTop: 8 },
-  popupBtn: { alignSelf: 'stretch', height: 46, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 22 },
+  popupBtn: { alignSelf: 'stretch', minHeight: 46, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginTop: 22 },
   popupBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, color: '#FFFFFF' },
 });

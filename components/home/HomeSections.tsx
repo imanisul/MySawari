@@ -1331,12 +1331,12 @@ export function ConnectCard() {
 
 const styles = StyleSheet.create({
   // Banner
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, height: 64 }, cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 16, minHeight: 64 }, cityRow: { flexDirection: 'row', alignItems: 'center', gap: 0 },
   city: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, color: '#FFFFFF' },
   brandLine: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
   // Figma: 72x42 pill, padding 14/12 (vertical is centred, not padded, so the 20px text is not clipped), radius 40, gap 4.
-  walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, height: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
+  walletPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, width: 72, minHeight: 42, paddingHorizontal: 12, borderRadius: 40, backgroundColor: '#F0EFFD', borderWidth: 1, borderColor: '#D1CCF9' },
   walletCoin: { width: 12, height: 12 },
   walletText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, color: '#6B5AED' },
   // Figma Home price banner: 393×287 card with the price lockup and SUV trio.
@@ -1345,7 +1345,7 @@ const styles = StyleSheet.create({
   priceBannerRays: { position: 'absolute', left: -83.8375, top: -136.8375 },
   priceBannerText: { position: 'absolute', left: 40.281, top: 60.5, width: 312.438, height: 164, alignItems: 'center' },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2.394, height: 78, width: 312.438, zIndex: 1 },
-  priceLeadCol: { minWidth: 128.088, height: 64, alignItems: 'center', justifyContent: 'center' },
+  priceLeadCol: { minWidth: 128.088, minHeight: 64, alignItems: 'center', justifyContent: 'center' },
   priceCarShadow: { position: 'absolute', top: 188.39, left: 51.65, width: 290, height: 36, zIndex: 2 },
   priceCars: { position: 'absolute', top: 120.5, left: 10.5, width: 372, height: 124, zIndex: 3 },
   headlineBlock: { alignItems: 'center', marginTop: 12 },
@@ -1515,14 +1515,14 @@ const styles = StyleSheet.create({
   referTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   referTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20, flexShrink: 1 },
   referSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
-  referBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 20, paddingHorizontal: 8, borderRadius: 31 },
+  referBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 20, paddingHorizontal: 8, borderRadius: 31 },
   referBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
 
   // Search
   // Figma: 361px card, 6 padding, 8 between the tabs and the destination box, shadow 0 2 15 4 rgba(47,62,117,.08).
   searchCard: { marginHorizontal: 16, padding: 6, borderWidth: 1, borderRadius: 16, shadowColor: '#6B5AED', shadowOpacity: 0.08, shadowRadius: 15, shadowOffset: { width: 0, height: 2 }, elevation: 3 },
   // Figma: 56 high frame, 4 padding, 12 gap, 1px #E7EAF4 border, 12 radius, 20%-opaque fill; the tabs fill what is left inside.
-  tabs: { flexDirection: 'row', gap: 12, height: 56, padding: 4, borderWidth: 1, borderColor: '#E7EAF4', borderRadius: 12, backgroundColor: 'rgba(244,246,250,0.2)' },
+  tabs: { flexDirection: 'row', gap: 12, minHeight: 56, padding: 4, borderWidth: 1, borderColor: '#E7EAF4', borderRadius: 12, backgroundColor: 'rgba(244,246,250,0.2)' },
   tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6, borderRadius: 10, borderWidth: 1, borderColor: 'transparent' },
   // Selected tab (design): #F9F9FB fill, soft lavender-grey border.
   tabOn: { backgroundColor: '#F9F9FB', borderColor: '#C4C6DC' },
@@ -1531,7 +1531,7 @@ const styles = StyleSheet.create({
   destBox: {
     marginTop: 10,
     width: '100%',
-    height: 49,
+    minHeight: 49,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 9,
@@ -1568,12 +1568,12 @@ const styles = StyleSheet.create({
   pickTagText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 14, color: '#FFFFFF' },
   // 4 below the photo, then 6 between the title row and the price row (Figma gaps).
   pickBody: { paddingHorizontal: 4, paddingTop: 4, paddingBottom: 6 },
-  pickTitleRow: { flexDirection: 'row', alignItems: 'center', height: 37 },
+  pickTitleRow: { flexDirection: 'row', alignItems: 'center', minHeight: 37 },
   pickName: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 19.5 },
   pickMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   pickMetaDot: { width: 3, height: 3, borderRadius: 1.5 },
   pickMeta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5, flexShrink: 1 },
-  ratingPill: { flexDirection: 'row', alignItems: 'center', paddingTop: 1, paddingRight: 4, paddingBottom: 2, paddingLeft: 5, height: 20, borderRadius: 20 },
+  ratingPill: { flexDirection: 'row', alignItems: 'center', paddingTop: 1, paddingRight: 4, paddingBottom: 2, paddingLeft: 5, minHeight: 20, borderRadius: 20 },
   ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, color: '#FFFFFF' },
   pickPriceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: 4, marginHorizontal: -4, marginTop: 6 },
   // Figma trims both prices to cap height (leading-trim: cap), so their bottoms are the baseline.
@@ -1624,7 +1624,7 @@ const styles = StyleSheet.create({
   member: { marginHorizontal: 16, minHeight: 65, borderWidth: 1, borderRadius: 12, paddingVertical: 10, paddingHorizontal: 8, gap: 3, justifyContent: 'center', alignItems: 'stretch' },
   memberHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 3 },
   memberTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, flexShrink: 1 },
-  memberBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, height: 22, paddingHorizontal: 10, borderRadius: 31 },
+  memberBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, minHeight: 22, paddingHorizontal: 10, borderRadius: 31 },
   memberBtnText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
   rate: { marginHorizontal: 16, marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14, borderWidth: 1, borderRadius: 16 },
   rateBadge: { width: 46, height: 46, borderRadius: 23, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

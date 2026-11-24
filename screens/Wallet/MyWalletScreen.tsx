@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   balanceLabel: { fontFamily: PF.semibold, fontSize: 13 },
   balance: { fontFamily: PF.semibold, fontSize: 24, lineHeight: 34, marginTop: 8 },
   balanceErr: { fontFamily: PF.regular, fontSize: 12, marginTop: 8 },
-  withdrawBtn: { height: 29, paddingHorizontal: 11, borderRadius: 7, justifyContent: 'center' },
+  withdrawBtn: { minHeight: 29, paddingHorizontal: 11, borderRadius: 7, justifyContent: 'center' },
   withdrawText: { fontFamily: PF.regular, fontSize: 12.5, color: '#FFFFFF' },
   hint: { fontFamily: PF.regular, fontSize: 11.5, lineHeight: 17, marginTop: 6 },
   // Design: the empty message sits in the middle of the space under the balance card.
@@ -380,9 +380,9 @@ const styles = StyleSheet.create({
   sheetSub: { fontFamily: PF.regular, fontSize: 12, marginTop: 4, marginBottom: 6 },
   input: { height: 46, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, marginTop: 8, fontFamily: PF.regular, fontSize: 14 },
   methods: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  method: { flex: 1, height: 38, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  method: { flex: 1, minHeight: 38, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   methodText: { fontFamily: PF.medium, fontSize: 13 },
   error: { fontFamily: PF.regular, fontSize: 12, marginTop: 8 },
-  submit: { height: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
+  submit: { minHeight: 50, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 14 },
   submitText: { fontFamily: PF.semibold, fontSize: 16, color: '#FFFFFF' },
 });

@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   link: { fontFamily: F.medium, fontSize: 12, color: '#6B5AED', textDecorationLine: 'underline' },
   ok: { fontFamily: F.medium, fontSize: 13, color: '#008758', textAlign: 'center' },
   err: { fontFamily: F.medium, fontSize: 12, color: '#C62828', textAlign: 'center' },
-  btn: { alignSelf: 'stretch', height: 46, borderRadius: 12, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center' },
+  btn: { alignSelf: 'stretch', minHeight: 46, borderRadius: 12, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: F.semibold, fontSize: 15, color: '#FFFFFF' },
   btnGhost: { backgroundColor: '#F4F6FA' },
   btnGhostText: { color: '#6B5AED' },

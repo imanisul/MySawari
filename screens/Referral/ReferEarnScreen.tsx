@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   howSub: { fontFamily: PF.medium, fontSize: 11, lineHeight: 17 },
   // TODO: Match Figma history row: 12px/10px padding, 8px radius, and 15px SemiBold label (currently fixed 57px height,
   // 10px radius, and 16px Medium label).
-  history: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 10, height: 57, paddingHorizontal: 12, marginTop: 17 },
+  history: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 10, minHeight: 57, paddingHorizontal: 12, marginTop: 17 },
   historyIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   historyText: { flex: 1, fontFamily: PF.medium, fontSize: 16 },
   // TODO: Match Figma FAQ title: 15px SemiBold and 8px section padding (currently 16px Medium and 20px top margin).
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   linkLabel: { fontFamily: PF.medium, fontSize: 11, lineHeight: 16.5 },
   link: { fontFamily: PF.medium, fontSize: 11, lineHeight: 16.5, flexShrink: 1, marginLeft: 2, marginRight: 4 },
   footerBtns: { flexDirection: 'row', gap: 12 },
-  wa: { flex: 1, height: 54, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  wa: { flex: 1, minHeight: 54, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 },
   waLogo: { width: 25, height: 25, borderRadius: 12.5, backgroundColor: '#25D366', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
   // TODO: Match Figma CTA: 17px SemiBold label and a 50px share button (currently 18.5px Medium and 54px).
   waText: { fontFamily: PF.medium, fontSize: 14, color: '#FFFFFF' },
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: '#6B5AED',
     width: '100%',
-    height: 44,
+    minHeight: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',

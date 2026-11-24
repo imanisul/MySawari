@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
   radio: { alignItems: 'center', borderRadius: 9, borderWidth: 1.5, height: 18, justifyContent: 'center', width: 18 },
   radioOn: { backgroundColor: '#FFFFFF', borderColor: '#6B5AED' },
   radioOff: { backgroundColor: '#FFFFFF', borderColor: '#BFC3D4' },
-  cancel: { height: 50, borderRadius: 12, borderWidth: 1, borderColor: '#D4D4D4', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  cancel: { minHeight: 50, borderRadius: 12, borderWidth: 1, borderColor: '#D4D4D4', alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   cancelText: { color: '#262626', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22 },
   radioDot: { backgroundColor: '#6B5AED', borderRadius: 4, height: 8, width: 8 },
 });

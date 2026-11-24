@@ -318,17 +318,17 @@ const styles = StyleSheet.create({
   metaDot: { width: 3, height: 3, borderRadius: 1.5, marginHorizontal: 6 },
   // Rating: 28px navy pill (padding 4/9/4/10, 2 between the number and the 14px star), review count 4 below.
   ratingCol: { alignItems: 'center', gap: 4 },
-  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, height: 28, paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 10 },
+  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, minHeight: 28, paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 10 },
   ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   reviewCount: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
   // Figma "Delivery & Pickup": 361×63 border-box, padding 12, 12 between the text and the switch.
   deliveryCard: { borderWidth: 1, borderRadius: 10, paddingVertical: 11, paddingHorizontal: 12 },
   // Row is 335×39; with 11 + 1 border above and below the card is the 63 Figma shows.
-  deliveryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, height: 39 },
+  deliveryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 39 },
   // Figma "Need a driver?": 361×84, padding 12 (inner row 335×58), 12 between the text and the switch.
   driverCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, minHeight: 84, borderWidth: 1, borderRadius: 10, padding: 12 },
   segBox: { flexDirection: 'row', gap: 16, borderWidth: 1, borderRadius: 8, padding: 4, marginTop: 16 },
-  seg: { flex: 1, height: 34, borderRadius: 6, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
+  seg: { flex: 1, minHeight: 34, borderRadius: 6, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   segText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13.5 },
   locBox: { borderWidth: 1, borderRadius: 10, marginTop: 8 },
   locRows: { paddingTop: 8, paddingBottom: 5, gap: 9 },
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
   locAdd: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, textDecorationLine: 'underline', marginTop: 3 },
   locValue: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 12.5, marginTop: 3 },
   locDivider: { height: 1, marginHorizontal: 8 },
-  sameRow: { flexDirection: 'row', alignItems: 'center', gap: 8.5, paddingHorizontal: 9.5, height: 36 },
+  sameRow: { flexDirection: 'row', alignItems: 'center', gap: 8.5, paddingHorizontal: 9.5, minHeight: 36 },
   checkbox: { width: 12.5, height: 12.5, borderRadius: 2.5, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   sameText: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 13 },
   keepRow: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-end', gap: 4, marginTop: 10 },

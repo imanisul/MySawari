@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   textBlock: { gap: 8 },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 30, lineHeight: 45, textAlign: 'center', color: '#2B386A' },
   subtitle: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, textAlign: 'center', color: '#737373' },
-  cta: { height: 54, borderRadius: 12, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center', padding: 12 },
+  cta: { minHeight: 54, borderRadius: 12, backgroundColor: '#6B5AED', alignItems: 'center', justifyContent: 'center', padding: 12 },
   ctaText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26, color: '#FFFFFF', textAlign: 'center' },
 });
 

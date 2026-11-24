@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   tickCircle: { width: 79, height: 79, borderRadius: 39.5, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: FONT.semibold, fontSize: 22, lineHeight: 30, textAlign: 'center', marginTop: 28, letterSpacing: -0.2 },
   sub: { fontFamily: FONT.regular, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6, paddingHorizontal: 12 },
-  amount: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch', height: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, marginTop: 26 },
+  amount: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', alignSelf: 'stretch', minHeight: 44, borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, marginTop: 26 },
   amountLabel: { fontFamily: FONT.regular, fontSize: 13 },
   amountValue: { fontFamily: FONT.semibold, fontSize: 16 },
   steps: { alignSelf: 'stretch', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingTop: 16, paddingBottom: 4, marginTop: 12 },

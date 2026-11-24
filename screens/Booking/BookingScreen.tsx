@@ -480,7 +480,7 @@ export default function BookingScreen() {
                     )}
                   </View>
                   <Text style={[styles.carMeta, { color: p.muted }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{meta.join('  •  ')}</Text>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`${mode}, change driving option`} onPress={chooseDriver} hitSlop={6}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`${mode}, change driving option`} onPress={chooseDriver} disabled={selectedCar.type === 'Bike'} hitSlop={6}>
                     <Text style={[styles.carMeta, { color: p.muted }]}>{mode}  •  {days} day{days === 1 ? '' : 's'}</Text>
                   </Pressable>
                   {ready && (
@@ -811,7 +811,7 @@ const styles = StyleSheet.create({
   carImage: { width: 120, minHeight: 116, alignSelf: 'stretch', borderRadius: 6, overflow: 'hidden' },
   brand: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16 },
   carName: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
-  rating: { flexDirection: 'row', alignItems: 'center', gap: 2, height: 28, paddingLeft: 10, paddingRight: 9, borderRadius: 20 },
+  rating: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 28, paddingLeft: 10, paddingRight: 9, borderRadius: 20 },
   ratingText: { fontFamily: FONT.semibold, fontSize: 13, color: '#FFFFFF' },
   carMeta: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 16, marginTop: 2 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
@@ -838,16 +838,16 @@ const styles = StyleSheet.create({
   stopSub: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 17 },
   changeText: { fontFamily: FONT.medium, fontSize: 12, paddingLeft: 8 },
 
-  couponField: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, height: 50, paddingLeft: 12, paddingRight: 6 },
+  couponField: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, minHeight: 50, paddingLeft: 12, paddingRight: 6, paddingVertical: 4 },
   couponInput: { flex: 1, fontFamily: FONT.medium, fontSize: 13, padding: 0 },
   apply: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
-  applyBtn: { height: 36, paddingHorizontal: 16, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  applyBtn: { minHeight: 36, paddingHorizontal: 16, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   couponError: { fontFamily: FONT.medium, fontSize: 11, marginTop: 6 },
   couponApplied: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, minHeight: 48, paddingHorizontal: 12, paddingVertical: 8 },
   couponAppliedTitle: { fontFamily: FONT.semibold, fontSize: 13 },
   couponAppliedSub: { fontFamily: FONT.regular, fontSize: 11, marginTop: 2 },
   chips: { gap: 8, paddingTop: 8 },
-  chip: { borderRadius: 4, height: 25, paddingHorizontal: 8, justifyContent: 'center' },
+  chip: { borderRadius: 4, minHeight: 25, paddingHorizontal: 8, justifyContent: 'center' },
   chipText: { fontFamily: FONT.semibold, fontSize: 11 },
 
   saveCard: { borderWidth: 1, borderRadius: 12, padding: 12 },
@@ -855,7 +855,7 @@ const styles = StyleSheet.create({
   saveIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   saveTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
   saveSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16 },
-  cashChip: { alignSelf: 'flex-start', borderRadius: 2, paddingHorizontal: 4, height: 17, justifyContent: 'center' },
+  cashChip: { alignSelf: 'flex-start', borderRadius: 2, paddingHorizontal: 4, minHeight: 17, justifyContent: 'center' },
   cashChipText: { fontFamily: FONT.medium, fontSize: 11 },
   cashNote: { fontFamily: FONT.medium, fontSize: 10.5, marginTop: 6, marginLeft: 48 },
   divider: { height: 1, marginVertical: 12, marginHorizontal: -12 },
@@ -864,7 +864,7 @@ const styles = StyleSheet.create({
   radio: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, backgroundColor: '#FFFFFF' },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   planName: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
-  saveChip: { height: 19, paddingHorizontal: 8, borderRadius: 10, justifyContent: 'center' },
+  saveChip: { minHeight: 19, paddingHorizontal: 8, borderRadius: 10, justifyContent: 'center' },
   saveChipText: { fontFamily: FONT.semibold, fontSize: 8, color: '#FFFFFF' },
   planSub: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16, marginTop: 4 },
   planPrice: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },

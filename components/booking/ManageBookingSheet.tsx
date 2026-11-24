@@ -86,6 +86,6 @@ const styles = StyleSheet.create({
   noticeTitle: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17 },
   noticeBody: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
   subhead: { fontFamily: FONT.semibold, fontSize: 14, lineHeight: 23 },
-  cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { minHeight: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: FONT.medium, fontSize: 14, lineHeight: 26 },
 });

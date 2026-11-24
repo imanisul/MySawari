@@ -182,8 +182,10 @@ const LAST_ACTIVE_KEY = '@mysawari_last_active_at';
 export function SawariProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [vehicleType, setVehicleType] = useState<'car' | 'bike'>('car');
-  const [mode, setMode] = useState<DriverMode>('Self Drive');
+  const [modeChoice, setMode] = useState<DriverMode>('Self Drive');
   const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
+  // Bikes are self-ride only: a "With Driver" left over from a car must not add the driver charge to a bike.
+  const mode: DriverMode = selectedCar?.type === 'Bike' ? 'Self Drive' : modeChoice;
   const [planToBuy, setPlanToBuy] = useState<'starter' | 'plus' | 'pro' | null>(null);
   // The plan included in the booking being paid for (set when the car is held, read after payment).
   const planInPayment = useRef<'starter' | 'plus' | 'pro' | null>(null);

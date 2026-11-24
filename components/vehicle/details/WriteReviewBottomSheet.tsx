@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     paddingHorizontal: 14,
-    height: 44,
+    minHeight: 44,
     fontFamily: 'Inter_400Regular',
     fontSize: 14,
     marginBottom: 12,
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   photoAddText: { fontFamily: 'Inter_500Medium', fontSize: 10, color: '#6B7280', marginTop: 2 },
   footer: { paddingHorizontal: 16, paddingTop: 10, borderTopWidth: StyleSheet.hairlineWidth },
   submitBtn: {
-    height: 50,
+    minHeight: 50,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',

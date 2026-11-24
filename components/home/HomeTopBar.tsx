@@ -443,7 +443,7 @@ const s = StyleSheet.create({
   // Date field 145–196, 14 below it → 210 total (Figma). 64 + 12 + 49 + 8 + 12 = 145.
   searchWrap: { marginTop: 8, paddingTop: 12, paddingHorizontal: 16, paddingBottom: 14 },
   search: {
-    height: 51, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12,
+    minHeight: 51, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 4,
     backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#D1CCF9', borderRadius: 12,
   },
   searchText: { flex: 1, fontFamily: F.medium, fontSize: 15, lineHeight: 22, color: '#737373' },

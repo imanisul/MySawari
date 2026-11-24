@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   check: { alignSelf: 'center', width: 79, height: 79, borderRadius: 39.5, alignItems: 'center', justifyContent: 'center' },
   title: { fontFamily: FONT.semibold, fontSize: 24, lineHeight: 32, textAlign: 'center', marginTop: 34, letterSpacing: -0.2 },
   sub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 6 },
-  idPill: { borderWidth: 1, borderRadius: 8, height: 38, alignItems: 'center', justifyContent: 'center', marginTop: 26 },
+  idPill: { borderWidth: 1, borderRadius: 8, minHeight: 38, alignItems: 'center', justifyContent: 'center', marginTop: 26 },
   idText: { fontFamily: FONT.semibold, fontSize: 13 },
   card: { borderWidth: 1, borderRadius: 12, padding: 12, marginTop: 12, gap: 12 },
   carRow: { flexDirection: 'row', gap: 12 },
@@ -208,6 +208,6 @@ const styles = StyleSheet.create({
   footerWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   fade: { height: 64 },
   footer: { paddingHorizontal: 16, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth, boxShadow: '0px -6px 18px rgba(47, 62, 117, 0.07)' },
-  cta: { height: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { minHeight: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: FONT.medium, fontSize: 16, color: '#FFFFFF' },
 });

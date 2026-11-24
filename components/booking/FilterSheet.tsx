@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
-  applyBtn: { alignItems: 'center', backgroundColor: '#6B5AED', borderRadius: 12, height: 54, justifyContent: 'center', width: '100%' },
+  applyBtn: { alignItems: 'center', backgroundColor: '#6B5AED', borderRadius: 12, minHeight: 54, justifyContent: 'center', width: '100%' },
   applyText: { color: '#FFFFFF', fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 17, lineHeight: 26 },
   footer: {
     padding: 16,

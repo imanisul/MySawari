@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   // "You're saving / ₹300 / on this booking": 56 tall, so the dashes and title always land in the same place.
-  saveBlock: { height: 56, alignItems: 'center', justifyContent: 'center' },
+  saveBlock: { minHeight: 56, alignItems: 'center', justifyContent: 'center' },
   saving: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9.5, lineHeight: 13, color: '#525252' },
   amount: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 22, lineHeight: 28, color: '#008758' },
   onThis: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 9.5, lineHeight: 13, color: '#262626' },

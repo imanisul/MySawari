@@ -275,14 +275,14 @@ export function RefundTrackingModal({ visible, onClose, booking, onRefundUpdated
                 onPress={() => { setEditing(false); setError(null); }}
                 style={({ pressed }) => [styles.cta, styles.ctaGhost, { borderColor: c.segBorder, opacity: pressed ? 0.85 : 1 }]}
               >
-                <Text style={[styles.ctaText, { color: c.mutedForeground }]}>Cancel</Text>
+                <Text style={[styles.ctaText, { color: c.mutedForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancel</Text>
               </Pressable>
               <Pressable
                 disabled={saving}
                 onPress={save}
                 style={({ pressed }) => [styles.cta, { flex: 1.4, backgroundColor: c.primary, opacity: pressed ? 0.85 : 1 }]}
               >
-                {saving ? <ActivityIndicator color={c.primaryForeground} /> : <Text style={[styles.ctaText, { color: c.primaryForeground }]}>Save details</Text>}
+                {saving ? <ActivityIndicator color={c.primaryForeground} /> : <Text style={[styles.ctaText, { color: c.primaryForeground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Save details</Text>}
               </Pressable>
             </View>
           </View>
@@ -327,14 +327,14 @@ const styles = StyleSheet.create({
   editLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   editText: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
   switchRow: { flexDirection: 'row', gap: 8 },
-  switchBtn: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  switchBtn: { flex: 1, minHeight: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   originalBox: { flexDirection: 'row', gap: 10, borderWidth: 1, borderRadius: 8, padding: 12, alignItems: 'flex-start' },
   originalTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 18 },
   originalDesc: { fontFamily: FONT.medium, fontSize: 11.5, lineHeight: 17 },
   note: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
   bottom: { paddingHorizontal: 16, paddingTop: 8, gap: 12 },
   ctaRow: { flexDirection: 'row', gap: 10 },
-  cta: { flex: 1, height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { flex: 1, minHeight: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaGhost: { borderWidth: 1 },
   ctaText: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
 });

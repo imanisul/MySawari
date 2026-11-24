@@ -44,10 +44,19 @@ const SCALED_MARKER = typeof Symbol !== 'undefined' ? Symbol('__mysawari_scaled_
 function scaleStyleObject(s: any): any {
   if (!s || typeof s !== 'object' || (s as any)[SCALED_MARKER]) return s;
   if (typeof s.fontSize === 'number' || typeof s.lineHeight === 'number') {
+    const rawFs = typeof s.fontSize === 'number' ? Math.round(s.fontSize * k * 10) / 10 : undefined;
+    let rawLh = typeof s.lineHeight === 'number' ? Math.round(s.lineHeight * k * 10) / 10 : undefined;
+
+    // Guard against vertical text clipping: if a style specifies a fixed lineHeight that is too tight
+    // (less than 1.2x fontSize), letters with descenders/ascenders get clipped when system font scales up.
+    if (typeof rawFs === 'number' && typeof rawLh === 'number' && rawLh < rawFs * 1.2) {
+      rawLh = Math.round(rawFs * 1.25 * 10) / 10;
+    }
+
     const scaled: any = {
       ...s,
-      ...(typeof s.fontSize === 'number' ? { fontSize: Math.round(s.fontSize * k * 10) / 10 } : null),
-      ...(typeof s.lineHeight === 'number' ? { lineHeight: Math.round(s.lineHeight * k * 10) / 10 } : null),
+      ...(rawFs !== undefined ? { fontSize: rawFs } : null),
+      ...(rawLh !== undefined ? { lineHeight: rawLh } : null),
     };
     try {
       Object.defineProperty(scaled, SCALED_MARKER, { value: true, enumerable: false, configurable: true });
@@ -78,10 +87,24 @@ if (Math.abs(k - 1) > 0.01) {
   };
 }
 
-// System font scaling cap:
-// - On short screens (< 720px height), cap at 1.15 to ensure words don't overflow compact cards
-// - On standard/tall screens, cap at 1.2
-const maxFontMultiplier = screenH < 720 ? 1.15 : 1.2;
+// The phone's font size setting is followed up to 1.2× (the standard accessible step). Boxes that hold text use
+// minHeight, so they grow with it; fixed artwork blocks (Flash Sale page, Home deals row, tab bar) pin their own text.
+// Beyond 1.2× (Android 14+ goes to 2×) text stops growing so no layout breaks.
+export const maxFontMultiplier = 1.2;
+
+/** Helper props to guarantee text auto-fits single line on small devices or big font scales */
+export const ADAPTIVE_SINGLE_LINE = {
+  numberOfLines: 1,
+  adjustsFontSizeToFit: true,
+  minimumFontScale: 0.8,
+} as const;
+
+export const ADAPTIVE_BUTTON_TEXT = {
+  numberOfLines: 1,
+  adjustsFontSizeToFit: true,
+  minimumFontScale: 0.82,
+  maxFontSizeMultiplier: 1.15,
+} as const;
 
 try {
   const RN = require('react-native');
@@ -89,9 +112,13 @@ try {
     const Base = RN[name];
     const Capped: any = React.forwardRef((props: any, ref: any) => {
       const scaledStyle = scalePropStyle(props?.style);
+      const userMax = typeof props?.maxFontSizeMultiplier === 'number' ? props.maxFontSizeMultiplier : undefined;
+      // Cap at 1.25 max even if an unconstrained or extreme multiplier is requested, unless allowFontScaling is false
+      const effectiveMax = userMax !== undefined ? Math.min(userMax, 1.25) : maxFontMultiplier;
+
       return React.createElement(Base, {
-        maxFontSizeMultiplier: maxFontMultiplier,
         ...props,
+        maxFontSizeMultiplier: effectiveMax,
         ...(scaledStyle !== props?.style ? { style: scaledStyle } : null),
         ref,
       });

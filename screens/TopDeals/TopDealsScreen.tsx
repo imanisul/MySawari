@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   vehicleTypeChip: {
-    height: 32,
+    minHeight: 32,
     paddingHorizontal: 14,
     alignItems: 'center',
     justifyContent: 'center',
@@ -920,7 +920,7 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     minWidth: 68,
-    height: 38,
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -940,7 +940,7 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
   quickFilterChip: {
-    height: 38,
+    minHeight: 38,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 14,
@@ -1131,7 +1131,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   comfortPill: {
-    height: 28,
+    minHeight: 28,
     paddingHorizontal: 10,
     backgroundColor: '#6B5AED',
     borderRadius: 20,
@@ -1189,7 +1189,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    height: 50,
+    minHeight: 50,
   },
   titleCol: {
     flex: 1,
@@ -1206,7 +1206,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    height: 20,
+    minHeight: 20,
   },
   specText: {
     fontFamily: 'PlusJakartaSans_500Medium',
@@ -1233,7 +1233,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
     width: 56,
-    height: 28,
+    minHeight: 28,
     paddingLeft: 10,
     paddingRight: 9,
     backgroundColor: '#6B5AED',
@@ -1270,7 +1270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 8,
-    height: 25,
+    minHeight: 25,
     paddingHorizontal: 4,
     alignSelf: 'stretch',
   },
@@ -1297,7 +1297,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 25,
+    minHeight: 25,
   },
   viewDetailsText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',
@@ -1314,7 +1314,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 8,
     gap: 12,
-    height: 17,
+    minHeight: 17,
     alignSelf: 'stretch',
   },
   extendText: {

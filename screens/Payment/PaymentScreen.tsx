@@ -545,7 +545,7 @@ export default function PaymentScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  topBar: { alignItems: 'center', flexDirection: 'row', height: 64, paddingHorizontal: 16 },
+  topBar: { alignItems: 'center', flexDirection: 'row', minHeight: 64, paddingHorizontal: 16 },
   headerIconButton: { alignItems: 'center', borderRadius: 16, height: 32, justifyContent: 'center', width: 32 },
   headerCopy: { flex: 1, gap: 2, justifyContent: 'center', marginHorizontal: 12 },
   title: { fontFamily: 'Inter_600SemiBold', fontSize: 13, lineHeight: 20 },
@@ -566,5 +566,5 @@ const styles = StyleSheet.create({
   applyBtn: { paddingHorizontal: 20, justifyContent: 'center', alignItems: 'center', borderRadius: 8 },
   couponItem: { borderWidth: 1, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center' },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, borderTopWidth: 1, padding: 20, flexDirection: 'row', alignItems: 'center' },
-  payButton: { paddingHorizontal: 32, height: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }
+  payButton: { paddingHorizontal: 32, minHeight: 56, borderRadius: 16, justifyContent: 'center', alignItems: 'center' }
 });

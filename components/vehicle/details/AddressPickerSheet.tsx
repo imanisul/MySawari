@@ -137,6 +137,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 8, paddingLeft: 11, paddingRight: 6, paddingVertical: 11 },
   rowName: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
   rowAddr: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 4 },
-  button: { height: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 17 },
+  button: { minHeight: 53, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 17 },
   buttonText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 17 },
 });

@@ -250,7 +250,7 @@ export function CancelBookingSheet({
             {loading ? (
               <ActivityIndicator color={c.primaryForeground} />
             ) : (
-              <Text style={[styles.ctaText, { color: canSubmit ? c.primaryForeground : c.disabledText }]}>Cancellation request</Text>
+              <Text style={[styles.ctaText, { color: canSubmit ? c.primaryForeground : c.disabledText }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Cancellation request</Text>
             )}
           </Pressable>
         </View>}
@@ -332,16 +332,16 @@ const styles = StyleSheet.create({
   radio: { width: 14, height: 14, borderRadius: 7, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   radioDot: { width: 4, height: 4, borderRadius: 2 },
   radioText: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20 },
-  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, height: 46, fontFamily: FONT.medium, fontSize: 13 },
+  input: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, minHeight: 46, fontFamily: FONT.medium, fontSize: 13 },
   reasonInput: { minHeight: 46, height: undefined, paddingVertical: 12, lineHeight: 20, textAlignVertical: 'top' },
   switchRow: { flexDirection: 'row', gap: 8 },
-  switchBtn: { flex: 1, height: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  switchBtn: { flex: 1, minHeight: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   bottom: { paddingHorizontal: 16, paddingTop: 8, gap: 16 },
   agreeRow: { flexDirection: 'row', gap: 6, alignItems: 'flex-start' },
   check: { width: 16, height: 16, borderRadius: 4, borderWidth: 1, marginTop: 2, alignItems: 'center', justifyContent: 'center' },
   agreeText: { flex: 1, fontFamily: FONT.medium, fontSize: 13, lineHeight: 20 },
   error: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 18 },
-  cta: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cta: { minHeight: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   ctaText: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
   popupOverlay: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 36, gap: 8 },
   popup: { width: '100%', maxWidth: 320, borderRadius: 20, borderWidth: 1, borderColor: '#EAECF1', paddingTop: 20, paddingHorizontal: 12, paddingBottom: 12, gap: 16 },

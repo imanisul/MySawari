@@ -227,8 +227,7 @@ const CarListCardUI = React.memo(function CarListCardUI({ car, style, onCarPress
             </View>
             {unavailable ? (
               <View style={styles.linkRow}>
-                <Text
-                  style={[styles.availText, { color: (availability.availableToday || availability.nextAvailableFrom) && availability.reason !== 'service' ? p.green : p.red }]}
+                <Text style={[styles.availText, { color: (availability.availableToday || availability.nextAvailableFrom) && availability.reason !== 'service' ? p.green : p.red }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
@@ -313,14 +312,14 @@ const styles = StyleSheet.create({
   metaDot: { width: 3, height: 3, borderRadius: 2 },
   meta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, flexShrink: 1 },
   ratingCol: { alignItems: 'center', gap: 4 },
-  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, height: 28, paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 10 },
+  ratingPill: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 20, minHeight: 28, paddingTop: 4, paddingRight: 9, paddingBottom: 4, paddingLeft: 10 },
   ratingText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   reviews: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
   // Price row: 25 high, 4 side padding; the price and the struck rate are trimmed to cap height (Figma leading-trim: cap).
-  priceBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, height: 25, paddingHorizontal: 4 },
+  priceBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, minHeight: 25, paddingHorizontal: 4 },
   priceWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 },
   // Member pill: 22 high, 6/10 padding, 4 between the lock and the text, #6B5AED.
-  memberPill: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 22, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 20, backgroundColor: '#6B5AED' },
+  memberPill: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 22, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 20, backgroundColor: '#6B5AED' },
   memberText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 9, lineHeight: 10, letterSpacing: 0.18, color: '#FFFFFF', includeFontPadding: false },
   priceRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 2 },
   price: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28.5, marginTop: -7.85, marginBottom: -6.5, includeFontPadding: false },

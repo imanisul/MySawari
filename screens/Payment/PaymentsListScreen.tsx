@@ -531,6 +531,6 @@ const styles = StyleSheet.create({
   typeBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   inputBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingHorizontal: 16, height: 56, marginBottom: 16 },
   input: { flex: 1, fontFamily: 'Inter_500Medium', fontSize: 16, height: '100%' },
-  saveBtn: { height: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
+  saveBtn: { minHeight: 56, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
   saveBtnText: { fontFamily: 'Inter_700Bold', fontSize: 16, color: '#FFFFFF' }
 });

@@ -98,8 +98,7 @@ export function VehicleHeader({
             <View style={styles.editBtn}>
               <Feather name={isDatesLocked ? 'lock' : 'edit'} size={10} color={isDatesLocked ? p.sub : p.navy} style={styles.editIcon} />
               <View style={styles.editBox}>
-                <Text
-                  style={[styles.editText, { color: isDatesLocked ? p.sub : p.navy }]}
+                <Text style={[styles.editText, { color: isDatesLocked ? p.sub : p.navy }]}
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.75}
@@ -145,18 +144,21 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingHorizontal: 16, paddingVertical: 12, minHeight: 64 },
   iconBtn: { width: 32, height: 32, borderRadius: 16, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   // Frame 94: column of 20px title + 17px date row, 2px apart.
-  titleCol: { flex: 1, gap: 2, justifyContent: 'center' },
+  // minWidth 0: a long name or date line shrinks inside the row instead of pushing the heart / share off a narrow phone.
+  titleCol: { flex: 1, minWidth: 0, gap: 2, justifyContent: 'center' },
   // Figma's text box is exactly 20px high and centres its single 13/20 line.
-  titleBox: { height: 20, justifyContent: 'center' },
+  titleBox: { minHeight: 20, justifyContent: 'center' },
   title: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
-  tripRow: { height: 17, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tripRow: { minHeight: 17, flexDirection: 'row', alignItems: 'center', gap: 6 },
   // Medium/xs box: 11px on a 150% line = 16px, centred.
-  tripBox: { height: 16, justifyContent: 'center', flexShrink: 1 },
+  tripBox: { minHeight: 16, justifyContent: 'center', flexShrink: 1 },
   trip: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16, flexShrink: 1 },
-  editBtn: { width: 28, height: 12, flexDirection: 'row', alignItems: 'center' },
+  // Sized by its content (icon 10 + 2 + label): the old fixed 28 held a 10 icon and a 26 label, so "Edit" spilt 8px.
+  editBtn: { minHeight: 12, flexDirection: 'row', alignItems: 'center', gap: 2, flexShrink: 0 },
   editIcon: { width: 10, height: 10, flexShrink: 0 },
-  editBox: { width: 26, height: 12, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  editText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 10, textDecorationLine: 'underline' },
+  editBox: { minHeight: 12, justifyContent: 'center', flexShrink: 0 },
+  // 12 line (not 10) so Android doesn't clip the 11px letters.
+  editText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 12, textDecorationLine: 'underline', includeFontPadding: false },
   // Frame 24: two 32px circles, 8 apart, right aligned -- 32+8+32 = 72 wide, 32 tall.
   actions: { width: 72, height: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 8 },
 });

@@ -466,7 +466,8 @@ export default function CarDetailsScreen() {
           <VehicleHeroGallery car={enrichedCar} />
           {/* Figma: 8 below the photos, 8 above the "Need a driver?" card, then 8 and the mileage block's own 8. */}
           <View style={{ height: 16 }} />
-          <DriverCard />
+          {/* Bikes are self-ride only, so no driver option. */}
+          {enrichedCar?.type !== 'Bike' && <DriverCard />}
           <View style={{ height: 8 }} />
 
           <View onLayout={(e) => { mileageEnd.current = e.nativeEvent.layout.y + e.nativeEvent.layout.height; }}>
@@ -578,10 +579,10 @@ export default function CarDetailsScreen() {
 
 const styles = StyleSheet.create({
   floatWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 16 },
-  floatCard: { width: 325, maxWidth: '100%', height: 45, flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 6, paddingRight: 8, paddingLeft: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 10, shadowColor: '#6B5AED', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
+  floatCard: { width: 325, maxWidth: '100%', minHeight: 45, flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 6, paddingBottom: 6, paddingRight: 8, paddingLeft: 10, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: 10, shadowColor: '#6B5AED', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 4 },
   floatTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, includeFontPadding: false },
   floatSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 9, lineHeight: 14, includeFontPadding: false },
-  floatBtn: { flexShrink: 0, minWidth: 96, height: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },
+  floatBtn: { flexShrink: 0, minWidth: 96, minHeight: 31, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 6, paddingHorizontal: 8, borderRadius: 6 },
   floatBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5, includeFontPadding: false },
   screen: { flex: 1 },
 });

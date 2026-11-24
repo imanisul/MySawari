@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, ScrollView, Linking, LayoutAnimation
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
-import Svg, { Defs, RadialGradient, Stop, Rect, Path } from 'react-native-svg';
+import Svg, { Defs, RadialGradient, Stop, Rect, Path, Circle } from 'react-native-svg';
 import { Image } from 'expo-image';
 import type { ImageSourcePropType } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -637,11 +637,11 @@ const WHY = [
   { title: 'Lowest rent in the market', desc: 'Our daily rates are 200-500 lesser than the market rates' },
   { title: 'Well maintained vehicles', desc: 'Being the largest car/bike rental company in Guwahati, we have in-house maintenance team to keep our vehicles maintained all the time' },
   { title: 'True roadside assistance', desc: 'We have a dedicated support and roadside assistance team and we actually provide roadside assistance, not just claim' },
-  { title: 'Unlimited kilometres', desc: 'Trips should not have limits, hence we provide unlimited kilometres on all our bookings' },
-  { title: 'Zero cancellation/rescheduling fees', desc: 'We provide 100% refund for cancellations till 24 hours prior to trip start time & charge zero fees for rescheduling' },
+  { title: 'Unlimited kilometres', desc: 'Trips should not have limits, hence we provide unlimited km for all bookings of 2 days or longer duration' },
+  { title: 'Zero cancellation/rescheduling fees', desc: 'We provide 100% refund for cancellations till 24 hours prior to trip start time and also charge zero fees for rescheduling' },
   { title: 'Wide variety of vehicles', desc: 'Being the largest car/bike rental company, we offer a wide variety of options to choose from' },
   { title: 'No hidden charges', desc: "We don't apply any hidden charges. Our rates are super transparent. What you see is what you pay." },
-  { title: 'Zero security deposit', desc: "You won't have to pay any security amount for taking a vehicle on rent from us. We keep just the original DL as a security." },
+  { title: 'Zero security deposit', desc: "You won't have to pay any security amount to us for taking a vehicle on rent from us. We keep just the original DL as a security." },
   { title: 'Doorstep/Airport Delivery', desc: 'We provide doorstep or airport delivery for a nominal delivery charge of Rs.200+Rs.20/km.' },
   { title: 'Lowest booking amount', desc: "While other agencies charge Rs.1,000-Rs.5,000 booking amount, our booking amount is just Rs.500. And it's 100% refundable/adjustable." },
   { title: 'Multiple payment options', desc: 'We accept all payment modes - cash, card, UPI etc.' },
@@ -669,23 +669,22 @@ export function WhyRent() {
   return (
     // 8 above and below like the other sections, so Location below it sits 16 off the card.
     <View style={[styles.block, { paddingTop: 8, paddingBottom: 8 }]}>
-      {/* linear-gradient(236.34deg, #D5D9EA -14.94%, #EEF0F7 67.82%) on a 361×307 card: the line runs from
-          (1.04, 0.08) to (-0.04, 0.92) of the card, and the colour at its start is #D5D9EA already 15% of the way
-          to #EEF0F7 (#D5D9EA), reaching #EEF0F7 at 67.82%. */}
+      {/* Figma: linear-gradient(236.34deg, #D1CCF9 -14.94%, #F0EFFD 67.82%) on a 361×307 card, border 1 #D1CCF9:
+          the line runs from (1.04, 0.08) to (-0.04, 0.92) of the card, reaching #F0EFFD at 67.82%. */}
       <LinearGradient
-        colors={whyLight ? ['#D5D9EA', '#EEF0F7', '#EEF0F7'] : ['#D5D9EA', p.purpleBg, p.purpleBg]}
+        colors={whyLight ? ['#D1CCF9', '#F0EFFD', '#F0EFFD'] : ['#D1CCF9', p.purpleBg, p.purpleBg]}
         locations={[0, 0.6782, 1]}
         start={{ x: 1.042, y: 0.075 }}
         end={{ x: -0.042, y: 0.925 }}
-        style={[styles.whyCard, { borderColor: whyLight ? '#D5D9EA' : p.memberBorder }]}
+        style={[styles.whyCard, { borderColor: whyLight ? '#D1CCF9' : p.memberBorder }]}
       >
-        {/* Figma "Ellipse 4": a 151×147 #4B5A9E blob, blurred 67, centred about 58 in from the right edge and 13 above the
+        {/* Figma "Ellipse 4": a 151×147 #9C90F3 blob, blurred 67, centred about 58 in from the right edge and 13 above the
             card's top. Drawn as a soft radial wash from that point (SVG filters are unreliable on Android). */}
         <Svg style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
             <RadialGradient id="whyGlow" cx="84%" cy="-4%" rx="42%" ry="48%" fx="84%" fy="-4%">
-              <Stop offset="0" stopColor={whyLight ? '#4B5A9E' : p.purpleGlow} stopOpacity="0.6" />
-              <Stop offset="1" stopColor={whyLight ? '#4B5A9E' : p.purpleGlow} stopOpacity="0" />
+              <Stop offset="0" stopColor={whyLight ? '#9C90F3' : p.purpleGlow} stopOpacity="0.6" />
+              <Stop offset="1" stopColor={whyLight ? '#9C90F3' : p.purpleGlow} stopOpacity="0" />
             </RadialGradient>
           </Defs>
           <Rect x="0" y="0" width="100%" height="100%" fill="url(#whyGlow)" />
@@ -704,8 +703,12 @@ export function WhyRent() {
           >
             {why.map((w) => (
               <View key={w.title} style={styles.whyRow}>
-                <View style={[styles.whyCheck, { backgroundColor: whyLight ? '#6B5AED' : p.purpleCheck }]}>
-                  <Feather name="check" size={11} color="#FFFFFF" />
+                {/* Figma Frame 2147225605: 24×28 (4 on top); a 20 #6B5AED circle (8.33% inset) with a 1px white tick. */}
+                <View style={styles.whyCheckBox}>
+                  <Svg width={24} height={24} viewBox="0 0 24 24">
+                    <Circle cx={12} cy={12} r={10} fill={whyLight ? '#6B5AED' : p.purpleCheck} />
+                    <Path d="M8 12.5L10.5 14.5L16 9" stroke="#FFFFFF" strokeWidth={1} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  </Svg>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.whyItemTitle, { color: p.fg }]}>{w.title}</Text>
@@ -1018,7 +1021,7 @@ const styles = StyleSheet.create({
   mileCard: { paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12, gap: 12 },
   mileRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 37 },
   mileHead: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-  mileTag: { borderRadius: 9, paddingHorizontal: 7, height: 17, justifyContent: 'center' },
+  mileTag: { borderRadius: 9, paddingHorizontal: 7, minHeight: 17, justifyContent: 'center' },
   mileTagText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, color: '#FFFFFF', letterSpacing: 0.2 },
   mileTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   mileSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
@@ -1026,17 +1029,17 @@ const styles = StyleSheet.create({
   addDayCard: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingLeft: 12, paddingRight: 10, paddingVertical: 12, marginTop: 12, gap: 12 },
   addDayTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   addDaySub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
-  addDayBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 6, paddingHorizontal: 10, height: 36 },
+  addDayBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 6, paddingHorizontal: 10, minHeight: 36 },
   addDayBtnText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
 
   // Figma "Car Details Navigation": 393×50, padding 4/16/10, 4 between the pills (so a 36px pill).
   pills: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 10, gap: 4, alignItems: 'center' },
   // Figma "Link": padding 8 / 12, 36 high, fully round, 4 apart; the label is 13 / 20 medium.
-  pill: { borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 8, height: 36, alignItems: 'center', justifyContent: 'center' },
+  pill: { borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 8, minHeight: 36, alignItems: 'center', justifyContent: 'center' },
   pillText: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20, includeFontPadding: false },
 
   table: { borderWidth: 1, borderRadius: 10, overflow: 'hidden' },
-  tableRow: { flexDirection: 'row', alignItems: 'center', height: 36, paddingHorizontal: 12 },
+  tableRow: { flexDirection: 'row', alignItems: 'center', minHeight: 36, paddingHorizontal: 12 },
   tableLabelCol: { width: '52.2%', flexDirection: 'row', alignItems: 'center', gap: 7 },
   tableLabel: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13 },
   tableValue: { flex: 1, fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 25 },
@@ -1055,7 +1058,7 @@ const styles = StyleSheet.create({
   planRadioDot: { width: 5.5, height: 5.5, borderRadius: 3 },
   addedRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 10, paddingHorizontal: 2 },
   addedText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
-  saveChip: { borderRadius: 10, paddingHorizontal: 8, height: 19.5, justifyContent: 'center', marginLeft: 0.5 },
+  saveChip: { borderRadius: 10, paddingHorizontal: 8, minHeight: 19.5, justifyContent: 'center', marginLeft: 0.5 },
   saveChipText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 8.5, color: '#FFFFFF' },
   planSub: { fontFamily: 'PlusJakartaSans_400Regular', fontSize: 11, marginTop: 6.5 },
   planPrice: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15.5 },
@@ -1080,11 +1083,12 @@ const styles = StyleSheet.create({
 
   // Figma "Why my Sawari": 361×307 border-box, padding 12/16/12/12, 12 between the title and the list.
   whyCard: { borderWidth: 1, borderRadius: 10, paddingTop: 12, paddingRight: 16, paddingBottom: 12, paddingLeft: 12, overflow: 'hidden' },
-  whyThumb: { position: 'absolute', top: 0, right: -8.5, width: 4, borderRadius: 2, backgroundColor: '#A3A3A3' },
-  whyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 22.5, marginBottom: 12 },
+  // Figma "Rectangle 161125015": 4×42, 5 from the card's right edge, 48 from its top (the list starts at 47).
+  whyThumb: { position: 'absolute', top: 1, right: -11, width: 4, borderRadius: 20, backgroundColor: '#A3A3A3' },
+  whyTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 15, lineHeight: 23, marginBottom: 12 },
   whyRow: { flexDirection: 'row', gap: 8 },
   // Figma: a 24px badge with 4 above it (a 28px box), 8 before the text.
-  whyCheck: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
+  whyCheckBox: { width: 24, height: 28, paddingTop: 4 },
   whyItemTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11, lineHeight: 16.5 },
   whyItemDesc: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
 
@@ -1104,7 +1108,7 @@ const styles = StyleSheet.create({
   tlTitle: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 20 },
   tlDesc: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16.5 },
   // Figma "Overlay": 20px pill, padding 4/8, text 8/12 weight 700.
-  badge: { borderRadius: 24, paddingHorizontal: 8, height: 20, justifyContent: 'center' },
+  badge: { borderRadius: 24, paddingHorizontal: 8, minHeight: 20, justifyContent: 'center' },
   badgeText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
   // Figma Payment Schedule: padding 10/12/12, 6 between the heading and the rows.
   payCard: { paddingTop: 10, paddingHorizontal: 12, paddingBottom: 12 },
@@ -1132,7 +1136,7 @@ const styles = StyleSheet.create({
   helpSub: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16, marginTop: 2 },
   helpBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
 
-  agreeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 56 },
+  agreeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 56 },
   // 16 × 16 box centred on the first 20px text line.
   checkbox: { width: 16, height: 16, borderRadius: 3, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   agreeText: { flex: 1, fontFamily: 'PlusJakartaSans_500Medium', fontSize: 13, lineHeight: 20 },

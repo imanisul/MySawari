@@ -33,6 +33,28 @@ const SCHEDULE_ON_PATH =
 const SATURDAY_PATH =
   'M99.2161 213.446C97.3497 213.482 95.5837 213.182 93.9179 212.547C92.2782 211.885 90.8465 210.939 89.6227 209.709C88.4256 208.478 87.5175 207.016 86.8982 205.32L91.9336 202.944C92.7113 204.556 93.7623 205.816 95.0866 206.724C96.4375 207.632 97.9129 208.07 99.5126 208.039C100.366 208.023 101.096 207.876 101.705 207.597C102.313 207.319 102.786 206.95 103.124 206.49C103.461 206.003 103.624 205.44 103.611 204.8C103.598 204.107 103.374 203.525 102.938 203.053C102.501 202.554 101.827 202.167 100.915 201.891L95.0394 200.084C92.6517 199.356 90.8445 198.297 89.6176 196.907C88.3903 195.49 87.7575 193.782 87.7192 191.782C87.6855 190.023 88.0824 188.468 88.9101 187.119C89.7644 185.769 90.9576 184.706 92.4897 183.929C94.0484 183.153 95.841 182.745 97.8673 182.706C99.6536 182.672 101.312 182.947 102.844 183.531C104.375 184.115 105.698 184.957 106.813 186.056C107.954 187.154 108.82 188.484 109.41 190.047L104.414 192.423C103.828 191.047 102.968 189.983 101.833 189.232C100.698 188.453 99.4104 188.078 97.9706 188.105C97.1441 188.121 96.4135 188.268 95.7787 188.547C95.1439 188.826 94.6581 189.222 94.3212 189.735C93.9838 190.222 93.8212 190.785 93.8334 191.425C93.8467 192.118 94.0851 192.727 94.5486 193.252C95.0115 193.75 95.699 194.137 96.6112 194.412L102.365 196.143C104.78 196.87 106.587 197.915 107.786 199.279C109.013 200.643 109.645 202.324 109.683 204.324C109.717 206.057 109.293 207.612 108.412 208.989C107.531 210.34 106.298 211.417 104.714 212.221C103.155 212.997 101.322 213.406 99.2161 213.446ZM110.873 212.744L120.482 182.789L128.721 182.66L139.269 212.297L132.51 212.404L130.414 206.356L119.496 206.528L117.592 212.638L110.873 212.744ZM121.131 201.101L128.61 200.984L123.829 186.977L125.508 186.951L121.131 201.101ZM144.933 212.235L144.631 187.837L137.072 187.93L137.005 182.531L158.204 182.269L158.27 187.668L150.831 187.76L151.133 212.158L144.933 212.235ZM172.685 212.475C170.338 212.487 168.242 212.005 166.397 211.028C164.552 210.051 163.092 208.712 162.016 207.011C160.967 205.283 160.437 203.326 160.425 201.139L160.326 182.259L166.526 182.227L166.623 200.707C166.629 201.88 166.888 202.945 167.4 203.903C167.938 204.833 168.662 205.563 169.571 206.091C170.481 206.62 171.509 206.881 172.656 206.875C173.829 206.869 174.854 206.597 175.731 206.059C176.635 205.521 177.338 204.784 177.84 203.848C178.368 202.885 178.629 201.817 178.623 200.644L178.526 182.164L184.726 182.132L184.825 201.011C184.836 203.198 184.313 205.161 183.256 206.9C182.225 208.612 180.792 209.966 178.957 210.962C177.122 211.958 175.032 212.463 172.685 212.475ZM188.987 211.934L189.105 182.134L200.505 182.179C202.558 182.187 204.37 182.554 205.94 183.28C207.537 184.007 208.787 185.078 209.688 186.495C210.589 187.912 211.035 189.66 211.027 191.74C211.019 193.767 210.546 195.498 209.607 196.935C208.668 198.344 207.41 199.406 205.834 200.12L212.587 212.027L205.627 211.999L198.319 198.81L202.31 201.186L195.23 201.158L195.187 211.958L188.987 211.934ZM195.251 195.758L200.491 195.779C201.371 195.782 202.132 195.612 202.773 195.268C203.414 194.924 203.91 194.446 204.259 193.834C204.634 193.222 204.824 192.516 204.827 191.716C204.83 190.889 204.646 190.169 204.276 189.554C203.931 188.939 203.44 188.457 202.801 188.108C202.163 187.759 201.403 187.582 200.523 187.579L195.283 187.558L195.251 195.758ZM214.867 212.053L215.183 182.255L224.902 182.358C228.129 182.392 230.922 183.062 233.281 184.367C235.641 185.672 237.462 187.451 238.745 189.705C240.028 191.959 240.654 194.526 240.623 197.405C240.593 200.285 239.912 202.851 238.582 205.104C237.251 207.33 235.393 209.071 233.006 210.325C230.619 211.58 227.813 212.19 224.586 212.156L214.867 212.053ZM221.124 206.719L224.803 206.758C226.75 206.779 228.434 206.41 229.855 205.652C231.277 204.867 232.382 203.772 233.17 202.367C233.986 200.935 234.403 199.26 234.424 197.34C234.444 195.393 234.062 193.709 233.277 192.287C232.519 190.866 231.437 189.761 230.032 188.973C228.627 188.184 226.951 187.78 225.005 187.759L221.325 187.72L221.124 206.719ZM240.224 212.324L250.763 182.683L259.002 182.81L268.621 212.762L261.862 212.658L259.956 206.548L249.037 206.379L246.944 212.428L240.224 212.324ZM250.84 201.006L258.319 201.122L253.977 186.973L255.657 186.999L250.84 201.006ZM275.824 212.91L276.071 199.913L266.472 182.927L273.551 183.062L280.509 195.836L277.99 195.788L285.389 183.287L292.468 183.421L282.271 199.99L282.023 213.028L275.824 212.91Z';
 
+type Shadow = { dx: number; dy: number; color: string };
+// Figma box-shadow lists, last one drawn first (furthest back).
+const BOLT_SHADOWS: Shadow[] = [{ dx: 1, dy: 1, color: '#000000' }, { dx: 3, dy: 3, color: '#E58900' }];
+const LETTER_SHADOWS: Shadow[] = [{ dx: -1.42189, dy: 1.42189, color: '#000000' }, { dx: -4.26568, dy: 4.26568, color: '#FF008B' }];
+const WEEKDAY_SHADOWS: Shadow[] = [{ dx: -1.14542, dy: 1.14542, color: '#000000' }];
+
+/**
+ * A Figma layer with an outside `border` and hard `box-shadow`s: each shadow is the whole shape (fill + border)
+ * offset, the border sits outside the fill (a stroke of 2 × border drawn under the fill), so the fill keeps its full size.
+ */
+function OutlinedPath({ d, fill, border, shadows }: { d: string; fill: string; border: number; shadows: Shadow[] }) {
+  return (
+    <>
+      {[...shadows].reverse().map((sh, i) => (
+        <Path key={i} d={d} fill={sh.color} stroke={sh.color} strokeWidth={border * 2} strokeLinejoin="round" transform={`translate(${sh.dx}, ${sh.dy})`} />
+      ))}
+      <Path d={d} fill="#000000" stroke="#000000" strokeWidth={border * 2} strokeLinejoin="round" />
+      <Path d={d} fill={fill} />
+    </>
+  );
+}
+
 export interface FlashSaleHeroTitleProps {
   /** Optional variant indicator (e.g. 'comingSoon', 'schedule'). */
   variant?: 'comingSoon' | 'schedule' | string;
@@ -68,123 +90,38 @@ export const FlashSaleHeroTitle = memo(function FlashSaleHeroTitle({
       {/* 1. Left Bolt (3D Gold with Orange and Black Shadows)              */}
       {/* ================================================================= */}
       <G id="BoltLeft">
-        {/* Far orange shadow */}
-        <Path d={BOLT_LEFT_PATH} fill="#E58900" transform="translate(3, 3)" />
-        {/* Near black shadow */}
-        <Path d={BOLT_LEFT_PATH} fill="#000000" transform="translate(1, 1)" />
-        {/* Main gold bolt */}
-        <Path
-          d={BOLT_LEFT_PATH}
-          fill="#FBC422"
-          stroke="#000000"
-          strokeWidth={2.4}
-          strokeLinejoin="round"
-        />
+        <OutlinedPath d={BOLT_LEFT_PATH} fill="#FBC422" border={1.2} shadows={BOLT_SHADOWS} />
       </G>
 
       {/* ================================================================= */}
       {/* 2. Right Bolt (3D Gold with Orange and Black Shadows)             */}
       {/* ================================================================= */}
       <G id="BoltRight">
-        {/* Far orange shadow */}
-        <Path d={BOLT_RIGHT_PATH} fill="#E58900" transform="translate(3, 3)" />
-        {/* Near black shadow */}
-        <Path d={BOLT_RIGHT_PATH} fill="#000000" transform="translate(1, 1)" />
-        {/* Main gold bolt */}
-        <Path
-          d={BOLT_RIGHT_PATH}
-          fill="#FBC422"
-          stroke="#000000"
-          strokeWidth={2.4}
-          strokeLinejoin="round"
-        />
+        <OutlinedPath d={BOLT_RIGHT_PATH} fill="#FBC422" border={1.2} shadows={BOLT_SHADOWS} />
       </G>
 
       {/* ================================================================= */}
       {/* 3. FLASH (3D Pink & Black Comic Shadows + White Body)             */}
       {/* ================================================================= */}
       <G id="FLASH">
-        {/* Far comic pink shadow */}
-        <Path
-          d={FLASH_PATH}
-          fill="#FF008B"
-          stroke="#FF008B"
-          strokeWidth={3.41}
-          strokeLinejoin="round"
-          transform="translate(-4.27, 4.27)"
-        />
-        {/* Near comic black shadow */}
-        <Path
-          d={FLASH_PATH}
-          fill="#000000"
-          stroke="#000000"
-          strokeWidth={3.41}
-          strokeLinejoin="round"
-          transform="translate(-1.42, 1.42)"
-        />
-        {/* Main white letterform with crisp black outline */}
-        <Path
-          d={FLASH_PATH}
-          fill="#FFFFFF"
-          stroke="#000000"
-          strokeWidth={3.41}
-          strokeLinejoin="round"
-        />
+        {/* Figma: white, 1.70627 outside border, shadows -1.42189 black then -4.26568 #FF008B */}
+        <OutlinedPath d={FLASH_PATH} fill="#FFFFFF" border={1.70627} shadows={LETTER_SHADOWS} />
       </G>
 
       {/* ================================================================= */}
       {/* 4. SALE (3D Pink & Black Comic Shadows + White Body)              */}
       {/* ================================================================= */}
       <G id="SALE">
-        {/* Far comic pink shadow */}
-        <Path
-          d={SALE_PATH}
-          fill="#FF008B"
-          stroke="#FF008B"
-          strokeWidth={3.41}
-          strokeLinejoin="round"
-          transform="translate(-4.27, 4.27)"
-        />
-        {/* Near comic black shadow */}
-        <Path
-          d={SALE_PATH}
-          fill="#000000"
-          stroke="#000000"
-          strokeWidth={3.41}
-          strokeLinejoin="round"
-          transform="translate(-1.42, 1.42)"
-        />
-        {/* Main white letterform with crisp black outline */}
-        <Path
-          d={SALE_PATH}
-          fill="#FFFFFF"
-          stroke="#000000"
-          strokeWidth={3.41}
-          strokeLinejoin="round"
-        />
+        {/* Figma: white, 1.70627 outside border, shadows -1.42189 black then -4.26568 #FF008B */}
+        <OutlinedPath d={SALE_PATH} fill="#FFFFFF" border={1.70627} shadows={LETTER_SHADOWS} />
       </G>
 
       {/* ================================================================= */}
       {/* 5. SCHEDULE ON (Black Shadow + White Outlined Letterform)         */}
       {/* ================================================================= */}
       <G id="SCHEDULE_ON">
-        {/* Comic black drop shadow */}
-        <Path
-          d={SCHEDULE_ON_PATH}
-          fill="#000000"
-          stroke="#000000"
-          strokeWidth={2.75}
-          strokeLinejoin="round"
-          transform="translate(-1.15, 1.15)"
-        />
-        {/* Main white letterform with black outline */}
-        <Path
-          d={SCHEDULE_ON_PATH}
-          fill="#FFFFFF"
-          stroke="#000000"
-          strokeWidth={2.75}
-          strokeLinejoin="round"
-        />
+        {/* Same as SATURDAY: white, 1.37451 outside border, -1.14542 / 1.14542 black shadow */}
+        <OutlinedPath d={SCHEDULE_ON_PATH} fill="#FFFFFF" border={1.37451} shadows={WEEKDAY_SHADOWS} />
       </G>
 
       {/* ================================================================= */}
@@ -193,34 +130,18 @@ export const FlashSaleHeroTitle = memo(function FlashSaleHeroTitle({
       <G id="WEEKDAY">
         {isSaturday ? (
           <>
-            {/* Comic black drop shadow */}
-            <Path
-              d={SATURDAY_PATH}
-              fill="#000000"
-              stroke="#000000"
-              strokeWidth={2.75}
-              strokeLinejoin="round"
-              transform="translate(-1.15, 1.15)"
-            />
-            {/* Main white letterform with black outline */}
-            <Path
-              d={SATURDAY_PATH}
-              fill="#FFFFFF"
-              stroke="#000000"
-              strokeWidth={2.75}
-              strokeLinejoin="round"
-            />
+            <OutlinedPath d={SATURDAY_PATH} fill="#FFFFFF" border={1.37451} shadows={WEEKDAY_SHADOWS} />
           </>
         ) : (
           <>
             {/* Dynamic weekday drop shadow */}
             <SvgText
-              x={189.5 - 1.15}
-              y={208 + 1.15}
+              x={189.5 - 1.14542}
+              y={208 + 1.14542}
               textAnchor="middle"
               fill="#000000"
               stroke="#000000"
-              strokeWidth={2.75}
+              strokeWidth={1.37451 * 2}
               strokeLinejoin="round"
               fontSize={30}
               fontFamily="PlusJakartaSans_800ExtraBold"
@@ -228,15 +149,26 @@ export const FlashSaleHeroTitle = memo(function FlashSaleHeroTitle({
             >
               {displayWeekday}
             </SvgText>
-            {/* Dynamic weekday white body */}
+            {/* Outside border (1.37451): the outline drawn first, the white letters on top */}
+            <SvgText
+              x={189.5}
+              y={208}
+              textAnchor="middle"
+              fill="#000000"
+              stroke="#000000"
+              strokeWidth={1.37451 * 2}
+              strokeLinejoin="round"
+              fontSize={30}
+              fontFamily="PlusJakartaSans_800ExtraBold"
+              fontWeight="900"
+            >
+              {displayWeekday}
+            </SvgText>
             <SvgText
               x={189.5}
               y={208}
               textAnchor="middle"
               fill="#FFFFFF"
-              stroke="#000000"
-              strokeWidth={2.75}
-              strokeLinejoin="round"
               fontSize={30}
               fontFamily="PlusJakartaSans_800ExtraBold"
               fontWeight="900"

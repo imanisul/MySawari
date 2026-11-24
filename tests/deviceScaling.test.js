@@ -85,10 +85,17 @@ test('Style Scaling Implementation: Prevents double-scaling and scales inline st
   function scaleStyleObject(s) {
     if (!s || typeof s !== 'object' || s[SCALED_MARKER]) return s;
     if (typeof s.fontSize === 'number' || typeof s.lineHeight === 'number') {
+      const rawFs = typeof s.fontSize === 'number' ? Math.round(s.fontSize * k * 10) / 10 : undefined;
+      let rawLh = typeof s.lineHeight === 'number' ? Math.round(s.lineHeight * k * 10) / 10 : undefined;
+
+      if (typeof rawFs === 'number' && typeof rawLh === 'number' && rawLh < rawFs * 1.2) {
+        rawLh = Math.round(rawFs * 1.25 * 10) / 10;
+      }
+
       const scaled = {
         ...s,
-        ...(typeof s.fontSize === 'number' ? { fontSize: Math.round(s.fontSize * k * 10) / 10 } : null),
-        ...(typeof s.lineHeight === 'number' ? { lineHeight: Math.round(s.lineHeight * k * 10) / 10 } : null),
+        ...(rawFs !== undefined ? { fontSize: rawFs } : null),
+        ...(rawLh !== undefined ? { lineHeight: rawLh } : null),
       };
       Object.defineProperty(scaled, SCALED_MARKER, { value: true, enumerable: false, configurable: true });
       return scaled;
@@ -123,4 +130,30 @@ test('Style Scaling Implementation: Prevents double-scaling and scales inline st
   assert.equal(mixed[1], null);
   assert.equal(mixed[2], false);
   assert.equal(mixed[3].fontSize, 12.0);
+
+  // 5. Vertical clipping protection: tight lineHeight is expanded to at least 1.25x fontSize
+  const tightStyle = scaleStyleObject({ fontSize: 16, lineHeight: 18 });
+  assert.equal(tightStyle.fontSize, 13.8);
+  assert.equal(tightStyle.lineHeight, 17.3, 'Tight lineHeight must expand to 1.25x fontSize to prevent vertical clipping');
+});
+
+test('Accessibility & Font Scaling: Max multiplier resolution caps gracefully', () => {
+  const maxFontMultiplier = 1.2;
+  function resolveEffectiveMax(props) {
+    const userMax = typeof props?.maxFontSizeMultiplier === 'number' ? props.maxFontSizeMultiplier : undefined;
+    return userMax !== undefined ? Math.min(userMax, 1.25) : maxFontMultiplier;
+  }
+
+  // 1. Default (no user multiplier): caps at 1.2 (20% increase for accessibility without layout breaking)
+  assert.equal(resolveEffectiveMax({}), 1.2);
+  assert.equal(resolveEffectiveMax(null), 1.2);
+  assert.equal(resolveEffectiveMax({ maxFontSizeMultiplier: undefined }), 1.2);
+
+  // 2. Explicit smaller multiplier preserved (e.g. badges, tab bars)
+  assert.equal(resolveEffectiveMax({ maxFontSizeMultiplier: 1.0 }), 1.0);
+  assert.equal(resolveEffectiveMax({ maxFontSizeMultiplier: 1.15 }), 1.15);
+
+  // 3. Extreme multiplier (e.g. 2.0x on Android 14) safely capped at 1.25
+  assert.equal(resolveEffectiveMax({ maxFontSizeMultiplier: 1.4 }), 1.25);
+  assert.equal(resolveEffectiveMax({ maxFontSizeMultiplier: 2.0 }), 1.25);
 });

@@ -159,7 +159,7 @@ export function StickyBookingBar({
           disabled={disabled}
           style={({ pressed }) => [styles.button, { backgroundColor: p.button }, pressed && styles.pressed, disabled && { opacity: 0.5 }]}
         >
-          <Text style={[styles.buttonText, { color: p.onNavy }]}>{label}</Text>
+          <Text style={[styles.buttonText, { color: p.onNavy }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
         </Pressable>
 
         {/* Figma: "₹500 payable now • Refundable up to 24h before trip", 6 apart, centred. */}
@@ -246,12 +246,12 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' },
   dot: { width: 3, height: 3, borderRadius: 1.5 },
   // Figma "Membership Tags": 18 high pill (radius 100), 1px #D5D9EA border, #EEF0F7 fill, padding 3 / 8 — so a 10px line.
-  chip: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3, height: 18, justifyContent: 'center', alignItems: 'center' },
+  chip: { borderWidth: 1, borderRadius: 100, paddingHorizontal: 8, paddingVertical: 3, minHeight: 18, justifyContent: 'center', alignItems: 'center' },
   chipText: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 8, lineHeight: 10, includeFontPadding: false },
   meta: { fontFamily: 'PlusJakartaSans_500Medium', fontSize: 11, lineHeight: 16 },
   breakupBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2, paddingVertical: 10 },
   breakupText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 11 },
-  button: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', borderRadius: 12, height: 54, padding: 12 },
+  button: { alignItems: 'center', justifyContent: 'center', flexDirection: 'row', borderRadius: 12, minHeight: 54, padding: 12 },
   buttonText: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 19, lineHeight: 28 },
   note: { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 10, lineHeight: 12, textAlign: 'center' },
   noteRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 4 },

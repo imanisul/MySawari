@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   primaryBtn: {
-    height: 48,
+    minHeight: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   secondaryBtn: {
-    height: 42,
+    minHeight: 42,
     alignItems: 'center',
     justifyContent: 'center',
   },

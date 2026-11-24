@@ -395,7 +395,7 @@ function Dashes({ color }: { color: string }) {
 const styles = StyleSheet.create({
   dim: { backgroundColor: 'transparent' },
   header: { paddingLeft: 16, paddingRight: 16, paddingBottom: 16 + 24 },
-  headerTop: { flexDirection: 'row', justifyContent: 'flex-end', height: 24, alignItems: 'center', marginBottom: 32 },
+  headerTop: { flexDirection: 'row', justifyContent: 'flex-end', minHeight: 24, alignItems: 'center', marginBottom: 32 },
   more: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   // Same spot as the header row it used to sit in (16 from the right, 4 under the status bar, 24 high).
   morePinned: { position: 'absolute', right: 16, zIndex: 10, elevation: 10 },
@@ -411,14 +411,14 @@ const styles = StyleSheet.create({
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   planIcon: { width: 16, height: 16 },
   planName: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 23 },
-  offChip: { height: 20, paddingHorizontal: 8, borderRadius: 24, justifyContent: 'center' },
+  offChip: { minHeight: 20, paddingHorizontal: 8, borderRadius: 24, justifyContent: 'center' },
   offChipText: { fontFamily: FONT.bold, fontSize: 8, lineHeight: 12, color: '#FFFFFF' },
-  upgrade: { height: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#6B5AED', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  upgrade: { minHeight: 26, paddingTop: 4, paddingBottom: 5, paddingHorizontal: 12, borderRadius: 31, backgroundColor: '#6B5AED', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   upgradeText: { fontFamily: FONT.bold, fontSize: 11, lineHeight: 17, color: '#FFFFFF' },
   memberTitle: { fontFamily: FONT.semibold, fontSize: 15, lineHeight: 20 },
   memberSub: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 16.5 },
 
-  wallet: { borderWidth: 1, borderRadius: 12, height: 60, paddingVertical: 16, paddingHorizontal: 12, gap: 12, marginTop: 16, flexDirection: 'row', alignItems: 'center' },
+  wallet: { borderWidth: 1, borderRadius: 12, minHeight: 60, paddingVertical: 16, paddingHorizontal: 12, gap: 12, marginTop: 16, flexDirection: 'row', alignItems: 'center' },
   walletLabel: { flex: 1, fontFamily: FONT.semibold, fontSize: 17, lineHeight: 26 },
   walletValue: { fontFamily: FONT.bold, fontSize: 17, lineHeight: 26, textAlign: 'right' },
 
@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   rowIcon: { width: 36, height: 36, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   rowTitle: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
   rowSub: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
-  cashChip: { alignSelf: 'flex-start', height: 17, paddingHorizontal: 4, borderRadius: 2, justifyContent: 'center' },
+  cashChip: { alignSelf: 'flex-start', minHeight: 17, paddingHorizontal: 4, borderRadius: 2, justifyContent: 'center' },
   cashChipText: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
   cashNote: { fontFamily: FONT.regular, fontSize: 11, lineHeight: 16, marginTop: 8, paddingHorizontal: 4 },
   dashes: { flexDirection: 'row', overflow: 'hidden', gap: 3, marginHorizontal: 0 },
@@ -436,7 +436,7 @@ const styles = StyleSheet.create({
 
   stickyBar: { position: 'absolute', top: 0, left: 0, right: 0 },
   stickyTitle: { fontFamily: FONT.semibold, fontSize: 17, lineHeight: 24, color: '#FFFFFF' },
-  guestLogin: { alignSelf: 'flex-start', marginTop: 14, paddingHorizontal: 18, height: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  guestLogin: { alignSelf: 'flex-start', marginTop: 14, paddingHorizontal: 18, minHeight: 38, borderRadius: 19, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   guestLoginText: { fontFamily: FONT.semibold, fontSize: 13, color: PURPLE },
 
 
@@ -444,13 +444,13 @@ const styles = StyleSheet.create({
   menuOverlay: { flex: 1 },
   // Figma: 92×111 white card, radius 8, three 35px rows, 12px side padding.
   menu: { position: 'absolute', width: 92, borderRadius: 8, paddingVertical: 3, borderWidth: 1 },
-  menuItem: { paddingHorizontal: 12, height: 35, justifyContent: 'center' },
+  menuItem: { paddingHorizontal: 12, minHeight: 35, justifyContent: 'center' },
   menuText: { fontFamily: FONT.medium, fontSize: 12, lineHeight: 18 },
   dialogOverlay: { flex: 1, justifyContent: 'center', paddingHorizontal: 18 },
   dialog: { borderRadius: 12, paddingHorizontal: 8, paddingTop: 20, paddingBottom: 12 },
   dialogTitle: { fontFamily: FONT.semibold, fontSize: 19, lineHeight: 25, textAlign: 'center' },
   dialogBody: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20, textAlign: 'center', marginTop: 10, paddingHorizontal: 12 },
   dialogBtns: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  dialogBtn: { flex: 1, height: 47, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  dialogBtn: { flex: 1, minHeight: 47, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   dialogBtnText: { fontFamily: FONT.semibold, fontSize: 15},
 });

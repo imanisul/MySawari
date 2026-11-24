@@ -390,18 +390,18 @@ export function PricingSummary({ booking }: { booking: BookingSnapshot }) {
       {!cancelled && (
         b.remainingRentalAmount > 0 && !paidAtPickup ? (
           <>
-            <View style={[styles.payBadge, { backgroundColor: c.background, borderWidth: 1, borderColor: c.segBorder, height: 38 }]}>
+            <View style={[styles.payBadge, { backgroundColor: c.background, borderWidth: 1, borderColor: c.segBorder, minHeight: 38 }]}>
               <Feather name="clock" size={20} color={c.foreground} />
-              <Text style={[styles.payBadgeText, { color: c.foreground }]}>Payment due at pickup</Text>
+              <Text style={[styles.payBadgeText, { color: c.foreground }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Payment due at pickup</Text>
             </View>
             <Text style={[styles.payNote, { color: c.mutedForeground }]}>
               Pay {rupees(b.remainingRentalAmount)} when you collect your vehicle{(b.pickupCharge || 0) + (b.dropCharge || 0) > 0 ? `, including ${rupees((b.pickupCharge || 0) + (b.dropCharge || 0))} delivery and return charges` : ''}.
             </Text>
           </>
         ) : (
-          <View style={[styles.payBadge, { backgroundColor: c.success + '1A' }]}>
+          <View style={[styles.payBadge, { backgroundColor: c.success + '1A', minHeight: 38 }]}>
             <Feather name="check-circle" size={20} color={c.success} />
-            <Text style={[styles.payBadgeText, { color: c.success }]}>Payment completed</Text>
+            <Text style={[styles.payBadgeText, { color: c.success }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>Payment completed</Text>
           </View>
         )
       )}
@@ -448,7 +448,7 @@ export function HelpCard({ onWhatsApp, compact }: { onWhatsApp: () => void; /** 
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  tag: { alignSelf: 'flex-start', borderRadius: 999, borderWidth: 0.8, paddingHorizontal: 8, height: 18, justifyContent: 'center' },
+  tag: { alignSelf: 'flex-start', borderRadius: 999, borderWidth: 0.8, paddingHorizontal: 8, minHeight: 18, justifyContent: 'center' },
   tagText: { fontFamily: FONT.semibold, fontSize: 8, lineHeight: 12 },
 
   card: { borderWidth: 1, borderRadius: 12, padding: 8 },
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   dotRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot: { width: 3, height: 3, borderRadius: 2 },
   meta: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17 },
-  idChip: { alignSelf: 'flex-start', borderRadius: 4, paddingHorizontal: 6, height: 22, justifyContent: 'center', maxWidth: '100%' },
+  idChip: { alignSelf: 'flex-start', borderRadius: 4, paddingHorizontal: 6, minHeight: 22, justifyContent: 'center', maxWidth: '100%' },
   idText: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 16 },
   price: { fontFamily: FONT.bold, fontSize: 11, lineHeight: 17 },
 
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   rowValue: { fontFamily: FONT.semibold, fontSize: 11, lineHeight: 17, textAlign: 'right', fontVariant: ['tabular-nums'] },
   rowStrongLabel: { fontFamily: FONT.medium, fontSize: 13, lineHeight: 20 },
   rowStrongValue: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20, textAlign: 'right', fontVariant: ['tabular-nums'] },
-  payBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, height: 36 },
+  payBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 8, minHeight: 36 },
   payBadgeText: { fontFamily: FONT.semibold, fontSize: 13, lineHeight: 20 },
   payNote: { fontFamily: FONT.medium, fontSize: 11, lineHeight: 17, textAlign: 'center' },
 

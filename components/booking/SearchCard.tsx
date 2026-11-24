@@ -320,12 +320,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
-    height: 38,
+    minHeight: 38,
     borderRadius: 10,
     borderWidth: 1,
   },
   largeField: {
-    height: 42,
+    minHeight: 42,
     paddingHorizontal: 14,
     borderRadius: 10,
   },
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
   },
 
   searchButton: {
-    height: 48,
+    minHeight: 48,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',

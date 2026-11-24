@@ -169,6 +169,21 @@ function Sparkle({ size, left, top }: { size: number; left: number; top: number 
   );
 }
 
+/**
+ * Figma Frame 2147226220 (184.85 × 114.9 column, centred, no padding) holding Frame 2147226232: a 184.85 × 131.96
+ * row, children on the bottom edge, 17.06 under them, 11.38 apart, margin −8 top and bottom. That holds the
+ * bolt + FLASH / SALE artwork.
+ */
+function FsTitleFrame() {
+  return (
+    <View style={styles.fsTitleOuter}>
+      <View style={styles.fsTitleFrame}>
+        <FsTitle width={174.073} height={92.4218} style={{ marginLeft: -1.2 }} />
+      </View>
+    </View>
+  );
+}
+
 /** Live ticking countdown timer box in top header (Images 6 & 7) */
 function LiveCountdownHeader({ expiryMs, scale = 1 }: { expiryMs: number; scale?: number }) {
   const [now, setNow] = useState(Date.now());
@@ -186,30 +201,29 @@ function LiveCountdownHeader({ expiryMs, scale = 1 }: { expiryMs: number; scale?
 
   return (
     <View style={[styles.liveHeaderWrap, scale < 1 && { transform: [{ scale }], marginBottom: -92.42 * (1 - scale) }]}>
-      {/* Frame 2147226232: the bolt + FLASH / SALE lettering, exported from Figma (172.87 × 92.42) */}
-      <FsTitle width={174.073} height={92.4218} style={{ marginLeft: -1.2 }} />
+      <FsTitleFrame />
 
       {/* Right: ENDS IN + 3 white square boxes */}
       <View style={styles.liveTimerCol}>
-        <Text style={styles.endsInLabel}>ENDS IN</Text>
+        <Text maxFontSizeMultiplier={1} style={styles.endsInLabel}>ENDS IN</Text>
         <View style={styles.timerRow}>
           <View style={styles.timerUnit}>
             <View style={styles.timerBox}>
-              <Text style={styles.timerNum}>{pad(hrs)}</Text>
+              <Text maxFontSizeMultiplier={1} style={styles.timerNum}>{pad(hrs)}</Text>
             </View>
-            <Text style={styles.timerUnitText}>Hrs</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.timerUnitText}>Hrs</Text>
           </View>
           <View style={styles.timerUnit}>
             <View style={styles.timerBox}>
-              <Text style={styles.timerNum}>{pad(mins)}</Text>
+              <Text maxFontSizeMultiplier={1} style={styles.timerNum}>{pad(mins)}</Text>
             </View>
-            <Text style={styles.timerUnitText}>Min</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.timerUnitText}>Min</Text>
           </View>
           <View style={styles.timerUnit}>
             <View style={styles.timerBox}>
-              <Text style={styles.timerNum}>{pad(secs)}</Text>
+              <Text maxFontSizeMultiplier={1} style={styles.timerNum}>{pad(secs)}</Text>
             </View>
-            <Text style={styles.timerUnitText}>Sec</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.timerUnitText}>Sec</Text>
           </View>
         </View>
       </View>
@@ -227,6 +241,7 @@ export default function FlashSaleScreen() {
   // fit (never grow): the header and Coming Soon block to the width, the ticket to the width and to the room left
   // between the header and the photo row, centred in that room (on a 393 × 852 phone that is the Figma spot).
   const fitW = Math.min(1, (windowWidth - 24) / 361);
+  const heroScale = Math.min(1, windowWidth / 393);
   const headerBottom = insets.top + 44 - 17 + 92.42 * fitW;
   // The page's real height, measured (Android's window height can include/exclude the bars and change just after the
   // page opens, which moved the ticket). Content waits for this measurement, so it is laid out once, in place.
@@ -716,16 +731,16 @@ export default function FlashSaleScreen() {
         <SkeletonGroup style={{ flex: 1 }}>
           <View style={styles.mainContainer} accessibilityLabel="Loading Flash Sale">
             <View style={[styles.liveHeaderWrap, fitW < 1 && { transform: [{ translateX: -8.4 }, { scale: fitW }], marginBottom: -92.42 * (1 - fitW) }]}>
-              <FsTitle width={174.073} height={92.4218} style={{ marginLeft: -1.2 }} />
+              <FsTitleFrame />
               <View style={styles.liveTimerCol}>
-                <Text style={styles.endsInLabel}>ENDS IN</Text>
+                <Text maxFontSizeMultiplier={1} style={styles.endsInLabel}>ENDS IN</Text>
                 <View style={styles.timerRow}>
                   {['Hrs', 'Min', 'Sec'].map((unit, i) => (
                     <View key={i} style={styles.timerUnit}>
                       <View style={styles.timerBox}>
                         <Skeleton width={22} height={18} borderRadius={4} style={GHOST} delay={60 + i * 30} />
                       </View>
-                      <Text style={styles.timerUnitText}>{unit}</Text>
+                      <Text maxFontSizeMultiplier={1} style={styles.timerUnitText}>{unit}</Text>
                     </View>
                   ))}
                 </View>
@@ -790,8 +805,8 @@ export default function FlashSaleScreen() {
             <View style={styles.alreadyClaimedIcon}>
               <Feather name="check" size={30} color="#FFFFFF" />
             </View>
-            <Text style={styles.alreadyClaimedTitle}>You’ve already claimed this deal</Text>
-            <Text style={styles.alreadyClaimedMessage}>
+            <Text maxFontSizeMultiplier={1} style={styles.alreadyClaimedTitle}>You’ve already claimed this deal</Text>
+            <Text maxFontSizeMultiplier={1} style={styles.alreadyClaimedMessage}>
               Today’s Flash Sale deal has already been claimed on your account.
             </Text>
             <Pressable
@@ -799,7 +814,7 @@ export default function FlashSaleScreen() {
               onPress={() => router.push('/bookings')}
               style={({ pressed }) => [styles.alreadyClaimedButton, pressed && { opacity: 0.9 }]}
             >
-              <Text style={styles.alreadyClaimedButtonText}>VIEW MY BOOKINGS</Text>
+              <Text maxFontSizeMultiplier={1} style={styles.alreadyClaimedButtonText}>VIEW MY BOOKINGS</Text>
             </Pressable>
           </View>
         </View>
@@ -818,11 +833,14 @@ export default function FlashSaleScreen() {
           accessibilityRole="header"
           accessibilityLabel={isComingSoon ? 'Flash Sale, coming soon' : `Flash Sale, schedule on ${(revealPassed ? scheduleInfo.weekday : scheduleInfo.revealWeekday).toLowerCase()}`}
         >
-          <Reanimated.View entering={APPEAR}>
+          {/* Figma Group 1171275692: 377.8 × 222.82 at left 7 in the 393 frame, top = 50% − h/2 + 0.41, i.e. its centre
+              sits 0.6 left of and 0.41 below the screen's centre. All of it scales with the screen (never above 1). */}
+          <Reanimated.View entering={APPEAR} style={{ transform: [{ translateX: -0.6 * heroScale }, { translateY: 0.41 * heroScale }] }}>
             <FlashSaleHeroTitle
               variant={isComingSoon ? 'comingSoon' : 'schedule'}
               weekday={revealPassed ? scheduleInfo.weekday : scheduleInfo.revealWeekday}
-              width={Math.min(393, windowWidth)}
+              width={377.8 * heroScale}
+              height={222.82 * heroScale}
             />
           </Reanimated.View>
         </View>
@@ -872,7 +890,7 @@ export default function FlashSaleScreen() {
                 <View style={styles.tripWhenRow} pointerEvents="none">
                   <View style={styles.tripWhenPill} accessibilityLabel={`Trip ${tripWhenLabel.replace('→', 'to')}`}>
                     <Feather name="calendar" size={12} color="#6152D8" />
-                    <Text style={styles.tripWhenText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tripWhenLabel}</Text>
+                    <Text maxFontSizeMultiplier={1} style={styles.tripWhenText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{tripWhenLabel}</Text>
                   </View>
                 </View>
               )}
@@ -890,7 +908,7 @@ export default function FlashSaleScreen() {
                   <View style={styles.soldRibbonBox} pointerEvents="none">
                     <View style={styles.soldRibbon}>
                       <View style={styles.soldRibbonInner}>
-                        <Text style={styles.soldRibbonText}>SOLD OUT</Text>
+                        <Text maxFontSizeMultiplier={1} style={styles.soldRibbonText}>SOLD OUT</Text>
                       </View>
                     </View>
                   </View>
@@ -899,17 +917,17 @@ export default function FlashSaleScreen() {
                 {/* Top-left Amber Duration Badge */}
                 {!!durationLabel && (
                   <View style={styles.durationBadge}>
-                    <Text style={styles.durationBadgeText}>{durationLabel}</Text>
+                    <Text maxFontSizeMultiplier={1} style={styles.durationBadgeText}>{durationLabel}</Text>
                   </View>
                 )}
 
                 {ticketLocked ? (
                   // Figma 1717:15185: the car stays visible; a white card (329 × 77, 1px #FBC422 52%) closes the photo.
                   <View style={styles.lockedMembersCard}>
-                    <Text style={styles.lockedMembersText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+                    <Text maxFontSizeMultiplier={1} style={styles.lockedMembersText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
                       Members Get {earlyAccessMinutes} Minutes.
                     </Text>
-                    <Text style={[styles.lockedMembersText, { color: BG }]} numberOfLines={1}>Exclusive Access.</Text>
+                    <Text maxFontSizeMultiplier={1} style={[styles.lockedMembersText, { color: BG }]} numberOfLines={1}>Exclusive Access.</Text>
                   </View>
                 ) : displayCars.length > 1 ? (
                   // Frame 25: one dot per car in the sale (only when there is more than one), the shown car as a bar
@@ -926,18 +944,18 @@ export default function FlashSaleScreen() {
                 // Locked times row (Images 3 & 4)
                 <View style={styles.lockedTimesRow}>
                   <View style={[styles.timeBox, styles.timeBoxGold]}>
-                    <Text style={styles.timeBoxMain} numberOfLines={1}>
+                    <Text maxFontSizeMultiplier={1} style={styles.timeBoxMain} numberOfLines={1}>
                       {formatTime12(opensMs - earlyAccessMinutes * 60000)} – {formatTime12(opensMs)}
                     </Text>
-                    <Text style={[styles.timeBoxSub, { color: '#E58900' }]} numberOfLines={1}>
+                    <Text maxFontSizeMultiplier={1} style={[styles.timeBoxSub, { color: '#E58900' }]} numberOfLines={1}>
                       Exclusive Member Access
                     </Text>
                   </View>
                   <View style={styles.timeBox}>
-                    <Text style={styles.timeBoxMain} numberOfLines={1}>
+                    <Text maxFontSizeMultiplier={1} style={styles.timeBoxMain} numberOfLines={1}>
                       {formatTime12(opensMs)} onwards
                     </Text>
-                    <Text style={styles.timeBoxSub} numberOfLines={1}>
+                    <Text maxFontSizeMultiplier={1} style={styles.timeBoxSub} numberOfLines={1}>
                       Open to Everyone
                     </Text>
                   </View>
@@ -949,7 +967,7 @@ export default function FlashSaleScreen() {
                   {/* Frame 2147225757: name + specs on the left, rating on the right (padding 0 4, 50 high) */}
                   <View style={styles.detailsRow1}>
                     <View style={{ flex: 1, gap: 4 }}>
-                      <Text style={styles.carTitle} numberOfLines={1}>{carDisplayName}</Text>
+                      <Text maxFontSizeMultiplier={1} style={styles.carTitle} numberOfLines={1}>{carDisplayName}</Text>
                       <View style={styles.specsRow}>
                         {[
                           activeCar.transmission,
@@ -958,7 +976,7 @@ export default function FlashSaleScreen() {
                         ].filter(Boolean).map((spec, i) => (
                           <React.Fragment key={String(spec)}>
                             {i > 0 && <View style={styles.specDot} />}
-                            <Text style={styles.specsText} numberOfLines={1}>{spec}</Text>
+                            <Text maxFontSizeMultiplier={1} style={styles.specsText} numberOfLines={1}>{spec}</Text>
                           </React.Fragment>
                         ))}
                       </View>
@@ -968,12 +986,12 @@ export default function FlashSaleScreen() {
                     {Number(activeCar.reviewCount ?? activeCar.ratings?.reviewCount) > 0 && Number(activeCar.rating ?? activeCar.ratings?.averageRating) > 0 && (
                       <View style={styles.ratingCol}>
                         <View style={styles.ratingBadge}>
-                          <Text style={styles.ratingNum}>{Number(activeCar.rating ?? activeCar.ratings?.averageRating).toFixed(1)}</Text>
+                          <Text maxFontSizeMultiplier={1} style={styles.ratingNum}>{Number(activeCar.rating ?? activeCar.ratings?.averageRating).toFixed(1)}</Text>
                           <View style={{ width: 14, height: 14 }}>
                             <FsRatingStar width={10.8239} height={10.3534} style={{ position: 'absolute', left: 14 * 0.1134, top: 14 * 0.0958 }} />
                           </View>
                         </View>
-                        <Text style={styles.reviewCount}>({Number(activeCar.reviewCount ?? activeCar.ratings?.reviewCount)} Reviews)</Text>
+                        <Text maxFontSizeMultiplier={1} style={styles.reviewCount}>({Number(activeCar.reviewCount ?? activeCar.ratings?.reviewCount)} Reviews)</Text>
                       </View>
                     )}
                   </View>
@@ -981,13 +999,13 @@ export default function FlashSaleScreen() {
                   {/* Frame 2147225762: price + struck price on the left, View Details on the right (padding 4, 25 high) */}
                   <View style={styles.detailsRow3}>
                     <View style={styles.priceRow}>
-                      {dealPrice != null && <Text style={styles.dealPriceText}>{formatCurrency(dealPrice)}</Text>}
+                      {dealPrice != null && <Text maxFontSizeMultiplier={1} style={styles.dealPriceText}>{formatCurrency(dealPrice)}</Text>}
                       {dealPrice != null && originalPrice != null && originalPrice > dealPrice && (
-                        <Text style={styles.struckPriceText}>{formatCurrency(originalPrice)}</Text>
+                        <Text maxFontSizeMultiplier={1} style={styles.struckPriceText}>{formatCurrency(originalPrice)}</Text>
                       )}
                     </View>
                     <Pressable hitSlop={10} onPress={handleViewDetails} accessibilityRole="button" accessibilityLabel={hasAccess ? 'View details' : 'Members only. Buy membership to get access'} style={({ pressed }) => [styles.viewDetailsRow, pressed && { opacity: 0.7 }]}>
-                      <Text style={styles.viewDetailsText}>View Details</Text>
+                      <Text maxFontSizeMultiplier={1} style={styles.viewDetailsText}>View Details</Text>
                       <FsChevron width={13} height={13} />
                     </Pressable>
                   </View>
@@ -1006,7 +1024,7 @@ export default function FlashSaleScreen() {
                       <BlurView intensity={20} tint="dark" style={StyleSheet.absoluteFill} />
                       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(251, 196, 34, 0.06)' }]} />
                       <Text style={styles.earlyAccessWhiteText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85} allowFontScaling={false}>
-                        Members get <Text style={styles.earlyAccessGoldText}>early access</Text>
+                        Members get <Text maxFontSizeMultiplier={1} style={styles.earlyAccessGoldText}>early access</Text>
                       </Text>
                     </View>
                     {/* Crown (Figma Vector): 16.66 × 11.66 at (17.48, −12), tilted −24.98°, sitting on the pill's edge */}
@@ -1028,13 +1046,13 @@ export default function FlashSaleScreen() {
                   onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }}
                   style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
                 >
-                  <Text style={styles.mainCtaText}>Buy Membership to</Text>
+                  <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>Buy Membership to</Text>
                   <FsLock width={20} height={20} />
-                  <Text style={styles.mainCtaText}>Unlock</Text>
+                  <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>Unlock</Text>
                 </Pressable>
               ) : ticketLocked && isMember ? (
                 <View style={styles.mainCtaBtn}>
-                  <Text style={styles.mainCtaText}>
+                  <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>
                     Your early access opens at {formatTime12(scheduledStartsMs - earlyAccessMinutes * 60000)}
                   </Text>
                 </View>
@@ -1047,7 +1065,7 @@ export default function FlashSaleScreen() {
                   }}
                   style={({ pressed }) => [styles.mainCtaBtn, pressed && { opacity: 0.9 }]}
                 >
-                  <Text style={styles.mainCtaText}>Get Membership &amp; Unlock Early Access</Text>
+                  <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>Get Membership &amp; Unlock Early Access</Text>
                 </Pressable>
               ) : (
                 // Saturday preview before Sunday's sale.
@@ -1062,7 +1080,7 @@ export default function FlashSaleScreen() {
                   style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
                 >
                   <FsLock width={20} height={20} />
-                  <Text style={styles.mainCtaText}>
+                  <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>
                     Unlocks {scheduleInfo.weekdayTitle} at {scheduleInfo.timeStr}
                   </Text>
                 </Pressable>
@@ -1070,7 +1088,7 @@ export default function FlashSaleScreen() {
             ) : isLive && activeCar.unavailable ? (
               // Sold out (Figma 1844:16246): red, nothing to tap
               <View style={[styles.mainCtaBtn, styles.soldCta]} accessibilityRole="button" accessibilityState={{ disabled: true }}>
-                <Text style={[styles.mainCtaText, { color: '#FFFFFF' }]}>SOLD OUT</Text>
+                <Text maxFontSizeMultiplier={1} style={[styles.mainCtaText, { color: '#FFFFFF' }]}>SOLD OUT</Text>
               </View>
             ) : membersOnlyNow ? (
               <Pressable
@@ -1078,9 +1096,9 @@ export default function FlashSaleScreen() {
                 onPress={() => { Haptics.selectionAsync(); router.push('/membership'); }}
                 style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
               >
-                <Text style={styles.mainCtaText}>Buy Membership to</Text>
+                <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>Buy Membership to</Text>
                 <FsLock width={20} height={20} />
-                <Text style={styles.mainCtaText}>Unlock</Text>
+                <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>Unlock</Text>
               </Pressable>
             ) : isLive && !canBook ? (
               // Live Early Access Window for non-member (Image 6)
@@ -1092,9 +1110,9 @@ export default function FlashSaleScreen() {
                 }}
                 style={({ pressed }) => [styles.mainCtaBtn, styles.memberCta, pressed && { opacity: 0.9 }]}
               >
-                <Text style={styles.mainCtaText}>Buy Membership to</Text>
+                <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>Buy Membership to</Text>
                 <FsLock width={20} height={20} />
-                <Text style={styles.mainCtaText}>Unlock</Text>
+                <Text maxFontSizeMultiplier={1} style={styles.mainCtaText}>Unlock</Text>
               </Pressable>
             ) : (
               // Live Open to Member / Everyone -> BOOK NOW (Image 7)
@@ -1103,7 +1121,7 @@ export default function FlashSaleScreen() {
                 onPress={() => handleBookNow()}
                 style={({ pressed }) => [styles.mainCtaBtn, pressed && { opacity: 0.9 }]}
               >
-                <Text style={[styles.mainCtaText, styles.bookNowText]}>{booking ? 'PLEASE WAIT…' : 'BOOK NOW'}</Text>
+                <Text maxFontSizeMultiplier={1} style={[styles.mainCtaText, styles.bookNowText]}>{booking ? 'PLEASE WAIT…' : 'BOOK NOW'}</Text>
               </Pressable>
             )}
           </View>
@@ -1188,6 +1206,27 @@ const styles = createUnscaled({
     paddingTop: 40,
     gap: 8,
     marginTop: -17,
+  },
+  fsTitleOuter: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: 0,
+    width: 184.85,
+    height: 114.9,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  fsTitleFrame: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingBottom: 17.0627,
+    gap: 11.38,
+    width: 184.85,
+    height: 131.96,
+    flexGrow: 0,
+    flexShrink: 0,
+    marginVertical: -8,
+    zIndex: 0,
   },
   liveTitleCol: {
     flexDirection: 'row',

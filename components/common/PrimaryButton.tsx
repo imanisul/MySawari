@@ -48,6 +48,9 @@ export function PrimaryButton({
             styles.primaryButtonText, 
             { color: isDisabled ? colors.disabledText : '#FFFFFF' }
           ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
         >
           {label}
         </Text>
@@ -64,6 +67,6 @@ export function PrimaryButton({
 }
 
 const styles = StyleSheet.create({
-  primaryButton: { alignItems: 'center', borderRadius: 14, flexDirection: 'row', height: 56, justifyContent: 'center', marginTop: 20 },
+  primaryButton: { alignItems: 'center', borderRadius: 14, flexDirection: 'row', minHeight: 56, justifyContent: 'center', marginTop: 20 },
   primaryButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 10 },
 });

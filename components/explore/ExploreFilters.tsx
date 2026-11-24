@@ -58,15 +58,13 @@ const BIKE_BUDGETS: { key: string; label: string; min: number; max: number }[] =
 ];
 const ALL_BUDGETS = [...BUDGETS, ...BIKE_BUDGETS];
 
-const MUV_NAME_RE = /\b(ertiga|rumion|innova|hycross|crysta|triber|carens|xl6|marazzo|lodgy|enjoy|mobilio|hexa)\b/i;
-
 // Body types in the design's order; any other type the fleet has (Luxury, Bike …) is listed after them.
 const BODY_ORDER: { key: string; label: string; test: (c: string, name?: string) => boolean }[] = [
   { key: 'SUV', label: 'SUV', test: (c) => /suv/i.test(c || '') },
   { key: 'Compact SUV', label: 'Compact SUV', test: (c) => /compact\s*suv/i.test(c || '') },
   { key: 'Sedan', label: 'SEDAN', test: (c) => /sedan/i.test(c || '') },
   { key: 'Hatchback', label: 'HATCH BACK', test: (c) => /hatch/i.test(c || '') },
-  { key: 'MUV', label: 'MUV / MPV', test: (c, name) => /muv|mpv/i.test(c || '') || MUV_NAME_RE.test(name || '') },
+  { key: 'MUV', label: 'MUV / MPV', test: (c) => /muv|mpv/i.test(c || '') },
 ];
 
 function matchesBodyCategory(car: Car, bodyKey: string): boolean {
@@ -403,7 +401,9 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, bik
       ...BODY_ORDER.map((b) => ({ key: b.key, label: b.label, count: count((c) => matchesBodyCategory(c, b.key)) })),
       ...extraBodies.map((cat) => ({ key: cat, label: cat.toUpperCase(), count: count((c) => c.category === cat) })),
     ];
-    const transmission: Option[] = TRANSMISSIONS.map((t) => ({ key: t.key, label: t.label, count: count((c) => t.test(c.transmission || '')) }));
+    // Bikes: the Operation App's Scooter / Geared type (mapped to Automatic / Manual), same as the Home tiles and chips.
+    const transmission: Option[] = (isBike ? TRANSMISSIONS.filter((t) => t.key !== 'Semi-Automatic') : TRANSMISSIONS)
+      .map((t) => ({ key: t.key, label: isBike ? (t.key === 'Automatic' ? 'Scooter' : 'Geared') : t.label, count: count((c) => t.test(c.transmission || '')) }));
     const fuel: Option[] = FUELS.map((f) => ({ key: f.key, label: f.label, count: count((c) => f.test(c.fuel || '')) }))
       .filter((o) => o.count > 0 || (isBike ? o.key === 'Petrol' : ['Petrol', 'Diesel', 'CNG', 'Hybrid'].includes(o.key)));
     const ratings: Option[] = RATINGS.map((r) => ({ key: r.key, label: r.label, count: count((c) => (ratingOf(c) ?? 0) >= r.min) }));
@@ -493,7 +493,7 @@ export function ExploreFilterSheet({ visible, onClose, value, onApply, cars, bik
                   {list('body', opts.body)}
                 </>
               )}
-              <Text style={[styles.group, { color: p.muted, marginTop: isBike ? 0 : 12 }]}>Transmission</Text>
+              <Text style={[styles.group, { color: p.muted, marginTop: isBike ? 0 : 12 }]}>{isBike ? 'Bike Type' : 'Transmission'}</Text>
               {list('transmission', opts.transmission)}
             </>
           )}

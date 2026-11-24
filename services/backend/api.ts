@@ -635,25 +635,26 @@ let preloadedOrderCache: {
   timestamp: number;
 } | null = null;
 
-/** Infer a car's body category when the DB record omitted `vehicleType` or stored a generic `'car'`. */
-// Body type from the car's model name first: the Operation App's "vehicle type" is typed in by hand and is often wrong
-// (Tiago / Alto K10 saved as SUV, Punch / Nexon / Fronx as Hatchback, every Ertiga / Triber / Rumion as SUV), which put
-// cars under the wrong Home tile and Explore filter. That field is only used for models not listed here.
-// Names are matched on word starts only, so "WagonR", "XUV300" and "AltoK10" are recognised too.
+/** A car's body category. The `vehicleType` picked in the Operation App (SUV, Sedan, Hatchback, MUV/MPV, Luxury,
+ * Tempo Traveller, Mini Bus, Bus) always wins; the model name is only a guess for records with no type or a generic
+ * `'car'`. Names are matched on word starts only, so "WagonR", "XUV300" and "AltoK10" are recognised too. */
 const MUV_MODELS = /\b(ertiga|rumion|innova|hycross|crysta|triber|carens|xl6|marazzo|lodgy|enjoy|mobilio|hexa|bolero\s*neo\s*plus)/;
 const SUV_MODELS = /\b(creta|seltos|brezza|venue|nexon|punch|xuv|scorpio|thar|fronx|taisor|curvv|harrier|safari|bolero|jimny|elevate|vitara|kushaq|taigun|hector|sonet|magnite|kiger|exter|fortuner|endeavour|alcazar|compass|urban\s*cruiser|hyryder)/;
 const SEDAN_MODELS = /\b(dzire|amaze|city|ciaz|aura|tigor|verna|slavia|virtus|civic|camry|accord|etios|xcent|rapid|ciaz)/;
 const HATCH_MODELS = /\b(swift|baleno|i20|i10|grand\s*i10|tiago|altroz|glanza|wagon|alto|ignis|santro|celerio|kwid|polo|s-?presso|k10)/;
 
 export function inferCarBodyCategory(name: string, rawType?: string, seats?: number): Car['category'] {
+  const trimmed = typeof rawType === 'string' ? rawType.trim() : '';
+  if (/mpv|muv/i.test(trimmed)) return 'MUV';
+  if (/^suv$/i.test(trimmed)) return 'SUV';
+  if (/^sedan$/i.test(trimmed)) return 'Sedan';
+  if (/^hatch\s*back$/i.test(trimmed)) return 'Hatchback';
+  if (trimmed && !/^(car|other)$/i.test(trimmed)) return trimmed as Car['category'];
   const n = name.toLowerCase();
   if (MUV_MODELS.test(n)) return 'MUV';
   if (SUV_MODELS.test(n)) return 'SUV';
   if (SEDAN_MODELS.test(n)) return 'Sedan';
   if (HATCH_MODELS.test(n)) return 'Hatchback';
-  const trimmed = typeof rawType === 'string' ? rawType.trim() : '';
-  if (/mpv|muv/i.test(trimmed)) return 'MUV';
-  if (trimmed && !/^(car|other)$/i.test(trimmed)) return trimmed as Car['category'];
   if (Number(seats) >= 7) return 'MUV';
   return 'Sedan';
 }
@@ -729,10 +730,6 @@ export const API = {
       // even if someone mistakenly saved it as 'SUV' or 'Luxury' in the DB.
       // The Operation App's category (car / bike) decides when it is set; older records fall back to the old guess.
       const isBike = v.category === 'bike' || (v.category !== 'car' && (v.seatingCapacity <= 2 || /^(bike|scooter|geared|cruiser|sports|standard|commuter)$/i.test(v.vehicleType)));
-      // Body type picked in the Operation App (SUV / Sedan / Hatchback / MUV/MPV) drives Home tiles and Explore filters.
-      const pickedBody = /^(suv|sedan|hatchback)$/i.test(String(v.vehicleType || '').trim())
-        ? (String(v.vehicleType).trim().replace(/^suv$/i, 'SUV').replace(/^sedan$/i, 'Sedan').replace(/^hatchback$/i, 'Hatchback') as Car['category'])
-        : /^(muv|mpv|muv\s*\/\s*mpv)$/i.test(String(v.vehicleType || '').trim()) ? 'MUV' as Car['category'] : null;
       // Bike type picked in the Operation App: Scooter = no gears (Automatic), Geared = Manual. Explore's Bikes / Scooters split uses this.
       const pickedBikeTransmission = /^scooter$/i.test(String(v.vehicleType || '').trim()) ? 'Automatic' : /^geared$/i.test(String(v.vehicleType || '').trim()) ? 'Manual' : null;
       const { getVehicleImage } = require('../../utils/vehicleImages');
@@ -919,7 +916,7 @@ export const API = {
         name: resolvedDisplayName,
         displayName: resolvedDisplayName,
         vehicleName: resolvedDisplayName,
-        category: isBike ? 'Bike' : pickedBody || inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''} ${v.model || ''}`, v.vehicleType, v.seatingCapacity),
+        category: isBike ? 'Bike' : inferCarBodyCategory(`${resolvedDisplayName} ${v.vehicleName || ''} ${v.model || ''}`, v.vehicleType, v.seatingCapacity),
         price: `₹${Number(v.pricePerDay)}`,
         perDay: Number(v.pricePerDay),
         image: hasImages ? getFullUrl(v.images[0].url) : fallbackImage,

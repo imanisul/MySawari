@@ -24,7 +24,7 @@ import * as Haptics from '@/utils/haptics';
 import { safeBack } from '@/utils/navigation';
 import { useAfterSlideIn } from '@/hooks/useAfterSlideIn';
 import { useSawari } from '@/context/SawariContext';
-import { useDealCars, dealPricing, useOpenTopDeal, dealDayTime, nextIstHourMs } from '@/hooks/useDealCars';
+import { useDealCars, dealPricing, useOpenTopDeal, nextIstHourMs } from '@/hooks/useDealCars';
 import { VEHICLES_KEY } from '@/hooks/useVehicles';
 import { formatCurrency, MYSAWARI_HUB_NAME } from '@/services/backend/pricingEngine';
 import {
@@ -361,22 +361,12 @@ function VehicleCard({
             )}
           </View>
 
-          {/* When the deal runs (India time): Today 3:00 PM → Tmrw 8:00 AM */}
-          <View style={styles.whenRow} accessible accessibilityLabel={`Starts ${dealDayTime(startMs, nowMs)}, ends ${dealDayTime(endMs, nowMs)}`}>
-            <View style={styles.whenCol}>
-              <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(startMs, nowMs)}</Text>
-            </View>
-            <Feather name="arrow-right" size={12} color="#6152D8" />
-            <View style={[styles.whenCol, { alignItems: 'flex-end' }]}>
-              <Text style={styles.whenVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dealDayTime(endMs, nowMs)}</Text>
-            </View>
-          </View>
-
           {/* Row 2: Frame 2147225762 */}
           <View style={styles.priceActionRow}>
             {/* Left: Frame 2147225771 (Price + for X hours) */}
             <View style={styles.priceGroup}>
               <Text style={styles.dealPriceText}>{formatCurrency(dealPrice)}</Text>
+              <Text style={styles.hoursText} numberOfLines={1}>for {hoursRemaining} {hoursRemaining === 1 ? 'hour' : 'hours'}</Text>
             </View>
 
             {/* Right: Frame 51 View Details */}
@@ -1103,7 +1093,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingTop: 4,
     paddingHorizontal: 4,
-    paddingBottom: 8,
+    paddingBottom: 6,
     gap: 8,
   },
   photoBox: {
@@ -1262,9 +1252,6 @@ const styles = StyleSheet.create({
   },
 
   // ── Price & Action Row (Frame 2147225762) ──
-  whenRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8, borderWidth: 1, borderColor: '#DEDAFB', backgroundColor: '#FBFAFE' },
-  whenCol: { flex: 1, minWidth: 0 },
-  whenVal: { fontFamily: 'PlusJakartaSans_600SemiBold', fontSize: 13, lineHeight: 18, color: '#6B5AED' },
   priceActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1277,7 +1264,7 @@ const styles = StyleSheet.create({
   priceGroup: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    gap: 4,
+    gap: 2,
   },
   dealPriceText: {
     fontFamily: 'PlusJakartaSans_600SemiBold',

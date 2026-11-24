@@ -21,7 +21,7 @@
     "updates": {
       "url": "https://u.expo.dev/7eae244d-1043-4c00-b2af-e384e4a921e4",
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 5000
     },
     "ios": {
       "bundleIdentifier": "com.mysawari.customer",
